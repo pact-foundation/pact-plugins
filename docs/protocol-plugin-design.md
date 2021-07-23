@@ -13,8 +13,8 @@ the following features.
 
 _High Level Summary_
 
-1. User is responsible for starting the plugin following plugin specific documentation. The plugin must start an administration HTTP server, which will be used by the framework to communicate instructions for each Test Session
-2. Pact is given plugin specific configuration - including the administration API details - which is then sent to the administration server to initialise a new test session. This step should result in a new service being started for use by the test code (e.g. a TCP socket or a protobuf server) and a unique session ID returned. Each session must be thread safe and isolated from any other sessions
+1. Plugin driver is responsible for starting the plugin. The framework communicates instructions for each Test Session to the plugin via the driver bus.
+2. Pact is given plugin specific configuration - including the administration API details - which is then sent to the administration server to initialise a new test session. This step should result in a new service being started for use by the test code (e.g. a TCP socket or a protobuf server) and a unique session ID returned. Each session must be thread safe and isolated from any other sessions.
 3. The Pact framework will maintain the details of the TestSession - including interactions, failures, logs  etc.
 4. The calling code is now able to add Interactions to the plugin, which are stored by the framework and registered with the plugin. The plugin is responsible for defining what an Interaction looks like and how it should be passed in for its specific combination of protocol, payload, transport and interaction type.
 5. During Test Execution, the calling code communicates directly to the Mock Service provided by the plugin. The Mock Service is responsible for handling the request, comparing the request against the registered interactions, and returning a suitable response. It must keep track of the interactions that were matched during the test session.
@@ -69,10 +69,14 @@ func TestPluginPact(t *testing.T) {
 
 _High Level Summary_
 
-1. User is responsible for starting the plugin following plugin specific documentation. The plugin must start an administration HTTP server, which will be used by the framework to communicate instructions for each Test Session
-2. Pact is given plugin specific configuration - including the administration API details - which is then sent to the administration server to initialise a new provider Test Session. 3. The user starts the Provider Service, and runs the verify() command
-4. Pact fetches the pact files (e.g. from the broker), including the pacts for verification details if configured, and stores this information. 5. For each pact, the framework will be responsible for configuring provider states, and sending each interaction from the pact file to the plugin. The plugin will then perform the plugin-specific interaction, communicating with the Provider Service and returning any mismatches to the framework. This process repeats for all interactions in all pacts. 6. The Pact framework will maintain the details of the TestSession - including pacts, interaction failures, pending status, logs  etc.
-7. Pact calculates the verification status for the test session, and optionally publishes verification results back to a Broker 8. The Pact client library then conveys the verification status, and the User terminates all process.s
+1. Plugin driver is responsible for starting the plugin. The framework communicates instructions for each Test Session vai the driver bus.
+2. Pact is given plugin specific configuration - including the administration API details - which is then sent to the administration server to initialise a new provider Test Session.
+3. The user starts the Provider Service, and runs the verify() command
+4. Pact fetches the pact files (e.g. from the broker), including the pacts for verification details if configured, and stores this information.
+5. For each pact, the framework will be responsible for configuring provider states, and sending each interaction from the pact file to the plugin. The plugin will then perform the plugin-specific interaction, communicating with the Provider Service and returning any mismatches to the framework. This process repeats for all interactions in all pacts.
+6. The Pact framework will maintain the details of the TestSession - including pacts, interaction failures, pending status, logs  etc.
+7. Pact calculates the verification status for the test session, and optionally publishes verification results back to a Broker.
+8. The Pact client library then conveys the verification status, and the driver terminates all plugin processes.
 
 _Provider Sequence Diagram_
 ![pact_provider_plugin_sequence](https://user-images.githubusercontent.com/53900/103849702-872ec480-50f9-11eb-93ff-28d1fbfa5cd6.png)
