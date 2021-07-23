@@ -33,6 +33,14 @@ Main responsibilities:
 * Provide a catalogue of features the plugin provides when the driver requests it.
 * Respond to messages from the driver.
 
+#### Plugins that provide protocol implementations
+
+See [Protocol design docs](docs/protocol-plugin-design.md).
+
+#### Plugins that provide matchers/generators
+
+TODO
+
 ## Background
 
 Pact was created initially to support the rise of RESTful microservices and has grown to be the de-facto API contract 
