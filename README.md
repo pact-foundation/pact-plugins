@@ -28,7 +28,7 @@ Being able to mix and match `protocol`, `transport` and `interaction mode` would
 
 Further, being able to add custom contract testing behaviour for bespoke use cases would be helpful in situations where we can't justify the effort to build into the framework itself (custom protocols in banking such as AS2805 come to mind).
 
-To give some sense of magnitude to the challenge, I put this table together well over a year ago that shows some of the Pact deficiencies across popular microservice deployments. In my consulting career (which not-so-coincidentally also aligns quite closely with my Pact maintainership) I've encountered all of those technologies in one form or another.
+To give some sense of magnitude to the challenge, this table shows some of the Pact deficiencies across popular microservice deployments.
 
 ![83211994-ced39200-a1a1-11ea-8804-19b633cbb1d6](https://user-images.githubusercontent.com/53900/103729694-1e7e1400-5035-11eb-8d4e-641939791552.png)
 
