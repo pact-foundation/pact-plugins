@@ -41,6 +41,27 @@ Example of a manifest for a plugin written in Ruby that provides matching CSV fi
   "version": "0.0.0",
   "executableType": "ruby",
   "minimumRequiredVersion": "2.7.2",
-  "entryPoint": "main.rb",
+  "entryPoint": "main.rb"
 }
 ```
+
+## Getting the port of the plugin GRPC server
+
+When the plugin is started (except for the DLL executable type), the plugin will print a JSON message to its
+standard output that contains the port that the plugin GRPC server is running on. The driver needs to poll the
+plugin standard output for this message.
+
+The message will have the following attributes:
+
+| Attribute | Description |
+| --------- | ----------- |
+| port | The port number the GRPC server for the plugin is listening on |
+| serverKey | A randomly generated key required to use as a bearer token when communicating with the plugin |
+
+Example:
+
+```json
+{"port": 12345, "serverKey": "b37d2d9a9ceb"}
+```
+
+
