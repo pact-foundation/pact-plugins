@@ -1,0 +1,67 @@
+syntax = "proto3";
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/wrappers.proto";
+
+package io.pact.plugin;
+
+message InitPluginRequest {
+  string implementation = 1;
+  string version = 2;
+}
+
+message CatalogueEntry {
+  string type = 1;
+  string key = 2;
+  map<string, string> values = 3;
+}
+
+message InitPluginResponse {
+  repeated CatalogueEntry catalogue = 1;
+}
+
+message Catalogue {
+  repeated CatalogueEntry catalogue = 1;
+}
+
+message Void {}
+
+message Body {
+  string contentType = 1;
+  google.protobuf.BytesValue content = 2;
+}
+
+message CompareContentsRequest {
+  Body expected = 1;
+  Body actual = 2;
+  google.protobuf.Struct context = 3;
+}
+
+message BodyTypeMismatch {
+  string expected = 1;
+  string actual = 2;
+}
+
+message BodyMismatch {
+  google.protobuf.BytesValue expected = 1;
+  google.protobuf.BytesValue actual = 2;
+  string mismatch = 3;
+  string path = 4;
+  string diff = 5;
+}
+
+message BodyItemMatchResult {
+  string key = 1;
+  repeated BodyMismatch result = 2;
+}
+
+message CompareContentsResponse {
+  BodyTypeMismatch typeMismatch = 1;
+  repeated BodyItemMatchResult results = 2;
+}
+
+service PactPlugin {
+  rpc InitPlugin(InitPluginRequest) returns (InitPluginResponse);
+  rpc UpdateCatalogue(Catalogue) returns (Void);
+  rpc CompareContents(CompareContentsRequest) returns (CompareContentsResponse);
+}
