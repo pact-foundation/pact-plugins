@@ -22,6 +22,8 @@ Main responsibilities:
 * Provide a messaging bus to facilitate communication between the language implementation and the plugins.
 * Manage the plugin lifecycles.
 
+See [Plugin driver design docs](docs/plugin-driver-design.md).
+
 ### Plugins
 
 Plugins are required to start up a GRPC server when loaded, and respond to messages from the plugin driver. They provide
