@@ -64,4 +64,57 @@ Example:
 {"port": 12345, "serverKey": "b37d2d9a9ceb"}
 ```
 
+## Init request to the plugin
 
+Once the port has been extracted from the plugin standard output, the driver must send a `InitPluginRequest`
+message via GRPC to the plugin. The plugin will respond with a `InitPluginResponse` which will contain all the
+catalogue entries for the features that the plugin provides. The driver needs to update its catalogue with these
+entries and then publish the updated catalogue to all loaded plugins (including the new one).
+
+## Feature Catalogue
+
+Each entry in the catalogue is keyed based on the following structure: `$providerType/$name?/$type/$key`, where the
+different parts are defined by:
+
+| Attribute | Description |
+| --------- | ----------- |
+| providerType | Denotes an entry from the core Pact framework (`core`) or from a plugin (`plugin`) |
+| name | The name of the plugin (omitted for core entries) |
+| type | The type of the entry. Valid values are: content-matcher, matcher, mock-server |
+| key | Key for the type. It must be unique withing the entries for the plugin. |
+
+For example, a plugin entry for matching CSV bodies would be `plugin/pact-csv/content-matcher/csv`.
+
+### Core catalogue entries
+
+The driver must provide the following entries from the Pact framework:
+
+| Key | Description |
+| --- | ----------- |
+| `core/mock-server/http-1` | Http/1.1 mock server | 
+| `core/mock-server/https-1` | Http/1.1 + TLS mock server | 
+| `core/matcher/v2-regex` | V2 spec regex matcher |
+| `core/matcher/v2-type` | V2 spec type matcher |
+| `core/matcher/v3-number-type` | V3 spec number matcher |
+| `core/matcher/v3-integer-type` | V3 spec integer matcher |
+| `core/matcher/v3-decimal-type` | V3 spec decimal matcher |
+| `core/matcher/v3-date` | V3 spec date matcher |
+| `core/matcher/v3-time` | V3 spec time matcher |
+| `core/matcher/v3-datetime` | V3 spec DateTime matcher |
+| `core/matcher/v2-min-type` | V2 spec minimum type matcher |
+| `core/matcher/v2-max-type` | V2 spec maximum type matcher |
+| `core/matcher/v2-minmax-type` | V2 spec minimum/maximum type matcher |
+| `core/matcher/v3-includes` | V3 spec includes matcher |
+| `core/matcher/v3-null` | V3 spec null matcher |
+| `core/matcher/v4-equals-ignore-order` | V4 spec ignore array order matcher matcher |
+| `core/matcher/v4-min-equals-ignore-order` | V4 spec ignore array order matcher matcher |
+| `core/matcher/v4-max-equals-ignore-order` | V4 spec ignore array order matcher matcher |
+| `core/matcher/v4-minmax-equals-ignore-order` | V4 spec ignore array order matcher matcher |
+| `core/matcher/v3-content-type` | V3 spec content type matcher |
+| `core/matcher/v4-array-contains` | V4 spec array contains matcher |
+| `core/matcher/v1-equalit` | V1 spec equality matcher |
+| `core/content-matcher/xml` | Matcher for XML content types |
+| `core/content-matcher/json` | Matcher for JSON content types |
+| `core/content-matcher/text` | Matcher for Text content types |
+| `core/content-matcher/multipart-form-data` | Matcher for Multipart Form POST content types |
+| `core/content-matcher/form-urlencoded` | Matcher for URL-encoded Form POST content types |
