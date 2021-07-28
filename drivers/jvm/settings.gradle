@@ -1,2 +1,3 @@
 rootProject.name = 'pact-jvm-driver'
-include('driver')
+include('core')
+include('dsl')

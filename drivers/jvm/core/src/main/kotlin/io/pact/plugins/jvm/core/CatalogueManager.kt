@@ -1,4 +1,4 @@
-package io.pact.plugins.jvm
+package io.pact.plugins.jvm.core
 
 import io.pact.core.model.ContentType
 import io.pact.plugin.Plugin

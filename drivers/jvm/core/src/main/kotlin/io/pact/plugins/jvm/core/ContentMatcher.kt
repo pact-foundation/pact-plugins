@@ -1,4 +1,4 @@
-package io.pact.plugins.jvm
+package io.pact.plugins.jvm.core
 
 interface ContentMatcher {
   val isCore: Boolean

@@ -1,4 +1,4 @@
-package io.pact.plugins.jvm
+package io.pact.plugins.jvm.core
 
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok

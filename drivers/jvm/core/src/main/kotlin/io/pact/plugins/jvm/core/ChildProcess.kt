@@ -1,4 +1,4 @@
-package io.pact.plugins.jvm
+package io.pact.plugins.jvm.core
 
 import io.pact.core.support.json.JsonParser
 import io.pact.core.support.json.JsonValue
