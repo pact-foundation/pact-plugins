@@ -1,9 +1,10 @@
 package io.pact.plugins.jvm.core
 
-import io.pact.core.support.json.JsonParser
-import io.pact.core.support.json.JsonValue
 import mu.KLogging
+import java.io.StringReader
 import java.util.concurrent.LinkedBlockingDeque
+import javax.json.Json
+import javax.json.JsonObject
 
 class ChildProcess(
   val pb: ProcessBuilder,
@@ -15,7 +16,7 @@ class ChildProcess(
   private lateinit var errorThread: Thread
   private lateinit var ioThread: Thread
   private lateinit var process: Process
-  val channel: LinkedBlockingDeque<JsonValue> = LinkedBlockingDeque()
+  val channel: LinkedBlockingDeque<JsonObject> = LinkedBlockingDeque()
 
   fun start(): ChildProcess {
     process = pb.start()
@@ -30,7 +31,8 @@ class ChildProcess(
             logger.debug { "Plugin ${manifest.name} [${process.pid()}] $line" }
             if (line.trim().startsWith("{")) {
               logger.debug("Got JSON message from plugin process")
-              channel.offer(JsonParser.parseString(line))
+              val jsonReader = Json.createReader(StringReader(line.trim()));
+              channel.offer(jsonReader.readObject())
             }
           }
         }

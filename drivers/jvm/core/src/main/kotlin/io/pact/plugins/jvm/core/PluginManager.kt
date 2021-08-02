@@ -7,32 +7,23 @@ import com.github.michaelbull.result.mapError
 import com.vdurmont.semver4j.Semver
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
-import io.pact.core.model.OptionalBody
-import io.pact.core.support.Json
-import io.pact.core.support.Utils
-import io.pact.core.support.handleWith
-import io.pact.core.support.json.JsonParser
-import io.pact.core.support.json.JsonValue
 import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.PactPluginGrpc.newBlockingStub
 import io.pact.plugin.Plugin
+import io.pact.plugins.jvm.core.Utils.handleWith
 import mu.KLogging
 import org.apache.commons.lang3.SystemUtils
-import java.io.BufferedReader
-import java.io.File
-import java.io.IOException
-import java.io.InputStreamReader
+import java.io.*
 import java.lang.Runtime.getRuntime
-import java.lang.RuntimeException
 import java.lang.reflect.InvocationTargetException
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
+import javax.json.Json
+import javax.json.JsonObject
 import kotlin.reflect.full.createInstance
-import kotlin.reflect.full.declaredMemberFunctions
 import kotlin.reflect.full.memberFunctions
-import kotlin.reflect.jvm.jvmErasure
 
 interface PactPluginManifest {
   val pluginDir: File
@@ -56,15 +47,15 @@ data class DefaultPactPluginManifest(
   override val dependencies: List<String>
 ): PactPluginManifest {
   companion object {
-    fun fromJson(pluginDir: File, pluginJson: JsonValue.Object): PactPluginManifest {
+    fun fromJson(pluginDir: File, pluginJson: JsonObject): PactPluginManifest {
       return DefaultPactPluginManifest(
         pluginDir,
-        Json.toInteger(pluginJson["pluginInterfaceVersion"]) ?: 1,
-        Json.toString(pluginJson["name"]),
-        Json.toString(pluginJson["version"]),
-        Json.toString(pluginJson["executableType"]),
-        Json.toString(pluginJson["minimumRequiredVersion"]),
-        Json.toString(pluginJson["entryPoint"]),
+        toInteger(pluginJson["pluginInterfaceVersion"]) ?: 1,
+        toString(pluginJson["name"])!!,
+        toString(pluginJson["version"])!!,
+        toString(pluginJson["executableType"])!!,
+        toString(pluginJson["minimumRequiredVersion"]),
+        toString(pluginJson["entryPoint"])!!,
         listOf()
       )
     }
@@ -72,6 +63,7 @@ data class DefaultPactPluginManifest(
 }
 
 interface PactPlugin {
+  val manifest: PactPluginManifest
   val port: Int?
   val serverKey: String?
   val processPid: Long?
@@ -84,6 +76,7 @@ interface PactPlugin {
 
 data class DefaultPactPlugin(
   val cp: ChildProcess,
+  override val manifest: PactPluginManifest,
   override val port: Int?,
   override val serverKey: String,
   override var stub: PactPluginGrpc.PactPluginBlockingStub? = null,
@@ -105,15 +98,15 @@ interface PluginManager {
   /**
    * Loads the plugin by name
    */
-  fun loadPlugin(name: String): Result<PactPlugin, String>
+  fun loadPlugin(name: String, version: String?): Result<PactPlugin, String>
 
   /**
    * Invoke the content type matcher
    */
   fun invokeContentMatcher(
     matcher: ContentMatcher,
-    expected: OptionalBody,
-    actual: OptionalBody,
+    expected: Any,
+    actual: Any,
     context: Any
   ): Any?
 }
@@ -131,21 +124,38 @@ object DefaultPluginManager: KLogging(), PluginManager {
     })
   }
 
-  override fun loadPlugin(name: String): Result<PactPlugin, String> {
-    return if (PLUGIN_REGISTER.containsKey(name)) {
-      Ok(PLUGIN_REGISTER[name]!!)
+  override fun loadPlugin(name: String, version: String?): Result<PactPlugin, String> {
+    val plugin = lookupPlugin(name, version)
+    return if (plugin != null) {
+      Ok(plugin)
     } else {
-      when (val manifest = loadPluginManifest(name)) {
+      when (val manifest = loadPluginManifest(name, version)) {
         is Ok -> initialisePlugin(manifest.value)
         is Err -> Err(manifest.error)
       }
     }
   }
 
+  private fun lookupPlugin(name: String, version: String?): PactPlugin? {
+    return if (version == null) {
+      PLUGIN_REGISTER.filter { it.value.manifest.name == name }.entries.maxByOrNull { it.value.manifest.version }?.value
+    } else {
+      PLUGIN_REGISTER["$name/$version"]
+    }
+  }
+
+  private fun lookupPluginManifest(name: String, version: String?): PactPluginManifest? {
+    return if (version == null) {
+      PLUGIN_MANIFEST_REGISTER.filter { it.value.name == name }.entries.maxByOrNull { it.value.version }?.value
+    } else {
+      PLUGIN_MANIFEST_REGISTER["$name/$version"]
+    }
+  }
+
   override fun invokeContentMatcher(
     matcher: ContentMatcher,
-    expected: OptionalBody,
-    actual: OptionalBody,
+    expected: Any,
+    actual: Any,
     context: Any
   ): Any? {
     return when {
@@ -163,7 +173,8 @@ object DefaultPluginManager: KLogging(), PluginManager {
           .setExpected(Plugin.Body.newBuilder())
           .setActual(Plugin.Body.newBuilder())
           .setContext(com.google.protobuf.Struct.parseFrom(
-            Json.toJson(context).serialise().toByteArray()
+//            Json.toJson(context).serialise().toByteArray()
+            "".toByteArray()
           ))
           .build()
         PLUGIN_REGISTER[matcher.catalogueEntry.key]!!.stub!!.compareContents(request)
@@ -188,7 +199,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     return when (result) {
       is Ok -> {
         val plugin = result.value
-        PLUGIN_REGISTER[manifest.name] = plugin
+        PLUGIN_REGISTER["${manifest.name}/${manifest.version}"] = plugin
         logger.debug { "Plugin process started OK (port = ${plugin.port}), sending init message" }
         handleWith<PactPlugin> {
           val request = Plugin.InitPluginRequest.newBuilder()
@@ -294,8 +305,8 @@ object DefaultPluginManager: KLogging(), PluginManager {
       cp.start()
       logger.debug { "Plugin ${manifest.name} started with PID ${cp.pid}" }
       val startupInfo = cp.channel.poll(2000, TimeUnit.MILLISECONDS)
-      if (startupInfo is JsonValue.Object) {
-        Ok(DefaultPactPlugin(cp, Json.toInteger(startupInfo["port"]), Json.toString(startupInfo["serverKey"])))
+      if (startupInfo is JsonObject) {
+        Ok(DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), toString(startupInfo["serverKey"])!!))
       } else {
         cp.destroy()
         Err("Plugin process did not output the correct startup message - got $startupInfo")
@@ -331,25 +342,26 @@ object DefaultPluginManager: KLogging(), PluginManager {
       Ok("")
     }
 
-  private fun loadPluginManifest(name: String): Result<PactPluginManifest, String> {
-  return if (PLUGIN_MANIFEST_REGISTER.containsKey(name)) {1z k2qaaq  tv     c1`
-      Ok(PLUGIN_MANIFEST_REGISTER[name]!!)
+  private fun loadPluginManifest(name: String, version: String?): Result<PactPluginManifest, String> {
+    val manifest = lookupPluginManifest(name, version)
+    return if (manifest != null) {
+      Ok(manifest)
     } else {
       val pluginDir = System.getenv("PACT_PLUGIN_DIR") ?: System.getenv("HOME") + "/.pact/plugins"
       for (file in File(pluginDir).walk()) {
         if (file.isFile && file.name == "pact-plugin.json") {
           logger.debug { "Found plugin manifest: $file" }
-          val pluginJson = file.bufferedReader().use { JsonParser.parseReader(it) }
-          if (pluginJson.isObject) {
-            val plugin = DefaultPactPluginManifest.fromJson(file.parentFile, pluginJson.asObject()!!)
-            if (plugin.name == name) {
-              PLUGIN_MANIFEST_REGISTER[name] = plugin
+          val pluginJson = file.bufferedReader().use { Json.createReader(it).readObject() }
+          if (pluginJson != null) {
+            val plugin = DefaultPactPluginManifest.fromJson(file.parentFile, pluginJson)
+            if (plugin.name == name && version == null || plugin.version == version) {
+              PLUGIN_MANIFEST_REGISTER["$name/${plugin.version}"] = plugin
               return Ok(plugin)
             }
           }
         }
       }
-      Err("No plugin with name '$name' was found in the Pact plugin directory '$pluginDir'")
+      Err("No plugin with name '$name' and version '${version ?: "any"}' was found in the Pact plugin directory '$pluginDir'")
     }
   }
 

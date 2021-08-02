@@ -13,7 +13,7 @@ Main plugin driver responsibilities:
 ## Locating plugins
 
 Plugins must be stored on the system in a Pact plugins directory, defined either by the `PACT_PLUGIN_DIR` environment 
-variable or in the default `$HOME/.pact/plugins`. Each plugin must be in a separate sub-directory and contain a plugin
+variable or in the default `$HOME/.pact/plugins`. Each plugin must be in a separate sub-directory (plugin name/version) and contain a plugin
 manifest file `pact-plugin.json`.
 
 ## Plugin manifest file

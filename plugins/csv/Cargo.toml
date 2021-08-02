@@ -1,0 +1,16 @@
+[package]
+name = "csv"
+version = "0.0.0"
+edition = "2018"
+
+[dependencies]
+tonic = "0.5.0"
+prost = "0.8.0"
+prost-types = "0.8.0"
+tokio = { version = "1.0", features = ["full"] }
+uuid = { version = "0.8", features = ["v4"] }
+futures = "0.3"
+async-std = "1.9.0"
+
+[build-dependencies]
+tonic-build = "0.5"

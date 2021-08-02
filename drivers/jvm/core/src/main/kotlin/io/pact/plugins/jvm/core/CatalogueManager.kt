@@ -1,6 +1,5 @@
 package io.pact.plugins.jvm.core
 
-import io.pact.core.model.ContentType
 import io.pact.plugin.Plugin
 import mu.KLogging
 import java.lang.IllegalArgumentException
@@ -29,6 +28,10 @@ object CatalogueManager : KLogging() {
 
   fun entries() = catalogue.entries
 
+  fun lookupEntry(key: String): CatalogueEntry? {
+    return catalogue[key]
+  }
+
   fun findContentMatcher(contentType: ContentType): ContentMatcher? {
     val catalogueEntry = catalogue.values.find { entry ->
       if (entry.type == CatalogueEntryType.CONTENT_MATCHER) {
@@ -48,13 +51,18 @@ object CatalogueManager : KLogging() {
   }
 }
 
+class ContentType(private val contentType: String) {
+  fun matches(type: String) = contentType.matches(Regex(type))
+}
+
 enum class CatalogueEntryType {
-  CONTENT_MATCHER, MOCK_SERVER, MATCHER;
+  CONTENT_MATCHER, MOCK_SERVER, MATCHER, INTERACTION;
 
   companion object {
     fun fromString(type: String): CatalogueEntryType {
       return when (type) {
         "content-matcher" -> CONTENT_MATCHER
+        "interaction" -> INTERACTION
         "matcher" -> MATCHER
         "mock-server" -> MOCK_SERVER
         else -> throw IllegalArgumentException("'$type' is not a valid CatalogueEntryType value")
