@@ -58,6 +58,15 @@ class ContentType(private val contentType: String) {
 enum class CatalogueEntryType {
   CONTENT_MATCHER, MOCK_SERVER, MATCHER, INTERACTION;
 
+  override fun toString(): String {
+    return when (this) {
+      CONTENT_MATCHER -> "content-matcher"
+      MOCK_SERVER -> "mock-server"
+      MATCHER -> "matcher"
+      INTERACTION -> "interaction"
+    }
+  }
+
   companion object {
     fun fromString(type: String): CatalogueEntryType {
       return when (type) {

@@ -18,11 +18,11 @@ class CsvClientTest {
     return builder
       .usingPlugin("csv")
       .expectsToReceive("request for a report", "core/interaction/http")
-      .with(Map.of("path", "/reports/report001.csv"))
+      .with(Map.of("request.path", "/reports/report001.csv"))
       .willRespondWith(Map.of(
         "status", "200",
-        "body", Map.of(
-          "Content-Type", "application/csv",
+        "contents", Map.of(
+          "content-type", "application/csv",
           "column:1", "matching(type,'Name')",
           "column:2", "matching(number,100)",
           "column:3", "matching(datetime, 'yyyy-MM-dd','2000-01-01')"

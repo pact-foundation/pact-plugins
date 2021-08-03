@@ -1,5 +1,5 @@
 [package]
-name = "csv"
+name = "pact-plugin-csv"
 version = "0.0.0"
 edition = "2018"
 
@@ -11,6 +11,9 @@ tokio = { version = "1.0", features = ["full"] }
 uuid = { version = "0.8", features = ["v4"] }
 futures = "0.3"
 async-std = "1.9.0"
+log = "0.4"
+env_logger = "0.8"
+maplit = "1.0.2"
 
 [build-dependencies]
 tonic-build = "0.5"

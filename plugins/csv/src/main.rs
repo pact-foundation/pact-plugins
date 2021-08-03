@@ -1,15 +1,15 @@
 use core::pin::Pin;
 use core::task::{Context, Poll};
-use std::convert::TryInto;
 use std::net::SocketAddr;
 
 use futures::Stream;
-use futures::stream::StreamExt;
+use log::debug;
 use tokio::net::{TcpListener, TcpStream};
-use tonic::{Request, Response, Status, transport::Server};
+use tonic::{Response, transport::Server};
 use uuid::Uuid;
-
+use maplit::hashmap;
 use proto::pact_plugin_server::{PactPlugin, PactPluginServer};
+use env_logger::Env;
 
 mod proto;
 
@@ -22,14 +22,27 @@ impl PactPlugin for CsvPactPlugin {
     &self,
     request: tonic::Request<proto::InitPluginRequest>,
   ) -> Result<tonic::Response<proto::InitPluginResponse>, tonic::Status> {
-    Err(tonic::Status::unimplemented("unimplemented"))
+    let message = request.get_ref();
+    debug!("Init request from {}/{}", message.implementation, message.version);
+    Ok(Response::new(proto::InitPluginResponse {
+      catalogue: vec![
+        proto::CatalogueEntry {
+          r#type: "content-matcher".to_string(),
+          key: "csv".to_string(),
+          values: hashmap! {
+            "content-types".to_string() => "text/csv".to_string()
+          }
+        }
+      ]
+    }))
   }
 
   async fn update_catalogue(
     &self,
     request: tonic::Request<proto::Catalogue>,
   ) -> Result<tonic::Response<proto::Void>, tonic::Status> {
-    Err(tonic::Status::unimplemented("unimplemented"))
+    debug!("Update catalogue request, ignoring");
+    Ok(Response::new(proto::Void {}))
   }
 
   async fn compare_contents(
@@ -55,16 +68,20 @@ impl Stream for TcpIncoming {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+  let env = Env::new().filter("LOG_LEVEL");
+  env_logger::init_from_env(env);
+
   let addr: SocketAddr = "0.0.0.0:0".parse()?;
   let listener = TcpListener::bind(addr).await?;
   let address = listener.local_addr()?;
 
-  println!("{{\"port\":{}, \"serverKey\":\"{}\"}}", address.port(), Uuid::new_v4().to_string());
+  let server_key = Uuid::new_v4().to_string();
+  println!("{{\"port\":{}, \"serverKey\":\"{}\"}}", address.port(), server_key);
 
   let plugin = CsvPactPlugin::default();
   Server::builder()
     .add_service(PactPluginServer::new(plugin))
-    .serve_with_incoming(TcpIncoming { inner: listener }).await;
+    .serve_with_incoming(TcpIncoming { inner: listener }).await?;
 
   Ok(())
 }

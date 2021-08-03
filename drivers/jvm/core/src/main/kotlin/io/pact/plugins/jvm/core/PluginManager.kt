@@ -25,6 +25,16 @@ import javax.json.JsonObject
 import kotlin.reflect.full.createInstance
 import kotlin.reflect.full.memberFunctions
 
+enum class PluginDependencyType {
+  OSPackage, Plugin, Library, Executable
+}
+
+data class PluginDependency(
+  val name: String,
+  val version: String?,
+  val type: PluginDependencyType
+)
+
 interface PactPluginManifest {
   val pluginDir: File
   val pluginInterfaceVersion: Int
@@ -33,7 +43,7 @@ interface PactPluginManifest {
   val executableType: String
   val minimumRequiredVersion: String?
   val entryPoint: String
-  val dependencies: List<String>
+  val dependencies: List<PluginDependency>
 }
 
 data class DefaultPactPluginManifest(
@@ -44,8 +54,33 @@ data class DefaultPactPluginManifest(
   override val executableType: String,
   override val minimumRequiredVersion: String?,
   override val entryPoint: String,
-  override val dependencies: List<String>
+  override val dependencies: List<PluginDependency>
 ): PactPluginManifest {
+
+  fun toMap(): Map<String, Any> {
+    val map = mutableMapOf<String, Any>(
+      "pluginDir" to pluginDir.toString(),
+      "pluginInterfaceVersion" to pluginInterfaceVersion,
+      "name" to name,
+      "version" to version,
+      "executableType" to executableType,
+      "entryPoint" to entryPoint
+    )
+    if (!minimumRequiredVersion.isNullOrEmpty()) {
+      map["minimumRequiredVersion"] = minimumRequiredVersion
+    }
+    if (dependencies.isNotEmpty()) {
+      map["dependencies"] = dependencies.map {
+        mapOf(
+          "name" to it.name,
+          "version" to it.version,
+          "type" to it.type.name
+        )
+      }
+    }
+    return map
+  }
+
   companion object {
     fun fromJson(pluginDir: File, pluginJson: JsonObject): PactPluginManifest {
       return DefaultPactPluginManifest(
