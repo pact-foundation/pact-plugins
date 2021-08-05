@@ -9,7 +9,12 @@ import au.com.dius.pact.core.model.annotations.Pact;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.io.IOException;
 import java.util.Map;
+
+import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.is;
 
 @ExtendWith(PactConsumerTestExt.class)
 class CsvClientTest {
@@ -22,7 +27,7 @@ class CsvClientTest {
       .willRespondWith(Map.of(
         "status", "200",
         "contents", Map.of(
-          "content-type", "application/csv",
+          "content-type", "text/csv",
           "column:1", "matching(type,'Name')",
           "column:2", "matching(number,100)",
           "column:3", "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
@@ -33,8 +38,9 @@ class CsvClientTest {
 
   @Test
   @PactTestFor(providerName = "CsvServer")
-  void test(MockServer mockServer) {
+  void test(MockServer mockServer) throws IOException {
     CsvClient client = new CsvClient(mockServer.getUrl());
-    client.fetch("report001.csv");
+    String csv = client.fetch("report001.csv");
+    assertThat(csv, is(equalTo("Name,100,2000-01-01\n")));
   }
 }

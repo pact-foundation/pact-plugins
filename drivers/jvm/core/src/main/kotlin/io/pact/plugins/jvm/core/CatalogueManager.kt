@@ -11,7 +11,7 @@ object CatalogueManager : KLogging() {
     catalogueList.forEach {
       val type = CatalogueEntryType.fromString(it.type)
       val key = "plugin/$name/${type}/${it.key}"
-      catalogue[key] = CatalogueEntry(type, CatalogueEntryProviderType.PLUGIN, name, it.valuesMap)
+      catalogue[key] = CatalogueEntry(type, CatalogueEntryProviderType.PLUGIN, name, it.key, it.valuesMap)
     }
 
     logger.debug { "Updated catalogue entries:\n${catalogue.keys.joinToString("\n")}" }
@@ -83,6 +83,7 @@ enum class CatalogueEntryType {
 data class CatalogueEntry(
   val type: CatalogueEntryType,
   val providerType: CatalogueEntryProviderType,
+  val pluginName: String,
   val key: String,
   val values: Map<String, String> = mapOf()
 )

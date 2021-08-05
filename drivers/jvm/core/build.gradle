@@ -16,7 +16,7 @@ dependencies {
     implementation "io.grpc:grpc-netty:1.35.0"
     implementation "javax.annotation:javax.annotation-api:1.3.2"
     implementation 'com.google.guava:guava:24.0-jre'
-    implementation('io.github.microutils:kotlin-logging:2.0.3') {
+    implementation('io.github.microutils:kotlin-logging:2.0.10') {
         exclude group: 'org.jetbrains.kotlin'
     }
     implementation('com.michael-bull.kotlin-result:kotlin-result:1.1.9') {
@@ -25,6 +25,7 @@ dependencies {
     implementation 'javax.json:javax.json-api:1.1.4'
     implementation 'org.glassfish:javax.json:1.1.4'
     implementation 'org.apache.commons:commons-lang3:3.12.0'
+    implementation 'au.com.dius.pact.core:model:4.3.0-beta.0'
 
     protobuf files('../../../proto/')
 }

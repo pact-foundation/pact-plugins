@@ -1,5 +1,9 @@
 package io.grpc.examples.csv;
 
+import org.apache.hc.client5.http.fluent.Request;
+
+import java.io.IOException;
+
 public class CsvClient {
   private String url;
 
@@ -7,7 +11,7 @@ public class CsvClient {
     this.url = url;
   }
 
-  public String fetch(String report) {
-    return null;
+  public String fetch(String report) throws IOException {
+    return Request.get(url + "/reports/" + report).execute().returnContent().asString();
   }
 }

@@ -1,5 +1,15 @@
 package io.pact.plugins.jvm.core
 
+import au.com.dius.pact.core.model.ContentType
+import au.com.dius.pact.core.model.OptionalBody
+import au.com.dius.pact.core.model.generators.Category
+import au.com.dius.pact.core.model.generators.Generator
+import au.com.dius.pact.core.model.generators.Generators
+import au.com.dius.pact.core.model.generators.createGenerator
+import au.com.dius.pact.core.model.matchingrules.MatchingRule
+import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
+import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
+import au.com.dius.pact.core.support.Json.toJson
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
@@ -11,9 +21,14 @@ import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.PactPluginGrpc.newBlockingStub
 import io.pact.plugin.Plugin
 import io.pact.plugins.jvm.core.Utils.handleWith
+import io.pact.plugins.jvm.core.Utils.jsonToValue
+import io.pact.plugins.jvm.core.Utils.structToJson
 import mu.KLogging
 import org.apache.commons.lang3.SystemUtils
-import java.io.*
+import java.io.BufferedReader
+import java.io.File
+import java.io.IOException
+import java.io.InputStreamReader
 import java.lang.Runtime.getRuntime
 import java.lang.reflect.InvocationTargetException
 import java.nio.file.Path
@@ -144,6 +159,16 @@ interface PluginManager {
     actual: Any,
     context: Any
   ): Any?
+
+
+  /**
+   * Invoke the content type matcher to configure the interaction
+   */
+  fun configureContentMatcherInteraction(
+    matcher: ContentMatcher,
+    contentType: String,
+    bodyConfig: Map<String, Any?>
+  ): Any?
 }
 
 object DefaultPluginManager: KLogging(), PluginManager {
@@ -223,6 +248,40 @@ object DefaultPluginManager: KLogging(), PluginManager {
       }
       else -> throw RuntimeException("Mis-configured content type matcher $matcher")
     }
+  }
+
+  override fun configureContentMatcherInteraction(
+    matcher: ContentMatcher,
+    contentType: String,
+    bodyConfig: Map<String, Any?>
+  ): Triple<OptionalBody, MatchingRuleCategory?, Generators?> {
+    val builder = com.google.protobuf.Struct.newBuilder()
+    bodyConfig.forEach { (key, value) ->
+      builder.putFields(key, jsonToValue(toJson(value)))
+    }
+    val request = Plugin.ConfigureContentsRequest.newBuilder()
+      .setContentType(contentType)
+      .setContentsConfig(builder)
+      .build()
+    val plugin = lookupPlugin(matcher.pluginName, null) ?:
+      throw PactPluginNotFoundException(matcher.pluginName, null)
+    logger.debug { "Sending configureContents request to plugin ${plugin.manifest}" }
+    val response = plugin.stub!!.configureContents(request)
+    logger.debug { "Got response: $response" }
+    val returnedContentType = ContentType(response.contents.contentType)
+    val body = OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType)
+    val rules = MatchingRuleCategory("body", response.rulesMap.entries.associate { (key, value) ->
+      key to MatchingRuleGroup(value.ruleList.map {
+        MatchingRule.create(it.type, structToJson(it.values))
+      }.toMutableList())
+    }.toMutableMap())
+    val generators = Generators(mutableMapOf(Category.BODY to response.generatorsMap.mapValues {
+      createGenerator(it.value.type, structToJson(it.value.values))
+    }.toMutableMap()))
+    logger.debug { "body=$body" }
+    logger.debug { "rules=$rules" }
+    logger.debug { "generators=$generators" }
+    return Triple(body, rules, generators)
   }
 
   private fun initialisePlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
