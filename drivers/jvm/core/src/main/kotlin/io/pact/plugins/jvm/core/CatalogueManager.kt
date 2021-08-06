@@ -1,5 +1,6 @@
 package io.pact.plugins.jvm.core
 
+import au.com.dius.pact.core.model.ContentType
 import io.pact.plugin.Plugin
 import mu.KLogging
 import java.lang.IllegalArgumentException
@@ -49,18 +50,35 @@ object CatalogueManager : KLogging() {
       CatalogueContentMatcher(catalogueEntry)
       else null
   }
+
+  fun findContentGenerator(contentType: ContentType): ContentGenerator? {
+    val catalogueEntry = catalogue.values.find { entry ->
+      if (entry.type == CatalogueEntryType.CONTENT_GENERATOR) {
+        val contentTypes = entry.values["content-types"]?.split(';')
+        if (contentTypes.isNullOrEmpty()) {
+          false
+        } else {
+          contentTypes.any { contentType.matches(it) }
+        }
+      } else {
+        false
+      }
+    }
+    return if (catalogueEntry != null)
+      CatalogueContentGenerator(catalogueEntry)
+    else null
+  }
 }
 
-class ContentType(private val contentType: String) {
-  fun matches(type: String) = contentType.matches(Regex(type))
-}
+private fun ContentType.matches(type: String) = this.getBaseType().orEmpty().matches(Regex(type))
 
 enum class CatalogueEntryType {
-  CONTENT_MATCHER, MOCK_SERVER, MATCHER, INTERACTION;
+  CONTENT_MATCHER, CONTENT_GENERATOR, MOCK_SERVER, MATCHER, INTERACTION;
 
   override fun toString(): String {
     return when (this) {
       CONTENT_MATCHER -> "content-matcher"
+      CONTENT_GENERATOR -> "content-generator"
       MOCK_SERVER -> "mock-server"
       MATCHER -> "matcher"
       INTERACTION -> "interaction"
@@ -71,6 +89,7 @@ enum class CatalogueEntryType {
     fun fromString(type: String): CatalogueEntryType {
       return when (type) {
         "content-matcher" -> CONTENT_MATCHER
+        "content-generator" -> CONTENT_GENERATOR
         "interaction" -> INTERACTION
         "matcher" -> MATCHER
         "mock-server" -> MOCK_SERVER

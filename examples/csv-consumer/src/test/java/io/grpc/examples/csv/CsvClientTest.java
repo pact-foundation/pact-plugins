@@ -15,6 +15,7 @@ import java.util.Map;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
+import static org.hamcrest.Matchers.matchesRegex;
 
 @ExtendWith(PactConsumerTestExt.class)
 class CsvClientTest {
@@ -41,6 +42,9 @@ class CsvClientTest {
   void test(MockServer mockServer) throws IOException {
     CsvClient client = new CsvClient(mockServer.getUrl());
     String csv = client.fetch("report001.csv");
-    assertThat(csv, is(equalTo("Name,100,2000-01-01\n")));
+    String[] values = csv.trim().split(",");
+    assertThat(values[0], is(equalTo("Name")));
+    assertThat(values[1], is(equalTo("100")));
+    assertThat(values[2], matchesRegex("\\d{4}-\\d{2}-\\d{2}"));
   }
 }

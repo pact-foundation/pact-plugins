@@ -3,19 +3,24 @@ use core::task::{Context, Poll};
 use std::net::SocketAddr;
 
 use anyhow::anyhow;
-use csv::Writer;
+use csv::{Writer, ReaderBuilder};
 use env_logger::Env;
 use futures::Stream;
 use log::debug;
 use maplit::hashmap;
-use serde_json::Value;
+use pact_models::generators::{NoopVariantMatcher, VariantMatcher, GenerateValue};
+use pact_models::prelude::{Generator, ContentType};
+use prost_types::value::Kind;
+use serde_json::{json, Value};
 use tokio::net::{TcpListener, TcpStream};
-use tonic::{Request, Response, Status, transport::Server};
+use tonic::{Request, Response, transport::Server};
 use uuid::Uuid;
+use bytes::Bytes;
 
 use proto::pact_plugin_server::{PactPlugin, PactPluginServer};
 
 use crate::parser::{parse_field, parse_value};
+use pact_models::bodies::OptionalBody;
 
 mod proto;
 mod parser;
@@ -87,6 +92,42 @@ fn setup_csv_contents(request: &Request<proto::ConfigureContentsRequest>) -> any
   }
 }
 
+fn generate_csv_content(request: &Request<proto::GenerateContentRequest>) -> anyhow::Result<OptionalBody> {
+  let mut generators = hashmap! {};
+  for (key, gen) in &request.get_ref().generators {
+    let column = parse_field(&key)?;
+    let values = gen.values.as_ref().ok_or(anyhow!("Generator values were expected"))?.fields.iter().map(|(k, v)| {
+      (k.clone(), from_value(v))
+    }).collect();
+    let generator = Generator::from_map(&gen.r#type, &values)
+      .ok_or(anyhow!("Failed to build generator of type {}", gen.r#type))?;
+    generators.insert(column, generator);
+  };
+
+  let context = hashmap! {};
+  let variant_matcher = NoopVariantMatcher.boxed();
+  let mut wtr = Writer::from_writer(vec![]);
+  let csv_data = request.get_ref().contents.as_ref().unwrap().content.as_ref().unwrap();
+  let mut rdr = ReaderBuilder::new().has_headers(false).from_reader(csv_data.as_slice());
+  for result in rdr.records() {
+    let record = result?;
+    for (col, field) in record.iter().enumerate() {
+      debug!("got column:{} = '{}'", col, field);
+      if let Some(generator) = generators.get(&col) {
+        let value = generator.generate_value(&field.to_string(), &context, &variant_matcher)?;
+        wtr.write_field(value)?;
+      } else {
+        wtr.write_field(field)?;
+      }
+    }
+    wtr.write_record(None::<&[u8]>)?;
+  }
+  let generated = wtr.into_inner()?;
+  debug!("Generated contents has {} bytes", generated.len());
+  let bytes = Bytes::from(generated);
+  Ok(OptionalBody::Present(bytes, Some(ContentType::from("text/csv;charset=UTF-8"))))
+}
+
 fn to_value(value: &Value) -> prost_types::Value {
   match value {
     Value::Null => prost_types::Value { kind: Some(prost_types::value::Kind::NullValue(0)) },
@@ -108,6 +149,19 @@ fn to_value(value: &Value) -> prost_types::Value {
   }
 }
 
+fn from_value(value: &prost_types::Value) -> Value {
+  match value.kind.as_ref().unwrap() {
+    Kind::NullValue(_) => Value::Null,
+    Kind::NumberValue(n) => json!(*n),
+    Kind::StringValue(s) => Value::String(s.clone()),
+    Kind::BoolValue(b) => Value::Bool(*b),
+    Kind::StructValue(s) => Value::Object(s.fields.iter()
+      .map(|(k, v)| (k.clone(), from_value(v))).collect()),
+    Kind::ListValue(l) => Value::Array(l.values.iter()
+      .map(|v| from_value(v)).collect())
+  }
+}
+
 #[tonic::async_trait]
 impl PactPlugin for CsvPactPlugin {
   async fn init_plugin(
@@ -120,6 +174,13 @@ impl PactPlugin for CsvPactPlugin {
       catalogue: vec![
         proto::CatalogueEntry {
           r#type: "content-matcher".to_string(),
+          key: "csv".to_string(),
+          values: hashmap! {
+            "content-types".to_string() => "text/csv;application/csv".to_string()
+          }
+        },
+        proto::CatalogueEntry {
+          r#type: "content-generator".to_string(),
           key: "csv".to_string(),
           values: hashmap! {
             "content-types".to_string() => "text/csv;application/csv".to_string()
@@ -155,6 +216,25 @@ impl PactPlugin for CsvPactPlugin {
     // "column:3", "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
     setup_csv_contents(&request)
       .map_err(|err| tonic::Status::aborted(format!("Invalid column definition: {}", err)))
+  }
+
+  async fn generate_content(
+    &self,
+    request: tonic::Request<proto::GenerateContentRequest>,
+  ) -> Result<tonic::Response<proto::GenerateContentResponse>, tonic::Status> {
+    debug!("Received generate_content request");
+
+    generate_csv_content(&request)
+      .map(|contents| {
+        debug!("Generated contents: {}", contents);
+        Response::new(proto::GenerateContentResponse {
+          contents: Some(proto::Body {
+            content_type: contents.content_type().unwrap_or(ContentType::from("text/csv")).to_string(),
+            content: Some(contents.value().unwrap().to_vec()),
+          })
+        })
+      })
+      .map_err(|err| tonic::Status::aborted(format!("Failed to generate CSV contents: {}", err)))
   }
 }
 

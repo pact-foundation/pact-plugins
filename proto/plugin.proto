@@ -85,9 +85,19 @@ message ConfigureContentsResponse {
   map<string, Generator> generators = 3;
 }
 
+message GenerateContentRequest {
+    Body contents = 1;
+    map<string, Generator> generators = 2;
+}
+
+message GenerateContentResponse {
+  Body contents = 1;
+}
+
 service PactPlugin {
   rpc InitPlugin(InitPluginRequest) returns (InitPluginResponse);
   rpc UpdateCatalogue(Catalogue) returns (Void);
   rpc CompareContents(CompareContentsRequest) returns (CompareContentsResponse);
   rpc ConfigureContents(ConfigureContentsRequest) returns (ConfigureContentsResponse);
+  rpc GenerateContent(GenerateContentRequest) returns (GenerateContentResponse);
 }

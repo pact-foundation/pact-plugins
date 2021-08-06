@@ -1102,6 +1102,7 @@ dependencies = [
  "anyhow",
  "async-std",
  "bigdecimal",
+ "bytes",
  "csv",
  "env_logger",
  "futures",

@@ -2,6 +2,7 @@ package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.model.ContentType
 import au.com.dius.pact.core.model.OptionalBody
+import au.com.dius.pact.core.model.PactSpecVersion
 import au.com.dius.pact.core.model.generators.Category
 import au.com.dius.pact.core.model.generators.Generator
 import au.com.dius.pact.core.model.generators.Generators
@@ -14,6 +15,9 @@ import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
 import com.github.michaelbull.result.mapError
+import com.google.protobuf.ByteString
+import com.google.protobuf.BytesValue
+import com.google.protobuf.Struct
 import com.vdurmont.semver4j.Semver
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
@@ -169,6 +173,16 @@ interface PluginManager {
     contentType: String,
     bodyConfig: Map<String, Any?>
   ): Any?
+
+  /**
+   * Invoke the content generator to generate the contents for a body
+   */
+  fun generateContent(
+    contentGenerator: CatalogueContentGenerator,
+    contentType: ContentType,
+    generators: Map<String, Generator>,
+    body: OptionalBody
+  ): OptionalBody
 }
 
 object DefaultPluginManager: KLogging(), PluginManager {
@@ -282,6 +296,37 @@ object DefaultPluginManager: KLogging(), PluginManager {
     logger.debug { "rules=$rules" }
     logger.debug { "generators=$generators" }
     return Triple(body, rules, generators)
+  }
+
+  override fun generateContent(
+    contentGenerator: CatalogueContentGenerator,
+    contentType: ContentType,
+    generators: Map<String, Generator>,
+    body: OptionalBody
+  ): OptionalBody {
+    val plugin = lookupPlugin(contentGenerator.catalogueEntry.pluginName, null) ?:
+      throw PactPluginNotFoundException(contentGenerator.catalogueEntry.pluginName, null)
+    val request = Plugin.GenerateContentRequest.newBuilder()
+      .setContents(Plugin.Body.newBuilder()
+        .setContent(BytesValue.newBuilder().setValue(ByteString.copyFrom(body.orEmpty())))
+        .setContentType(contentType.toString()))
+
+    generators.forEach { (key, generator) ->
+      val builder = Struct.newBuilder()
+      generator.toMap(PactSpecVersion.V4).forEach { (key, value) ->
+        builder.putFields(key, jsonToValue(toJson(value)))
+      }
+      val gen = Plugin.Generator.newBuilder()
+        .setType(generator.type)
+        .setValues(builder)
+        .build()
+      request.putGenerators(key, gen)
+    }
+    logger.debug { "Sending generateContent request to plugin ${plugin.manifest}" }
+    val response = plugin.stub!!.generateContent(request.build())
+    logger.debug { "Got response: $response" }
+    val returnedContentType = ContentType(response.contents.contentType)
+    return OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType)
   }
 
   private fun initialisePlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
