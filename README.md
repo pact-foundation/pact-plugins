@@ -4,6 +4,8 @@
 * Pact Specification tracking issue: https://github.com/pact-foundation/pact-specification/issues/83
 * Plugin Project Board: https://github.com/pact-foundation/pact-plugins/projects/1
 
+[![Pact Plugin Build (Gradle)](https://github.com/pact-foundation/pact-plugins/actions/workflows/gradle.yml/badge.svg)](https://github.com/pact-foundation/pact-plugins/actions/workflows/gradle.yml)
+
 ## Plugin architecture
 
 The plugins are enabled via a message passing mechanism over GRPC. Each language implements a driver which provides the
