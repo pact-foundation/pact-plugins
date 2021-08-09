@@ -1,4 +1,4 @@
-name: Pact-JVM Build
+name: Pact Plugin Build (Gradle)
 
 on:
   - push
