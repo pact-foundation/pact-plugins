@@ -5,6 +5,7 @@
 * Plugin Project Board: https://github.com/pact-foundation/pact-plugins/projects/1
 
 [![Pact Plugin Build (Gradle)](https://github.com/pact-foundation/pact-plugins/actions/workflows/gradle.yml/badge.svg)](https://github.com/pact-foundation/pact-plugins/actions/workflows/gradle.yml)
+[![Pact Plugin Build (Rust)](https://github.com/pact-foundation/pact-plugins/actions/workflows/rust.yml/badge.svg)](https://github.com/pact-foundation/pact-plugins/actions/workflows/rust.yml)
 
 ## Plugin architecture
 
