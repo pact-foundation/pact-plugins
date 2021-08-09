@@ -6,7 +6,7 @@ import java.util.concurrent.LinkedBlockingDeque
 import javax.json.Json
 import javax.json.JsonObject
 
-class ChildProcess(
+open class ChildProcess(
   val pb: ProcessBuilder,
   val manifest: PactPluginManifest
 ) {
@@ -18,7 +18,7 @@ class ChildProcess(
   private lateinit var process: Process
   val channel: LinkedBlockingDeque<JsonObject> = LinkedBlockingDeque()
 
-  fun start(): ChildProcess {
+  open fun start(): ChildProcess {
     process = pb.start()
     logger.debug { "Child process started = ${process.info()}" }
 
@@ -57,7 +57,7 @@ class ChildProcess(
     return this
   }
 
-  fun destroy() {
+  open fun destroy() {
     process.destroy()
   }
 

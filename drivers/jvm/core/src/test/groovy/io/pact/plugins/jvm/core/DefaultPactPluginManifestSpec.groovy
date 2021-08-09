@@ -6,10 +6,16 @@ import javax.json.Json
 
 class DefaultPactPluginManifestSpec extends Specification {
 
+  File pluginFile
+
+  def setup() {
+    pluginFile = 'drivers/jvm/core/src/test/resources/plugins' as File
+  }
+
   def 'converting manifest to JSON'() {
     given:
     def manifest = new DefaultPactPluginManifest(
-      'drivers/jvm/core/src/test/resources/plugins' as File,
+      pluginFile,
       1,
       'TestPlugin',
       '1.2.3',
@@ -21,7 +27,7 @@ class DefaultPactPluginManifestSpec extends Specification {
 
     expect:
     manifest.toMap() == [
-      pluginDir: 'drivers/jvm/core/src/test/resources/plugins',
+      pluginDir: pluginFile.toString(),
       pluginInterfaceVersion: 1,
       name: 'TestPlugin',
       version: '1.2.3',
@@ -33,7 +39,7 @@ class DefaultPactPluginManifestSpec extends Specification {
   def 'converting manifest to JSON - with min required version'() {
     given:
     def manifest = new DefaultPactPluginManifest(
-      'drivers/jvm/core/src/test/resources/plugins' as File,
+      pluginFile,
       1,
       'TestPlugin',
       '1.2.3',
@@ -45,7 +51,7 @@ class DefaultPactPluginManifestSpec extends Specification {
 
     expect:
     manifest.toMap() == [
-      pluginDir: 'drivers/jvm/core/src/test/resources/plugins',
+      pluginDir: pluginFile.toString(),
       pluginInterfaceVersion: 1,
       name: 'TestPlugin',
       version: '1.2.3',
@@ -56,10 +62,9 @@ class DefaultPactPluginManifestSpec extends Specification {
   }
 
   def 'converting manifest to JSON - with dependencies'() {
-    def file = 'drivers/jvm/core/src/test/resources/plugins' as File
     given:
     def manifest = new DefaultPactPluginManifest(
-      file,
+      pluginFile,
       1,
       'TestPlugin',
       '1.2.3',
@@ -74,7 +79,7 @@ class DefaultPactPluginManifestSpec extends Specification {
 
     expect:
     manifest.toMap() == [
-      pluginDir: file.toString(),
+      pluginDir: pluginFile.toString(),
       pluginInterfaceVersion: 1,
       name: 'TestPlugin',
       version: '1.2.3',
