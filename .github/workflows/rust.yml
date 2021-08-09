@@ -39,4 +39,4 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: |
-         docker run --rm --user "$(id -u)":"$(id -g)" -v $(pwd):/workspace -w /workspace/drivers/rust -t pactfoundation/rust-musl-build 'cargo build && cargo test'
+         docker run --rm --user "$(id -u)":"$(id -g)" -v $(pwd):/workspace -w /workspace/drivers/rust -t pactfoundation/rust-musl-build -c 'cargo build && cargo test'
