@@ -1,0 +1,11 @@
+[package]
+name = "csv-provider"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+actix-web = "3"
+fakeit = "1.1.1"
+rand = "0.8.4"
+csv = "1.1"
+anyhow = "1.0.42"
