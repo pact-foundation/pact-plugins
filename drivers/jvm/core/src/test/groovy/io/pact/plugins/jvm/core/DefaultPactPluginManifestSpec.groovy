@@ -77,7 +77,11 @@ class DefaultPactPluginManifestSpec extends Specification {
       version: '1.2.3',
       executableType: 'ruby',
       entryPoint: 'exec.rb',
-      minimumRequiredVersion: '1.7.1'
+      minimumRequiredVersion: '1.7.1',
+      dependencies: [
+        [name: 'dep1', version: '1.0', type: 'Plugin'],
+        [name: 'dep2', version: '2.0', type: 'Library']
+      ]
     ]
   }
 }
