@@ -44,7 +44,7 @@ jobs:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
           restore-keys: ${{ runner.os }}-gradle
-      - run: gradlew
+      - run: gradle -v
       - name: Build plugin driver
         run: ./gradlew -s --no-daemon -i build
         working-directory: drivers/jvm
