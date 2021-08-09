@@ -1,6 +1,7 @@
 plugins {
     id 'java-library'
     id 'com.google.protobuf' version '0.8.14'
+    id 'groovy'
 }
 
 ext {
@@ -28,6 +29,15 @@ dependencies {
     implementation 'au.com.dius.pact.core:model:4.3.0-beta.0'
 
     protobuf files('../../../proto/')
+
+    testImplementation "org.codehaus.groovy:groovy:3.0.8"
+    testImplementation "org.junit.jupiter:junit-jupiter-api:5.7.0"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.7.0"
+    testRuntimeOnly "org.junit.vintage:junit-vintage-engine:5.7.0"
+    testImplementation 'org.hamcrest:hamcrest:2.2'
+    testImplementation('org.spockframework:spock-core:2.0-groovy-3.0') {
+        exclude group: 'org.codehaus.groovy'
+    }
 }
 
 protobuf {
