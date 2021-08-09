@@ -10,6 +10,7 @@ import au.com.dius.pact.core.model.generators.createGenerator
 import au.com.dius.pact.core.model.matchingrules.MatchingRule
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
+import au.com.dius.pact.core.model.matchingrules.RuleLogic
 import au.com.dius.pact.core.support.Json.toJson
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
@@ -287,7 +288,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     val rules = MatchingRuleCategory("body", response.rulesMap.entries.associate { (key, value) ->
       key to MatchingRuleGroup(value.ruleList.map {
         MatchingRule.create(it.type, structToJson(it.values))
-      }.toMutableList())
+      }.toMutableList(), RuleLogic.AND, false)
     }.toMutableMap())
     val generators = Generators(mutableMapOf(Category.BODY to response.generatorsMap.mapValues {
       createGenerator(it.value.type, structToJson(it.value.values))
