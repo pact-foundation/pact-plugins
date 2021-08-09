@@ -102,6 +102,7 @@ data class DefaultPactPluginManifest(
   }
 
   companion object {
+    @JvmStatic
     fun fromJson(pluginDir: File, pluginJson: JsonObject): PactPluginManifest {
       return DefaultPactPluginManifest(
         pluginDir,

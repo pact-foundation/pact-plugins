@@ -2,6 +2,8 @@ package io.pact.plugins.jvm.core
 
 import spock.lang.Specification
 
+import javax.json.Json
+
 class DefaultPactPluginManifestSpec extends Specification {
 
   def 'converting manifest to JSON'() {
@@ -54,9 +56,10 @@ class DefaultPactPluginManifestSpec extends Specification {
   }
 
   def 'converting manifest to JSON - with dependencies'() {
+    def file = 'drivers/jvm/core/src/test/resources/plugins' as File
     given:
     def manifest = new DefaultPactPluginManifest(
-      'drivers/jvm/core/src/test/resources/plugins' as File,
+      file,
       1,
       'TestPlugin',
       '1.2.3',
@@ -71,7 +74,7 @@ class DefaultPactPluginManifestSpec extends Specification {
 
     expect:
     manifest.toMap() == [
-      pluginDir: 'drivers/jvm/core/src/test/resources/plugins',
+      pluginDir: file.toString(),
       pluginInterfaceVersion: 1,
       name: 'TestPlugin',
       version: '1.2.3',
@@ -83,5 +86,26 @@ class DefaultPactPluginManifestSpec extends Specification {
         [name: 'dep2', version: '2.0', type: 'Library']
       ]
     ]
+  }
+
+  def 'loading manifest from JSON'() {
+    given:
+    InputStream pluginFile = DefaultPactPluginManifestSpec.getResourceAsStream('/pact-plugin.json')
+    def pluginJson = Json.createReader(pluginFile).readObject()
+
+    when:
+    def pluginManifest = DefaultPactPluginManifest.fromJson('pact-plugin.json' as File, pluginJson)
+
+    then:
+    pluginManifest == new DefaultPactPluginManifest(
+      'pact-plugin.json' as File,
+      1,
+      'csv',
+      '0.0.0',
+      'exec',
+      null,
+      'pact-plugins/plugins/csv/target/debug/pact-plugin-csv',
+      []
+    )
   }
 }
