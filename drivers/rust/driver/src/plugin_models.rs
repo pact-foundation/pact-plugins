@@ -3,6 +3,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::child_process::ChildPluginProcess;
+use crate::proto::{InitPluginRequest, InitPluginResponse, pact_plugin_client::PactPluginClient};
 
 /// Type of plugin dependencies
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug)]
@@ -75,12 +76,29 @@ pub struct PactPlugin {
   /// Manifest for this plugin
   pub manifest: PactPluginManifest,
   /// Running child process
-  pub child: ChildPluginProcess,
+  pub child: ChildPluginProcess
 }
 
 impl PactPlugin {
+  /// Create a new Plugin
+  pub fn new(manifest: &PactPluginManifest, child: ChildPluginProcess) -> Self {
+    PactPlugin { manifest: manifest.clone(), child }
+  }
+
   /// Port the plugin is running on
   pub fn port(&self) -> u16 {
     self.child.port()
+  }
+
+  /// Kill the running plugin process
+  pub fn kill(&self) {
+    self.child.kill();
+  }
+
+  /// Send an init request to the plugin process
+  pub async fn init_plugin(&self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
+    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
+    let response = client.init_plugin(tonic::Request::new(request)).await?;
+    Ok(response.get_ref().clone())
   }
 }

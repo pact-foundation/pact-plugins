@@ -7,12 +7,12 @@ use std::io::BufReader;
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::sync::Mutex;
+use std::process::{Command, Stdio};
 
 use anyhow::anyhow;
 use lazy_static::lazy_static;
-use log::{debug, trace, max_level};
-use duct::cmd;
-use duct::ReaderHandle;
+use log::{debug, error, max_level, trace, warn};
+use sysinfo::{ProcessExt, Signal, System, SystemExt};
 
 use crate::child_process::ChildPluginProcess;
 use crate::plugin_models::{PactPlugin, PactPluginManifest, PluginDependency};
@@ -121,15 +121,17 @@ pub fn lookup_plugin_manifest(plugin: &PluginDependency) -> Option<PactPluginMan
 async fn initialise_plugin(manifest: &PactPluginManifest) -> anyhow::Result<PactPlugin> {
   match manifest.executable_type.as_str() {
     "exec" => {
-      let plugin = start_plugin_process(manifest)?;
+      let plugin = start_plugin_process(manifest).await?;
       debug!("Plugin process started OK (port = {}), sending init message", plugin.port());
 
-      let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", plugin.port())).await?;
-      let request = tonic::Request::new(InitPluginRequest {
+      let request = InitPluginRequest {
         implementation: "Pact-Rust".to_string(),
         version: "0".to_string()
-      });
-      let response = client.init_plugin(request).await?;
+      };
+      let response = plugin.init_plugin(request).await.map_err(|err| {
+        plugin.kill();
+        anyhow!("Failed to send init request to the plugin - {}", err)
+      })?;
       debug!("Got init response {:?} from plugin {}", response, manifest.name);
 //           CatalogueManager.registerPluginEntries(manifest.name, response.catalogueList)
 //           plugin.stub = stub
@@ -153,7 +155,7 @@ async fn initialise_plugin(manifest: &PactPluginManifest) -> anyhow::Result<Pact
   }
 }
 
-fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<PactPlugin> {
+async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<PactPlugin> {
   debug!("Starting plugin with manifest {:?}", manifest);
   let mut path = PathBuf::from(manifest.entry_point.clone());
   if !path.is_absolute() || !path.exists() {
@@ -161,16 +163,25 @@ fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<PactPlu
   }
   debug!("Starting plugin using {:?}", path);
   let log_level = max_level();
-  let reader: ReaderHandle = cmd!(path)
+  let child = Command::new(path)
     .env("LOG_LEVEL", log_level.as_str())
     .env("RUST_LOG", log_level.as_str())
-    .reader()?;
-  debug!("Plugin {} started with PID {:?}", manifest.name, reader.pids().first());
+    .current_dir(manifest.plugin_dir.clone())
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()?;
+  let child_pid = child.id();
+  debug!("Plugin {} started with PID {:?}", manifest.name, child_pid);
 
-  match ChildPluginProcess::new(reader, manifest) {
-    Ok(child) => Ok(PactPlugin { manifest: manifest.clone(), child }),
+  match ChildPluginProcess::new(child, manifest) {
+    Ok(child) => Ok(PactPlugin::new(manifest, child)),
     Err(err) => {
-      reader.kill();
+      let s = System::new();
+      if let Some(process) = s.process(child_pid as i32) {
+        process.kill(Signal::Term);
+      } else {
+        warn!("Child process with PID {} was not found", child_pid);
+      }
       Err(err)
     }
   }

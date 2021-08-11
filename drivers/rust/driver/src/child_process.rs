@@ -1,16 +1,18 @@
 //! Module for managing running child processes
 
+use std::io::BufRead;
+use std::io::BufReader;
+use std::sync::mpsc::channel;
 use std::time::Duration;
+use std::process::Child;
 
 use anyhow::anyhow;
 use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
-use duct::ReaderHandle;
-use std::sync::mpsc::channel;
+use sysinfo::{ProcessExt, Signal, System, SystemExt};
 
 use crate::plugin_models::PactPluginManifest;
-use std::io::BufRead;
-use std::io::BufReader;
+use std::sync::Arc;
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -29,19 +31,24 @@ pub struct ChildPluginProcess {
 
 impl ChildPluginProcess {
   /// Start the child process and try read the startup JSON message from its standard output.
-  pub fn new(child: ReaderHandle, manifest: &PactPluginManifest) -> anyhow::Result<Self> {
+  pub fn new(child: Child, manifest: &PactPluginManifest) -> anyhow::Result<Self> {
     let (tx, rx) = channel();
     let manifest = manifest.clone();
     let plugin_name = manifest.name.clone();
-    let child_pid = child.pids().first().cloned().unwrap_or_default();
+    let child_pid = child.id();
+    let child_out = child.stdout
+      .ok_or_else(|| anyhow!("Could not get the child process standard output stream"))?;
+    let child_err = child.stderr
+      .ok_or_else(|| anyhow!("Could not get the child process standard error stream"))?;
 
+    let name = plugin_name.clone();
     tokio::task::spawn_blocking(move || {
-      let buffer = BufReader::new(child);
       let mut startup_read = false;
-      for line in buffer.lines() {
+      let reader = BufReader::new(child_out);
+      for line in reader.lines() {
         match line {
           Ok(line) => {
-            debug!("Plugin {} - {}", plugin_name, line);
+            debug!("Plugin({}, {}, STDOUT): {}", name, child_pid, line);
             if !startup_read {
               let line = line.trim();
               if line.starts_with("{") {
@@ -67,6 +74,16 @@ impl ChildPluginProcess {
       }
     });
 
+    tokio::task::spawn_blocking(move || {
+      let reader = BufReader::new(child_err);
+      for line in reader.lines() {
+        match line {
+          Ok(line) => debug!("Plugin({}, {}, STDERR): {}", plugin_name, child_pid, line),
+          Err(err) => warn!("Failed to read line from child process output - {}", err)
+        };
+      }
+    });
+
     match rx.recv_timeout(Duration::from_millis(500)) {
       Ok(result) => result,
       Err(err) => {
@@ -79,5 +96,15 @@ impl ChildPluginProcess {
   /// Port the plugin is running on
   pub fn port(&self) -> u16 {
     self.plugin_info.port
+  }
+
+  /// Kill the running plugin process
+  pub fn kill(&self) {
+    let s = System::new();
+    if let Some(process) = s.process(self.child_pid as i32) {
+      process.kill(Signal::Term);
+    } else {
+      warn!("Child process with PID {} was not found", self.child_pid);
+    }
   }
 }
