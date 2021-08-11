@@ -1,4 +1,4 @@
-name: Pact Plugin Build (Rust)
+name: Pact Plugin Driver (Rust)
 
 on: [push, pull_request]
 

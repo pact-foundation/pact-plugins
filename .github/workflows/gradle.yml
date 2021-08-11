@@ -1,4 +1,4 @@
-name: Pact Plugin Build (Gradle)
+name: Pact Plugin Driver (Gradle)
 
 on:
   - push
