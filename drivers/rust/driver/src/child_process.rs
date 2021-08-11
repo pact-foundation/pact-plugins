@@ -2,17 +2,16 @@
 
 use std::io::BufRead;
 use std::io::BufReader;
+use std::process::Child;
 use std::sync::mpsc::channel;
 use std::time::Duration;
-use std::process::Child;
 
 use anyhow::anyhow;
 use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
-use sysinfo::{ProcessExt, Signal, System, SystemExt};
+use sysinfo::{Pid, ProcessExt, Signal, System, SystemExt};
 
 use crate::plugin_models::PactPluginManifest;
-use std::sync::Arc;
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -24,7 +23,7 @@ pub struct RunningPluginInfo {
 /// Running child process
 #[derive(Debug, Clone)]
 pub struct ChildPluginProcess {
-  child_pid: u32,
+  child_pid: usize,
   manifest: PactPluginManifest,
   plugin_info: RunningPluginInfo
 }
@@ -56,7 +55,7 @@ impl ChildPluginProcess {
                 match serde_json::from_str::<RunningPluginInfo>(line) {
                   Ok(plugin_info) => {
                     tx.send(Ok(ChildPluginProcess {
-                      child_pid: child_pid,
+                      child_pid: child_pid as usize,
                       manifest: manifest.clone(),
                       plugin_info
                     }))
@@ -101,7 +100,7 @@ impl ChildPluginProcess {
   /// Kill the running plugin process
   pub fn kill(&self) {
     let s = System::new();
-    if let Some(process) = s.process(self.child_pid as i32) {
+    if let Some(process) = s.process(self.child_pid as Pid) {
       process.kill(Signal::Term);
     } else {
       warn!("Child process with PID {} was not found", self.child_pid);

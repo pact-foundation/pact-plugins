@@ -12,7 +12,7 @@ use std::process::{Command, Stdio};
 use anyhow::anyhow;
 use lazy_static::lazy_static;
 use log::{debug, error, max_level, trace, warn};
-use sysinfo::{ProcessExt, Signal, System, SystemExt};
+use sysinfo::{ProcessExt, Signal, System, SystemExt, Pid};
 
 use crate::child_process::ChildPluginProcess;
 use crate::plugin_models::{PactPlugin, PactPluginManifest, PluginDependency};
@@ -177,7 +177,7 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
     Ok(child) => Ok(PactPlugin::new(manifest, child)),
     Err(err) => {
       let s = System::new();
-      if let Some(process) = s.process(child_pid as i32) {
+      if let Some(process) = s.process(child_pid as Pid) {
         process.kill(Signal::Term);
       } else {
         warn!("Child process with PID {} was not found", child_pid);
