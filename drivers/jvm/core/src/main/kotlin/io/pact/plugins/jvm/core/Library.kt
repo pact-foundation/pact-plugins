@@ -5,9 +5,3 @@ class PactPluginNotFoundException(val name: String, val version: String?) :
 
 class PactPluginEntryFoundException(val type: String) :
   RuntimeException("No interaction type of '$type' was found in the catalogue")
-
-class Library {
-    fun someLibraryMethod(): Boolean {
-        return true
-    }
-}

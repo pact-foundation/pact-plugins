@@ -3,7 +3,7 @@ use csv::Writer;
 use rand::prelude::*;
 use fakeit::{name, datetime};
 
-#[get("/data")]
+#[get("/reports/{report}.csv")]
 async fn data() -> HttpResponse {
     let rows: u8 = random();
     let mut wtr = Writer::from_writer(vec![]);
@@ -18,7 +18,7 @@ async fn data() -> HttpResponse {
         ]);
     }
     HttpResponse::Ok()
-      .content_type("text/csv")
+      .content_type("text/csv; charset=UTF-8")
       .body(wtr.into_inner().unwrap_or_default())
 }
 

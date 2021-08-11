@@ -21,6 +21,7 @@ use proto::pact_plugin_server::{PactPlugin, PactPluginServer};
 
 use crate::parser::{parse_field, parse_value};
 use pact_models::bodies::OptionalBody;
+use std::env::var_os;
 
 mod proto;
 mod parser;
