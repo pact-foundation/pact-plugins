@@ -18,6 +18,7 @@ prost = "0.8.0"
 prost-types = "0.8.0"
 tokio = { version = "1.0", features = ["full"] }
 sysinfo = "0.20.0"
+itertools = "0.10.1"
 
 [build-dependencies]
 tonic-build = "0.5"

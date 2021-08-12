@@ -17,6 +17,7 @@ use sysinfo::{ProcessExt, Signal, System, SystemExt, Pid};
 use crate::child_process::ChildPluginProcess;
 use crate::plugin_models::{PactPlugin, PactPluginManifest, PluginDependency};
 use crate::proto::{InitPluginRequest, pact_plugin_client::PactPluginClient};
+use crate::catalogue_manager::{register_plugin_entries, remove_plugin_entries};
 
 lazy_static! {
   static ref PLUGIN_MANIFEST_REGISTER: Mutex<HashMap<String, PactPluginManifest>> = Mutex::new(HashMap::new());
@@ -133,14 +134,8 @@ async fn initialise_plugin(manifest: &PactPluginManifest) -> anyhow::Result<Pact
         anyhow!("Failed to send init request to the plugin - {}", err)
       })?;
       debug!("Got init response {:?} from plugin {}", response, manifest.name);
-//           CatalogueManager.registerPluginEntries(manifest.name, response.catalogueList)
-//           plugin.stub = stub
-//           plugin.channel = channel
-//           plugin.catalogueEntries = response.catalogueList
-//           Thread {
-//             publishUpdatedCatalogue()
-//           }.run()
-//           plugin
+      register_plugin_entries(&manifest.name, &response.catalogue);
+      tokio::task::spawn(async { publish_updated_catalogue() });
 
       let key = format!("{}/{}", manifest.name, manifest.version);
       {
@@ -187,15 +182,18 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
   }
 }
 
-//   init {
-//     getRuntime().addShutdownHook(Thread {
-//       logger.debug { "SHUTDOWN - shutting down all plugins" }
-//       PLUGIN_REGISTER.forEach { (_, plugin) ->
-//         plugin.shutdown()
-//       }
-//     })
-//   }
-//
+/// Shut down all plugin processes
+pub fn shutdown_plugins() {
+  debug!("Shutting down all plugins");
+  let mut guard = PLUGIN_REGISTER.lock().unwrap();
+  for plugin in guard.values() {
+    debug!("Shutting down plugin {:?}", plugin);
+    plugin.kill();
+    remove_plugin_entries(&plugin.manifest.name);
+  }
+  guard.clear()
+}
+
 //   override fun invokeContentMatcher(
 //     matcher: ContentMatcher,
 //     expected: Any,
@@ -298,20 +296,19 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
 //     val returnedContentType = ContentType(response.contents.contentType)
 //     return OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType)
 //   }
-//
-//   private fun publishUpdatedCatalogue() {
-//     val requestBuilder = Plugin.Catalogue.newBuilder()
-//     CatalogueManager.entries().forEach { (_, entry) ->
-//       requestBuilder.addCatalogue(Plugin.CatalogueEntry.newBuilder()
-//         .setKey(entry.key)
-//         .setType(entry.type.name)
-//         .putAllValues(entry.values)
-//         .build())
-//     }
-//     val request = requestBuilder.build()
-//
-//     PLUGIN_REGISTER.forEach { (_, plugin) ->
-//       plugin.stub?.updateCatalogue(request)
-//     }
-//   }
-//
+
+fn publish_updated_catalogue() {
+  // val requestBuilder = Plugin.Catalogue.newBuilder()
+  // CatalogueManager.entries().forEach { (_, entry) ->
+  //   requestBuilder.addCatalogue(Plugin.CatalogueEntry.newBuilder()
+  //     .setKey(entry.key)
+  //     .setType(entry.type.name)
+  //     .putAllValues(entry.values)
+  //     .build())
+  // }
+  // val request = requestBuilder.build()
+  //
+  // PLUGIN_REGISTER.forEach { (_, plugin) ->
+  //   plugin.stub?.updateCatalogue(request)
+  // }
+}

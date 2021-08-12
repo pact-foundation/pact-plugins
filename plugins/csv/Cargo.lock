@@ -1184,6 +1184,7 @@ version = "0.0.0"
 dependencies = [
  "anyhow",
  "home",
+ "itertools",
  "lazy_static",
  "log",
  "maplit",
