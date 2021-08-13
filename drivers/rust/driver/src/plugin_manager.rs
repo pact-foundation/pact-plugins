@@ -11,12 +11,12 @@ use std::process::{Command, Stdio};
 
 use anyhow::anyhow;
 use lazy_static::lazy_static;
-use log::{debug, error, max_level, trace, warn};
+use log::{debug, max_level, trace, warn};
 use sysinfo::{ProcessExt, Signal, System, SystemExt, Pid};
 
 use crate::child_process::ChildPluginProcess;
 use crate::plugin_models::{PactPlugin, PactPluginManifest, PluginDependency};
-use crate::proto::{InitPluginRequest, pact_plugin_client::PactPluginClient};
+use crate::proto::InitPluginRequest;
 use crate::catalogue_manager::{register_plugin_entries, remove_plugin_entries};
 
 lazy_static! {
@@ -134,7 +134,7 @@ async fn initialise_plugin(manifest: &PactPluginManifest) -> anyhow::Result<Pact
         anyhow!("Failed to send init request to the plugin - {}", err)
       })?;
       debug!("Got init response {:?} from plugin {}", response, manifest.name);
-      register_plugin_entries(&manifest.name, &response.catalogue);
+      register_plugin_entries(manifest, &response.catalogue);
       tokio::task::spawn(async { publish_updated_catalogue() });
 
       let key = format!("{}/{}", manifest.name, manifest.version);

@@ -1,17 +1,19 @@
 //! Manages the catalogue of features provided by plugins
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt::{self, Display, Formatter};
 use std::sync::Mutex;
 
-use anyhow::anyhow;
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use log::{debug, error, trace, warn};
+use log::{debug, error};
+use pact_models::content_types::ContentType;
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 
+use crate::content::ContentMatcher;
+use crate::plugin_models::PactPluginManifest;
 use crate::proto::CatalogueEntry as ProtoCatalogueEntry;
-use std::ops::DerefMut;
 
 lazy_static! {
   static ref CATALOGUE_REGISTER: Mutex<HashMap<String, CatalogueEntry>> = Mutex::new(HashMap::new());
@@ -86,8 +88,8 @@ pub struct CatalogueEntry {
   pub entry_type: CatalogueEntryType,
   /// Provider of the entry
   pub provider_type: CatalogueEntryProviderType,
-  /// Plugin name
-  pub plugin_name: String,
+  /// Plugin manifest
+  pub plugin: Option<PactPluginManifest>,
   /// Entry key
   pub key: String,
   /// assocaited Entry values
@@ -95,16 +97,16 @@ pub struct CatalogueEntry {
 }
 
 /// Register the entries in the global catalogue
-pub fn register_plugin_entries(name: &String, catalogue_list: &Vec<ProtoCatalogueEntry>) {
+pub fn register_plugin_entries(plugin: &PactPluginManifest, catalogue_list: &Vec<ProtoCatalogueEntry>) {
   let mut guard = CATALOGUE_REGISTER.lock().unwrap();
 
   for entry in catalogue_list {
     let entry_type = CatalogueEntryType::from(entry.r#type.clone());
-    let key = format!("plugin/{}/{}/{}", name, entry_type, entry.key);
+    let key = format!("plugin/{}/{}/{}", plugin.name, entry_type, entry.key);
     guard.insert(key.clone(), CatalogueEntry {
       entry_type,
       provider_type: CatalogueEntryProviderType::PLUGIN,
-      plugin_name: name.clone(),
+      plugin: Some(plugin.clone()),
       key: key.clone(),
       values: entry.values.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
     });
@@ -144,48 +146,49 @@ pub fn remove_plugin_entries(name: &String) {
   debug!("Removed all catalogue entries for plugin {}", name);
 }
 
-//   fun entries() = catalogue.entries
-//
-//   fun lookupEntry(key: String): CatalogueEntry? {
-//     return catalogue[key]
-//   }
-//
-//   fun findContentMatcher(contentType: ContentType): ContentMatcher? {
-//     val catalogueEntry = catalogue.values.find { entry ->
-//       if (entry.type == CatalogueEntryType.CONTENT_MATCHER) {
-//         val contentTypes = entry.values["content-types"]?.split(';')
-//         if (contentTypes.isNullOrEmpty()) {
-//           false
-//         } else {
-//           contentTypes.any { contentType.matches(it) }
-//         }
-//       } else {
+/// Find a content matcher in the global catalogue for the provided content type
+pub fn find_content_matcher(content_type: &ContentType) -> Option<ContentMatcher> {
+  let guard = CATALOGUE_REGISTER.lock().unwrap();
+  guard.values().find(|entry| {
+    if entry.entry_type == CatalogueEntryType::CONTENT_MATCHER {
+      if let Some(content_types) = entry.values.get("content-types") {
+        content_types.split(";").any(|ct| matches_pattern(ct.trim(), content_type))
+      } else {
+        false
+      }
+    } else {
+      false
+    }
+  }).map(|entry| ContentMatcher { catalogue_entry: entry.clone() })
+}
+
+fn matches_pattern(pattern: &str, content_type: &ContentType) -> bool {
+  let content_type = ContentType { attributes: BTreeMap::default(), .. content_type.clone() }.to_string();
+  match Regex::new(pattern) {
+    Ok(regex) => regex.is_match(content_type.as_str()),
+    Err(err) => {
+      error!("Failed to parse '{}' as a regex - {}", pattern, err);
+      false
+    }
+  }
+}
+
+// TODO
+///// Find a content genetrator in the global catalogue for the provided content type
+// pub fn find_content_generator(content_type: ContentType) -> Option<ContentGenerator> {
+//   val catalogueEntry = catalogue.values.find { entry ->
+//     if (entry.type == CatalogueEntryType.CONTENT_GENERATOR) {
+//       val contentTypes = entry.values["content-types"]?.split(';')
+//       if (contentTypes.isNullOrEmpty()) {
 //         false
-//       }
-//     }
-//     return if (catalogueEntry != null)
-//       CatalogueContentMatcher(catalogueEntry)
-//       else null
-//   }
-//
-//   fun findContentGenerator(contentType: ContentType): ContentGenerator? {
-//     val catalogueEntry = catalogue.values.find { entry ->
-//       if (entry.type == CatalogueEntryType.CONTENT_GENERATOR) {
-//         val contentTypes = entry.values["content-types"]?.split(';')
-//         if (contentTypes.isNullOrEmpty()) {
-//           false
-//         } else {
-//           contentTypes.any { contentType.matches(it) }
-//         }
 //       } else {
-//         false
+//         contentTypes.any { contentType.matches(it) }
 //       }
+//     } else {
+//       false
 //     }
-//     return if (catalogueEntry != null)
-//       CatalogueContentGenerator(catalogueEntry)
-//     else null
 //   }
+//   return if (catalogueEntry != null)
+//     CatalogueContentGenerator(catalogueEntry)
+//   else null
 // }
-//
-// private fun ContentType.matches(type: String) = this.getBaseType().orEmpty().matches(Regex(type))
-//

@@ -34,15 +34,16 @@ message Body {
 message CompareContentsRequest {
   Body expected = 1;
   Body actual = 2;
-  google.protobuf.Struct context = 3;
+  bool allow_unexpected_keys = 3;
+  map<string, MatchingRules> rules = 4;
 }
 
-message BodyTypeMismatch {
+message ContentTypeMismatch {
   string expected = 1;
   string actual = 2;
 }
 
-message BodyMismatch {
+message ContentMismatch {
   google.protobuf.BytesValue expected = 1;
   google.protobuf.BytesValue actual = 2;
   string mismatch = 3;
@@ -50,14 +51,9 @@ message BodyMismatch {
   string diff = 5;
 }
 
-message BodyItemMatchResult {
-  string key = 1;
-  repeated BodyMismatch result = 2;
-}
-
 message CompareContentsResponse {
-  BodyTypeMismatch typeMismatch = 1;
-  repeated BodyItemMatchResult results = 2;
+  ContentTypeMismatch typeMismatch = 1;
+  repeated ContentMismatch results = 2;
 }
 
 message ConfigureContentsRequest {

@@ -3,7 +3,13 @@
 use serde::{Deserialize, Serialize};
 
 use crate::child_process::ChildPluginProcess;
-use crate::proto::{InitPluginRequest, InitPluginResponse, pact_plugin_client::PactPluginClient};
+use crate::proto::{
+  InitPluginRequest,
+  InitPluginResponse,
+  CompareContentsRequest,
+  CompareContentsResponse,
+  pact_plugin_client::PactPluginClient
+};
 
 /// Type of plugin dependencies
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug)]
@@ -99,6 +105,13 @@ impl PactPlugin {
   pub async fn init_plugin(&self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
     let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
     let response = client.init_plugin(tonic::Request::new(request)).await?;
+    Ok(response.get_ref().clone())
+  }
+
+  /// Send a compare contents request to the plugin process
+  pub async fn compare_contents(&self, request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
+    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
+    let response = client.compare_contents(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 }

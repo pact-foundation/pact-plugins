@@ -9,7 +9,7 @@ use std::time::Duration;
 use anyhow::anyhow;
 use log::{debug, error, warn};
 use serde::{Deserialize, Serialize};
-use sysinfo::{Pid, ProcessExt, Signal, System, SystemExt};
+use sysinfo::{Pid, ProcessExt, Signal, System, SystemExt, RefreshKind};
 
 use crate::plugin_models::PactPluginManifest;
 
@@ -99,7 +99,7 @@ impl ChildPluginProcess {
 
   /// Kill the running plugin process
   pub fn kill(&self) {
-    let s = System::new();
+    let s = System::new_with_specifics(RefreshKind::new().with_processes());
     if let Some(process) = s.process(self.child_pid as Pid) {
       process.kill(Signal::Term);
     } else {
