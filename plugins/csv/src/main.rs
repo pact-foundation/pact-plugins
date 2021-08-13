@@ -1,27 +1,30 @@
 use core::pin::Pin;
 use core::task::{Context, Poll};
+use std::collections::HashMap;
+use std::io::Read;
 use std::net::SocketAddr;
 
 use anyhow::anyhow;
-use csv::{Writer, ReaderBuilder};
+use bytes::Bytes;
+use csv::{Reader, ReaderBuilder, StringRecord, Writer};
 use env_logger::Env;
 use futures::Stream;
 use log::debug;
 use maplit::hashmap;
-use pact_models::generators::{NoopVariantMatcher, VariantMatcher, GenerateValue};
-use pact_models::prelude::{Generator, ContentType};
+use pact_matching::matchers::Matches;
+use pact_models::bodies::OptionalBody;
+use pact_models::generators::{GenerateValue, NoopVariantMatcher, VariantMatcher};
+use pact_models::matchingrules::{MatchingRule, RuleList, RuleLogic};
+use pact_models::prelude::{ContentType, Generator};
 use prost_types::value::Kind;
 use serde_json::{json, Value};
 use tokio::net::{TcpListener, TcpStream};
 use tonic::{Request, Response, transport::Server};
 use uuid::Uuid;
-use bytes::Bytes;
-
-use proto::pact_plugin_server::{PactPlugin, PactPluginServer};
 
 use crate::parser::{parse_field, parse_value};
-use pact_models::bodies::OptionalBody;
-use std::env::var_os;
+use crate::proto::pact_plugin_server::{PactPlugin, PactPluginServer};
+use crate::proto::to_object;
 
 mod proto;
 mod parser;
@@ -193,7 +196,7 @@ impl PactPlugin for CsvPactPlugin {
 
   async fn update_catalogue(
     &self,
-    request: tonic::Request<proto::Catalogue>,
+    _request: tonic::Request<proto::Catalogue>,
   ) -> Result<tonic::Response<proto::Void>, tonic::Status> {
     debug!("Update catalogue request, ignoring");
     Ok(Response::new(proto::Void {}))
@@ -203,7 +206,71 @@ impl PactPlugin for CsvPactPlugin {
     &self,
     request: tonic::Request<proto::CompareContentsRequest>,
   ) -> Result<tonic::Response<proto::CompareContentsResponse>, tonic::Status> {
-    Err(tonic::Status::unimplemented("unimplemented"))
+    debug!("compare_contents request");
+    let request = request.get_ref();
+    match (request.expected.as_ref(), request.actual.as_ref()) {
+      (Some(expected), Some(actual)) => {
+        let expected_csv_data = expected.content.as_ref().unwrap();
+        let mut expected_rdr = ReaderBuilder::new().has_headers(false)
+          .from_reader(expected_csv_data.as_slice());
+        let actual_csv_data = actual.content.as_ref().unwrap();
+        let mut actual_rdr = ReaderBuilder::new().has_headers(false)
+          .from_reader(actual_csv_data.as_slice());
+        let rules = request.rules.iter()
+          .map(|(key, rules)| {
+            let rules = rules.rule.iter().fold(RuleList::empty(RuleLogic::And), |mut list, rule| {
+              match to_object(&rule.values.as_ref().unwrap()) {
+                Value::Object(mut map) => {
+                  map.insert("match".to_string(), Value::String(rule.r#type.clone()));
+                  debug!("Creating matching rule with {:?}", map);
+                  list.add_rule(&MatchingRule::from_json(&Value::Object(map)).unwrap());
+                }
+                _ => {}
+              }
+              list
+            });
+            (key.clone(), rules)
+          }).collect();
+        compare_contents(&mut expected_rdr, &mut actual_rdr, request.allow_unexpected_keys, rules)
+          .map_err(|err| tonic::Status::aborted(format!("Failed to compare CSV contents: {}", err)))
+      }
+      (None, Some(actual)) => {
+        let contents = actual.content.as_ref().unwrap();
+        Ok(Response::new(proto::CompareContentsResponse {
+          type_mismatch: None,
+          results: vec![
+            proto::ContentMismatch {
+              expected: None,
+              actual: Some(contents.clone()),
+              mismatch: format!("Expected no CSV content, but got {} bytes", contents.len()),
+              path: "".to_string(),
+              diff: "".to_string()
+            }
+          ]
+        }))
+      }
+      (Some(expected), None) => {
+        let contents = expected.content.as_ref().unwrap();
+        Ok(Response::new(proto::CompareContentsResponse {
+          type_mismatch: None,
+          results: vec![
+            proto::ContentMismatch {
+              expected: Some(contents.clone()),
+              actual: None,
+              mismatch: format!("Expected CSV content, but did not get any"),
+              path: "".to_string(),
+              diff: "".to_string()
+            }
+          ]
+        }))
+      }
+      (None, None) => {
+        Ok(Response::new(proto::CompareContentsResponse {
+          type_mismatch: None,
+          results: vec![]
+        }))
+      }
+    }
   }
 
   async fn configure_contents(
@@ -239,6 +306,82 @@ impl PactPlugin for CsvPactPlugin {
   }
 }
 
+fn compare_contents<R: Read>(
+  expected: &mut Reader<R>,
+  actual: &mut Reader<R>,
+  allow_unexpected_keys: bool,
+  rules: HashMap<String, RuleList>
+) -> anyhow::Result<tonic::Response<proto::CompareContentsResponse>> {
+  debug!("Comparing contents using allow_unexpected_keys ({}) and rules ({:?})", allow_unexpected_keys, rules);
+
+  let mut expected_records = expected.records();
+  let mut actual_records = actual.records();
+  let mut results = vec![];
+
+  let expected_row = expected_records.next()
+    .ok_or_else(|| anyhow!("Could not read the expected content"))??;
+  let actual_row = actual_records.next()
+    .ok_or_else(|| anyhow!("Could not read the expected content"))??;
+  if actual_row.len() < expected_row.len() {
+    results.push(proto::ContentMismatch {
+      expected: Some(format!("{} columns", expected_row.len()).as_bytes().to_vec()),
+      actual: Some(format!("{} columns", actual_row.len()).as_bytes().to_vec()),
+      mismatch: format!("Expected {} columns, but got {}", expected_row.len(), actual_row.len()),
+      path: String::default(),
+      diff: String::default()
+    });
+  } else if actual_row.len() > expected_row.len() && !allow_unexpected_keys {
+    results.push(proto::ContentMismatch {
+      expected: Some(format!("{} columns", expected_row.len()).as_bytes().to_vec()),
+      actual: Some(format!("{} columns", actual_row.len()).as_bytes().to_vec()),
+      mismatch: format!("Expected at least {} columns, but got {}", expected_row.len(), actual_row.len()),
+      path: String::default(),
+      diff: String::default()
+    });
+  }
+
+  compare_row(&expected_row, &actual_row, &rules, &mut results);
+  for row in actual_records {
+    compare_row(&expected_row, &row?, &rules, &mut results);
+  }
+
+  Ok(Response::new(proto::CompareContentsResponse {
+    type_mismatch: None,
+    results
+  }))
+}
+
+fn compare_row(
+  expected_row: &StringRecord,
+  actual_row: &StringRecord,
+  rules: &HashMap<String, RuleList>,
+  results: &mut Vec<proto::ContentMismatch>) {
+  for (index, item) in actual_row.iter().enumerate() {
+    let expected_item = expected_row.get(index).unwrap_or_default();
+    let path = format!("column:{}", index);
+    if let Some(rules) = rules.get(&path) {
+      for rule in &rules.rules {
+        if let Err(err) = expected_item.matches_with(item, rule, false) {
+          results.push(proto::ContentMismatch {
+            expected: Some(expected_item.as_bytes().to_vec()),
+            actual: Some(item.as_bytes().to_vec()),
+            mismatch: err.to_string(),
+            path: format!("row:{:5}, column:{:2}", actual_row.position().unwrap().line(), index),
+            diff: String::default()
+          });
+        }
+      }
+    } else if item != expected_item {
+      results.push(proto::ContentMismatch {
+        expected: Some(expected_item.as_bytes().to_vec()),
+        actual: Some(item.as_bytes().to_vec()),
+        mismatch: format!("Expected column {} value to equal '{}', but got '{}'", index, expected_item, item),
+        path: format!("row:{:5}, column:{:2}", actual_row.position().unwrap().line(), index),
+        diff: String::default()
+      });
+    }
+  }
+}
 
 struct TcpIncoming {
   inner: TcpListener

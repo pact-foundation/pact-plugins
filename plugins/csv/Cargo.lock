@@ -1168,7 +1168,7 @@ dependencies = [
  "logos",
  "maplit",
  "pact_matching",
- "pact_models 0.1.1",
+ "pact_models",
  "prost",
  "prost-types",
  "serde_json",
@@ -1188,8 +1188,10 @@ dependencies = [
  "lazy_static",
  "log",
  "maplit",
+ "pact_models",
  "prost",
  "prost-types",
+ "regex",
  "serde",
  "serde_json",
  "sysinfo",
@@ -1200,9 +1202,7 @@ dependencies = [
 
 [[package]]
 name = "pact_matching"
-version = "0.10.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "537ac3b94ab7e589e81a0493056324f500227b37be8c8d7739833f0c381260e0"
+version = "0.10.1"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -1221,7 +1221,8 @@ dependencies = [
  "multipart",
  "nom",
  "onig",
- "pact_models 0.1.0",
+ "pact-plugin-driver",
+ "pact_models",
  "rand 0.8.4",
  "semver 0.11.0",
  "serde",
@@ -1229,40 +1230,6 @@ dependencies = [
  "sxd-document",
  "tokio",
  "tree_magic_mini",
- "uuid",
-]
-
-[[package]]
-name = "pact_models"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e599bd32a95883f1cf3e99c838df9e34eb95fd887faf977dddca6e9e574e7c8"
-dependencies = [
- "anyhow",
- "base64",
- "bytes",
- "chrono",
- "chrono-tz",
- "fs2",
- "hex",
- "indextree",
- "itertools",
- "lazy_static",
- "lenient_semver",
- "log",
- "maplit",
- "mime",
- "nom",
- "onig",
- "parse-zoneinfo",
- "rand 0.8.4",
- "rand_regex",
- "regex",
- "regex-syntax",
- "reqwest",
- "serde",
- "serde_json",
- "sxd-document",
  "uuid",
 ]
 
@@ -1286,7 +1253,6 @@ dependencies = [
  "mime",
  "nom",
  "onig",
- "pact-plugin-driver",
  "parse-zoneinfo",
  "rand 0.8.4",
  "rand_regex",
