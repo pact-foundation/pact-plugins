@@ -11,13 +11,19 @@ dependencies {
   implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.1'
 
   testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.0'
-  testImplementation 'au.com.dius.pact.consumer:junit5:4.3.0-beta.0'
+  testImplementation 'au.com.dius.pact.consumer:junit5:4.3.0-beta.1'
   testImplementation 'io.pact.plugins.jvm:core:0.0.0'
   testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.0'
   testImplementation 'ch.qos.logback:logback-classic:1.2.5'
   testImplementation 'org.hamcrest:hamcrest:2.1'
+  testImplementation('com.github.javafaker:javafaker:1.0.2') {
+    exclude group: 'org.yaml'
+  }
+  implementation 'org.yaml:snakeyaml:1.26'
 }
 
 test {
   useJUnitPlatform()
+  systemProperty('pact.mockserver.addCloseHeader', 'true')
+  systemProperty('http.keepAlive', 'false')
 }

@@ -53,6 +53,8 @@ message ContentMismatch {
 
 message CompareContentsResponse {
   ContentTypeMismatch typeMismatch = 1;
+  // TODO: This needs to be a list of results where each result has a key and a list of
+  // mismatches
   repeated ContentMismatch results = 2;
 }
 

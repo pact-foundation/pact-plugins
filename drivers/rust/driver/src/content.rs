@@ -22,8 +22,10 @@ pub struct ContentMatcher {
 #[derive(Clone, Debug)]
 pub struct ContentMismatch {
   /// Expected value in string format
+  // TODO: change to bytes
   pub expected: String,
   /// Actual value in string format
+  // TODO: change to bytes
   pub actual: String,
   /// Mismatch description
   pub mismatch: String,
