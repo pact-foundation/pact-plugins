@@ -68,6 +68,26 @@ object CatalogueManager : KLogging() {
       CatalogueContentGenerator(catalogueEntry)
     else null
   }
+
+  // TODO
+  // /// Remove entries for a plugin
+  //pub fn remove_plugin_entries(name: &String) {
+  //  let prefix = format!("plugin/{}/", name);
+  //  let keys: Vec<String> = {
+  //    let guard = CATALOGUE_REGISTER.lock().unwrap();
+  //    guard.keys()
+  //      .filter(|key| key.starts_with(&prefix))
+  //      .cloned()
+  //      .collect()
+  //  };
+  //
+  //  let mut guard = CATALOGUE_REGISTER.lock().unwrap();
+  //  for key in keys {
+  //    guard.remove(&key);
+  //  }
+  //
+  //  debug!("Removed all catalogue entries for plugin {}", name);
+  //}
 }
 
 private fun ContentType.matches(type: String) = this.getBaseType().orEmpty().matches(Regex(type))

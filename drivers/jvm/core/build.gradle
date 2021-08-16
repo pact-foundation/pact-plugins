@@ -20,13 +20,14 @@ dependencies {
     implementation('io.github.microutils:kotlin-logging:2.0.10') {
         exclude group: 'org.jetbrains.kotlin'
     }
-    implementation('com.michael-bull.kotlin-result:kotlin-result:1.1.9') {
+    implementation('com.michael-bull.kotlin-result:kotlin-result:1.1.10') {
         exclude group: 'org.jetbrains.kotlin'
     }
     implementation 'javax.json:javax.json-api:1.1.4'
     implementation 'org.glassfish:javax.json:1.1.4'
     implementation 'org.apache.commons:commons-lang3:3.12.0'
-    implementation 'au.com.dius.pact.core:model:4.3.0-beta.0'
+    implementation 'au.com.dius.pact.core:support:4.3.0-beta.1'
+    implementation 'au.com.dius.pact.core:model:4.3.0-beta.1'
 
     protobuf files('../../../proto/')
 

@@ -3,7 +3,16 @@ package io.pact.plugins.jvm.core
 import au.com.dius.pact.core.model.OptionalBody
 import au.com.dius.pact.core.model.generators.Generators
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
+import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
 import mu.KLogging
+
+data class ContentMismatch(
+  val expected: ByteArray,
+  val actual: ByteArray,
+  val mismatch: String,
+  val path: String,
+  val diff : String? = null
+)
 
 interface ContentMatcher {
   val isCore: Boolean
@@ -14,6 +23,13 @@ interface ContentMatcher {
     contentType: String,
     bodyConfig: Map<String, Any?>
   ): Triple<OptionalBody, MatchingRuleCategory?, Generators?>
+
+  fun invokeContentMatcher(
+    expected: OptionalBody,
+    actual: OptionalBody,
+    allowUnexpectedKeys: Boolean,
+    rules: Map<String, MatchingRuleGroup>
+  ): List<ContentMismatch>
 }
 
 data class CatalogueContentMatcher(
@@ -32,6 +48,24 @@ data class CatalogueContentMatcher(
   ): Triple<OptionalBody, MatchingRuleCategory?, Generators?> {
     logger.debug { "Sending configureContentMatcherInteraction request to for plugin $catalogueEntry" }
     return DefaultPluginManager.configureContentMatcherInteraction(this, contentType, bodyConfig)
+  }
+
+  override fun invokeContentMatcher(
+    expected: OptionalBody,
+    actual: OptionalBody,
+    allowUnexpectedKeys: Boolean,
+    rules: Map<String, MatchingRuleGroup>
+  ): List<ContentMismatch> {
+    val result = DefaultPluginManager.invokeContentMatcher(this, expected, actual, allowUnexpectedKeys, rules)
+    return result.resultsList.map {
+      ContentMismatch(
+        it.expected.toByteArray(),
+        it.actual.toByteArray(),
+        it.mismatch,
+        it.path,
+        it.diff
+      )
+    }
   }
 
   companion object : KLogging()

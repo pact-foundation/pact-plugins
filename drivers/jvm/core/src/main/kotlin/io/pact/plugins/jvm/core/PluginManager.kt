@@ -35,15 +35,12 @@ import java.io.File
 import java.io.IOException
 import java.io.InputStreamReader
 import java.lang.Runtime.getRuntime
-import java.lang.reflect.InvocationTargetException
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.json.Json
 import javax.json.JsonObject
-import kotlin.reflect.full.createInstance
-import kotlin.reflect.full.memberFunctions
 
 enum class PluginDependencyType {
   OSPackage, Plugin, Library, Executable
@@ -161,10 +158,11 @@ interface PluginManager {
    */
   fun invokeContentMatcher(
     matcher: ContentMatcher,
-    expected: Any,
-    actual: Any,
-    context: Any
-  ): Any?
+    expected: OptionalBody,
+    actual: OptionalBody,
+    allowUnexpectedKeys: Boolean,
+    rules: Map<String, MatchingRuleGroup>
+  ): Plugin.CompareContentsResponse
 
 
   /**
@@ -230,37 +228,36 @@ object DefaultPluginManager: KLogging(), PluginManager {
 
   override fun invokeContentMatcher(
     matcher: ContentMatcher,
-    expected: Any,
-    actual: Any,
-    context: Any
-  ): Any? {
-    return when {
-      matcher is CatalogueContentMatcher && matcher.isCore -> {
-        val clazz = Class.forName(matcher.catalogueEntry.values["implementation"]).kotlin
-        val bodyMatcher = clazz.objectInstance ?: clazz.createInstance()
-        try {
-          clazz.memberFunctions.find { it.name == "matchBody" }!!.call(bodyMatcher, expected, actual, context)
-        } catch (e: InvocationTargetException) {
-          throw e.targetException
-        }
-      }
-      matcher is CatalogueContentMatcher -> {
+    expected: OptionalBody,
+    actual: OptionalBody,
+    allowUnexpectedKeys: Boolean,
+    rules: Map<String, MatchingRuleGroup>
+  ): Plugin.CompareContentsResponse {
+    return when (matcher) {
+      is CatalogueContentMatcher -> {
         val request = Plugin.CompareContentsRequest.newBuilder()
-          .setExpected(Plugin.Body.newBuilder())
-          .setActual(Plugin.Body.newBuilder())
-          .setContext(com.google.protobuf.Struct.parseFrom(
-//            Json.toJson(context).serialise().toByteArray()
-            "".toByteArray()
-          ))
+          .setExpected(Plugin.Body.newBuilder().setContent(
+            BytesValue.newBuilder().setValue(ByteString.copyFrom(expected.orEmpty()))))
+          .setActual(Plugin.Body.newBuilder().setContent(
+            BytesValue.newBuilder().setValue(ByteString.copyFrom(actual.orEmpty()))))
+          .setAllowUnexpectedKeys(allowUnexpectedKeys)
+          .putAllRules(rules.entries.associate { (key, rules) ->
+            key to Plugin.MatchingRules.newBuilder().addAllRule(
+              rules.rules.map { rule ->
+                val builder = Plugin.MatchingRule.newBuilder()
+                builder
+                  .setType(rule.name)
+                  .setValues(builder.valuesBuilder.putAllFields(rule.attributes.entries.associate {
+                    it.key to jsonToValue(it.value)
+                  }.toMutableMap()))
+                  .build()
+              }
+            ).build()
+          })
           .build()
-        PLUGIN_REGISTER[matcher.catalogueEntry.key]!!.stub!!.compareContents(request)
-      }
-      matcher.isCore -> {
-        try {
-          matcher::class.memberFunctions.find { it.name == "matchBody" }!!.call(matcher, expected, actual, context)
-        } catch (e: InvocationTargetException) {
-          throw e.targetException
-        }
+        val plugin = lookupPlugin(matcher.pluginName, null) ?:
+          throw PactPluginNotFoundException(matcher.pluginName, null)
+        plugin.stub!!.compareContents(request)
       }
       else -> throw RuntimeException("Mis-configured content type matcher $matcher")
     }
