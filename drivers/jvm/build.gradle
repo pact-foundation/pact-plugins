@@ -59,7 +59,7 @@ subprojects {
         artifact javadocJar
         pom {
           name = project.name
-          description = project.description
+          description = 'Pact Plugin Driver implementation'
           url = 'https://github.com/pact-foundation/pact-plugins'
           licenses {
             license {
