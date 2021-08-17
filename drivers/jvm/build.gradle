@@ -19,8 +19,7 @@ subprojects {
     mavenCentral()
   }
 
-  version = '0.0.0'
-  group = 'io.pact.plugins.jvm'
+  version = '0.0.1'
 
   targetCompatibility = '11'
   sourceCompatibility = '11'
@@ -91,7 +90,7 @@ subprojects {
     }
     repositories {
       maven {
-        url "https://oss.sonatype.org/service/local/staging/deploy/maven2"
+        url "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2"
         if (project.hasProperty('sonatypeUsername')) {
           credentials {
             username sonatypeUsername
@@ -102,10 +101,9 @@ subprojects {
     }
   }
 
-  if (System.env.CI != 'true') {
-    signing {
-      sign publishing.publications.mavenPublication
-    }
+  signing {
+    required { project.hasProperty('isRelease') }
+    sign publishing.publications.mavenPublication
   }
 
   detekt {
