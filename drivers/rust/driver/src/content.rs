@@ -43,7 +43,11 @@ impl ContentMatcher {
 
   /// Catalogue entry key for this matcher
   pub fn catalogue_entry_key(&self) -> String {
-    format!("plugin/{}/content-matcher/{}", self.plugin_name(), self.catalogue_entry.key)
+    if self.is_core() {
+      format!("core/content-matcher/{}", self.catalogue_entry.key)
+    } else {
+      format!("plugin/{}/content-matcher/{}", self.plugin_name(), self.catalogue_entry.key)
+    }
   }
 
   /// Plugin name that provides this matcher

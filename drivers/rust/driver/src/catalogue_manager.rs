@@ -7,9 +7,11 @@ use std::sync::Mutex;
 use itertools::Itertools;
 use lazy_static::lazy_static;
 use log::{debug, error};
-use pact_models::content_types::ContentType;
+use maplit::hashset;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+
+use pact_models::content_types::ContentType;
 
 use crate::content::ContentMatcher;
 use crate::plugin_models::PactPluginManifest;
@@ -117,14 +119,20 @@ pub fn register_plugin_entries(plugin: &PactPluginManifest, catalogue_list: &Vec
 
 /// Register the core Pact framework entries in the global catalogue
 pub fn register_core_entries(entries: &Vec<CatalogueEntry>) {
-  let mut guard = CATALOGUE_REGISTER.lock().unwrap();
+  let mut inner = CATALOGUE_REGISTER.lock().unwrap();
 
+  let mut updated_keys = hashset!();
   for entry in entries {
     let key = format!("core/{}/{}", entry.entry_type, entry.key);
-    guard.insert(key.clone(), entry.clone());
+    if !inner.contains_key(&key) {
+      inner.insert(key.clone(), entry.clone());
+      updated_keys.insert(key.clone());
+    }
   }
 
-  debug!("Updated catalogue entries:\n{}", guard.keys().sorted().join("\n"))
+  if !updated_keys.is_empty() {
+    debug!("Updated catalogue entries:\n{}", updated_keys.iter().sorted().join("\n"));
+  }
 }
 
 /// Remove entries for a plugin
@@ -148,11 +156,12 @@ pub fn remove_plugin_entries(name: &String) {
 
 /// Find a content matcher in the global catalogue for the provided content type
 pub fn find_content_matcher(content_type: &ContentType) -> Option<ContentMatcher> {
+  debug!("Looking for a content matcher for {}", content_type);
   let guard = CATALOGUE_REGISTER.lock().unwrap();
   guard.values().find(|entry| {
     if entry.entry_type == CatalogueEntryType::CONTENT_MATCHER {
       if let Some(content_types) = entry.values.get("content-types") {
-        content_types.split(";").any(|ct| matches_pattern(ct.trim(), content_type))
+        content_types.split(",").any(|ct| matches_pattern(ct.trim(), content_type))
       } else {
         false
       }
