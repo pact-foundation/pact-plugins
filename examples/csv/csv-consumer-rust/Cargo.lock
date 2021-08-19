@@ -229,6 +229,7 @@ dependencies = [
 name = "csv-consumer-rust"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "env_logger",
  "expectest",
  "pact_consumer",

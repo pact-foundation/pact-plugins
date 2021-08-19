@@ -6,6 +6,7 @@ edition = "2018"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 reqwest = "0.11.4"
+anyhow = "1.0.43"
 
 [dev-dependencies]
 expectest = "0.12.0"
