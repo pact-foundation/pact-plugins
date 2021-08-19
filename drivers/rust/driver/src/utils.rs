@@ -2,12 +2,13 @@
 
 use std::collections::HashMap;
 
-use prost_types::{Struct, ListValue};
-use serde_json::Value;
+use prost_types::{ListValue, Struct};
+use prost_types::value::Kind;
+use serde_json::{json, Value};
 
-pub(crate) fn to_proto_struct(values: HashMap<&str, Value>) -> Struct {
+pub(crate) fn to_proto_struct(values: HashMap<String, Value>) -> Struct {
   Struct {
-    fields: values.iter().map(|(k, v)| (k.to_string(), to_proto_value(v))).collect()
+    fields: values.iter().map(|(k, v)| (k.clone(), to_proto_value(v))).collect()
   }
 }
 
@@ -29,5 +30,25 @@ fn to_proto_value(val: &Value) -> prost_types::Value {
     Value::Object(o) => prost_types::Value { kind: Some(prost_types::value::Kind::StructValue(Struct {
       fields: o.iter().map(|(k, v)| (k.clone(), to_proto_value(v))).collect()
     }))}
+  }
+}
+
+pub(crate) fn proto_struct_to_json(val: &prost_types::Struct) -> Value {
+  Value::Object(val.fields.iter()
+    .map(|(k, v)| (k.clone(), proto_value_to_json(v))).collect())
+}
+
+pub(crate) fn proto_value_to_json(val: &prost_types::Value) -> Value {
+  match &val.kind {
+    Some(kind) => match kind {
+      Kind::NullValue(_) => Value::Null,
+      Kind::NumberValue(n) => json!(n),
+      Kind::StringValue(s) => Value::String(s.clone()),
+      Kind::BoolValue(b) => Value::Bool(*b),
+      Kind::StructValue(s) => proto_struct_to_json(s),
+      Kind::ListValue(l) => Value::Array(l.values.iter()
+        .map(|v| proto_value_to_json(v)).collect())
+    }
+    None => Value::Null
   }
 }

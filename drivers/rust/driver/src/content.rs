@@ -1,15 +1,21 @@
 //! Support for matching and generating content based on content types
-
+use std::collections::HashMap;
 use std::str::from_utf8;
 
-use log::error;
+use anyhow::anyhow;
+use bytes::Bytes;
+use log::{debug, error};
+use maplit::hashmap;
 use pact_models::bodies::OptionalBody;
-use pact_models::matchingrules::MatchingRuleCategory;
+use pact_models::matchingrules::{Category, MatchingRule, MatchingRuleCategory, RuleList};
+use pact_models::path_exp::DocPath;
+use pact_models::prelude::{ContentType, Generator, Generators, RuleLogic, GeneratorCategory};
+use serde_json::Value;
 
 use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
 use crate::plugin_manager::lookup_plugin;
-use crate::proto::{Body, CompareContentsRequest, MatchingRule, MatchingRules};
-use crate::utils::to_proto_struct;
+use crate::proto::{Body, CompareContentsRequest, ConfigureContentsRequest};
+use crate::utils::{proto_struct_to_json, to_proto_struct};
 
 /// Matcher for contents based on content type
 #[derive(Clone, Debug)]
@@ -57,14 +63,79 @@ impl ContentMatcher {
       .unwrap_or("core".to_string())
   }
 
-  // TODO
-  // override fun configureContent(
-  // contentType: String,
-  // bodyConfig: Map<String, Any?>
-  // ): Triple<OptionalBody, MatchingRuleCategory?, Generators?> {
-  // logger.debug { "Sending configureContentMatcherInteraction request to for plugin $catalogueEntry" }
-  // return DefaultPluginManager.configureContentMatcherInteraction(this, contentType, bodyConfig)
-  // }
+  /// Get the plugin to configure the contents for the interaction part based on the provided
+  /// definition
+  pub async fn configure_content(
+    &self,
+    content_type: &ContentType,
+    definition: HashMap<String, Value>
+  ) -> anyhow::Result<(OptionalBody, Option<MatchingRuleCategory>, Option<Generators>)> {
+    debug!("Sending ConfigureContents request to plugin {:?}", self.catalogue_entry);
+    let request = ConfigureContentsRequest {
+      content_type: content_type.to_string(),
+      contents_config: Some(to_proto_struct(definition)),
+    };
+
+    let plugin_manifest = self.catalogue_entry.plugin.as_ref()
+      .expect("Plugin type is required");
+    match lookup_plugin(&plugin_manifest.as_dependency()) {
+      Some(plugin) => match plugin.configure_contents(request).await {
+        Ok(response) => {
+          debug!("Got response: {:?}", response);
+          let body = match response.contents {
+            Some(body) => {
+              let returned_content_type = ContentType::parse(body.content_type.as_str()).ok();
+              let contents = body.content.unwrap_or_default();
+              OptionalBody::Present(Bytes::from(contents), returned_content_type)
+            },
+            None => OptionalBody::Missing
+          };
+
+          let rules = MatchingRuleCategory {
+            name: Category::BODY,
+            rules: response.rules.iter().map(|(k, rules)| {
+              // TODO: This is unwrapping the DocPath
+              (DocPath::new(k).unwrap(), RuleList {
+                rules: rules.rule.iter().map(|rule| {
+                  // TODO: This is unwrapping the MatchingRule
+                  MatchingRule::create(rule.r#type.as_str(), &rule.values.as_ref().map(|rule| {
+                    proto_struct_to_json(rule)
+                  }).unwrap_or_default()).unwrap()
+                }).collect(),
+                rule_logic: RuleLogic::And,
+                cascaded: false
+              })
+            }).collect()
+          };
+
+          let generators = Generators {
+            categories: hashmap!{
+              GeneratorCategory::BODY => response.generators.iter().map(|(k, gen)| {
+                // TODO: This is unwrapping the DocPath
+                // TODO: This is unwrapping the Generator
+                (DocPath::new(k).unwrap(), Generator::create(gen.r#type.as_str(),
+                  &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default()).unwrap())
+              }).collect()
+            }
+          };
+
+          debug!("body={}", body);
+          debug!("rules={:?}", rules);
+          debug!("generators={:?}", generators);
+
+          Ok((body, Some(rules), Some(generators)))
+        }
+        Err(err) => {
+          error!("Call to plugin failed - {}", err);
+          Err(anyhow!("Call to plugin failed - {}", err))
+        }
+      },
+      None => {
+        error!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry);
+        Err(anyhow!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry))
+      }
+    }
+  }
 
   /// Get the plugin to match the contents against the expected contents returning all the mismatches.
   /// Note that it is an error to call this with a non-plugin (core) content matcher.
@@ -89,11 +160,11 @@ impl ContentMatcher {
       }),
       allow_unexpected_keys,
       rules: context.rules.iter().map(|(k, r)| {
-        (k.to_string(), MatchingRules {
+        (k.to_string(), crate::proto::MatchingRules {
           rule: r.rules.iter().map(|rule|{
-            MatchingRule {
+            crate::proto::MatchingRule {
               r#type: rule.name(),
-              values: Some(to_proto_struct(rule.values())),
+              values: Some(to_proto_struct(rule.values().iter().map(|(k, v)| (k.to_string(), v.clone())).collect())),
             }
           }).collect()
         })

@@ -161,7 +161,7 @@ pub fn find_content_matcher(content_type: &ContentType) -> Option<ContentMatcher
   guard.values().find(|entry| {
     if entry.entry_type == CatalogueEntryType::CONTENT_MATCHER {
       if let Some(content_types) = entry.values.get("content-types") {
-        content_types.split(",").any(|ct| matches_pattern(ct.trim(), content_type))
+        content_types.split(";").any(|ct| matches_pattern(ct.trim(), content_type))
       } else {
         false
       }

@@ -232,40 +232,6 @@ pub fn shutdown_plugins() {
 //     }
 //   }
 //
-//   override fun configureContentMatcherInteraction(
-//     matcher: ContentMatcher,
-//     contentType: String,
-//     bodyConfig: Map<String, Any?>
-//   ): Triple<OptionalBody, MatchingRuleCategory?, Generators?> {
-//     val builder = com.google.protobuf.Struct.newBuilder()
-//     bodyConfig.forEach { (key, value) ->
-//       builder.putFields(key, jsonToValue(toJson(value)))
-//     }
-//     val request = Plugin.ConfigureContentsRequest.newBuilder()
-//       .setContentType(contentType)
-//       .setContentsConfig(builder)
-//       .build()
-//     val plugin = lookupPlugin(matcher.pluginName, null) ?:
-//       throw PactPluginNotFoundException(matcher.pluginName, null)
-//     logger.debug { "Sending configureContents request to plugin ${plugin.manifest}" }
-//     val response = plugin.stub!!.configureContents(request)
-//     logger.debug { "Got response: $response" }
-//     val returnedContentType = ContentType(response.contents.contentType)
-//     val body = OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType)
-//     val rules = MatchingRuleCategory("body", response.rulesMap.entries.associate { (key, value) ->
-//       key to MatchingRuleGroup(value.ruleList.map {
-//         MatchingRule.create(it.type, structToJson(it.values))
-//       }.toMutableList(), RuleLogic.AND, false)
-//     }.toMutableMap())
-//     val generators = Generators(mutableMapOf(Category.BODY to response.generatorsMap.mapValues {
-//       createGenerator(it.value.type, structToJson(it.value.values))
-//     }.toMutableMap()))
-//     logger.debug { "body=$body" }
-//     logger.debug { "rules=$rules" }
-//     logger.debug { "generators=$generators" }
-//     return Triple(body, rules, generators)
-//   }
-//
 //   override fun generateContent(
 //     contentGenerator: CatalogueContentGenerator,
 //     contentType: ContentType,

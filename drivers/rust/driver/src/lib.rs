@@ -5,5 +5,5 @@ pub mod plugin_manager;
 mod child_process;
 mod proto;
 pub mod catalogue_manager;
-mod content;
+pub mod content;
 mod utils;
