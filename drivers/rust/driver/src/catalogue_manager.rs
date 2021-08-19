@@ -13,7 +13,7 @@ use serde::{Deserialize, Serialize};
 
 use pact_models::content_types::ContentType;
 
-use crate::content::ContentMatcher;
+use crate::content::{ContentMatcher, ContentGenerator};
 use crate::plugin_models::PactPluginManifest;
 use crate::proto::CatalogueEntry as ProtoCatalogueEntry;
 
@@ -182,22 +182,19 @@ fn matches_pattern(pattern: &str, content_type: &ContentType) -> bool {
   }
 }
 
-// TODO
-///// Find a content genetrator in the global catalogue for the provided content type
-// pub fn find_content_generator(content_type: ContentType) -> Option<ContentGenerator> {
-//   val catalogueEntry = catalogue.values.find { entry ->
-//     if (entry.type == CatalogueEntryType.CONTENT_GENERATOR) {
-//       val contentTypes = entry.values["content-types"]?.split(';')
-//       if (contentTypes.isNullOrEmpty()) {
-//         false
-//       } else {
-//         contentTypes.any { contentType.matches(it) }
-//       }
-//     } else {
-//       false
-//     }
-//   }
-//   return if (catalogueEntry != null)
-//     CatalogueContentGenerator(catalogueEntry)
-//   else null
-// }
+/// Find a content genetrator in the global catalogue for the provided content type
+pub fn find_content_generator(content_type: &ContentType) -> Option<ContentGenerator> {
+  debug!("Looking for a content generator for {}", content_type);
+  let guard = CATALOGUE_REGISTER.lock().unwrap();
+  guard.values().find(|entry| {
+    if entry.entry_type == CatalogueEntryType::CONTENT_GENERATOR {
+      if let Some(content_types) = entry.values.get("content-types") {
+        content_types.split(";").any(|ct| matches_pattern(ct.trim(), content_type))
+      } else {
+        false
+      }
+    } else {
+      false
+    }
+  }).map(|entry| ContentGenerator { catalogue_entry: entry.clone() })
+}

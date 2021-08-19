@@ -36,6 +36,7 @@ mod tests {
   use pact_consumer::prelude::*;
   use pact_models::prelude::*;
   use serde_json::json;
+  use regex::Regex;
 
   use crate::CsvClient;
 
@@ -60,7 +61,12 @@ mod tests {
       .start_mock_server();
 
     let client = CsvClient::new(csv_service.url().clone());
-    let data = client.fetch("report001.csv").await;
-    expect!(data).to(be_ok().value("Name,100,2000-01-01\n"));
+    let data = client.fetch("report001.csv").await.unwrap();
+    let columns: Vec<&str> = data.trim().split(",").collect();
+    expect!(columns.get(0)).to(be_some().value(&"Name"));
+    expect!(columns.get(1)).to(be_some().value(&"100"));
+    let date = columns.get(2).unwrap();
+    let re = Regex::new("\\d{4}-\\d{2}-\\d{2}").unwrap();
+    expect!(re.is_match(date)).to(be_true());
   }
 }

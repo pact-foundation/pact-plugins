@@ -14,7 +14,7 @@ use serde_json::Value;
 
 use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
 use crate::plugin_manager::lookup_plugin;
-use crate::proto::{Body, CompareContentsRequest, ConfigureContentsRequest};
+use crate::proto::{Body, CompareContentsRequest, ConfigureContentsRequest, GenerateContentRequest};
 use crate::utils::{proto_struct_to_json, to_proto_struct};
 
 /// Matcher for contents based on content type
@@ -235,38 +235,75 @@ impl ContentMatcher {
   }
 }
 
-// package io.pact.plugins.jvm.core
-//
-// import au.com.dius.pact.core.model.ContentType
-// import au.com.dius.pact.core.model.OptionalBody
-// import au.com.dius.pact.core.model.generators.Generator
-// import mu.KLogging
-//
-// /**
-//  * Interface to a content generator
-//  */
-// interface ContentGenerator {
-//   val catalogueEntry: CatalogueEntry
-//   /**
-//    * If this is a core generator or from a plugin
-//    */
-//   val isCore: Boolean
-//
-//   /**
-//    * Generate the contents for the body, using the provided generators
-//    */
-//   fun generateContent(contentType: ContentType, generators: Map<String, Generator>, body: OptionalBody): OptionalBody
-// }
-//
-// open class CatalogueContentGenerator(override val catalogueEntry: CatalogueEntry) : ContentGenerator, KLogging() {
-//   override val isCore: Boolean
-//     get() = catalogueEntry.providerType == CatalogueEntryProviderType.CORE
-//
-//   override fun generateContent(
-//     contentType: ContentType,
-//     generators: Map<String, Generator>,
-//     body: OptionalBody
-//   ): OptionalBody {
-//     return DefaultPluginManager.generateContent(this, contentType, generators, body)
-//   }
-// }
+/// Generator for contents based on content type
+#[derive(Clone, Debug)]
+pub struct ContentGenerator {
+  /// Catalogue entry for this content matcher
+  pub catalogue_entry: CatalogueEntry
+}
+
+impl ContentGenerator {
+  /// If this is a core framework generator
+  pub fn is_core(&self) -> bool {
+    self.catalogue_entry.provider_type == CatalogueEntryProviderType::CORE
+  }
+
+  /// Catalogue entry key for this generator
+  pub fn catalogue_entry_key(&self) -> String {
+    if self.is_core() {
+      format!("core/content-generator/{}", self.catalogue_entry.key)
+    } else {
+      format!("plugin/{}/content-generator/{}", self.plugin_name(), self.catalogue_entry.key)
+    }
+  }
+
+  /// Plugin name that provides this matcher
+  pub fn plugin_name(&self) -> String {
+    self.catalogue_entry.plugin.as_ref()
+      .map(|p| p.name.clone())
+      .unwrap_or("core".to_string())
+  }
+
+  /// Generate the content for the given content type and body
+  pub async fn generate_content(
+    &self,
+    content_type: &ContentType,
+    generators: &HashMap<String, Generator>,
+    body: &OptionalBody
+  ) -> anyhow::Result<OptionalBody> {
+    let request = GenerateContentRequest {
+      contents: Some(crate::proto::Body {
+        content_type: content_type.to_string(),
+        content: Some(body.value().unwrap_or_default().to_vec())
+      }),
+      generators: generators.iter().map(|(k, v)| {
+        (k.clone(), crate::proto::Generator {
+          r#type: v.name(),
+          values: Some(to_proto_struct(v.values().iter()
+            .map(|(k, v)| (k.to_string(), v.clone())).collect())),
+        })
+      }).collect()
+    };
+
+    let plugin_manifest = self.catalogue_entry.plugin.as_ref()
+      .expect("Plugin type is required");
+    match lookup_plugin(&plugin_manifest.as_dependency()) {
+      Some(plugin) => {
+        debug!("Sending generateContent request to plugin {:?}", plugin_manifest);
+        match plugin.generate_content(request).await?.contents {
+          Some(contents) => {
+            Ok(OptionalBody::Present(
+              Bytes::from(contents.content.unwrap_or_default()),
+              ContentType::parse(contents.content_type.as_str()).ok()
+            ))
+          }
+          None => Ok(OptionalBody::Empty)
+        }
+      },
+      None => {
+        error!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry);
+        Err(anyhow!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry))
+      }
+    }
+  }
+}

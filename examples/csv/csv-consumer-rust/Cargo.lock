@@ -235,6 +235,7 @@ dependencies = [
  "pact_consumer",
  "pact_mock_server",
  "pact_models",
+ "regex",
  "reqwest",
  "serde_json",
  "tokio",

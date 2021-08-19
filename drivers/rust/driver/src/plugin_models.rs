@@ -116,4 +116,11 @@ impl PactPlugin {
     let response = client.configure_contents(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
+
+  /// Send a generate content request to the plugin
+  pub async fn generate_content(&self, request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
+    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
+    let response = client.generate_content(tonic::Request::new(request)).await?;
+    Ok(response.get_ref().clone())
+  }
 }

@@ -231,38 +231,9 @@ pub fn shutdown_plugins() {
 //       else -> throw RuntimeException("Mis-configured content type matcher $matcher")
 //     }
 //   }
-//
-//   override fun generateContent(
-//     contentGenerator: CatalogueContentGenerator,
-//     contentType: ContentType,
-//     generators: Map<String, Generator>,
-//     body: OptionalBody
-//   ): OptionalBody {
-//     val plugin = lookupPlugin(contentGenerator.catalogueEntry.pluginName, null) ?:
-//       throw PactPluginNotFoundException(contentGenerator.catalogueEntry.pluginName, null)
-//     val request = Plugin.GenerateContentRequest.newBuilder()
-//       .setContents(Plugin.Body.newBuilder()
-//         .setContent(BytesValue.newBuilder().setValue(ByteString.copyFrom(body.orEmpty())))
-//         .setContentType(contentType.toString()))
-//
-//     generators.forEach { (key, generator) ->
-//       val builder = Struct.newBuilder()
-//       generator.toMap(PactSpecVersion.V4).forEach { (key, value) ->
-//         builder.putFields(key, jsonToValue(toJson(value)))
-//       }
-//       val gen = Plugin.Generator.newBuilder()
-//         .setType(generator.type)
-//         .setValues(builder)
-//         .build()
-//       request.putGenerators(key, gen)
-//     }
-//     logger.debug { "Sending generateContent request to plugin ${plugin.manifest}" }
-//     val response = plugin.stub!!.generateContent(request.build())
-//     logger.debug { "Got response: $response" }
-//     val returnedContentType = ContentType(response.contents.contentType)
-//     return OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType)
-//   }
 
+
+// TODO
 fn publish_updated_catalogue() {
   // val requestBuilder = Plugin.Catalogue.newBuilder()
   // CatalogueManager.entries().forEach { (_, entry) ->
