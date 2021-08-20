@@ -90,3 +90,11 @@ object Utils : KLogging() {
     }
   }
 }
+
+public fun String?.ifNullOrEmpty(function: () -> String?): String? {
+  return if (this.isNullOrEmpty()) {
+    function()
+  } else {
+    this
+  }
+}
