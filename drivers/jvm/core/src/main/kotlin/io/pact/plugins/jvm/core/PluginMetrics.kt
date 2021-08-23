@@ -16,7 +16,7 @@ object PluginMetrics: KLogging() {
         System.getenv("pact_do_not_track")
       }
       if (doNotTrack != "true") {
-        DefaultPluginManager.logger.info {
+        logger.info {
           """
           Please note: we are tracking this plugin load anonymously to gather important usage statistics.
           To disable tracking, set the 'pact_do_not_track' system property or environment variable to 'true'.
@@ -37,7 +37,11 @@ object PluginMetrics: KLogging() {
             "cd2" to lookupContext(),                         // Custom Dimension 2: context
             "cd3" to osArch,                                  // Custom Dimension 3: osarch
             "cd4" to manifest.name,                           // Custom Dimension 4: plugin_name
-            "cd5" to manifest.version                         // Custom Dimension 5: plugin_version
+            "cd5" to manifest.version,                        // Custom Dimension 5: plugin_version
+            "el" to "Plugin loaded",                          // Event
+            "ec" to "Plugin",                                 // Category
+            "ea" to "Loaded",                                 // Action
+            "ev" to "1"                                       // Value
           )
           val stringEntity = StringEntity(Json.toJson(entity).serialise(), ContentType.APPLICATION_JSON)
           val response = post("https://www.google-analytics.com/collect")

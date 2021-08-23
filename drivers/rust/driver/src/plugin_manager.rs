@@ -195,46 +195,6 @@ pub fn shutdown_plugins() {
 }
 
 // TODO
-//   override fun invokeContentMatcher(
-//     matcher: ContentMatcher,
-//     expected: Any,
-//     actual: Any,
-//     context: Any
-//   ): Any? {
-//     return when {
-//       matcher is CatalogueContentMatcher && matcher.isCore -> {
-//         val clazz = Class.forName(matcher.catalogueEntry.values["implementation"]).kotlin
-//         val bodyMatcher = clazz.objectInstance ?: clazz.createInstance()
-//         try {
-//           clazz.memberFunctions.find { it.name == "matchBody" }!!.call(bodyMatcher, expected, actual, context)
-//         } catch (e: InvocationTargetException) {
-//           throw e.targetException
-//         }
-//       }
-//       matcher is CatalogueContentMatcher -> {
-//         val request = Plugin.CompareContentsRequest.newBuilder()
-//           .setExpected(Plugin.Body.newBuilder())
-//           .setActual(Plugin.Body.newBuilder())
-//           .setContext(com.google.protobuf.Struct.parseFrom(
-// //            Json.toJson(context).serialise().toByteArray()
-//             "".toByteArray()
-//           ))
-//           .build()
-//         PLUGIN_REGISTER[matcher.catalogueEntry.key]!!.stub!!.compareContents(request)
-//       }
-//       matcher.isCore -> {
-//         try {
-//           matcher::class.memberFunctions.find { it.name == "matchBody" }!!.call(matcher, expected, actual, context)
-//         } catch (e: InvocationTargetException) {
-//           throw e.targetException
-//         }
-//       }
-//       else -> throw RuntimeException("Mis-configured content type matcher $matcher")
-//     }
-//   }
-
-
-// TODO
 fn publish_updated_catalogue() {
   // val requestBuilder = Plugin.Catalogue.newBuilder()
   // CatalogueManager.entries().forEach { (_, entry) ->
