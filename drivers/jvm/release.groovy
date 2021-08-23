@@ -65,7 +65,7 @@ def projectProps = './gradlew :core:properties'.execute().text.split('\n').injec
 
 def version = projectProps.version
 
-def prevTag = 'git tag --abbrev=0  --tags --match=pact-jvm-driver-*'.execute().text.trim()
+def prevTag = 'git describe --abbrev=0  --tags --match=pact-jvm-driver-*'.execute().text.trim()
 def changelog = []
 executeOnShell("git log --pretty='* %h - %s (%an, %ad)' ${prevTag}..HEAD".toString()) {
   println it
