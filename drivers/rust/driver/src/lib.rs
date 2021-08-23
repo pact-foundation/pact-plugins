@@ -7,3 +7,4 @@ mod proto;
 pub mod catalogue_manager;
 pub mod content;
 mod utils;
+mod metrics;

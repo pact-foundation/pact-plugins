@@ -41,7 +41,7 @@ object PluginMetrics: KLogging() {
             "el" to "Plugin loaded",                          // Event
             "ec" to "Plugin",                                 // Category
             "ea" to "Loaded",                                 // Action
-            "ev" to "1"                                       // Value
+            "ev" to 1                                         // Value
           )
           val stringEntity = StringEntity(Json.toJson(entity).serialise(), ContentType.APPLICATION_JSON)
           val response = post("https://www.google-analytics.com/collect")

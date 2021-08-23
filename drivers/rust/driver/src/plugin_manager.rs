@@ -5,19 +5,20 @@ use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::process::{Command, Stdio};
 use std::str::FromStr;
 use std::sync::Mutex;
-use std::process::{Command, Stdio};
 
 use anyhow::anyhow;
 use lazy_static::lazy_static;
 use log::{debug, max_level, trace, warn};
-use sysinfo::{ProcessExt, Signal, System, SystemExt, Pid};
+use sysinfo::{Pid, ProcessExt, Signal, System, SystemExt};
 
+use crate::catalogue_manager::{register_plugin_entries, remove_plugin_entries};
 use crate::child_process::ChildPluginProcess;
+use crate::metrics::send_metrics;
 use crate::plugin_models::{PactPlugin, PactPluginManifest, PluginDependency};
 use crate::proto::InitPluginRequest;
-use crate::catalogue_manager::{register_plugin_entries, remove_plugin_entries};
 
 lazy_static! {
   static ref PLUGIN_MANIFEST_REGISTER: Mutex<HashMap<String, PactPluginManifest>> = Mutex::new(HashMap::new());
@@ -29,9 +30,13 @@ lazy_static! {
 pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<PactPlugin> {
   debug!("Loading plugin {:?}", plugin);
   match lookup_plugin(plugin) {
-    Some(plugin) => Ok(plugin),
+    Some(plugin) => {
+      send_metrics(&plugin.manifest);
+      Ok(plugin)
+    },
     None => {
       let manifest = load_plugin_manifest(plugin)?;
+      send_metrics(&manifest);
       initialise_plugin(&manifest).await
     }
   }

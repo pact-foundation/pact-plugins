@@ -22,6 +22,8 @@ itertools = "0.10.1"
 pact_models = { version = "0.1.1", path = "../../../../pact-reference/rust/pact_models" }
 regex = "1.4"
 bytes = "1.0.1"
+uuid = { version = "0.8.2", features = ["v4"] }
+reqwest = "0.11.4"
 
 [build-dependencies]
 tonic-build = "0.5"
