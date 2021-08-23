@@ -793,7 +793,7 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.0.0"
+version = "0.0.1"
 dependencies = [
  "anyhow",
  "bytes",
