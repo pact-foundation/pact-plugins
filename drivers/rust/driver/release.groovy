@@ -91,7 +91,7 @@ ask('Update Changelog?: [Y]') {
 
 ask('Tag and Push commits?: [Y]') {
   executeOnShell 'git push'
-  executeOnShell("git tag pact-jvm-driver-v${releaseVer}")
+  executeOnShell("git tag pact-rust-driver-v${releaseVer}")
   executeOnShell 'git push --tags'
 }
 
