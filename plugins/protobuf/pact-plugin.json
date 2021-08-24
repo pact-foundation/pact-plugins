@@ -1,0 +1,18 @@
+{
+  "manifestVersion": 1,
+  "pluginInterfaceVersion": 1,
+  "name": "protobuf",
+  "version": "0.0.0",
+  "executableType": "exec",
+  "entryPoint": "bin/pact-protobuf-plugin",
+  "entryPoints": {
+    "windows": "bin/pact-protobuf-plugin.bat"
+  },
+  "dependencies": [
+    {
+      "name": "jvm",
+      "version": "11+",
+      "type": "OSPackage"
+    }
+  ]
+}
