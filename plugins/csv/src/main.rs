@@ -89,7 +89,8 @@ fn setup_csv_contents(request: &Request<proto::ConfigureContentsRequest>) -> any
           content: Some(wtr.into_inner()?),
         }),
         rules,
-        generators
+        generators,
+        metadata: None
       }))
     }
     None => Err(anyhow!("No config provided to match/generate CSV content"))
