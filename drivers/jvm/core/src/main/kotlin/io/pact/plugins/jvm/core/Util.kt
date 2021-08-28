@@ -42,6 +42,9 @@ object Utils : KLogging() {
     }
   }
 
+  /**
+   * Convert a JSON type into a Protobuf Value
+   */
   fun jsonToValue(json: JsonValue): Value {
     return when (json) {
       is JsonValue.Integer -> Value.newBuilder().setNumberValue(json.toBigInteger().toDouble()).build()
@@ -52,16 +55,13 @@ object Utils : KLogging() {
       JsonValue.Null -> Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build()
       is JsonValue.Array -> Value.newBuilder().setListValue(
         ListValue.newBuilder().addAllValues(json.values.map { jsonToValue(it) }).build()).build()
-      is JsonValue.Object -> {
-        val builder = Struct.newBuilder()
-        json.entries.forEach { (key, value) ->
-          builder.putFields(key, jsonToValue(value))
-        }
-        Value.newBuilder().setStructValue(builder.build()).build()
-      }
+      is JsonValue.Object -> Value.newBuilder().setStructValue(toProtoStruct(json.entries)).build()
     }
   }
 
+  /**
+   * Convert a Protobuf Value into a JSON value
+   */
   fun valueToJson(value: Value?): JsonValue {
     return if (value == null) {
       JsonValue.Null
@@ -82,12 +82,26 @@ object Utils : KLogging() {
     }
   }
 
+  /**
+   * Convert a Protobuf Struct into a JSON value
+   */
   fun structToJson(struct: Struct?): JsonValue {
     return if (struct == null) {
       JsonValue.Null
     } else {
       JsonValue.Object(struct.fieldsMap.mapValues { valueToJson(it.value) }.toMutableMap())
     }
+  }
+
+  /**
+   * Convert a map of JSON values to a Protobuf Struct
+   */
+  fun toProtoStruct(attributes: Map<String, JsonValue>): Struct {
+    val builder = Struct.newBuilder()
+    attributes.entries.forEach { (key, value) ->
+      builder.putFields(key, jsonToValue(value))
+    }
+    return builder.build()
   }
 }
 

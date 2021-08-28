@@ -1,6 +1,7 @@
 package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.model.ContentType
+import au.com.dius.pact.core.model.ContentTypeOverride
 import au.com.dius.pact.core.model.OptionalBody
 import au.com.dius.pact.core.model.PactSpecVersion
 import au.com.dius.pact.core.model.generators.Category
@@ -12,6 +13,7 @@ import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
 import au.com.dius.pact.core.model.matchingrules.RuleLogic
 import au.com.dius.pact.core.support.Json.toJson
+import au.com.dius.pact.core.support.json.JsonValue
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import com.github.michaelbull.result.Result
@@ -28,8 +30,10 @@ import io.pact.plugin.Plugin
 import io.pact.plugins.jvm.core.Utils.handleWith
 import io.pact.plugins.jvm.core.Utils.jsonToValue
 import io.pact.plugins.jvm.core.Utils.structToJson
+import io.pact.plugins.jvm.core.Utils.valueToJson
 import mu.KLogging
 import org.apache.commons.lang3.SystemUtils
+import org.slf4j.LoggerFactory
 import java.io.BufferedReader
 import java.io.File
 import java.io.IOException
@@ -271,8 +275,8 @@ object DefaultPluginManager: KLogging(), PluginManager {
     matcher: ContentMatcher,
     contentType: String,
     bodyConfig: Map<String, Any?>
-  ): Triple<OptionalBody, MatchingRuleCategory?, Generators?> {
-    val builder = com.google.protobuf.Struct.newBuilder()
+  ): InteractionContents {
+    val builder = Struct.newBuilder()
     bodyConfig.forEach { (key, value) ->
       builder.putFields(key, jsonToValue(toJson(value)))
     }
@@ -286,7 +290,8 @@ object DefaultPluginManager: KLogging(), PluginManager {
     val response = plugin.stub!!.configureContents(request)
     logger.debug { "Got response: $response" }
     val returnedContentType = ContentType(response.contents.contentType)
-    val body = OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType)
+    val body = OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType,
+      toContentTypeOverride(response.contents.contentTypeOverride))
     val rules = MatchingRuleCategory("body", response.rulesMap.entries.associate { (key, value) ->
       key to MatchingRuleGroup(value.ruleList.map {
         MatchingRule.create(it.type, structToJson(it.values))
@@ -295,10 +300,24 @@ object DefaultPluginManager: KLogging(), PluginManager {
     val generators = Generators(mutableMapOf(Category.BODY to response.generatorsMap.mapValues {
       createGenerator(it.value.type, structToJson(it.value.values))
     }.toMutableMap()))
+    val metadata = if (response.hasMetadata()) {
+       response.metadata.fieldsMap.entries.associate { (key, value) -> key to valueToJson(value) }
+    } else {
+      emptyMap()
+    }
     logger.debug { "body=$body" }
     logger.debug { "rules=$rules" }
     logger.debug { "generators=$generators" }
-    return Triple(body, rules, generators)
+    logger.debug { "metadata=$metadata" }
+    return InteractionContents(body, rules, generators, metadata)
+  }
+
+  private fun toContentTypeOverride(override: Plugin.Body.ContentTypeOverride?): ContentTypeOverride {
+    return when (override) {
+      Plugin.Body.ContentTypeOverride.TEXT -> ContentTypeOverride.TEXT
+      Plugin.Body.ContentTypeOverride.BINARY -> ContentTypeOverride.BINARY
+      else -> ContentTypeOverride.DEFAULT
+    }
   }
 
   override fun generateContent(
@@ -344,15 +363,11 @@ object DefaultPluginManager: KLogging(), PluginManager {
         PLUGIN_REGISTER["${manifest.name}/${manifest.version}"] = plugin
         logger.debug { "Plugin process started OK (port = ${plugin.port}), sending init message" }
         handleWith<PactPlugin> {
-          val request = Plugin.InitPluginRequest.newBuilder()
-            .setImplementation("Pact-JVM")
-            .setVersion(Utils.lookupVersion(PluginManager::class.java))
-            .build()
           val channel = ManagedChannelBuilder.forTarget("127.0.0.1:${plugin.port}")
             .usePlaintext()
             .build()
           val stub = newBlockingStub(channel)
-          val response = stub.initPlugin(request)
+          val response = makeInitRequest(stub)
           logger.debug { "Got init response ${response.catalogueList} from plugin ${manifest.name}" }
           CatalogueManager.registerPluginEntries(manifest.name, response.catalogueList)
           plugin.stub = stub
@@ -369,6 +384,14 @@ object DefaultPluginManager: KLogging(), PluginManager {
       }
       is Err -> Err(result.error)
     }
+  }
+
+  fun makeInitRequest(stub: PactPluginGrpc.PactPluginBlockingStub): Plugin.InitPluginResponse {
+    val request = Plugin.InitPluginRequest.newBuilder()
+      .setImplementation("plugin-driver-jvm")
+      .setVersion(Utils.lookupVersion(PluginManager::class.java))
+      .build()
+    return stub.initPlugin(request)
   }
 
   private fun publishUpdatedCatalogue() {
@@ -439,6 +462,9 @@ object DefaultPluginManager: KLogging(), PluginManager {
       ProcessBuilder(manifest.pluginDir.resolve(manifest.entryPoint).toString())
     }.directory(manifest.pluginDir)
 
+    val logLevel = logLevel()
+    pb.environment()["LOG_LEVEL"] = logLevel
+    pb.environment()["RUST_LOG"] = logLevel
     env.forEach { (k, v) -> pb.environment()[k] = v }
 
     val cp = ChildProcess(pb, manifest)
@@ -458,6 +484,15 @@ object DefaultPluginManager: KLogging(), PluginManager {
       cp.destroy()
       Err("Plugin process did not start correctly - ${e.message}")
     }
+  }
+
+  private fun logLevel() = when {
+    logger.isTraceEnabled -> "trace"
+    logger.isDebugEnabled -> "debug"
+    logger.isInfoEnabled -> "info"
+    logger.isWarnEnabled -> "warn"
+    logger.isErrorEnabled -> "error"
+    else -> ""
   }
 
   private fun checkRubyVersion(manifest: PactPluginManifest, ruby: Ok<Path>) =
@@ -528,3 +563,10 @@ object DefaultPluginManager: KLogging(), PluginManager {
     }
   }
 }
+
+data class InteractionContents @JvmOverloads constructor(
+  val body: OptionalBody,
+  val rules: MatchingRuleCategory? = null,
+  val generators: Generators? = null,
+  val metadata: Map<String, JsonValue> = emptyMap()
+)

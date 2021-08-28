@@ -22,7 +22,7 @@ interface ContentMatcher {
   fun configureContent(
     contentType: String,
     bodyConfig: Map<String, Any?>
-  ): Triple<OptionalBody, MatchingRuleCategory?, Generators?>
+  ): InteractionContents
 
   fun invokeContentMatcher(
     expected: OptionalBody,
@@ -45,7 +45,7 @@ data class CatalogueContentMatcher(
   override fun configureContent(
     contentType: String,
     bodyConfig: Map<String, Any?>
-  ): Triple<OptionalBody, MatchingRuleCategory?, Generators?> {
+  ): InteractionContents {
     logger.debug { "Sending configureContentMatcherInteraction request to for plugin $catalogueEntry" }
     return DefaultPluginManager.configureContentMatcherInteraction(this, contentType, bodyConfig)
   }
