@@ -64,7 +64,7 @@ message CompareContentsResponse {
   repeated ContentMismatch results = 2;
 }
 
-message ConfigureContentsRequest {
+message ConfigureInteractionRequest {
   string contentType = 1;
   google.protobuf.Struct contentsConfig = 2;
 }
@@ -83,11 +83,17 @@ message Generator {
   google.protobuf.Struct values = 2;
 }
 
-message ConfigureContentsResponse {
+message PluginConfiguration {
+  google.protobuf.Struct interactionConfiguration = 1;
+  google.protobuf.Struct pactConfiguration = 2;
+}
+
+message ConfigureInteractionResponse {
   Body contents = 1;
   map<string, MatchingRules> rules = 2;
   map<string, Generator> generators = 3;
-  google.protobuf.Struct metadata = 4;
+  google.protobuf.Struct messageMetadata = 4;
+  PluginConfiguration pluginConfiguration = 5;
 }
 
 message GenerateContentRequest {
@@ -103,6 +109,6 @@ service PactPlugin {
   rpc InitPlugin(InitPluginRequest) returns (InitPluginResponse);
   rpc UpdateCatalogue(Catalogue) returns (Void);
   rpc CompareContents(CompareContentsRequest) returns (CompareContentsResponse);
-  rpc ConfigureContents(ConfigureContentsRequest) returns (ConfigureContentsResponse);
+  rpc ConfigureInteraction(ConfigureInteractionRequest) returns (ConfigureInteractionResponse);
   rpc GenerateContent(GenerateContentRequest) returns (GenerateContentResponse);
 }

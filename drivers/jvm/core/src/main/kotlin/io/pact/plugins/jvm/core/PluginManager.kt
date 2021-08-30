@@ -33,7 +33,6 @@ import io.pact.plugins.jvm.core.Utils.structToJson
 import io.pact.plugins.jvm.core.Utils.valueToJson
 import mu.KLogging
 import org.apache.commons.lang3.SystemUtils
-import org.slf4j.LoggerFactory
 import java.io.BufferedReader
 import java.io.File
 import java.io.IOException
@@ -280,14 +279,14 @@ object DefaultPluginManager: KLogging(), PluginManager {
     bodyConfig.forEach { (key, value) ->
       builder.putFields(key, jsonToValue(toJson(value)))
     }
-    val request = Plugin.ConfigureContentsRequest.newBuilder()
+    val request = Plugin.ConfigureInteractionRequest.newBuilder()
       .setContentType(contentType)
       .setContentsConfig(builder)
       .build()
     val plugin = lookupPlugin(matcher.pluginName, null) ?:
       throw PactPluginNotFoundException(matcher.pluginName, null)
-    logger.debug { "Sending configureContents request to plugin ${plugin.manifest}" }
-    val response = plugin.stub!!.configureContents(request)
+    logger.debug { "Sending configureInteraction request to plugin ${plugin.manifest}" }
+    val response = plugin.stub!!.configureInteraction(request)
     logger.debug { "Got response: $response" }
     val returnedContentType = ContentType(response.contents.contentType)
     val body = OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType,
@@ -300,16 +299,37 @@ object DefaultPluginManager: KLogging(), PluginManager {
     val generators = Generators(mutableMapOf(Category.BODY to response.generatorsMap.mapValues {
       createGenerator(it.value.type, structToJson(it.value.values))
     }.toMutableMap()))
-    val metadata = if (response.hasMetadata()) {
-       response.metadata.fieldsMap.entries.associate { (key, value) -> key to valueToJson(value) }
+
+    val metadata = if (response.hasMessageMetadata()) {
+       response.messageMetadata.fieldsMap.entries.associate { (key, value) -> key to valueToJson(value) }
     } else {
       emptyMap()
+    }
+
+    val pluginConfig = if (response.hasPluginConfiguration()) {
+      val pluginConfiguration = PluginConfiguration()
+
+      if (response.pluginConfiguration.hasInteractionConfiguration()) {
+        pluginConfiguration.interactionConfiguration.putAll(
+          structToJson(response.pluginConfiguration.interactionConfiguration).asObject()!!.entries
+        )
+      }
+      if (response.pluginConfiguration.hasPactConfiguration()) {
+        pluginConfiguration.pactConfiguration.putAll(
+          structToJson(response.pluginConfiguration.pactConfiguration).asObject()!!.entries
+        )
+      }
+
+      pluginConfiguration
+    } else {
+      PluginConfiguration()
     }
     logger.debug { "body=$body" }
     logger.debug { "rules=$rules" }
     logger.debug { "generators=$generators" }
     logger.debug { "metadata=$metadata" }
-    return InteractionContents(body, rules, generators, metadata)
+    logger.debug { "pluginConfig=$pluginConfig" }
+    return InteractionContents(body, rules, generators, metadata, pluginConfig)
   }
 
   private fun toContentTypeOverride(override: Plugin.Body.ContentTypeOverride?): ContentTypeOverride {
@@ -564,9 +584,15 @@ object DefaultPluginManager: KLogging(), PluginManager {
   }
 }
 
+data class PluginConfiguration(
+  val interactionConfiguration: MutableMap<String, JsonValue> = mutableMapOf(),
+  val pactConfiguration: MutableMap<String, JsonValue> = mutableMapOf()
+)
+
 data class InteractionContents @JvmOverloads constructor(
   val body: OptionalBody,
   val rules: MatchingRuleCategory? = null,
   val generators: Generators? = null,
-  val metadata: Map<String, JsonValue> = emptyMap()
+  val metadata: Map<String, JsonValue> = emptyMap(),
+  val pluginConfig: PluginConfiguration = PluginConfiguration()
 )
