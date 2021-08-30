@@ -7,14 +7,16 @@ use bytes::Bytes;
 use log::{debug, error};
 use maplit::hashmap;
 use pact_models::bodies::OptionalBody;
+use pact_models::content_types::ContentTypeOverride;
 use pact_models::matchingrules::{Category, MatchingRule, MatchingRuleCategory, RuleList};
 use pact_models::path_exp::DocPath;
-use pact_models::prelude::{ContentType, Generator, Generators, RuleLogic, GeneratorCategory};
+use pact_models::prelude::{ContentType, Generator, GeneratorCategory, Generators, RuleLogic};
 use serde_json::Value;
 
 use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
 use crate::plugin_manager::lookup_plugin;
 use crate::proto::{Body, CompareContentsRequest, ConfigureContentsRequest, GenerateContentRequest};
+use crate::proto::body;
 use crate::utils::{proto_struct_to_json, to_proto_struct};
 
 /// Matcher for contents based on content type
@@ -85,8 +87,13 @@ impl ContentMatcher {
           let body = match response.contents {
             Some(body) => {
               let returned_content_type = ContentType::parse(body.content_type.as_str()).ok();
-              let contents = body.content.unwrap_or_default();
-              OptionalBody::Present(Bytes::from(contents), returned_content_type)
+              let contents = body.content.as_ref().cloned().unwrap_or_default();
+              OptionalBody::Present(Bytes::from(contents), returned_content_type,
+                  Some(match body.content_type_override() {
+                    body::ContentTypeOverride::Text => ContentTypeOverride::TEXT,
+                    body::ContentTypeOverride::Binary => ContentTypeOverride::BINARY,
+                    body::ContentTypeOverride::Default => ContentTypeOverride::DEFAULT,
+                  }))
             },
             None => OptionalBody::Missing
           };
@@ -153,10 +160,12 @@ impl ContentMatcher {
       expected: Some(Body {
         content_type: expected.content_type().unwrap_or_default().to_string(),
         content: expected.value().map(|b| b.to_vec()),
+        content_type_override: body::ContentTypeOverride::Default as i32
       }),
       actual: Some(Body {
         content_type: actual.content_type().unwrap_or_default().to_string(),
         content: actual.value().map(|b| b.to_vec()),
+        content_type_override: body::ContentTypeOverride::Default as i32
       }),
       allow_unexpected_keys,
       rules: context.rules.iter().map(|(k, r)| {
@@ -274,7 +283,8 @@ impl ContentGenerator {
     let request = GenerateContentRequest {
       contents: Some(crate::proto::Body {
         content_type: content_type.to_string(),
-        content: Some(body.value().unwrap_or_default().to_vec())
+        content: Some(body.value().unwrap_or_default().to_vec()),
+        content_type_override: body::ContentTypeOverride::Default as i32
       }),
       generators: generators.iter().map(|(k, v)| {
         (k.clone(), crate::proto::Generator {
@@ -294,7 +304,8 @@ impl ContentGenerator {
           Some(contents) => {
             Ok(OptionalBody::Present(
               Bytes::from(contents.content.unwrap_or_default()),
-              ContentType::parse(contents.content_type.as_str()).ok()
+              ContentType::parse(contents.content_type.as_str()).ok(),
+              None
             ))
           }
           None => Ok(OptionalBody::Empty)
