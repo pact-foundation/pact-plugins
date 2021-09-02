@@ -4,6 +4,7 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 
 package io.pact.plugin;
+option go_package = "io.pact.plugin";
 
 message InitPluginRequest {
   string implementation = 1;
@@ -42,6 +43,7 @@ message CompareContentsRequest {
   Body actual = 2;
   bool allow_unexpected_keys = 3;
   map<string, MatchingRules> rules = 4;
+  PluginConfiguration pluginConfiguration = 5;
 }
 
 message ContentTypeMismatch {
@@ -57,11 +59,14 @@ message ContentMismatch {
   string diff = 5;
 }
 
+message ContentMismatches {
+  repeated ContentMismatch mismatches = 1;
+}
+
 message CompareContentsResponse {
-  ContentTypeMismatch typeMismatch = 1;
-  // TODO: This needs to be a list of results where each result has a key and a list of
-  // mismatches
-  repeated ContentMismatch results = 2;
+  string error = 1;
+  ContentTypeMismatch typeMismatch = 2;
+  map<string, ContentMismatches> results = 3;
 }
 
 message ConfigureInteractionRequest {
