@@ -25,6 +25,8 @@ use uuid::Uuid;
 use crate::parser::{parse_field, parse_value};
 use crate::proto::pact_plugin_server::{PactPlugin, PactPluginServer};
 use crate::proto::to_object;
+use crate::proto::catalogue_entry::EntryType;
+use crate::proto::body::ContentTypeOverride;
 
 mod proto;
 mod parser;
@@ -32,7 +34,7 @@ mod parser;
 #[derive(Debug, Default)]
 pub struct CsvPactPlugin {}
 
-fn setup_csv_contents(request: &Request<proto::ConfigureContentsRequest>) -> anyhow::Result<Response<proto::ConfigureContentsResponse>> {
+fn setup_csv_contents(request: &Request<proto::ConfigureInteractionRequest>) -> anyhow::Result<Response<proto::ConfigureInteractionResponse>> {
   match &request.get_ref().contents_config {
     Some(config) => {
       let mut columns = vec![];
@@ -83,14 +85,16 @@ fn setup_csv_contents(request: &Request<proto::ConfigureContentsRequest>) -> any
       }
       debug!("matching rules = {:?}", rules);
       debug!("generators = {:?}", generators);
-      Ok(Response::new(proto::ConfigureContentsResponse {
+      Ok(Response::new(proto::ConfigureInteractionResponse {
         contents: Some(proto::Body {
           content_type: "text/csv;charset=UTF-8".to_string(),
           content: Some(wtr.into_inner()?),
+          content_type_override: 0
         }),
         rules,
         generators,
-        metadata: None
+        message_metadata: None,
+        plugin_configuration: None
       }))
     }
     None => Err(anyhow!("No config provided to match/generate CSV content"))
@@ -130,7 +134,7 @@ fn generate_csv_content(request: &Request<proto::GenerateContentRequest>) -> any
   let generated = wtr.into_inner()?;
   debug!("Generated contents has {} bytes", generated.len());
   let bytes = Bytes::from(generated);
-  Ok(OptionalBody::Present(bytes, Some(ContentType::from("text/csv;charset=UTF-8"))))
+  Ok(OptionalBody::Present(bytes, Some(ContentType::from("text/csv;charset=UTF-8")), None))
 }
 
 fn to_value(value: &Value) -> prost_types::Value {
@@ -178,14 +182,14 @@ impl PactPlugin for CsvPactPlugin {
     Ok(Response::new(proto::InitPluginResponse {
       catalogue: vec![
         proto::CatalogueEntry {
-          r#type: "content-matcher".to_string(),
+          r#type: EntryType::ContentMatcher as i32,
           key: "csv".to_string(),
           values: hashmap! {
             "content-types".to_string() => "text/csv;application/csv".to_string()
           }
         },
         proto::CatalogueEntry {
-          r#type: "content-generator".to_string(),
+          r#type: EntryType::ContentGenerator as i32,
           key: "csv".to_string(),
           values: hashmap! {
             "content-types".to_string() => "text/csv;application/csv".to_string()
@@ -198,9 +202,9 @@ impl PactPlugin for CsvPactPlugin {
   async fn update_catalogue(
     &self,
     _request: tonic::Request<proto::Catalogue>,
-  ) -> Result<tonic::Response<proto::Void>, tonic::Status> {
+  ) -> Result<tonic::Response<()>, tonic::Status> {
     debug!("Update catalogue request, ignoring");
-    Ok(Response::new(proto::Void {}))
+    Ok(Response::new(()))
   }
 
   async fn compare_contents(
@@ -238,46 +242,57 @@ impl PactPlugin for CsvPactPlugin {
       (None, Some(actual)) => {
         let contents = actual.content.as_ref().unwrap();
         Ok(Response::new(proto::CompareContentsResponse {
+          error: String::default(),
           type_mismatch: None,
-          results: vec![
-            proto::ContentMismatch {
-              expected: None,
-              actual: Some(contents.clone()),
-              mismatch: format!("Expected no CSV content, but got {} bytes", contents.len()),
-              path: "".to_string(),
-              diff: "".to_string()
+          results: hashmap! {
+            String::default() => proto::ContentMismatches {
+              mismatches: vec![
+                proto::ContentMismatch {
+                  expected: None,
+                  actual: Some(contents.clone()),
+                  mismatch: format!("Expected no CSV content, but got {} bytes", contents.len()),
+                  path: "".to_string(),
+                  diff: "".to_string()
+                }
+              ]
             }
-          ]
+          }
         }))
       }
       (Some(expected), None) => {
         let contents = expected.content.as_ref().unwrap();
         Ok(Response::new(proto::CompareContentsResponse {
+          error: String::default(),
           type_mismatch: None,
-          results: vec![
-            proto::ContentMismatch {
-              expected: Some(contents.clone()),
-              actual: None,
-              mismatch: format!("Expected CSV content, but did not get any"),
-              path: "".to_string(),
-              diff: "".to_string()
+          results: hashmap! {
+            String::default() => proto::ContentMismatches {
+              mismatches: vec![
+                proto::ContentMismatch {
+                  expected: Some(contents.clone()),
+                  actual: None,
+                  mismatch: format!("Expected CSV content, but did not get any"),
+                  path: "".to_string(),
+                  diff: "".to_string()
+                }
+              ]
             }
-          ]
+          }
         }))
       }
       (None, None) => {
         Ok(Response::new(proto::CompareContentsResponse {
+          error: String::default(),
           type_mismatch: None,
-          results: vec![]
+          results: hashmap!{}
         }))
       }
     }
   }
 
-  async fn configure_contents(
+  async fn configure_interaction(
     &self,
-    request: tonic::Request<proto::ConfigureContentsRequest>,
-  ) -> Result<tonic::Response<proto::ConfigureContentsResponse>, tonic::Status> {
+    request: tonic::Request<proto::ConfigureInteractionRequest>,
+  ) -> Result<tonic::Response<proto::ConfigureInteractionResponse>, tonic::Status> {
     debug!("Received configure_contents request for '{}'", request.get_ref().content_type);
 
     // "column:1", "matching(type,'Name')",
@@ -300,6 +315,7 @@ impl PactPlugin for CsvPactPlugin {
           contents: Some(proto::Body {
             content_type: contents.content_type().unwrap_or(ContentType::from("text/csv")).to_string(),
             content: Some(contents.value().unwrap().to_vec()),
+            content_type_override: ContentTypeOverride::Default as i32
           })
         })
       })
@@ -347,8 +363,13 @@ fn compare_contents<R: Read>(
   }
 
   Ok(Response::new(proto::CompareContentsResponse {
+    error: String::default(),
     type_mismatch: None,
-    results
+    results: hashmap! {
+      String::default() => proto::ContentMismatches {
+        mismatches: results
+      }
+    }
   }))
 }
 
