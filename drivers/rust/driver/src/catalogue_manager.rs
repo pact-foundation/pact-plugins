@@ -15,7 +15,8 @@ use pact_models::content_types::ContentType;
 
 use crate::content::{ContentMatcher, ContentGenerator};
 use crate::plugin_models::PactPluginManifest;
-use crate::proto::CatalogueEntry as ProtoCatalogueEntry;
+use crate::proto::{CatalogueEntry as ProtoCatalogueEntry};
+use crate::proto::catalogue_entry::EntryType;
 
 lazy_static! {
   static ref CATALOGUE_REGISTER: Mutex<HashMap<String, CatalogueEntry>> = Mutex::new(HashMap::new());
@@ -72,6 +73,18 @@ impl From<String> for CatalogueEntryType {
   }
 }
 
+impl From<EntryType> for CatalogueEntryType {
+  fn from(t: EntryType) -> Self {
+    match t {
+      EntryType::ContentMatcher => CatalogueEntryType::CONTENT_MATCHER,
+      EntryType::ContentGenerator => CatalogueEntryType::CONTENT_GENERATOR,
+      EntryType::MockServer => CatalogueEntryType::MOCK_SERVER,
+      EntryType::Matcher => CatalogueEntryType::MATCHER,
+      EntryType::Interaction => CatalogueEntryType::INTERACTION
+    }
+  }
+}
+
 /// Provider of the catalogue entry
 #[derive(Clone, Copy, Debug, Deserialize, Serialize, PartialEq, Eq)]
 #[allow(non_camel_case_types)]
@@ -103,7 +116,7 @@ pub fn register_plugin_entries(plugin: &PactPluginManifest, catalogue_list: &Vec
   let mut guard = CATALOGUE_REGISTER.lock().unwrap();
 
   for entry in catalogue_list {
-    let entry_type = CatalogueEntryType::from(entry.r#type.clone());
+    let entry_type = CatalogueEntryType::from(entry.r#type());
     let key = format!("plugin/{}/{}/{}", plugin.name, entry_type, entry.key);
     guard.insert(key.clone(), CatalogueEntry {
       entry_type,

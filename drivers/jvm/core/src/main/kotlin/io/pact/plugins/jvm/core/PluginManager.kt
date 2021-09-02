@@ -419,7 +419,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     CatalogueManager.entries().forEach { (_, entry) ->
       requestBuilder.addCatalogue(Plugin.CatalogueEntry.newBuilder()
         .setKey(entry.key)
-        .setType(entry.type.name)
+        .setType(entry.type.toEntry())
         .putAllValues(entry.values)
         .build())
     }

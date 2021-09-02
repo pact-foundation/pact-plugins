@@ -10,7 +10,7 @@ object CatalogueManager : KLogging() {
 
   fun registerPluginEntries(name: String, catalogueList: List<Plugin.CatalogueEntry>) {
     catalogueList.forEach {
-      val type = CatalogueEntryType.fromString(it.type)
+      val type = CatalogueEntryType.fromEntry(it.type)
       val key = "plugin/$name/${type}/${it.key}"
       catalogue[key] = CatalogueEntry(type, CatalogueEntryProviderType.PLUGIN, name, it.key, it.valuesMap)
     }
@@ -105,6 +105,16 @@ enum class CatalogueEntryType {
     }
   }
 
+  fun toEntry(): Plugin.CatalogueEntry.EntryType {
+    return when (this) {
+      CONTENT_MATCHER -> Plugin.CatalogueEntry.EntryType.CONTENT_MATCHER
+      CONTENT_GENERATOR -> Plugin.CatalogueEntry.EntryType.CONTENT_GENERATOR
+      MOCK_SERVER -> Plugin.CatalogueEntry.EntryType.MOCK_SERVER
+      MATCHER -> Plugin.CatalogueEntry.EntryType.MATCHER
+      INTERACTION -> Plugin.CatalogueEntry.EntryType.INTERACTION
+    }
+  }
+
   companion object {
     fun fromString(type: String): CatalogueEntryType {
       return when (type) {
@@ -114,6 +124,21 @@ enum class CatalogueEntryType {
         "matcher" -> MATCHER
         "mock-server" -> MOCK_SERVER
         else -> throw IllegalArgumentException("'$type' is not a valid CatalogueEntryType value")
+      }
+    }
+
+    fun fromEntry(type: Plugin.CatalogueEntry.EntryType?): CatalogueEntryType {
+      return if (type != null) {
+        when (type) {
+          Plugin.CatalogueEntry.EntryType.CONTENT_MATCHER -> CONTENT_MATCHER
+          Plugin.CatalogueEntry.EntryType.CONTENT_GENERATOR -> CONTENT_GENERATOR
+          Plugin.CatalogueEntry.EntryType.MOCK_SERVER -> MOCK_SERVER
+          Plugin.CatalogueEntry.EntryType.MATCHER -> MATCHER
+          Plugin.CatalogueEntry.EntryType.INTERACTION -> INTERACTION
+          Plugin.CatalogueEntry.EntryType.UNRECOGNIZED -> CONTENT_MATCHER
+        }
+      } else {
+        CONTENT_MATCHER
       }
     }
   }

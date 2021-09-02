@@ -17,6 +17,7 @@ import com.google.protobuf.BytesValue
 import com.google.protobuf.DescriptorProtos
 import com.google.protobuf.Descriptors
 import com.google.protobuf.DynamicMessage
+import com.google.protobuf.Empty
 import com.google.protobuf.ProtocolStringList
 import com.google.protobuf.Value
 import io.grpc.Server
@@ -68,19 +69,19 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
     logger.debug { "Init request from ${request.implementation}/${request.version}" }
     return Plugin.InitPluginResponse.newBuilder().apply {
       this.addCatalogueBuilder()
-        .setType("content-matcher")
+        .setType(Plugin.CatalogueEntry.EntryType.CONTENT_MATCHER)
         .setKey("protobuf")
         .putValues("content-types", "application/protobuf")
       this.addCatalogueBuilder()
-        .setType("content-generator")
+        .setType(Plugin.CatalogueEntry.EntryType.CONTENT_GENERATOR)
         .setKey("protobuf")
         .putValues("content-types", "application/protobuf")
     }.build()
   }
 
-  override suspend fun updateCatalogue(request: Plugin.Catalogue): Plugin.Void {
+  override suspend fun updateCatalogue(request: Plugin.Catalogue): Empty {
     logger.debug { "Got update catalogue request: TODO" }
-    return Plugin.Void.newBuilder().build()
+    return Empty.newBuilder().build()
   }
 
   override suspend fun compareContents(request: Plugin.CompareContentsRequest): Plugin.CompareContentsResponse {

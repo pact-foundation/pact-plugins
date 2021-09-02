@@ -52,7 +52,7 @@ object ProtobufContentMatcher : KLogging() {
       }
 
       if (!context.allowUnexpectedKeys) {
-        actual.allFields.forEach { (field, value) ->
+        actual.allFields.forEach { (field, _) ->
           val fieldPath = path + field.name
           if (!expected.hasField(field)) {
             result.add(BodyItemMatchResult(fieldPath.joinToString("."), listOf(

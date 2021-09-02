@@ -11,7 +11,7 @@ func main() {
       w.Header().Add("Content-Type", "application/protobuf; message=InitPluginRequest")
       init := &io_pact_plugin.InitPluginRequest{
               Implementation: "Go Provider",
-//               Version:  "000",
+              Version:  "0.0.0",
       }
 
       out, err := proto.Marshal(init)
