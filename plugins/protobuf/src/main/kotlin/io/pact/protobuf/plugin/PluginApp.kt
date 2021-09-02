@@ -1,12 +1,17 @@
 package io.pact.protobuf.plugin
 
+import au.com.dius.pact.core.matchers.MatchingContext
 import au.com.dius.pact.core.model.PactSpecVersion
 import au.com.dius.pact.core.model.generators.Generator
+import au.com.dius.pact.core.model.matchingrules.MatchingRule
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
+import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
 import au.com.dius.pact.core.model.matchingrules.expressions.MatchingRuleDefinition.parseMatchingRuleDefinition
 import au.com.dius.pact.core.support.Json.toJson
+import au.com.dius.pact.core.support.isNotEmpty
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
+import com.google.common.io.BaseEncoding
 import com.google.protobuf.ByteString
 import com.google.protobuf.BytesValue
 import com.google.protobuf.DescriptorProtos
@@ -20,15 +25,16 @@ import io.grpc.Status
 import io.grpc.StatusRuntimeException
 import io.pact.plugin.PactPluginGrpcKt
 import io.pact.plugin.Plugin
+import io.pact.plugins.jvm.core.Utils.structToJson
 import io.pact.plugins.jvm.core.Utils.toProtoStruct
+import kotlinx.coroutines.*
 import mu.KLogging
-import org.apache.commons.lang3.builder.HashCodeBuilder
-import java.io.File
 import java.lang.Double.parseDouble
 import java.lang.Float.parseFloat
 import java.lang.Integer.parseInt
 import java.lang.Long.parseLong
 import java.nio.file.Path
+import java.security.MessageDigest
 import java.util.Base64
 import java.util.UUID.randomUUID
 
@@ -78,7 +84,117 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
   }
 
   override suspend fun compareContents(request: Plugin.CompareContentsRequest): Plugin.CompareContentsResponse {
-    return super.compareContents(request)
+    try {
+      val interactionConfig = request.pluginConfiguration.interactionConfiguration.fieldsMap
+      val messageKey = interactionConfig["descriptorKey"]?.stringValue
+      if (messageKey == null) {
+        logger.error { "Plugin configuration item with key 'descriptorKey' is required" }
+        return Plugin.CompareContentsResponse.newBuilder()
+          .setError("Plugin configuration item with key 'descriptorKey' is required")
+          .build()
+      }
+
+      logger.debug { "Pact level configuration keys: ${request.pluginConfiguration.pactConfiguration.fieldsMap.keys}" }
+      val descriptorBytesEncoded =
+        request.pluginConfiguration.pactConfiguration.fieldsMap[messageKey]?.structValue?.fieldsMap?.get("protoDescriptors")?.stringValue
+      if (descriptorBytesEncoded == null) {
+        logger.error { "Plugin configuration item with key '$messageKey' is required" }
+        return Plugin.CompareContentsResponse.newBuilder()
+          .setError("Plugin configuration item with key '$messageKey' is required")
+          .build()
+      }
+
+      val message = interactionConfig["message"]?.stringValue
+      if (message == null) {
+        logger.error { "Plugin configuration item with key 'message' is required" }
+        return Plugin.CompareContentsResponse.newBuilder()
+          .setError("Plugin configuration item with key 'message' is required")
+          .build()
+      }
+
+      logger.debug { "Received compareContents request for message $message" }
+
+      val descriptorBytes = Base64.getDecoder().decode(descriptorBytesEncoded)
+      logger.debug { "Protobuf file descriptor set is ${descriptorBytes.size} bytes" }
+      val digest = MessageDigest.getInstance("MD5")
+      digest.update(descriptorBytes)
+      val descriptorHash = BaseEncoding.base16().lowerCase().encode(digest.digest());
+      if (descriptorHash != messageKey) {
+        logger.error { "Protobuf descriptors checksum failed. Expected $messageKey but got $descriptorHash" }
+        return Plugin.CompareContentsResponse.newBuilder()
+          .setError("Protobuf descriptors checksum failed. Expected $messageKey but got $descriptorHash")
+          .build()
+      }
+
+      val descriptors = withContext(Dispatchers.IO) {
+        DescriptorProtos.FileDescriptorSet.parseFrom(descriptorBytes)
+      }
+      val fileDescriptors = descriptors.fileList.associateBy { it.name }
+      logger.debug { "Looking for message '$message'" }
+      val fileDescriptorForMessage = fileDescriptors.entries.find { entry ->
+        logger.debug { "Looking for message in file descriptor ${entry.key}" }
+        entry.value.messageTypeList.any {
+          it.name == message
+        }
+      }?.value
+      if (fileDescriptorForMessage == null) {
+        logger.error { "Did not find the Protobuf file descriptor containing message '$message'" }
+        return Plugin.CompareContentsResponse.newBuilder()
+          .setError("Did not find the Protobuf file descriptor containing message '$message'")
+          .build()
+      }
+
+      val fileDesc = Descriptors.FileDescriptor.buildFrom(
+        fileDescriptorForMessage,
+        buildDependencies(fileDescriptors, fileDescriptorForMessage.dependencyList)
+      )
+      val descriptor = fileDesc.findMessageTypeByName(message)
+      if (descriptor == null) {
+        logger.error { "Did not find the Protobuf descriptor for message '$message'" }
+        return Plugin.CompareContentsResponse.newBuilder()
+          .setError("Did not find the Protobuf descriptor for message '$message'")
+          .build()
+      }
+
+      val expectedMessage = DynamicMessage.parseFrom(descriptor, request.expected.content.value)
+      logger.debug { "expectedMessage = \n$expectedMessage" }
+      val actualMessage = DynamicMessage.parseFrom(descriptor, request.actual.content.value)
+      logger.debug { "actualMessage = \n$actualMessage" }
+      val matchingContext =
+        MatchingContext(MatchingRuleCategory("body", request.rulesMap.entries.associate { (key, rules) ->
+          key to MatchingRuleGroup(rules.ruleList.map {
+            MatchingRule.create(it.type, structToJson(it.values))
+          }.toMutableList())
+        }.toMutableMap()), request.allowUnexpectedKeys)
+      val result = ProtobufContentMatcher.compare(expectedMessage, actualMessage, matchingContext)
+      logger.debug { "result = $result" }
+
+      val response = Plugin.CompareContentsResponse.newBuilder()
+      for (item in result.bodyResults) {
+        response.putResults(item.key, Plugin.ContentMismatches.newBuilder().addAllMismatches(item.result.map {
+          val builder = Plugin.ContentMismatch.newBuilder()
+            .setExpected(
+              BytesValue.newBuilder().setValue(ByteString.copyFrom(it.expected.toString().toByteArray())).build()
+            )
+            .setActual(
+              BytesValue.newBuilder().setValue(ByteString.copyFrom(it.actual.toString().toByteArray())).build()
+            )
+            .setMismatch(it.mismatch)
+            .setPath(it.path)
+          if (it.diff.isNotEmpty()) {
+            builder.diff = it.diff
+          }
+          builder.build()
+        }).build())
+      }
+
+      return response.build()
+    } catch (ex: Exception) {
+      logger.error(ex) { "Failed to generate response" }
+      return Plugin.CompareContentsResponse.newBuilder()
+        .setError(ex.message)
+        .build()
+    }
   }
 
   override suspend fun configureInteraction(request: Plugin.ConfigureInteractionRequest): Plugin.ConfigureInteractionResponse {
@@ -99,8 +215,10 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       val protoFile = Path.of(config["proto"]!!.stringValue)
       val protoResult = ProtoParser.parseProtoFile(protoFile)
       val descriptorBytes = protoResult.toByteArray()
-      val descriptorHash = HashCodeBuilder(897, 433)
-        .append(descriptorBytes).toHashCode()
+      logger.debug { "Protobuf file descriptor set is ${descriptorBytes.size} bytes" }
+      val digest = MessageDigest.getInstance("MD5")
+      digest.update(descriptorBytes)
+      val descriptorHash = BaseEncoding.base16().lowerCase().encode(digest.digest());
 
       logger.debug { "Parsed proto file OK, file descriptors = ${protoResult.fileList.map { it.name }}" }
 
