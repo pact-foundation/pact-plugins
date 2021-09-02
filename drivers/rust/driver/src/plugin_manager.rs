@@ -12,7 +12,7 @@ use std::sync::Mutex;
 use anyhow::anyhow;
 use lazy_static::lazy_static;
 use log::{debug, max_level, trace, warn};
-use sysinfo::{Pid, ProcessExt, Signal, System, SystemExt};
+use sysinfo::{Pid, ProcessExt, Signal, System, SystemExt, RefreshKind};
 
 use crate::catalogue_manager::{register_plugin_entries, remove_plugin_entries};
 use crate::child_process::ChildPluginProcess;
@@ -176,7 +176,7 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
   match ChildPluginProcess::new(child, manifest) {
     Ok(child) => Ok(PactPlugin::new(manifest, child)),
     Err(err) => {
-      let s = System::new();
+      let s = System::new_with_specifics(RefreshKind::new().with_processes());
       if let Some(process) = s.process(child_pid as Pid) {
         process.kill(Signal::Term);
       } else {

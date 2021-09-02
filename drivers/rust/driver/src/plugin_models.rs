@@ -1,6 +1,9 @@
 //! Models for representing plugins
 
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 use crate::child_process::ChildPluginProcess;
 use crate::proto::*;
@@ -111,9 +114,9 @@ impl PactPlugin {
   }
 
   /// Send a configure contents request to the plugin process
-  pub async fn configure_contents(&self, request: ConfigureContentsRequest) -> anyhow::Result<ConfigureContentsResponse> {
+  pub async fn configure_interaction(&self, request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
     let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
-    let response = client.configure_contents(tonic::Request::new(request)).await?;
+    let response = client.configure_interaction(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
@@ -123,4 +126,13 @@ impl PactPlugin {
     let response = client.generate_content(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
+}
+
+/// Plugin configuration to add to the matching context for an interaction
+#[derive(Clone, Debug, PartialEq)]
+pub struct PluginInteractionConfig {
+  /// Global plugin config (Pact level)
+  pub pact_configuration: HashMap<String, Value>,
+  /// Interaction plugin config
+  pub interaction_configuration: HashMap<String, Value>
 }

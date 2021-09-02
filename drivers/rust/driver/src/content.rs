@@ -15,9 +15,16 @@ use serde_json::Value;
 
 use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
 use crate::plugin_manager::lookup_plugin;
-use crate::proto::{Body, CompareContentsRequest, ConfigureContentsRequest, GenerateContentRequest};
+use crate::proto::{
+  Body,
+  CompareContentsRequest,
+  ConfigureInteractionRequest,
+  GenerateContentRequest,
+  PluginConfiguration
+};
 use crate::proto::body;
 use crate::utils::{proto_struct_to_json, to_proto_struct};
+use crate::plugin_models::PluginInteractionConfig;
 
 /// Matcher for contents based on content type
 #[derive(Clone, Debug)]
@@ -65,15 +72,15 @@ impl ContentMatcher {
       .unwrap_or("core".to_string())
   }
 
-  /// Get the plugin to configure the contents for the interaction part based on the provided
-  /// definition
-  pub async fn configure_content(
+  /// Get the plugin to configure the interaction contents for the interaction part based on the
+  /// provided definition
+  pub async fn configure_interation(
     &self,
     content_type: &ContentType,
     definition: HashMap<String, Value>
   ) -> anyhow::Result<(OptionalBody, Option<MatchingRuleCategory>, Option<Generators>)> {
     debug!("Sending ConfigureContents request to plugin {:?}", self.catalogue_entry);
-    let request = ConfigureContentsRequest {
+    let request = ConfigureInteractionRequest {
       content_type: content_type.to_string(),
       contents_config: Some(to_proto_struct(definition)),
     };
@@ -81,7 +88,7 @@ impl ContentMatcher {
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()
       .expect("Plugin type is required");
     match lookup_plugin(&plugin_manifest.as_dependency()) {
-      Some(plugin) => match plugin.configure_contents(request).await {
+      Some(plugin) => match plugin.configure_interaction(request).await {
         Ok(response) => {
           debug!("Got response: {:?}", response);
           let body = match response.contents {
@@ -154,8 +161,9 @@ impl ContentMatcher {
     expected: &OptionalBody,
     actual: &OptionalBody,
     context: &MatchingRuleCategory,
-    allow_unexpected_keys: bool
-  ) -> Result<(), Vec<ContentMismatch>> {
+    allow_unexpected_keys: bool,
+    plugin_config: Option<PluginInteractionConfig>
+  ) -> Result<(), HashMap<String, Vec<ContentMismatch>>> {
     let request = CompareContentsRequest {
       expected: Some(Body {
         content_type: expected.content_type().unwrap_or_default().to_string(),
@@ -178,6 +186,10 @@ impl ContentMatcher {
           }).collect()
         })
       }).collect(),
+      plugin_configuration: plugin_config.map(|config| PluginConfiguration {
+        interaction_configuration: Some(to_proto_struct(config.interaction_configuration)),
+        pact_configuration: Some(to_proto_struct(config.pact_configuration))
+      })
     };
 
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()
@@ -185,60 +197,80 @@ impl ContentMatcher {
     match lookup_plugin(&plugin_manifest.as_dependency()) {
       Some(plugin) => match plugin.compare_contents(request).await {
         Ok(response) => if let Some(mismatch) = response.type_mismatch {
-          Err(vec![
-            ContentMismatch {
-              expected: mismatch.expected.clone(),
-              actual: mismatch.actual.clone(),
-              mismatch: format!("Expected content type '{}' but got '{}'", mismatch.expected, mismatch.actual),
-              path: "".to_string(),
-              diff: None
-            }
-          ])
-        } else if !response.results.is_empty() {
-          Err(response.results.iter().map(|result| {
-            ContentMismatch {
-              expected: result.expected.as_ref()
-                .map(|e| from_utf8(&e).unwrap_or_default().to_string())
-                .unwrap_or_default(),
-              actual: result.actual.as_ref()
-                .map(|a| from_utf8(&a).unwrap_or_default().to_string())
-                .unwrap_or_default(),
-              mismatch: result.mismatch.clone(),
-              path: result.path.clone(),
-              diff: if result.diff.is_empty() {
-                None
-              } else {
-                Some(result.diff.clone())
+          Err(hashmap!{
+            String::default() => vec![
+              ContentMismatch {
+                expected: mismatch.expected.clone(),
+                actual: mismatch.actual.clone(),
+                mismatch: format!("Expected content type '{}' but got '{}'", mismatch.expected, mismatch.actual),
+                path: "".to_string(),
+                diff: None
               }
-            }
+            ]
+          })
+        } else if !response.error.is_empty() {
+          Err(hashmap! {
+            String::default() => vec![
+              ContentMismatch {
+                expected: Default::default(),
+                actual: Default::default(),
+                mismatch: response.error.clone(),
+                path: "".to_string(),
+                diff: None
+              }
+            ]
+          })
+        } else if !response.results.is_empty() {
+          Err(response.results.iter().map(|(k, v)| {
+            (k.clone(), v.mismatches.iter().map(|mismatch| {
+              ContentMismatch {
+                expected: mismatch.expected.as_ref()
+                  .map(|e| from_utf8(&e).unwrap_or_default().to_string())
+                  .unwrap_or_default(),
+                actual: mismatch.actual.as_ref()
+                  .map(|a| from_utf8(&a).unwrap_or_default().to_string())
+                  .unwrap_or_default(),
+                mismatch: mismatch.mismatch.clone(),
+                path: mismatch.path.clone(),
+                diff: if mismatch.diff.is_empty() {
+                  None
+                } else {
+                  Some(mismatch.diff.clone())
+                }
+              }
+            }).collect())
           }).collect())
         } else {
           Ok(())
         }
         Err(err) => {
           error!("Call to plugin failed - {}", err);
-          Err(vec![
-            ContentMismatch {
-              expected: "".to_string(),
-              actual: "".to_string(),
-              mismatch: format!("Call to plugin failed = {}", err),
-              path: "".to_string(),
-              diff: None
-            }
-          ])
+          Err(hashmap! {
+            String::default() => vec![
+              ContentMismatch {
+                expected: "".to_string(),
+                actual: "".to_string(),
+                mismatch: format!("Call to plugin failed = {}", err),
+                path: "".to_string(),
+                diff: None
+              }
+            ]
+          })
         }
       },
       None => {
         error!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry);
-        Err(vec![
-          ContentMismatch {
-            expected: "".to_string(),
-            actual: "".to_string(),
-            mismatch: format!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry),
-            path: "".to_string(),
-            diff: None
-          }
-        ])
+        Err(hashmap! {
+          String::default() => vec![
+            ContentMismatch {
+              expected: "".to_string(),
+              actual: "".to_string(),
+              mismatch: format!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry),
+              path: "".to_string(),
+              diff: None
+            }
+          ]
+        })
       }
     }
   }

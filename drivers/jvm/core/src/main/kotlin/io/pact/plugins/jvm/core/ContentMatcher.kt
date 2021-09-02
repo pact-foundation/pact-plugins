@@ -7,8 +7,8 @@ import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
 import mu.KLogging
 
 data class ContentMismatch(
-  val expected: ByteArray,
-  val actual: ByteArray,
+  val expected: ByteArray?,
+  val actual: ByteArray?,
   val mismatch: String,
   val path: String,
   val diff : String? = null
@@ -29,7 +29,7 @@ interface ContentMatcher {
     actual: OptionalBody,
     allowUnexpectedKeys: Boolean,
     rules: Map<String, MatchingRuleGroup>
-  ): List<ContentMismatch>
+  ): Map<String, List<ContentMismatch>>
 }
 
 data class CatalogueContentMatcher(
@@ -55,16 +55,16 @@ data class CatalogueContentMatcher(
     actual: OptionalBody,
     allowUnexpectedKeys: Boolean,
     rules: Map<String, MatchingRuleGroup>
-  ): List<ContentMismatch> {
+  ): Map<String, List<ContentMismatch>> {
     val result = DefaultPluginManager.invokeContentMatcher(this, expected, actual, allowUnexpectedKeys, rules)
-    return result.resultsList.map {
-      ContentMismatch(
-        it.expected.toByteArray(),
-        it.actual.toByteArray(),
-        it.mismatch,
-        it.path,
-        it.diff
-      )
+    return if (result.error.isNotEmpty()) {
+      mapOf("$" to listOf(ContentMismatch(expected.value, actual.value, result.error, "$")))
+    } else {
+      result.resultsMap.mapValues { entry ->
+        entry.value.mismatchesList.map {
+          ContentMismatch(it.expected.toByteArray(), it.actual.toByteArray(), it.mismatch, it.path, it.diff)
+        }
+      }
     }
   }
 

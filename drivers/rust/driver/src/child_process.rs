@@ -83,11 +83,11 @@ impl ChildPluginProcess {
       }
     });
 
-    match rx.recv_timeout(Duration::from_millis(500)) {
+    match rx.recv_timeout(Duration::from_millis(5000)) {
       Ok(result) => result,
       Err(err) => {
         error!("Timeout waiting to get plugin startup info - {}", err);
-        Err(anyhow!("Plugin process did not output the correct startup message in 500 ms"))
+        Err(anyhow!("Plugin process did not output the correct startup message in 5000 ms"))
       }
     }
   }
