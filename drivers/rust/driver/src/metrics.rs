@@ -1,7 +1,7 @@
 use std::env::consts::{ARCH, OS};
 use std::env::var;
 
-use log::{debug, info};
+use log::{debug, info, warn};
 use reqwest::Client;
 use serde_json::json;
 use uuid::Uuid;
@@ -46,7 +46,7 @@ pub(crate) fn send_metrics(manifest: &PactPluginManifest) {
       Ok(handle) => {
         let manifest = manifest.clone();
         handle.spawn(async move {
-          info!(
+          warn!(
             "\n\nPlease note:\n\
             We are tracking this plugin load anonymously to gather important usage statistics.\n\
             To disable tracking, set the 'pact_do_not_track' environment variable to 'true'.\n\n"

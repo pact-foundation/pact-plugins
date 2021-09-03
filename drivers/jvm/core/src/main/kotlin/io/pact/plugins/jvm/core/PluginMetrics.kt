@@ -16,7 +16,7 @@ object PluginMetrics: KLogging() {
         System.getenv("pact_do_not_track")
       }
       if (doNotTrack != "true") {
-        logger.info {
+        logger.warn {
           """
           Please note: we are tracking this plugin load anonymously to gather important usage statistics.
           To disable tracking, set the 'pact_do_not_track' system property or environment variable to 'true'.
