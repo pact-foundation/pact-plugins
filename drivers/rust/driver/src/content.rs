@@ -15,16 +15,16 @@ use serde_json::Value;
 
 use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
 use crate::plugin_manager::lookup_plugin;
+use crate::plugin_models::PluginInteractionConfig;
 use crate::proto::{
   Body,
   CompareContentsRequest,
   ConfigureInteractionRequest,
   GenerateContentRequest,
-  PluginConfiguration
+  PluginConfiguration as ProtoPluginConfiguration
 };
 use crate::proto::body;
-use crate::utils::{proto_struct_to_json, to_proto_struct};
-use crate::plugin_models::PluginInteractionConfig;
+use crate::utils::{proto_struct_to_json, proto_struct_to_map, to_proto_struct};
 
 /// Matcher for contents based on content type
 #[derive(Clone, Debug)]
@@ -48,6 +48,58 @@ pub struct ContentMismatch {
   pub path: String,
   /// Optional diff of the expected and actual values
   pub diff: Option<String>
+}
+
+/// Interaction contents setup by the plugin
+#[derive(Clone, Debug)]
+pub struct InteractionContents {
+  /// Body/Contents of the interaction
+  pub body: OptionalBody,
+  /// Matching rules to apply
+  pub rules: Option<MatchingRuleCategory>,
+  /// Generators to apply
+  pub generators: Option<Generators>,
+  /// Message metadata
+  pub metadata: Option<HashMap<String, Value>>,
+  /// Plugin configuration data to apply to the interaction
+  pub plugin_config: PluginConfiguration
+}
+
+impl Default for InteractionContents {
+  fn default() -> Self {
+    InteractionContents {
+      body: Default::default(),
+      rules: None,
+      generators: None,
+      metadata: None,
+      plugin_config: Default::default()
+    }
+  }
+}
+
+/// Plugin data to persist into the Pact file
+#[derive(Clone, Debug)]
+pub struct PluginConfiguration {
+  /// Data to perist on the interaction
+  pub interaction_configuration: HashMap<String, Value>,
+  /// Data to persist in the Pact metadata
+  pub pact_configuration: HashMap<String, Value>
+}
+
+impl PluginConfiguration {
+  /// Plugin data is empty when the interaction and pact data is empty
+  pub fn is_empty(&self) -> bool {
+    self.pact_configuration.is_empty() && self.interaction_configuration.is_empty()
+  }
+}
+
+impl Default for PluginConfiguration {
+  fn default() -> Self {
+    PluginConfiguration {
+      interaction_configuration: Default::default(),
+      pact_configuration: Default::default()
+    }
+  }
 }
 
 impl ContentMatcher {
@@ -78,7 +130,7 @@ impl ContentMatcher {
     &self,
     content_type: &ContentType,
     definition: HashMap<String, Value>
-  ) -> anyhow::Result<(OptionalBody, Option<MatchingRuleCategory>, Option<Generators>)> {
+  ) -> anyhow::Result<InteractionContents> {
     debug!("Sending ConfigureContents request to plugin {:?}", self.catalogue_entry);
     let request = ConfigureInteractionRequest {
       content_type: content_type.to_string(),
@@ -105,39 +157,67 @@ impl ContentMatcher {
             None => OptionalBody::Missing
           };
 
-          let rules = MatchingRuleCategory {
-            name: Category::BODY,
-            rules: response.rules.iter().map(|(k, rules)| {
-              // TODO: This is unwrapping the DocPath
-              (DocPath::new(k).unwrap(), RuleList {
-                rules: rules.rule.iter().map(|rule| {
-                  // TODO: This is unwrapping the MatchingRule
-                  MatchingRule::create(rule.r#type.as_str(), &rule.values.as_ref().map(|rule| {
-                    proto_struct_to_json(rule)
-                  }).unwrap_or_default()).unwrap()
-                }).collect(),
-                rule_logic: RuleLogic::And,
-                cascaded: false
-              })
-            }).collect()
+          let rules = if !response.rules.is_empty() {
+            Some(MatchingRuleCategory {
+              name: Category::BODY,
+              rules: response.rules.iter().map(|(k, rules)| {
+                // TODO: This is unwrapping the DocPath
+                (DocPath::new(k).unwrap(), RuleList {
+                  rules: rules.rule.iter().map(|rule| {
+                    // TODO: This is unwrapping the MatchingRule
+                    MatchingRule::create(rule.r#type.as_str(), &rule.values.as_ref().map(|rule| {
+                      proto_struct_to_json(rule)
+                    }).unwrap_or_default()).unwrap()
+                  }).collect(),
+                  rule_logic: RuleLogic::And,
+                  cascaded: false
+                })}).collect()
+            })
+          } else {
+            None
           };
 
-          let generators = Generators {
-            categories: hashmap!{
-              GeneratorCategory::BODY => response.generators.iter().map(|(k, gen)| {
-                // TODO: This is unwrapping the DocPath
-                // TODO: This is unwrapping the Generator
-                (DocPath::new(k).unwrap(), Generator::create(gen.r#type.as_str(),
-                  &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default()).unwrap())
-              }).collect()
+          let generators = if !response.generators.is_empty() {
+            Some(Generators {
+              categories: hashmap! {
+                GeneratorCategory::BODY => response.generators.iter().map(|(k, gen)| {
+                  // TODO: This is unwrapping the DocPath
+                  // TODO: This is unwrapping the Generator
+                  (DocPath::new(k).unwrap(), Generator::create(gen.r#type.as_str(),
+                    &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default()).unwrap())
+                }).collect()
+              }
+            })
+          } else {
+            None
+          };
+
+          let metadata = response.message_metadata.as_ref().map(|md| proto_struct_to_map(md));
+
+          let plugin_config = if let Some(plugin_configuration) = response.plugin_configuration {
+            PluginConfiguration {
+              interaction_configuration: plugin_configuration.interaction_configuration.as_ref()
+                .map(|val| proto_struct_to_map(val)).unwrap_or_default(),
+              pact_configuration: plugin_configuration.pact_configuration.as_ref()
+                .map(|val| proto_struct_to_map(val)).unwrap_or_default()
             }
+          } else {
+            PluginConfiguration::default()
           };
 
           debug!("body={}", body);
           debug!("rules={:?}", rules);
           debug!("generators={:?}", generators);
+          debug!("metadata={:?}", metadata);
+          debug!("pluginConfig={:?}", plugin_config);
 
-          Ok((body, Some(rules), Some(generators)))
+          Ok(InteractionContents {
+            body,
+            rules,
+            generators,
+            metadata,
+            plugin_config
+          })
         }
         Err(err) => {
           error!("Call to plugin failed - {}", err);
@@ -186,7 +266,7 @@ impl ContentMatcher {
           }).collect()
         })
       }).collect(),
-      plugin_configuration: plugin_config.map(|config| PluginConfiguration {
+      plugin_configuration: plugin_config.map(|config| ProtoPluginConfiguration {
         interaction_configuration: Some(to_proto_struct(config.interaction_configuration)),
         pact_configuration: Some(to_proto_struct(config.pact_configuration))
       })

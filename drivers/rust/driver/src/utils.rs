@@ -52,3 +52,7 @@ pub(crate) fn proto_value_to_json(val: &prost_types::Value) -> Value {
     None => Value::Null
   }
 }
+
+pub(crate) fn proto_struct_to_map(val: &prost_types::Struct) -> HashMap<String, Value> {
+  val.fields.iter().map(|(k, v)| (k.clone(), proto_value_to_json(v))).collect()
+}
