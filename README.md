@@ -40,9 +40,21 @@ Main responsibilities:
 
 #### Plugins that provide protocol implementations
 
+Plugins can provide support for new protocols. The main features that the plugin would provide is to be
+able to create the protocol payloads and create a mock server that can deal with them.
+
 See [Protocol design docs](docs/protocol-plugin-design.md).
 
+#### Plugins that provide support for different types of content
+
+These plugins provide the ability to match and generate different types of contents which are used
+with existing protocol implementations. 
+
+See [Content matcher design docs](docs/content-matcher-design.md).
+
 #### Plugins that provide matchers/generators
+
+Plugins can also provide new matching rules and generators. 
 
 TODO
 
