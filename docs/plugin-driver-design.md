@@ -208,7 +208,7 @@ Load a plugin given a plugin dependency (name, version and list of dependencies)
 of all currently loaded plugins in a global plugin register so that the plugins are not loaded more than once.
 
 Every time a plugin is loaded, send an anonymous event to Google Analytics to track the details of the loaded plugin . 
-To disable tracking, users can set the 'pact_do_not_track' system property or environment variable to 'true'. 
+To disable tracking, users can set the `pact_do_not_track` system property or environment variable to `true`. 
 
 The following attributes are sent to GA:
 ```

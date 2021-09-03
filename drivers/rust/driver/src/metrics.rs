@@ -1,7 +1,7 @@
 use std::env::consts::{ARCH, OS};
 use std::env::var;
 
-use log::{debug, info, warn};
+use log::{debug, warn};
 use reqwest::Client;
 use serde_json::json;
 use uuid::Uuid;
