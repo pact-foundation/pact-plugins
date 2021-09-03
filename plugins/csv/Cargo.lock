@@ -1274,7 +1274,7 @@ dependencies = [
  "logos",
  "maplit",
  "pact_matching",
- "pact_models",
+ "pact_models 0.2.0-beta.2",
  "prost",
  "prost-types",
  "serde_json",
@@ -1295,7 +1295,7 @@ dependencies = [
  "lazy_static",
  "log",
  "maplit",
- "pact_models",
+ "pact_models 0.2.0-beta.1",
  "prost",
  "prost-types",
  "regex",
@@ -1331,7 +1331,7 @@ dependencies = [
  "nom 7.0.0",
  "onig",
  "pact-plugin-driver",
- "pact_models",
+ "pact_models 0.2.0-beta.2",
  "rand 0.8.4",
  "semver 0.11.0",
  "serde",
@@ -1345,6 +1345,41 @@ dependencies = [
 [[package]]
 name = "pact_models"
 version = "0.2.0-beta.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fa5682be01d34e684b9ee3f7e97ee367fe9c9b079071cf6295ca04c37f0dbdc"
+dependencies = [
+ "anyhow",
+ "base64",
+ "bytes",
+ "chrono",
+ "chrono-tz",
+ "fs2",
+ "hex",
+ "indextree",
+ "itertools",
+ "lazy_static",
+ "lenient_semver",
+ "log",
+ "logos",
+ "maplit",
+ "mime",
+ "nom 7.0.0",
+ "onig",
+ "parse-zoneinfo",
+ "rand 0.8.4",
+ "rand_regex",
+ "regex",
+ "regex-syntax",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sxd-document",
+ "uuid",
+]
+
+[[package]]
+name = "pact_models"
+version = "0.2.0-beta.2"
 dependencies = [
  "anyhow",
  "base64",
