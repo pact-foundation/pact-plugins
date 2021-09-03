@@ -95,11 +95,35 @@ The following describes the types of entries:
 
 #### Content Matcher (content-matcher)
 
-Content matchers are responsible for matching request and response bodies and message payloads.
+Content matchers are responsible for matching request and response bodies and message payloads. Each entry must have
+a `content-types` associated value with the list of content types the matcher supports (separated by semi-colons `;`).
+
+For example, the entry for a CSV content matcher would be:
+```
+{
+    type: EntryType::ContentMatcher,
+    key: "csv",
+    values: {
+        "content-types": "text/csv;application/csv"
+    }
+}
+```
 
 #### Content Generator (content-generator) 
 
-Content matchers are responsible for constructing request and response bodies and message payloads.
+Content matchers are responsible for constructing request and response bodies and message payloads. Each entry must have
+a `content-types` associated value with the list of content types the generator supports (separated by semi-colons `;`).
+
+For example, the entry for a CSV content generator would be:
+```
+{
+    type: EntryType::ContentGenerator,
+    key: "csv",
+    values: {
+        "content-types": "text/csv;application/csv"
+    }
+}
+```
 
 #### Matcher (matcher)
 
@@ -210,7 +234,7 @@ ev:     1                   // Value
 #### LookupPlugin(plugin: PluginDependency)
 Look up a plugin given a plugin dependency (name, version and list of dependencies) in the global plugin register.
 
-#### LoadPluginManifest(plugin_dep: PluginDependency)
+#### LoadPluginManifest(plugin: PluginDependency)
 Return the plugin manifest given a plugin dependency (name, version and list of dependencies). 
 Will first look in the global plugin manifest registry and then load the manifest from disk if not found in the registry.
 
