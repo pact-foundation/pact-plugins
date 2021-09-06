@@ -1,0 +1,33 @@
+@startuml
+skinparam responseMessageBelowArrow true
+participant "Pact Test DSL" as P1
+participant "Pact Impl" as P2
+participant "Mock server" as P3
+participant "Plugin Driver" as P4
+participant "Plugin" as P5
+P1 -> P2: Start Test, define Pact
+P2 -> P4: Load plugin required by test
+P4 -> P5: Start plugin and send InitPluginRequest
+P4 <- P5: Send catalogue entries (InitPluginResponse)
+P2 <- P4:
+note right of P2: Setup Pact interaction
+P2 -> P4: Configure interaction
+P4 -> P5: ConfigureInteractionRequest
+P4 <- P5: ConfigureInteractionResponse
+P2 <- P4:
+note right of P2: Start mock server for test with Pact interaction
+P1 <- P2:
+P1 -> P3: Make request to mock server
+P3 -> P4: Match request body
+P4 -> P5: CompareContentsRequest
+P4 <- P5: CompareContentsResponse
+P3 <- P4: Check match results
+P3 -> P4: Generate response body
+P4 -> P5: GenerateContentRequest
+P4 <- P5: GenerateContentResponse
+P3 <- P4:
+P1 <- P3: Return response
+P1 -> P2: Finish Test
+note right of P2: Write Pact file if test passed
+P1 <- P2:
+@enduml

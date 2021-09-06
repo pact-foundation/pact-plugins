@@ -1,0 +1,36 @@
+@startuml
+skinparam responseMessageBelowArrow true
+participant "Pact Test DSL" as P1
+participant "Language Impl" as P2
+collections "Plugin Folders" as P3
+participant "Plugin 1" as P4
+participant "Plugins ..." as P5
+participant "Plugin 2" as P6
+P1 -> P2 : Request Plugin
+P2 -> P3 : Load Plugin manifest
+P2 <- P3
+P2 -> P4 : Start plugin process
+note right of P4: Start GRPC server\n and print port to STDOUT
+P2 <- P4 : Read port from STDOUT
+P2 -> P4 : INIT Message
+P2 <- P4 : Plugin catalogue entries
+P2 -> P4 : Updated System Catalogue
+P2 -> P5 : Updated System Catalogue
+P2 -> P4 : Invoke Function
+P2 <- P4 : Request function from Plugin 2
+P2 -> P3 : Load Plugin manifest
+P2 <- P3
+P2 -> P6 : Start plugin process
+note right of P6: Start GRPC server\n and print port to STDOUT
+P2 <- P6 : Read port from STDOUT
+P2 -> P6 : INIT Message
+P2 <- P6 : Plugin catalogue entries
+P2 -> P4 : Updated System Catalogue
+P2 -> P5 : Updated System Catalogue
+P2 -> P6 : Updated System Catalogue
+P2 -> P6 : Invoke Function
+P2 <- P6 : Return function response
+P2 -> P4 : Send Plugin 2 response
+P2 <- P4 : Return function response
+P1 <- P2 : Return function response
+@enduml

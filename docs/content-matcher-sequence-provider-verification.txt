@@ -1,0 +1,27 @@
+@startuml
+skinparam responseMessageBelowArrow true
+participant "Pact Test DSL" as P1
+participant "Pact Impl" as P2
+participant "Provider" as P3
+participant "Plugin Driver" as P4
+participant "Plugin" as P5
+P1 -> P2: Start provider test
+note right of P2: Load pacts for test
+P2 -> P4: Load plugins for pact file
+P4 -> P5: Start plugin and send InitPluginRequest
+P4 <- P5: Send catalogue entries (InitPluginResponse)
+P2 <- P4:
+note right of P2: Create request for interaction
+P2 -> P4: Generate request body
+P4 -> P5: GenerateContentRequest
+P4 <- P5: GenerateContentResponse
+P2 <- P4:
+P2 -> P3: Send request to provider
+P2 <- P3:
+note right of P2: Match response body
+P2 -> P4:
+P4 -> P5: CompareContentsRequest
+P4 <- P5: CompareContentsResponse
+P2 <- P4:
+P1 <- P2: Return test result
+@enduml

@@ -93,11 +93,11 @@ The plugin will then receive the following request:
 
 ```
 ConfigureInteractionRequest {
-  contentType: "text/csv",
+  contentType: "text/csv"
   contentsConfig: {
-    "content-type", "text/csv",
-    "column:1", "matching(type,'Name')",
-    "column:2", "matching(number,100)",
+    "content-type", "text/csv"
+    "column:1", "matching(type,'Name')"
+    "column:2", "matching(number,100)"
     "column:3", "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
   }
 }
@@ -111,66 +111,51 @@ Here is what the CSV plugin responds with:
 
 ```
 ConfigureInteractionResponse {
-    contents {
+    contents: {
       contentType: "text/csv;charset=UTF-8"
-      content {
-        value: "Name,100,2000-01-01\n"
-      }
+      content: "Name,100,2000-01-01\n"
     }
-    rules [
-        {
-          key: "column:0"
-          value {
-            rule {
-              type: "type"
-              values {
-              }
-            }
+    rules: {
+          "column:0": {
+            rule [
+                {
+                  type: "type"
+                  values {}
+                }
+            ]    
           }
         },
         {
-          key: "column:1"
-          value {
-            rule {
-              type: "number"
-              values {
-              }
-            }
+          "column:1": {
+            rule [
+                {
+                  type: "number"
+                  values {}
+                }
+            ]
           }
         },
         {
-          key: "column:2"
-          value {
-            rule {
-              type: "datetime"
-              values {
-                fields {
-                  key: "format"
-                  value {
-                    string_value: "yyyy-MM-dd"
+          "column:2": {
+            rule [
+                {
+                  type: "datetime"
+                  values {
+                    "format": "yyyy-MM-dd"
                   }
                 }
-              }
-            }
-          }
+            ]
+          }      
         }
-    ]    
-    generators [
-        {
-          key: "column:2"
-          value {
+    }
+    generators {
+       "column:2" {
             type: "DateTime"
             values {
-              fields {
-                key: "format"
-                value {
-                  string_value: "yyyy-MM-dd"
-                }
-              }
+              "format": "yyyy-MM-dd"
             }
-          }
-        }
-    ]
+       }
+    }
 }
 ```
 
@@ -276,3 +261,11 @@ GenerateContentResponse {
     }
 }
 ```
+
+## Sequence Diagrams
+
+### Consumer test
+![Sequence consumer test](content-matcher-sequence-consumer-test.png)
+
+### Provider verification
+![Sequence provider test](content-matcher-sequence-provider-verification.png)
