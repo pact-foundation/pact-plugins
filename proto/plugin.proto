@@ -37,7 +37,7 @@ message CatalogueEntry {
   // Entry key
   string key = 2;
   // Associated data required for the entry. For CONTENT_MATCHER and CONTENT_GENERATOR types, a "content-types"
-  // value (seperated by semi-colons) is required for all the content types the plugin supports.
+  // value (separated by semi-colons) is required for all the content types the plugin supports.
   map<string, string> values = 3;
 }
 
