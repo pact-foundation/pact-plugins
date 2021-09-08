@@ -5,174 +5,37 @@ use std::io::Read;
 use std::net::SocketAddr;
 
 use anyhow::anyhow;
-use bytes::Bytes;
-use csv::{Reader, ReaderBuilder, StringRecord, Writer};
+use csv::{Reader, ReaderBuilder, StringRecord};
 use env_logger::Env;
 use futures::Stream;
 use log::debug;
 use maplit::hashmap;
 use pact_matching::matchers::Matches;
-use pact_models::bodies::OptionalBody;
-use pact_models::generators::{GenerateValue, NoopVariantMatcher, VariantMatcher};
 use pact_models::matchingrules::{MatchingRule, RuleList, RuleLogic};
-use pact_models::prelude::{ContentType, Generator};
-use prost_types::value::Kind;
-use serde_json::{json, Value};
+use pact_models::prelude::ContentType;
+use serde_json::Value;
 use tokio::net::{TcpListener, TcpStream};
-use tonic::{Request, Response, transport::Server};
+use tonic::{Response, transport::Server};
 use uuid::Uuid;
 
-use crate::parser::{parse_field, parse_value};
+use crate::csv_content::{setup_csv_contents, generate_csv_content, has_headers};
+use crate::proto::body::ContentTypeOverride;
+use crate::proto::catalogue_entry::EntryType;
 use crate::proto::pact_plugin_server::{PactPlugin, PactPluginServer};
 use crate::proto::to_object;
-use crate::proto::catalogue_entry::EntryType;
-use crate::proto::body::ContentTypeOverride;
 
 mod proto;
 mod parser;
+mod utils;
+mod csv_content;
 
 #[derive(Debug, Default)]
 pub struct CsvPactPlugin {}
 
-fn setup_csv_contents(request: &Request<proto::ConfigureInteractionRequest>) -> anyhow::Result<Response<proto::ConfigureInteractionResponse>> {
-  match &request.get_ref().contents_config {
-    Some(config) => {
-      let mut columns = vec![];
-      for (key, value) in &config.fields {
-        let column = parse_field(&key)?;
-        let result = parse_value(&value)?;
-        debug!("Parsed column definition: {}, {:?}", column, result);
-        if column > columns.len() {
-          columns.resize(column, None)
-        }
-        columns[column - 1] = Some(result);
-      }
-      let mut wtr = Writer::from_writer(vec![]);
-      let column_values = columns.iter().map(|v| {
-        if let Some(v) = v {
-          &v.0
-        } else {
-          ""
-        }
-      }).collect::<Vec<&str>>();
-      wtr.write_record(column_values)?;
-      let mut rules = hashmap!{};
-      let mut generators = hashmap!{};
-      for (col, vals) in columns.iter().enumerate() {
-        if let Some((_, rule, gen)) = vals {
-          if let Some(rule) = rule {
-            debug!("rule.values()={:?}", rule.values());
-            rules.insert(format!("column:{}", col), proto::MatchingRules {
-              rule: vec![
-                proto::MatchingRule {
-                  r#type: rule.name(),
-                  values: Some(prost_types::Struct {
-                    fields: rule.values().iter().map(|(key, val)| (key.to_string(), to_value(val))).collect()
-                  })
-                }
-              ]
-            });
-          }
-          if let Some(gen) = gen {
-            generators.insert(format!("column:{}", col), proto::Generator {
-              r#type: gen.name(),
-              values: Some(prost_types::Struct {
-                fields: gen.values().iter().map(|(key, val)| (key.to_string(), to_value(val))).collect()
-              })
-            });
-          }
-        }
-      }
-      debug!("matching rules = {:?}", rules);
-      debug!("generators = {:?}", generators);
-      Ok(Response::new(proto::ConfigureInteractionResponse {
-        contents: Some(proto::Body {
-          content_type: "text/csv;charset=UTF-8".to_string(),
-          content: Some(wtr.into_inner()?),
-          content_type_override: 0
-        }),
-        rules,
-        generators,
-        message_metadata: None,
-        plugin_configuration: None
-      }))
-    }
-    None => Err(anyhow!("No config provided to match/generate CSV content"))
-  }
-}
-
-fn generate_csv_content(request: &Request<proto::GenerateContentRequest>) -> anyhow::Result<OptionalBody> {
-  let mut generators = hashmap! {};
-  for (key, gen) in &request.get_ref().generators {
-    let column = parse_field(&key)?;
-    let values = gen.values.as_ref().ok_or(anyhow!("Generator values were expected"))?.fields.iter().map(|(k, v)| {
-      (k.clone(), from_value(v))
-    }).collect();
-    let generator = Generator::from_map(&gen.r#type, &values)
-      .ok_or(anyhow!("Failed to build generator of type {}", gen.r#type))?;
-    generators.insert(column, generator);
-  };
-
-  let context = hashmap! {};
-  let variant_matcher = NoopVariantMatcher.boxed();
-  let mut wtr = Writer::from_writer(vec![]);
-  let csv_data = request.get_ref().contents.as_ref().unwrap().content.as_ref().unwrap();
-  let mut rdr = ReaderBuilder::new().has_headers(false).from_reader(csv_data.as_slice());
-  for result in rdr.records() {
-    let record = result?;
-    for (col, field) in record.iter().enumerate() {
-      debug!("got column:{} = '{}'", col, field);
-      if let Some(generator) = generators.get(&col) {
-        let value = generator.generate_value(&field.to_string(), &context, &variant_matcher)?;
-        wtr.write_field(value)?;
-      } else {
-        wtr.write_field(field)?;
-      }
-    }
-    wtr.write_record(None::<&[u8]>)?;
-  }
-  let generated = wtr.into_inner()?;
-  debug!("Generated contents has {} bytes", generated.len());
-  let bytes = Bytes::from(generated);
-  Ok(OptionalBody::Present(bytes, Some(ContentType::from("text/csv;charset=UTF-8")), None))
-}
-
-fn to_value(value: &Value) -> prost_types::Value {
-  match value {
-    Value::Null => prost_types::Value { kind: Some(prost_types::value::Kind::NullValue(0)) },
-    Value::Bool(b) => prost_types::Value { kind: Some(prost_types::value::Kind::BoolValue(*b)) },
-    Value::Number(n) => if n.is_u64() {
-      prost_types::Value { kind: Some(prost_types::value::Kind::NumberValue(n.as_u64().unwrap_or_default() as f64)) }
-    } else if n.is_i64() {
-      prost_types::Value { kind: Some(prost_types::value::Kind::NumberValue(n.as_i64().unwrap_or_default() as f64)) }
-    } else {
-      prost_types::Value { kind: Some(prost_types::value::Kind::NumberValue(n.as_f64().unwrap_or_default())) }
-    }
-    Value::String(s) => prost_types::Value { kind: Some(prost_types::value::Kind::StringValue(s.clone())) },
-    Value::Array(v) => prost_types::Value { kind: Some(prost_types::value::Kind::ListValue(prost_types::ListValue {
-      values: v.iter().map(|val| to_value(val)).collect()
-    })) },
-    Value::Object(m) => prost_types::Value { kind: Some(prost_types::value::Kind::StructValue(prost_types::Struct {
-      fields: m.iter().map(|(key, val)| (key.clone(), to_value(val))).collect()
-    })) }
-  }
-}
-
-fn from_value(value: &prost_types::Value) -> Value {
-  match value.kind.as_ref().unwrap() {
-    Kind::NullValue(_) => Value::Null,
-    Kind::NumberValue(n) => json!(*n),
-    Kind::StringValue(s) => Value::String(s.clone()),
-    Kind::BoolValue(b) => Value::Bool(*b),
-    Kind::StructValue(s) => Value::Object(s.fields.iter()
-      .map(|(k, v)| (k.clone(), from_value(v))).collect()),
-    Kind::ListValue(l) => Value::Array(l.values.iter()
-      .map(|v| from_value(v)).collect())
-  }
-}
-
 #[tonic::async_trait]
 impl PactPlugin for CsvPactPlugin {
+
+  // Returns the catalogue entries for CSV
   async fn init_plugin(
     &self,
     request: tonic::Request<proto::InitPluginRequest>,
@@ -199,6 +62,7 @@ impl PactPlugin for CsvPactPlugin {
     }))
   }
 
+  // Not used
   async fn update_catalogue(
     &self,
     _request: tonic::Request<proto::Catalogue>,
@@ -207,20 +71,25 @@ impl PactPlugin for CsvPactPlugin {
     Ok(Response::new(()))
   }
 
+  // Request to compare the CSV contents
   async fn compare_contents(
     &self,
     request: tonic::Request<proto::CompareContentsRequest>,
   ) -> Result<tonic::Response<proto::CompareContentsResponse>, tonic::Status> {
-    debug!("compare_contents request");
     let request = request.get_ref();
+    debug!("compare_contents request - {:?}", request);
+
+    let has_headers = has_headers(&request.plugin_configuration);
+
     match (request.expected.as_ref(), request.actual.as_ref()) {
       (Some(expected), Some(actual)) => {
         let expected_csv_data = expected.content.as_ref().unwrap();
-        let mut expected_rdr = ReaderBuilder::new().has_headers(false)
+        let mut expected_rdr = ReaderBuilder::new().has_headers(has_headers)
           .from_reader(expected_csv_data.as_slice());
         let actual_csv_data = actual.content.as_ref().unwrap();
-        let mut actual_rdr = ReaderBuilder::new().has_headers(false)
+        let mut actual_rdr = ReaderBuilder::new().has_headers(has_headers)
           .from_reader(actual_csv_data.as_slice());
+
         let rules = request.rules.iter()
           .map(|(key, rules)| {
             let rules = rules.rule.iter().fold(RuleList::empty(RuleLogic::And), |mut list, rule| {
@@ -236,7 +105,8 @@ impl PactPlugin for CsvPactPlugin {
             });
             (key.clone(), rules)
           }).collect();
-        compare_contents(&mut expected_rdr, &mut actual_rdr, request.allow_unexpected_keys, rules)
+        compare_contents(has_headers, &mut expected_rdr, &mut actual_rdr,
+                         request.allow_unexpected_keys, rules)
           .map_err(|err| tonic::Status::aborted(format!("Failed to compare CSV contents: {}", err)))
       }
       (None, Some(actual)) => {
@@ -289,25 +159,26 @@ impl PactPlugin for CsvPactPlugin {
     }
   }
 
+  // Request to configure the interaction with CSV contents
+  // Example definition we should receive:
+  // "column:1", "matching(type,'Name')",
+  // "column:2", "matching(number,100)",
+  // "column:3", "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
   async fn configure_interaction(
     &self,
     request: tonic::Request<proto::ConfigureInteractionRequest>,
   ) -> Result<tonic::Response<proto::ConfigureInteractionResponse>, tonic::Status> {
     debug!("Received configure_contents request for '{}'", request.get_ref().content_type);
-
-    // "column:1", "matching(type,'Name')",
-    // "column:2", "matching(number,100)",
-    // "column:3", "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
     setup_csv_contents(&request)
       .map_err(|err| tonic::Status::aborted(format!("Invalid column definition: {}", err)))
   }
 
+  // Request to generate CSV contents
   async fn generate_content(
     &self,
     request: tonic::Request<proto::GenerateContentRequest>,
   ) -> Result<tonic::Response<proto::GenerateContentResponse>, tonic::Status> {
     debug!("Received generate_content request");
-
     generate_csv_content(&request)
       .map(|contents| {
         debug!("Generated contents: {}", contents);
@@ -324,6 +195,7 @@ impl PactPlugin for CsvPactPlugin {
 }
 
 fn compare_contents<R: Read>(
+  has_headers: bool,
   expected: &mut Reader<R>,
   actual: &mut Reader<R>,
   allow_unexpected_keys: bool,
@@ -331,35 +203,77 @@ fn compare_contents<R: Read>(
 ) -> anyhow::Result<tonic::Response<proto::CompareContentsResponse>> {
   debug!("Comparing contents using allow_unexpected_keys ({}) and rules ({:?})", allow_unexpected_keys, rules);
 
+  let mut results = vec![];
+
+  let expected_headers = match expected.headers() {
+    Ok(headers) => headers.clone(),
+    Err(err) => if has_headers {
+      return Err(anyhow!("Failed to read the expected headers: {}", err))
+    } else {
+      debug!("Failed to read the expected headers: {}", err);
+      StringRecord::default()
+    }
+  };
+  let actual_headers = match actual.headers() {
+    Ok(headers) => headers.clone(),
+    Err(err) => if has_headers {
+      return Err(anyhow!("Failed to read the actual headers: {}", err))
+    } else {
+      debug!("Failed to read the actual headers: {}", err);
+      StringRecord::default()
+    }
+  };
+  let actual_headers: HashMap<&str, usize> = actual_headers
+    .iter()
+    .enumerate()
+    .map(|(col, hdr)| (hdr, col))
+    .collect();
+
+  if has_headers {
+    for header in expected_headers.iter() {
+      if !actual_headers.contains_key(header) {
+        results.push(proto::ContentMismatch {
+          expected: Some(header.as_bytes().to_vec()),
+          actual: None,
+          mismatch: format!("Expected columns '{}', but was missing", header),
+          path: String::default(),
+          diff: String::default()
+        });
+      }
+    }
+  }
+
   let mut expected_records = expected.records();
   let mut actual_records = actual.records();
-  let mut results = vec![];
 
   let expected_row = expected_records.next()
     .ok_or_else(|| anyhow!("Could not read the expected content"))??;
   let actual_row = actual_records.next()
     .ok_or_else(|| anyhow!("Could not read the expected content"))??;
-  if actual_row.len() < expected_row.len() {
-    results.push(proto::ContentMismatch {
-      expected: Some(format!("{} columns", expected_row.len()).as_bytes().to_vec()),
-      actual: Some(format!("{} columns", actual_row.len()).as_bytes().to_vec()),
-      mismatch: format!("Expected {} columns, but got {}", expected_row.len(), actual_row.len()),
-      path: String::default(),
-      diff: String::default()
-    });
-  } else if actual_row.len() > expected_row.len() && !allow_unexpected_keys {
-    results.push(proto::ContentMismatch {
-      expected: Some(format!("{} columns", expected_row.len()).as_bytes().to_vec()),
-      actual: Some(format!("{} columns", actual_row.len()).as_bytes().to_vec()),
-      mismatch: format!("Expected at least {} columns, but got {}", expected_row.len(), actual_row.len()),
-      path: String::default(),
-      diff: String::default()
-    });
+
+  if !has_headers {
+    if actual_row.len() < expected_row.len() {
+      results.push(proto::ContentMismatch {
+        expected: Some(format!("{} columns", expected_row.len()).as_bytes().to_vec()),
+        actual: Some(format!("{} columns", actual_row.len()).as_bytes().to_vec()),
+        mismatch: format!("Expected {} columns, but got {}", expected_row.len(), actual_row.len()),
+        path: String::default(),
+        diff: String::default()
+      });
+    } else if actual_row.len() > expected_row.len() && !allow_unexpected_keys {
+      results.push(proto::ContentMismatch {
+        expected: Some(format!("{} columns", expected_row.len()).as_bytes().to_vec()),
+        actual: Some(format!("{} columns", actual_row.len()).as_bytes().to_vec()),
+        mismatch: format!("Expected at least {} columns, but got {}", expected_row.len(), actual_row.len()),
+        path: String::default(),
+        diff: String::default()
+      });
+    }
   }
 
-  compare_row(&expected_row, &actual_row, &rules, &mut results);
+  compare_row(&expected_row, &actual_row, &rules, has_headers, &expected_headers, &actual_headers, &mut results);
   for row in actual_records {
-    compare_row(&expected_row, &row?, &rules, &mut results);
+    compare_row(&expected_row, &row?, &rules, has_headers, &expected_headers, &actual_headers, &mut results);
   }
 
   Ok(Response::new(proto::CompareContentsResponse {
@@ -377,11 +291,25 @@ fn compare_row(
   expected_row: &StringRecord,
   actual_row: &StringRecord,
   rules: &HashMap<String, RuleList>,
+  has_headers: bool,
+  expected_headers: &StringRecord,
+  actual_headers: &HashMap<&str, usize>,
   results: &mut Vec<proto::ContentMismatch>) {
-  for (index, item) in actual_row.iter().enumerate() {
-    let expected_item = expected_row.get(index).unwrap_or_default();
-    let path = format!("column:{}", index);
-    if let Some(rules) = rules.get(&path) {
+  for (index, expected_item) in expected_row.iter().enumerate() {
+    let header = expected_headers.get(index).unwrap_or_default();
+    let item = if has_headers {
+      match actual_headers.get(header) {
+        Some(actual_index) => actual_row.get(*actual_index).unwrap_or_default(),
+        None => ""
+      }
+    } else {
+      actual_row.get(index).unwrap_or_default()
+    };
+
+    let path = format!("column:{}", index + 1);
+    let header_path = format!("column:{}", header);
+
+    if let Some(rules) = rules.get(&path).or_else(|| rules.get(header_path.as_str())) {
       for rule in &rules.rules {
         if let Err(err) = expected_item.matches_with(item, rule, false) {
           results.push(proto::ContentMismatch {

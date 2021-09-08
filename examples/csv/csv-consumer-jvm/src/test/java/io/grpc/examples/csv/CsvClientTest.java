@@ -7,6 +7,7 @@ import au.com.dius.pact.consumer.junit5.PactTestFor;
 import au.com.dius.pact.core.model.V4Pact;
 import au.com.dius.pact.core.model.annotations.Pact;
 import com.github.javafaker.Faker;
+import org.apache.commons.csv.CSVRecord;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
@@ -35,9 +36,29 @@ class CsvClientTest {
         "response.status", "200",
         "response.contents", Map.of(
           "content-type", "text/csv",
+          "csvHeaders", false,
           "column:1", "matching(type,'Name')",
           "column:2", "matching(number,100)",
           "column:3", "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
+        )
+      ))
+      .toPact();
+  }
+
+  @Pact(consumer = "CsvClient")
+  V4Pact csvWithHeaders(PactBuilder builder) {
+    return builder
+      .usingPlugin("csv")
+      .expectsToReceive("request for a report with headers", "core/interaction/http")
+      .with(Map.of(
+        "request.path", "/reports/report002.csv",
+        "response.status", "200",
+        "response.contents", Map.of(
+          "content-type", "text/csv",
+          "csvHeaders", true,
+          "column:Name", "matching(type,'Name')",
+          "column:Number", "matching(number,100)",
+          "column:Date", "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
         )
       ))
       .toPact();
@@ -54,6 +75,7 @@ class CsvClientTest {
           "request.method", "POST",
           "request.contents", Map.of(
             "content-type", "text/csv",
+            "csvHeaders", false,
             "column:1", "matching(type,'Name')",
             "column:2", "matching(number,100)",
             "column:3", "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
@@ -68,16 +90,32 @@ class CsvClientTest {
   @PactTestFor(providerName = "CsvServer", pactMethod = "pact")
   void getCsvReport(MockServer mockServer) throws IOException {
     CsvClient client = new CsvClient(mockServer.getUrl());
-    String csv = client.fetch("report001.csv");
-    String[] values = csv.trim().split(",");
-    assertThat(values[0], is(equalTo("Name")));
-    assertThat(values[1], is(equalTo("100")));
-    assertThat(values[2], matchesRegex("\\d{4}-\\d{2}-\\d{2}"));
+    List<CSVRecord> csvData = client.fetch("report001.csv", false);
+    assertThat(csvData.size(), is(1));
+    assertThat(csvData.get(0).get(0), is(equalTo("Name")));
+    assertThat(csvData.get(0).get(1), is(equalTo("100")));
+    assertThat(csvData.get(0).get(2), matchesRegex("\\d{4}-\\d{2}-\\d{2}"));
+  }
+
+  @Test
+  @PactTestFor(providerName = "CsvServer", pactMethod = "csvWithHeaders")
+  void getCsvReportWithHeaders(MockServer mockServer) throws IOException {
+    CsvClient client = new CsvClient(mockServer.getUrl());
+    List<CSVRecord> csvData = client.fetch("report002.csv", true);
+    assertThat(csvData.size(), is(1));
+    CSVRecord row = csvData.get(0);
+    assertThat(row.isConsistent(), is(true));
+    assertThat(row.isMapped("Name"), is(true));
+    assertThat(row.isMapped("Number"), is(true));
+    assertThat(row.isMapped("Date"), is(true));
+    assertThat(row.get("Name"), is(equalTo("Name")));
+    assertThat(row.get("Number"), is(equalTo("100")));
+    assertThat(row.get("Date"), matchesRegex("\\d{4}-\\d{2}-\\d{2}"));
   }
 
   @Test
   @PactTestFor(providerName = "CsvServer", pactMethod = "pact2")
-  void saveCsvReport(MockServer mockServer) throws IOException, InterruptedException {
+  void saveCsvReport(MockServer mockServer) throws IOException {
     Faker faker = new Faker();
     Random random = new Random();
     CsvClient client = new CsvClient(mockServer.getUrl());
