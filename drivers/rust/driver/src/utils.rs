@@ -1,4 +1,4 @@
-//! Utils for dealing with protobufs
+//! Utils for dealing with protobufs structs
 
 use std::collections::HashMap;
 
@@ -6,13 +6,15 @@ use prost_types::{ListValue, Struct};
 use prost_types::value::Kind;
 use serde_json::{json, Value};
 
-pub(crate) fn to_proto_struct(values: HashMap<String, Value>) -> Struct {
+/// Converts a map of key -> JSON to a prost Struct
+pub fn to_proto_struct(values: HashMap<String, Value>) -> Struct {
   Struct {
     fields: values.iter().map(|(k, v)| (k.clone(), to_proto_value(v))).collect()
   }
 }
 
-fn to_proto_value(val: &Value) -> prost_types::Value {
+/// Converts a JSON value to a prost struct
+pub fn to_proto_value(val: &Value) -> prost_types::Value {
   match val {
     Value::Null => prost_types::Value { kind: Some(prost_types::value::Kind::NullValue(0)) },
     Value::Bool(b) => prost_types::Value { kind: Some(prost_types::value::Kind::BoolValue(*b)) },
@@ -33,12 +35,14 @@ fn to_proto_value(val: &Value) -> prost_types::Value {
   }
 }
 
-pub(crate) fn proto_struct_to_json(val: &prost_types::Struct) -> Value {
+/// Converts a prost struct to JSON value
+pub fn proto_struct_to_json(val: &prost_types::Struct) -> Value {
   Value::Object(val.fields.iter()
     .map(|(k, v)| (k.clone(), proto_value_to_json(v))).collect())
 }
 
-pub(crate) fn proto_value_to_json(val: &prost_types::Value) -> Value {
+/// Converts a prost value to JSON value
+pub fn proto_value_to_json(val: &prost_types::Value) -> Value {
   match &val.kind {
     Some(kind) => match kind {
       Kind::NullValue(_) => Value::Null,
@@ -53,6 +57,7 @@ pub(crate) fn proto_value_to_json(val: &prost_types::Value) -> Value {
   }
 }
 
-pub(crate) fn proto_struct_to_map(val: &prost_types::Struct) -> HashMap<String, Value> {
+/// Converts a prost struct to a map of key -> JSON
+pub fn proto_struct_to_map(val: &prost_types::Struct) -> HashMap<String, Value> {
   val.fields.iter().map(|(k, v)| (k.clone(), proto_value_to_json(v))).collect()
 }

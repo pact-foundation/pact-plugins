@@ -317,8 +317,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fcd999463524c52659517fe2cea98493cfe485d10565e7b0fb07dbba7ad2753"
 dependencies = [
  "cfg-if",
+ "js-sys",
  "libc",
  "wasi",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -855,9 +857,7 @@ dependencies = [
 
 [[package]]
 name = "pact_models"
-version = "0.2.0-beta.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9fa5682be01d34e684b9ee3f7e97ee367fe9c9b079071cf6295ca04c37f0dbdc"
+version = "0.2.0-beta.2"
 dependencies = [
  "anyhow",
  "base64",

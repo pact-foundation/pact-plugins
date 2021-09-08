@@ -13,6 +13,7 @@ import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
 import au.com.dius.pact.core.model.matchingrules.RuleLogic
 import au.com.dius.pact.core.support.Json.toJson
+import au.com.dius.pact.core.support.isNotEmpty
 import au.com.dius.pact.core.support.json.JsonValue
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
@@ -30,6 +31,7 @@ import io.pact.plugin.Plugin
 import io.pact.plugins.jvm.core.Utils.handleWith
 import io.pact.plugins.jvm.core.Utils.jsonToValue
 import io.pact.plugins.jvm.core.Utils.structToJson
+import io.pact.plugins.jvm.core.Utils.toProtoStruct
 import io.pact.plugins.jvm.core.Utils.valueToJson
 import mu.KLogging
 import org.apache.commons.lang3.SystemUtils
@@ -164,7 +166,8 @@ interface PluginManager {
     expected: OptionalBody,
     actual: OptionalBody,
     allowUnexpectedKeys: Boolean,
-    rules: Map<String, MatchingRuleGroup>
+    rules: Map<String, MatchingRuleGroup>,
+    pluginConfiguration: Map<String, PluginConfiguration>
   ): Plugin.CompareContentsResponse
 
 
@@ -238,10 +241,19 @@ object DefaultPluginManager: KLogging(), PluginManager {
     expected: OptionalBody,
     actual: OptionalBody,
     allowUnexpectedKeys: Boolean,
-    rules: Map<String, MatchingRuleGroup>
+    rules: Map<String, MatchingRuleGroup>,
+    pluginConfiguration: Map<String, PluginConfiguration>
   ): Plugin.CompareContentsResponse {
+    logger.debug { "invokeContentMatcher: pluginConfiguration=$pluginConfiguration" }
     return when (matcher) {
       is CatalogueContentMatcher -> {
+        val pluginConfig = pluginConfiguration[matcher.pluginName]
+        val pluginConfigBuilder = Plugin.PluginConfiguration.newBuilder()
+        if (pluginConfig != null) {
+          pluginConfigBuilder.interactionConfiguration = toProtoStruct(pluginConfig.interactionConfiguration)
+          pluginConfigBuilder.pactConfiguration = toProtoStruct(pluginConfig.pactConfiguration)
+        }
+
         val request = Plugin.CompareContentsRequest.newBuilder()
           .setExpected(Plugin.Body.newBuilder().setContent(
             BytesValue.newBuilder().setValue(ByteString.copyFrom(expected.orEmpty()))))
@@ -261,6 +273,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
               }
             ).build()
           })
+          .setPluginConfiguration(pluginConfigBuilder.build())
           .build()
         val plugin = lookupPlugin(matcher.pluginName, null) ?:
           throw PactPluginNotFoundException(matcher.pluginName, null)
@@ -285,9 +298,11 @@ object DefaultPluginManager: KLogging(), PluginManager {
       .build()
     val plugin = lookupPlugin(matcher.pluginName, null) ?:
       throw PactPluginNotFoundException(matcher.pluginName, null)
+
     logger.debug { "Sending configureInteraction request to plugin ${plugin.manifest}" }
     val response = plugin.stub!!.configureInteraction(request)
     logger.debug { "Got response: $response" }
+
     val returnedContentType = ContentType(response.contents.contentType)
     val body = OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType,
       toContentTypeOverride(response.contents.contentTypeOverride))
@@ -307,13 +322,14 @@ object DefaultPluginManager: KLogging(), PluginManager {
     }
 
     val pluginConfig = if (response.hasPluginConfiguration()) {
-      val pluginConfiguration = PluginConfiguration()
+      val pluginConfiguration = PluginConfiguration(interactionMarkup = response.pluginConfiguration.interactionMarkup)
 
       if (response.pluginConfiguration.hasInteractionConfiguration()) {
         pluginConfiguration.interactionConfiguration.putAll(
           structToJson(response.pluginConfiguration.interactionConfiguration).asObject()!!.entries
         )
       }
+
       if (response.pluginConfiguration.hasPactConfiguration()) {
         pluginConfiguration.pactConfiguration.putAll(
           structToJson(response.pluginConfiguration.pactConfiguration).asObject()!!.entries
@@ -584,9 +600,13 @@ object DefaultPluginManager: KLogging(), PluginManager {
   }
 }
 
+/**
+ * Plugin configuration to add to the matching context for an interaction
+ */
 data class PluginConfiguration(
   val interactionConfiguration: MutableMap<String, JsonValue> = mutableMapOf(),
-  val pactConfiguration: MutableMap<String, JsonValue> = mutableMapOf()
+  val pactConfiguration: MutableMap<String, JsonValue> = mutableMapOf(),
+  val interactionMarkup: String = ""
 )
 
 data class InteractionContents @JvmOverloads constructor(

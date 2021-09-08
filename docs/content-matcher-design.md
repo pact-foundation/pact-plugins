@@ -159,6 +159,12 @@ ConfigureInteractionResponse {
 }
 ```
 
+#### Providing a text markup of the interaction for display in UIs
+
+To aid UIs displaying the interaction details to users, the plugin can provide a marked up text format of the interaction
+in the `interactionMarkup` attribute of the `PluginConfiguration`. This will be persisted into the pact file for the
+interaction.
+
 ### Match content requests
 
 Now that the interaction has been configured, everytime the Pact mock server or verifier encounters a content type

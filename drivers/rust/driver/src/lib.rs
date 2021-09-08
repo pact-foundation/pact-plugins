@@ -6,5 +6,5 @@ mod child_process;
 mod proto;
 pub mod catalogue_manager;
 pub mod content;
-mod utils;
+pub mod utils;
 mod metrics;

@@ -161,6 +161,8 @@ message PluginConfiguration {
   google.protobuf.Struct interactionConfiguration = 1;
   // Data to be persisted in the Pact file metadata (Global data)
   google.protobuf.Struct pactConfiguration = 2;
+  // Markdown/HTML formatted text representation of the interaction
+  string interactionMarkup = 3;
 }
 
 // Response to the configure/setup an interaction request
@@ -183,6 +185,8 @@ message GenerateContentRequest {
   Body contents = 1;
   // Generators to apply
   map<string, Generator> generators = 2;
+  // Additional data added to the Pact/Interaction by the plugin
+  PluginConfiguration pluginConfiguration = 3;
 }
 
 // Generated body/message response

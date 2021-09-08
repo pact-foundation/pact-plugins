@@ -28,7 +28,8 @@ interface ContentMatcher {
     expected: OptionalBody,
     actual: OptionalBody,
     allowUnexpectedKeys: Boolean,
-    rules: Map<String, MatchingRuleGroup>
+    rules: Map<String, MatchingRuleGroup>,
+    pluginConfiguration: Map<String, PluginConfiguration>
   ): Map<String, List<ContentMismatch>>
 }
 
@@ -54,9 +55,13 @@ data class CatalogueContentMatcher(
     expected: OptionalBody,
     actual: OptionalBody,
     allowUnexpectedKeys: Boolean,
-    rules: Map<String, MatchingRuleGroup>
+    rules: Map<String, MatchingRuleGroup>,
+    pluginConfiguration: Map<String, PluginConfiguration>
   ): Map<String, List<ContentMismatch>> {
-    val result = DefaultPluginManager.invokeContentMatcher(this, expected, actual, allowUnexpectedKeys, rules)
+    logger.debug { "invokeContentMatcher(allowUnexpectedKeys=$allowUnexpectedKeys, rules=$rules, " +
+      "pluginConfiguration=$pluginConfiguration)" }
+    val result = DefaultPluginManager.invokeContentMatcher(this, expected, actual, allowUnexpectedKeys, rules,
+      pluginConfiguration)
     return if (result.error.isNotEmpty()) {
       mapOf("$" to listOf(ContentMismatch(expected.value, actual.value, result.error, "$")))
     } else {
