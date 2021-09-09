@@ -161,8 +161,6 @@ message PluginConfiguration {
   google.protobuf.Struct interactionConfiguration = 1;
   // Data to be persisted in the Pact file metadata (Global data)
   google.protobuf.Struct pactConfiguration = 2;
-  // Markdown/HTML formatted text representation of the interaction
-  string interactionMarkup = 3;
 }
 
 // Response to the configure/setup an interaction request
@@ -177,6 +175,16 @@ message ConfigureInteractionResponse {
   google.protobuf.Struct messageMetadata = 4;
   // Plugin specific data to be persisted in the pact file
   PluginConfiguration pluginConfiguration = 5;
+  // Markdown/HTML formatted text representation of the interaction
+  string interactionMarkup = 6;
+  // Type of markup used
+  enum MarkupType {
+    // CommonMark format
+    COMMON_MARK = 0;
+    // HTML format
+    HTML = 1;
+  }
+  MarkupType interactionMarkupType = 7;
 }
 
 // Request to generate the contents using any defined generators

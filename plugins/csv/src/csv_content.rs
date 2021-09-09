@@ -132,9 +132,10 @@ pub fn setup_csv_contents(
           interaction_configuration: Some(to_proto_struct(hashmap!{
             "csvHeaders".to_string() => json!(has_headers)
           })),
-          pact_configuration: None,
-          interaction_markup: csv_markup
-        })
+          pact_configuration: None
+        }),
+        interaction_markup: csv_markup,
+        interaction_markup_type: 0
       }))
     }
     None => Err(anyhow!("No config provided to match/generate CSV content"))

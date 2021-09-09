@@ -322,7 +322,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     }
 
     val pluginConfig = if (response.hasPluginConfiguration()) {
-      val pluginConfiguration = PluginConfiguration(interactionMarkup = response.pluginConfiguration.interactionMarkup)
+      val pluginConfiguration = PluginConfiguration()
 
       if (response.pluginConfiguration.hasInteractionConfiguration()) {
         pluginConfiguration.interactionConfiguration.putAll(
@@ -340,12 +340,22 @@ object DefaultPluginManager: KLogging(), PluginManager {
     } else {
       PluginConfiguration()
     }
+
     logger.debug { "body=$body" }
     logger.debug { "rules=$rules" }
     logger.debug { "generators=$generators" }
     logger.debug { "metadata=$metadata" }
     logger.debug { "pluginConfig=$pluginConfig" }
-    return InteractionContents(body, rules, generators, metadata, pluginConfig)
+
+    return InteractionContents(
+      body,
+      rules,
+      generators,
+      metadata,
+      pluginConfig,
+      response.interactionMarkup,
+      response.interactionMarkupType.name
+    )
   }
 
   private fun toContentTypeOverride(override: Plugin.Body.ContentTypeOverride?): ContentTypeOverride {
@@ -560,7 +570,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     return if (manifest != null) {
       Ok(manifest)
     } else {
-      val pluginDir = System.getenv("PACT_PLUGIN_DIR") ?: System.getenv("HOME") + "/.pact/plugins"
+      val pluginDir = System.getenv("PACT_PLUGIN_DIR") ?: (System.getenv("HOME") + "/.pact/plugins")
       for (file in File(pluginDir).walk()) {
         if (file.isFile && file.name == "pact-plugin.json") {
           logger.debug { "Found plugin manifest: $file" }
@@ -605,8 +615,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
  */
 data class PluginConfiguration(
   val interactionConfiguration: MutableMap<String, JsonValue> = mutableMapOf(),
-  val pactConfiguration: MutableMap<String, JsonValue> = mutableMapOf(),
-  val interactionMarkup: String = ""
+  val pactConfiguration: MutableMap<String, JsonValue> = mutableMapOf()
 )
 
 data class InteractionContents @JvmOverloads constructor(
@@ -614,5 +623,7 @@ data class InteractionContents @JvmOverloads constructor(
   val rules: MatchingRuleCategory? = null,
   val generators: Generators? = null,
   val metadata: Map<String, JsonValue> = emptyMap(),
-  val pluginConfig: PluginConfiguration = PluginConfiguration()
+  val pluginConfig: PluginConfiguration = PluginConfiguration(),
+  val interactionMarkup: String = "",
+  val interactionMarkupType: String = ""
 )

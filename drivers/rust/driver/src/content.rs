@@ -24,6 +24,7 @@ use crate::proto::{
   PluginConfiguration as ProtoPluginConfiguration
 };
 use crate::proto::body;
+use crate::proto::configure_interaction_response::MarkupType;
 use crate::utils::{proto_struct_to_json, proto_struct_to_map, to_proto_struct};
 
 /// Matcher for contents based on content type
@@ -62,7 +63,11 @@ pub struct InteractionContents {
   /// Message metadata
   pub metadata: Option<HashMap<String, Value>>,
   /// Plugin configuration data to apply to the interaction
-  pub plugin_config: PluginConfiguration
+  pub plugin_config: PluginConfiguration,
+  /// Markup for the interaction to display in any UI
+  pub interaction_markup: String,
+  /// The type of the markup (CommonMark or HTML)
+  pub interaction_markup_type: String
 }
 
 impl Default for InteractionContents {
@@ -72,7 +77,9 @@ impl Default for InteractionContents {
       rules: None,
       generators: None,
       metadata: None,
-      plugin_config: Default::default()
+      plugin_config: Default::default(),
+      interaction_markup: "".to_string(),
+      interaction_markup_type: "".to_string()
     }
   }
 }
@@ -143,7 +150,7 @@ impl ContentMatcher {
       Some(plugin) => match plugin.configure_interaction(request).await {
         Ok(response) => {
           debug!("Got response: {:?}", response);
-          let body = match response.contents {
+          let body = match &response.contents {
             Some(body) => {
               let returned_content_type = ContentType::parse(body.content_type.as_str()).ok();
               let contents = body.content.as_ref().cloned().unwrap_or_default();
@@ -194,7 +201,7 @@ impl ContentMatcher {
 
           let metadata = response.message_metadata.as_ref().map(|md| proto_struct_to_map(md));
 
-          let plugin_config = if let Some(plugin_configuration) = response.plugin_configuration {
+          let plugin_config = if let Some(plugin_configuration) = &response.plugin_configuration {
             PluginConfiguration {
               interaction_configuration: plugin_configuration.interaction_configuration.as_ref()
                 .map(|val| proto_struct_to_map(val)).unwrap_or_default(),
@@ -216,7 +223,12 @@ impl ContentMatcher {
             rules,
             generators,
             metadata,
-            plugin_config
+            plugin_config,
+            interaction_markup: response.interaction_markup.clone(),
+            interaction_markup_type: match response.interaction_markup_type() {
+              MarkupType::Html => "HTML".to_string(),
+              _ => "COMMON_MARK".to_string(),
+            }
           })
         }
         Err(err) => {
@@ -386,6 +398,7 @@ impl ContentGenerator {
   }
 
   /// Generate the content for the given content type and body
+  // TODO need to pass in any plugin configuration
   pub async fn generate_content(
     &self,
     content_type: &ContentType,
@@ -404,7 +417,8 @@ impl ContentGenerator {
           values: Some(to_proto_struct(v.values().iter()
             .map(|(k, v)| (k.to_string(), v.clone())).collect())),
         })
-      }).collect()
+      }).collect(),
+      plugin_configuration: None
     };
 
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()
