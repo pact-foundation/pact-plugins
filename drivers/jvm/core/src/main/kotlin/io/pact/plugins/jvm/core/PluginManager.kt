@@ -205,17 +205,18 @@ object DefaultPluginManager: KLogging(), PluginManager {
   }
 
   override fun loadPlugin(name: String, version: String?): Result<PactPlugin, String> {
-    val plugin = lookupPlugin(name, version)
-    return if (plugin != null) {
-      PluginMetrics.sendMetrics(plugin.manifest)
-      Ok(plugin)
-    } else {
-      when (val manifest = loadPluginManifest(name, version)) {
-        is Ok -> {
-          PluginMetrics.sendMetrics(manifest.value)
-          initialisePlugin(manifest.value)
+    synchronized(PLUGIN_REGISTER) {
+      val plugin = lookupPlugin(name, version)
+      return if (plugin != null) {
+        Ok(plugin)
+      } else {
+        when (val manifest = loadPluginManifest(name, version)) {
+          is Ok -> {
+            PluginMetrics.sendMetrics(manifest.value)
+            initialisePlugin(manifest.value)
+          }
+          is Err -> Err(manifest.error)
         }
-        is Err -> Err(manifest.error)
       }
     }
   }
