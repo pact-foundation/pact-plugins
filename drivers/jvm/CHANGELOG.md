@@ -1,5 +1,17 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.3 - support getting config and interaction markup from plugins
+
+* 261e155 - bump version to 0.0.3 (Ronald Holshausen, Fri Sep 10 14:30:50 2021 +1000)
+* 2a905ca - update changelog for release 0.0.2 (Ronald Holshausen, Fri Sep 10 14:28:24 2021 +1000)
+* 691980a - chore: update pact models version (Ronald Holshausen, Fri Sep 10 14:20:17 2021 +1000)
+* dd257e0 - feat: Support access to plugins from concurrent running tests (Ronald Holshausen, Fri Sep 10 13:22:55 2021 +1000)
+* 9175d18 - refactor: make interaction markup type explicit (Ronald Holshausen, Thu Sep 9 11:20:26 2021 +1000)
+* b7ae09e - feat: support CSV with headers with CSV examples and plugin (Ronald Holshausen, Wed Sep 8 16:43:52 2021 +1000)
+* 893f47e - feat: support getting config and interaction markup from plugins (Ronald Holshausen, Wed Sep 8 16:42:01 2021 +1000)
+* 51a158b - chore: add sequence diagrams (Ronald Holshausen, Mon Sep 6 16:26:13 2021 +1000)
+* 67d223a - bump version to 0.0.3 (Ronald Holshausen, Mon Sep 6 15:04:14 2021 +1000)
+
 # 0.0.2 - Support for protobuf plugin prototype
 
 * 5ad7ada - chore: add docs on content matchers/generators (Ronald Holshausen, Mon Sep 6 14:57:41 2021 +1000)
