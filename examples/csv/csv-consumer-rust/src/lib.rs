@@ -47,29 +47,31 @@ mod tests {
 
   use crate::CsvClient;
 
-  fn test_csv_client() {
+  #[tokio::test]
+  async fn test_csv_client() {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    let data = tokio_test::block_on(async {
-      let csv_service = PactBuilder::new_v4("CsvClient", "CsvServer")
-        .using_plugin("csv", None).await
-        .interaction("request for a report", "core/interaction/http", |mut i| async move {
-          i.request.path("/reports/report001.csv");
-          i.response
-            .ok()
-            .contents(ContentType::from("text/csv"), json!({
-              "column:1": "matching(type,'Name')",
-              "column:2": "matching(number,100)",
-              "column:3": "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
-            })).await;
-          i.clone()
-        })
-        .await
-        .start_mock_server();
+    let csv_service = PactBuilder::new_v4("CsvClient", "CsvServer")
+      .using_plugin("csv", None).await
+      .interaction("request for a report", "core/interaction/http", |mut i| async move {
+        i.request.path("/reports/report001.csv");
+        i.response
+          .ok()
+          .contents(ContentType::from("text/csv"), json!({
+            "csvHeaders": false,
+            "column:1": "matching(type,'Name')",
+            "column:2": "matching(number,100)",
+            "column:3": "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
+          })).await;
+        i.clone()
+      })
+      .await
+    .start_mock_server_async()
+    .await;
 
-      let client = CsvClient::new(csv_service.url().clone());
-      client.fetch("report001.csv").await.unwrap()
-    });
+    let client = CsvClient::new(csv_service.url().clone());
+    let data = client.fetch("report001.csv").await.unwrap();
+
     let columns: Vec<&str> = data.trim().split(",").collect();
     expect!(columns.get(0)).to(be_some().value(&"Name"));
     expect!(columns.get(1)).to(be_some().value(&"100"));
@@ -78,45 +80,47 @@ mod tests {
     expect!(re.is_match(date)).to(be_true());
   }
 
-  #[test]
-  fn test_post_csv() {
+  #[tokio::test]
+  async fn test_post_csv() {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    let result = tokio_test::block_on(async {
-      let csv_service = PactBuilder::new_v4("CsvClient", "CsvServer")
-        .using_plugin("csv", None).await
-        .interaction("request for to store a report", "core/interaction/http", |mut i| async move {
-          i.request
-            .path("/reports/report001.csv")
-            .method("POST")
-            .contents(ContentType::from("text/csv"), json!({
-              "column:1": "matching(type,'Name')",
-              "column:2": "matching(number,100)",
-              "column:3": "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
-            })).await;
+    let csv_service = PactBuilder::new_v4("CsvClient", "CsvServer")
+      .using_plugin("csv", None).await
+      .interaction("request for to store a report", "core/interaction/http", |mut i| async move {
+        i.request
+          .path("/reports/report001.csv")
+          .method("POST")
+          .contents(ContentType::from("text/csv"), json!({
+            "csvHeaders": false,
+            "column:1": "matching(type,'Name')",
+            "column:2": "matching(number,100)",
+            "column:3": "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
+          })).await;
 
-          i.response.created();
+        i.response.created();
 
-          i.clone()
-        })
-        .await
-        .start_mock_server();
+        i.clone()
+      })
+      .await
+      .start_mock_server_async()
+      .await;
 
-      let client = CsvClient::new(csv_service.url().clone());
-      let rows = random::<u8>();
-      let mut data = vec![];
-      for _ in 0..rows {
-        let num: u8 = random();
-        let month = datetime::month().parse::<u8>().unwrap_or_default();
-        let day = datetime::day().parse::<u8>().unwrap_or_default();
-        data.push(vec![
-          name::full(),
-          num.to_string(),
-          format!("{}-{:02}-{:02}", datetime::year(), month, day)
-        ]);
-      }
-      client.save("report001.csv", &data).await
-    });
+    let client = CsvClient::new(csv_service.url().clone());
+    let rows = random::<u8>();
+    let mut data = vec![];
+    for _ in 0..rows {
+      let num: u8 = random();
+      let month = datetime::month().parse::<u8>().unwrap_or_default();
+      let day = datetime::day().parse::<u8>().unwrap_or_default();
+      data.push(vec![
+        name::full(),
+        num.to_string(),
+        format!("{}-{:02}-{:02}", datetime::year(), month, day)
+      ]);
+    }
+
+    let result = client.save("report001.csv", &data).await;
+
     expect!(result).to(be_ok().value(true));
   }
 }

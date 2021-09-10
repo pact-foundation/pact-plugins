@@ -1,15 +1,12 @@
 //! Module for managing running child processes
 
-use std::io::BufRead;
-use std::io::BufReader;
-use std::process::Child;
-use std::sync::mpsc::channel;
-use std::time::Duration;
-
 use anyhow::anyhow;
-use log::{debug, error, warn};
+use log::{debug, error, trace, warn};
 use serde::{Deserialize, Serialize};
-use sysinfo::{Pid, ProcessExt, Signal, System, SystemExt, RefreshKind};
+use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
+use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::process::Child;
+use tokio::sync::mpsc::channel;
 
 use crate::plugin_models::PactPluginManifest;
 
@@ -30,64 +27,68 @@ pub struct ChildPluginProcess {
 
 impl ChildPluginProcess {
   /// Start the child process and try read the startup JSON message from its standard output.
-  pub fn new(child: Child, manifest: &PactPluginManifest) -> anyhow::Result<Self> {
-    let (tx, rx) = channel();
-    let manifest = manifest.clone();
-    let plugin_name = manifest.name.clone();
-    let child_pid = child.id();
-    let child_out = child.stdout
+  pub async fn new(mut child: Child, manifest: &PactPluginManifest) -> anyhow::Result<Self> {
+    let (tx, mut rx) = channel(1);
+    let child_pid = child.id()
+      .ok_or_else(|| anyhow!("Could not get the child process ID"))?;
+    let child_out = child.stdout.take()
       .ok_or_else(|| anyhow!("Could not get the child process standard output stream"))?;
-    let child_err = child.stderr
+    let child_err = child.stderr.take()
       .ok_or_else(|| anyhow!("Could not get the child process standard error stream"))?;
 
-    let name = plugin_name.clone();
-    tokio::task::spawn_blocking(move || {
+    let mfso = manifest.clone();
+    tokio::task::spawn(async move {
+      trace!("Starting task to poll plugin stdout");
       let mut startup_read = false;
       let reader = BufReader::new(child_out);
-      for line in reader.lines() {
-        match line {
-          Ok(line) => {
-            debug!("Plugin({}, {}, STDOUT): {}", name, child_pid, line);
-            if !startup_read {
-              let line = line.trim();
-              if line.starts_with("{") {
-                startup_read = true;
-                match serde_json::from_str::<RunningPluginInfo>(line) {
-                  Ok(plugin_info) => {
-                    tx.send(Ok(ChildPluginProcess {
-                      child_pid: child_pid as usize,
-                      manifest: manifest.clone(),
-                      plugin_info
-                    }))
-                  }
-                  Err(err) => {
-                    error!("Failed to read startup info from plugin - {}", err);
-                    tx.send(Err(anyhow!("Failed to read startup info from plugin - {}", err)))
-                  }
-                }.unwrap_or_default();
+      let mut lines = reader.lines();
+      let plugin_name = mfso.name.as_str();
+      while let Ok(line) = lines.next_line().await {
+        if let Some(line) = line {
+          debug!("Plugin({}, {}, STDOUT): {}", plugin_name, child_pid, line);
+          if !startup_read {
+            let line = line.trim();
+            if line.starts_with("{") {
+              startup_read = true;
+              match serde_json::from_str::<RunningPluginInfo>(line) {
+                Ok(plugin_info) => {
+                  tx.send(Ok(ChildPluginProcess {
+                    child_pid: child_pid as usize,
+                    manifest: mfso.clone(),
+                    plugin_info
+                  })).await.unwrap_or_default()
+                }
+                Err(err) => {
+                  error!("Failed to read startup info from plugin - {}", err);
+                  tx.send(Err(anyhow!("Failed to read startup info from plugin - {}", err)))
+                    .await.unwrap_or_default()
+                }
               }
             }
           }
-          Err(err) => warn!("Failed to read line from child process output - {}", err)
-        };
+        }
       }
+      trace!("Task to poll plugin stderr done");
     });
 
-    tokio::task::spawn_blocking(move || {
+    let plugin_name = manifest.name.clone();
+    tokio::task::spawn(async move {
+      trace!("Starting task to poll plugin stderr");
       let reader = BufReader::new(child_err);
-      for line in reader.lines() {
-        match line {
-          Ok(line) => debug!("Plugin({}, {}, STDERR): {}", plugin_name, child_pid, line),
-          Err(err) => warn!("Failed to read line from child process output - {}", err)
-        };
+      let mut lines = reader.lines();
+      while let Ok(line) = lines.next_line().await {
+        if let Some(line) = line {
+          debug!("Plugin({}, {}, STDERR): {}", plugin_name, child_pid, line);
+        }
       }
+      trace!("Task to poll plugin stderr done");
     });
 
-    match rx.recv_timeout(Duration::from_millis(5000)) {
-      Ok(result) => result,
-      Err(err) => {
-        error!("Timeout waiting to get plugin startup info - {}", err);
-        Err(anyhow!("Plugin process did not output the correct startup message in 5000 ms"))
+    match rx.recv().await {
+      Some(result) => result,
+      None => {
+        error!("Timeout waiting to get plugin startup info");
+        Err(anyhow!("Plugin process did not output the correct startup message"))
       }
     }
   }

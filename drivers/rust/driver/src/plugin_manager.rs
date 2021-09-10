@@ -5,14 +5,15 @@ use std::fs;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Mutex;
 
 use anyhow::anyhow;
 use lazy_static::lazy_static;
 use log::{debug, max_level, trace, warn};
-use sysinfo::{Pid, ProcessExt, Signal, System, SystemExt, RefreshKind};
+use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
+use tokio::process::Command;
 
 use crate::catalogue_manager::{register_plugin_entries, remove_plugin_entries};
 use crate::child_process::ChildPluginProcess;
@@ -29,31 +30,48 @@ lazy_static! {
 /// plugin registry.
 pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<PactPlugin> {
   debug!("Loading plugin {:?}", plugin);
-  match lookup_plugin(plugin) {
+  trace!("Waiting on PLUGIN_REGISTER lock");
+  let mut inner = PLUGIN_REGISTER.lock().unwrap();
+  trace!("Got PLUGIN_REGISTER lock");
+  let result = match lookup_plugin_inner(plugin, &mut inner) {
     Some(plugin) => {
-      send_metrics(&plugin.manifest);
-      Ok(plugin)
+      debug!("Found running plugin {:?}", plugin);
+      plugin.update_access();
+      Ok(plugin.clone())
     },
     None => {
+      debug!("Did not find plugin, will start it");
       let manifest = load_plugin_manifest(plugin)?;
       send_metrics(&manifest);
-      initialise_plugin(&manifest).await
+      initialise_plugin(&manifest, &mut inner).await
     }
+  };
+  trace!("Releasing PLUGIN_REGISTER lock");
+  result
+}
+
+fn lookup_plugin_inner<'a>(
+  plugin: &PluginDependency,
+  plugin_register: &'a mut HashMap<String, PactPlugin>
+) -> Option<&'a mut PactPlugin> {
+  if let Some(version) = &plugin.version {
+    plugin_register.get_mut(format!("{}/{}", plugin.name, version).as_str())
+  } else {
+    plugin_register.iter_mut()
+      .filter(|(_, value)| value.manifest.name == plugin.name)
+      .max_by(|(_, v1), (_, v2)| v1.manifest.version.cmp(&v2.manifest.version))
+      .map(|(_, plugin)| plugin)
   }
 }
 
 /// Look up the plugin in the global plugin register
 pub fn lookup_plugin(plugin: &PluginDependency) -> Option<PactPlugin> {
-  let guard = PLUGIN_REGISTER.lock().unwrap();
-  if let Some(version) = &plugin.version {
-    guard.get(format!("{}/{}", plugin.name, version).as_str())
-      .cloned()
-  } else {
-    guard.iter()
-      .filter(|(_, value)| value.manifest.name == plugin.name)
-      .max_by(|(_, v1), (_, v2)| v1.manifest.version.cmp(&v2.manifest.version))
-      .map(|(_, p)| p.clone())
-  }
+  trace!("Waiting on PLUGIN_REGISTER lock");
+  let mut inner = PLUGIN_REGISTER.lock().unwrap();
+  trace!("Got PLUGIN_REGISTER lock");
+  let entry = lookup_plugin_inner(plugin, &mut inner);
+  trace!("Releasing PLUGIN_REGISTER lock");
+  entry.cloned()
 }
 
 /// Return the plugin manifest for the given plugin. Will first look in the global plugin manifest
@@ -124,7 +142,10 @@ pub fn lookup_plugin_manifest(plugin: &PluginDependency) -> Option<PactPluginMan
   }
 }
 
-async fn initialise_plugin(manifest: &PactPluginManifest) -> anyhow::Result<PactPlugin> {
+async fn initialise_plugin(
+  manifest: &PactPluginManifest,
+  plugin_register: &mut HashMap<String, PactPlugin>
+) -> anyhow::Result<PactPlugin> {
   match manifest.executable_type.as_str() {
     "exec" => {
       let plugin = start_plugin_process(manifest).await?;
@@ -143,13 +164,9 @@ async fn initialise_plugin(manifest: &PactPluginManifest) -> anyhow::Result<Pact
       tokio::task::spawn(async { publish_updated_catalogue() });
 
       let key = format!("{}/{}", manifest.name, manifest.version);
-      {
-        let mut guard = PLUGIN_REGISTER.lock().unwrap();
-        guard.insert(key, plugin);
-      }
+      plugin_register.insert(key, plugin.clone());
 
-      lookup_plugin(&manifest.as_dependency())
-        .ok_or_else(|| anyhow!("An unexpected error has occurred"))
+      Ok(plugin)
     }
     _ => Err(anyhow!("Plugin executable type of {} is not supported", manifest.executable_type))
   }
@@ -170,10 +187,10 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
     .stdout(Stdio::piped())
     .stderr(Stdio::piped())
     .spawn()?;
-  let child_pid = child.id();
-  debug!("Plugin {} started with PID {:?}", manifest.name, child_pid);
+  let child_pid = child.id().unwrap_or_default();
+  debug!("Plugin {} started with PID {}", manifest.name, child_pid);
 
-  match ChildPluginProcess::new(child, manifest) {
+  match ChildPluginProcess::new(child, manifest).await {
     Ok(child) => Ok(PactPlugin::new(manifest, child)),
     Err(err) => {
       let s = System::new_with_specifics(RefreshKind::new().with_processes());
@@ -199,6 +216,13 @@ pub fn shutdown_plugins() {
   guard.clear()
 }
 
+/// Shutdown the given plugin
+pub fn shutdown_plugin(plugin: &mut PactPlugin) {
+  debug!("Shutting down plugin {}:{}", plugin.manifest.name, plugin.manifest.version);
+  plugin.kill();
+  remove_plugin_entries(&plugin.manifest.name);
+}
+
 // TODO
 fn publish_updated_catalogue() {
   // val requestBuilder = Plugin.Catalogue.newBuilder()
@@ -214,4 +238,28 @@ fn publish_updated_catalogue() {
   // PLUGIN_REGISTER.forEach { (_, plugin) ->
   //   plugin.stub?.updateCatalogue(request)
   // }
+}
+
+/// Decrement access to the plugin. If the current access could is zero, shut down the plugin
+pub fn drop_plugin_access(plugin: &PluginDependency) {
+  let access_count = {
+    trace!("Waiting on PLUGIN_REGISTER lock");
+    let mut inner = PLUGIN_REGISTER.lock().unwrap();
+    trace!("Got PLUGIN_REGISTER lock");
+    let entry = lookup_plugin_inner(plugin, &mut inner);
+    trace!("Releasing PLUGIN_REGISTER lock");
+    entry.map(|entry| {
+      (entry.drop_access(), entry.clone())
+    })
+  };
+  if let Some((access_count, mut plugin)) = access_count {
+    if access_count == 0 {
+      shutdown_plugin(&mut plugin);
+      trace!("Waiting on PLUGIN_REGISTER lock");
+      let mut inner = PLUGIN_REGISTER.lock().unwrap();
+      trace!("Got PLUGIN_REGISTER lock");
+      inner.remove(format!("{}/{}", plugin.manifest.name, plugin.manifest.version).as_str());
+      trace!("Releasing PLUGIN_REGISTER lock");
+    }
+  }
 }

@@ -1,7 +1,9 @@
 //! Models for representing plugins
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
+use log::trace;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -79,14 +81,18 @@ impl PactPluginManifest {
 pub struct PactPlugin {
   /// Manifest for this plugin
   pub manifest: PactPluginManifest,
+
   /// Running child process
-  pub child: ChildPluginProcess
+  pub child: Arc<ChildPluginProcess>,
+
+  /// Count of access to the plugin. If this is ever zero, the plugin process will be shutdown
+  access_count: usize
 }
 
 impl PactPlugin {
   /// Create a new Plugin
   pub fn new(manifest: &PactPluginManifest, child: ChildPluginProcess) -> Self {
-    PactPlugin { manifest: manifest.clone(), child }
+    PactPlugin { manifest: manifest.clone(), child: Arc::new(child), access_count: 1 }
   }
 
   /// Port the plugin is running on
@@ -125,6 +131,23 @@ impl PactPlugin {
     let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
     let response = client.generate_content(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
+  }
+
+  /// Update the access of the plugin
+  pub fn update_access(&mut self) {
+    self.access_count += 1;
+    trace!("update_access: Plugin {}{} access is now {}", self.manifest.name, self.manifest.version,
+      self.access_count);
+  }
+
+  /// Decrement and return the access count for the plugin
+  pub fn drop_access(&mut self) -> usize {
+    if self.access_count > 0 {
+      self.access_count -= 1;
+    }
+    trace!("drop_access: Plugin {}{} access is now {}", self.manifest.name, self.manifest.version,
+      self.access_count);
+    self.access_count
   }
 }
 
