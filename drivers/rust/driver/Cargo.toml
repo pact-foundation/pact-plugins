@@ -28,7 +28,7 @@ prost-types = "0.8.0"
 tokio = { version = "1.0", features = ["full"] }
 sysinfo = "0.20.0"
 itertools = "0.10.1"
-pact_models = { version = "0.2.0-beta.1", path = "../../../../pact-reference/rust/pact_models" }
+pact_models = "0.2.0-beta.2"
 regex = "1.4"
 bytes = "1.0.1"
 uuid = { version = "0.8.2", features = ["v4"] }
