@@ -1,22 +1,26 @@
 [package]
-name = "csv-consumer-rust"
+name = "protobuf-consumer-rust"
 version = "0.0.0"
 edition = "2018"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
-reqwest = "0.11.4"
 anyhow = "1.0.43"
-csv = "1.1.6"
+tonic = "0.5.0"
+prost = "0.8.0"
+prost-types = "0.8.0"
 
 [dev-dependencies]
 expectest = "0.12.0"
 env_logger = "0.8"
-pact_models = "0.2.0-beta.2"
+pact_models = { version = "0.2.0-beta.2", path = "../../../../pact-reference/rust/pact_models" }
 pact_consumer = { version = "0.8.0-beta.0", path = "../../../../pact-reference/rust/pact_consumer" }
-pact_mock_server = "0.7"
+pact-plugin-driver = { version = "0.0", path = "../../../drivers/rust/driver" }
 serde_json = "1.0.66"
 regex = "1.4.6"
 fakeit = "1.1.1"
 rand = "0.8.4"
-tokio-test = "0.4.2"
+maplit = "1.0.2"
+
+[build-dependencies]
+tonic-build = "0.5"

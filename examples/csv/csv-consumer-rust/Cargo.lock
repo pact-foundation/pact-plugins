@@ -1077,9 +1077,7 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.0.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07daf72218052670fafed53a44d1b50fc2861ff02d2804c14a10abc9ee8ed63c"
+version = "0.0.3"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1088,7 +1086,7 @@ dependencies = [
  "lazy_static",
  "log",
  "maplit",
- "pact_models 0.2.0-beta.2",
+ "pact_models 0.2.0-beta.3",
  "prost",
  "prost-types",
  "regex",
@@ -1104,7 +1102,7 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "0.7.8"
+version = "0.8.0-beta.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1117,8 +1115,8 @@ dependencies = [
  "maplit",
  "pact-plugin-driver",
  "pact_matching 0.11.0-beta.1",
- "pact_mock_server 0.7.21",
- "pact_models 0.2.0-beta.2",
+ "pact_mock_server 0.8.0-beta.1",
+ "pact_models 0.2.0-beta.3",
  "regex",
  "serde_json",
  "tokio",
@@ -1182,7 +1180,7 @@ dependencies = [
  "nom",
  "onig",
  "pact-plugin-driver",
- "pact_models 0.2.0-beta.2",
+ "pact_models 0.2.0-beta.3",
  "rand 0.8.4",
  "semver 0.11.0",
  "serde",
@@ -1221,7 +1219,7 @@ dependencies = [
 
 [[package]]
 name = "pact_mock_server"
-version = "0.7.21"
+version = "0.8.0-beta.1"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1234,7 +1232,7 @@ dependencies = [
  "maplit",
  "pact-plugin-driver",
  "pact_matching 0.11.0-beta.1",
- "pact_models 0.2.0-beta.2",
+ "pact_models 0.2.0-beta.3",
  "rustls",
  "serde",
  "serde_json",
@@ -1283,6 +1281,39 @@ name = "pact_models"
 version = "0.2.0-beta.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "44b32d00f875824d82b8142d419233f71667c531c1ffdf17ffc51518fa30410d"
+dependencies = [
+ "anyhow",
+ "base64",
+ "bytes",
+ "chrono",
+ "chrono-tz",
+ "fs2",
+ "hex",
+ "indextree",
+ "itertools",
+ "lazy_static",
+ "lenient_semver",
+ "log",
+ "logos",
+ "maplit",
+ "mime",
+ "nom",
+ "onig",
+ "parse-zoneinfo",
+ "rand 0.8.4",
+ "rand_regex",
+ "regex",
+ "regex-syntax",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sxd-document",
+ "uuid",
+]
+
+[[package]]
+name = "pact_models"
+version = "0.2.0-beta.3"
 dependencies = [
  "anyhow",
  "base64",

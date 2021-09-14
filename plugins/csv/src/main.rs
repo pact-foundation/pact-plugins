@@ -19,7 +19,7 @@ use tonic::{Response, transport::Server};
 use uuid::Uuid;
 
 use crate::csv_content::{setup_csv_contents, generate_csv_content, has_headers};
-use crate::proto::body::ContentTypeOverride;
+use crate::proto::body::ContentTypeHint;
 use crate::proto::catalogue_entry::EntryType;
 use crate::proto::pact_plugin_server::{PactPlugin, PactPluginServer};
 use crate::proto::to_object;
@@ -186,7 +186,7 @@ impl PactPlugin for CsvPactPlugin {
           contents: Some(proto::Body {
             content_type: contents.content_type().unwrap_or(ContentType::from("text/csv")).to_string(),
             content: Some(contents.value().unwrap().to_vec()),
-            content_type_override: ContentTypeOverride::Default as i32
+            content_type_hint: ContentTypeHint::Default as i32
           })
         })
       })
