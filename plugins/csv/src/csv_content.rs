@@ -123,7 +123,7 @@ pub fn setup_csv_contents(
         contents: Some(proto::Body {
           content_type: "text/csv;charset=UTF-8".to_string(),
           content: Some(wtr.into_inner()?),
-          content_type_override: 0
+          content_type_hint: 0
         }),
         rules,
         generators,

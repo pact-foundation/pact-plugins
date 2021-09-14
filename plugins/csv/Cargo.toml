@@ -14,8 +14,8 @@ async-std = "1.9.0"
 log = "0.4"
 env_logger = "0.8"
 maplit = "1.0.2"
-pact_matching = "0.11.0-beta.0"
-pact_models = "0.2.0-beta.2"
+pact_matching = { version = "0.11.0-beta.0", path = "../../../pact-reference/rust/pact_matching" }
+pact_models = { version = "0.2.0-beta.3", path = "../../../pact-reference/rust/pact_models" }
 pact-plugin-driver = { version = "0.0.3", path = "../../drivers/rust/driver" }
 csv = "1.1"
 logos = "0.12.0"
