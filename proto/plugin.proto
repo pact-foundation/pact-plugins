@@ -60,7 +60,7 @@ message Body {
   // Bytes of the actual content
   google.protobuf.BytesValue content = 2;
   // Enum of content type override. This is a hint on how the content type should be treated.
-  enum ContentTypeOverride {
+  enum ContentTypeHint {
     // Determine the form of the content using the default rules of the Pact implementation
     DEFAULT = 0;
     // Contents must always be treated as a text form
@@ -70,7 +70,7 @@ message Body {
   }
   // Content type override to apply (if required). If omitted, the default rules of the Pact implementation
   // will be used
-  ContentTypeOverride contentTypeOverride = 3;
+  ContentTypeHint contentTypeHint = 3;
 }
 
 // Request to preform a comparison on an actual body given the expected one

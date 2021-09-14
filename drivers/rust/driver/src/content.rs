@@ -7,7 +7,7 @@ use bytes::Bytes;
 use log::{debug, error};
 use maplit::hashmap;
 use pact_models::bodies::OptionalBody;
-use pact_models::content_types::ContentTypeOverride;
+use pact_models::content_types::ContentTypeHint;
 use pact_models::matchingrules::{Category, MatchingRule, MatchingRuleCategory, RuleList};
 use pact_models::path_exp::DocPath;
 use pact_models::prelude::{ContentType, Generator, GeneratorCategory, Generators, RuleLogic};
@@ -15,7 +15,7 @@ use serde_json::Value;
 
 use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
 use crate::plugin_manager::lookup_plugin;
-use crate::plugin_models::PluginInteractionConfig;
+use crate::plugin_models::{PluginInteractionConfig, PactPluginManifest};
 use crate::proto::{
   Body,
   CompareContentsRequest,
@@ -32,6 +32,13 @@ use crate::utils::{proto_struct_to_json, proto_struct_to_map, to_proto_struct};
 pub struct ContentMatcher {
   /// Catalogue entry for this content matcher
   pub catalogue_entry: CatalogueEntry
+}
+
+impl ContentMatcher {
+  /// Plugin details for this content matcher
+  pub fn plugin(&self) -> Option<PactPluginManifest> {
+    self.catalogue_entry.plugin.clone()
+  }
 }
 
 /// Mismatch result
@@ -155,10 +162,10 @@ impl ContentMatcher {
               let returned_content_type = ContentType::parse(body.content_type.as_str()).ok();
               let contents = body.content.as_ref().cloned().unwrap_or_default();
               OptionalBody::Present(Bytes::from(contents), returned_content_type,
-                  Some(match body.content_type_override() {
-                    body::ContentTypeOverride::Text => ContentTypeOverride::TEXT,
-                    body::ContentTypeOverride::Binary => ContentTypeOverride::BINARY,
-                    body::ContentTypeOverride::Default => ContentTypeOverride::DEFAULT,
+                  Some(match body.content_type_hint() {
+                    body::ContentTypeHint::Text => ContentTypeHint::TEXT,
+                    body::ContentTypeHint::Binary => ContentTypeHint::BINARY,
+                    body::ContentTypeHint::Default => ContentTypeHint::DEFAULT,
                   }))
             },
             None => OptionalBody::Missing
@@ -260,12 +267,12 @@ impl ContentMatcher {
       expected: Some(Body {
         content_type: expected.content_type().unwrap_or_default().to_string(),
         content: expected.value().map(|b| b.to_vec()),
-        content_type_override: body::ContentTypeOverride::Default as i32
+        content_type_hint: body::ContentTypeHint::Default as i32
       }),
       actual: Some(Body {
         content_type: actual.content_type().unwrap_or_default().to_string(),
         content: actual.value().map(|b| b.to_vec()),
-        content_type_override: body::ContentTypeOverride::Default as i32
+        content_type_hint: body::ContentTypeHint::Default as i32
       }),
       allow_unexpected_keys,
       rules: context.rules.iter().map(|(k, r)| {
@@ -409,7 +416,7 @@ impl ContentGenerator {
       contents: Some(crate::proto::Body {
         content_type: content_type.to_string(),
         content: Some(body.value().unwrap_or_default().to_vec()),
-        content_type_override: body::ContentTypeOverride::Default as i32
+        content_type_hint: body::ContentTypeHint::Default as i32
       }),
       generators: generators.iter().map(|(k, v)| {
         (k.clone(), crate::proto::Generator {

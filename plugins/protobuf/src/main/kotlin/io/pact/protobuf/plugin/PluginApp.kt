@@ -272,7 +272,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       builder.contentsBuilder
         .setContentType("application/protobuf;message=$message")
         .setContent(BytesValue.newBuilder().setValue(messageBuilder.build().toByteString()).build())
-        .setContentTypeOverride(Plugin.Body.ContentTypeOverride.BINARY)
+        .setContentTypeHint(Plugin.Body.ContentTypeHint.BINARY)
 
       for ((key, rules) in matchingRules.matchingRules) {
         val rulesBuilder = Plugin.MatchingRules.newBuilder()

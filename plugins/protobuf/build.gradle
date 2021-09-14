@@ -30,9 +30,9 @@ dependencies {
     implementation('com.michael-bull.kotlin-result:kotlin-result:1.1.12') {
         exclude group: 'org.jetbrains.kotlin'
     }
-    implementation 'au.com.dius.pact.core:support:4.3.0-beta.2'
-    implementation 'au.com.dius.pact.core:model:4.3.0-beta.2'
-    implementation 'au.com.dius.pact.core:matchers:4.3.0-beta.2'
+    implementation 'au.com.dius.pact.core:support:4.3.0-beta.3'
+    implementation 'au.com.dius.pact.core:model:4.3.0-beta.3'
+    implementation 'au.com.dius.pact.core:matchers:4.3.0-beta.3'
     implementation 'com.google.protobuf:protobuf-java:3.17.3'
     implementation 'ch.qos.logback:logback-classic:1.2.5'
     implementation 'com.github.os72:protoc-jar:3.11.4'

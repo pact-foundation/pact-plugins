@@ -1,7 +1,7 @@
 package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.model.ContentType
-import au.com.dius.pact.core.model.ContentTypeOverride
+import au.com.dius.pact.core.model.ContentTypeHint
 import au.com.dius.pact.core.model.OptionalBody
 import au.com.dius.pact.core.model.PactSpecVersion
 import au.com.dius.pact.core.model.generators.Category
@@ -306,7 +306,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
 
     val returnedContentType = ContentType(response.contents.contentType)
     val body = OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType,
-      toContentTypeOverride(response.contents.contentTypeOverride))
+      toContentTypeHint(response.contents.contentTypeHint))
     val rules = MatchingRuleCategory("body", response.rulesMap.entries.associate { (key, value) ->
       key to MatchingRuleGroup(value.ruleList.map {
         MatchingRule.create(it.type, structToJson(it.values))
@@ -359,11 +359,11 @@ object DefaultPluginManager: KLogging(), PluginManager {
     )
   }
 
-  private fun toContentTypeOverride(override: Plugin.Body.ContentTypeOverride?): ContentTypeOverride {
+  private fun toContentTypeHint(override: Plugin.Body.ContentTypeHint?): ContentTypeHint {
     return when (override) {
-      Plugin.Body.ContentTypeOverride.TEXT -> ContentTypeOverride.TEXT
-      Plugin.Body.ContentTypeOverride.BINARY -> ContentTypeOverride.BINARY
-      else -> ContentTypeOverride.DEFAULT
+      Plugin.Body.ContentTypeHint.TEXT -> ContentTypeHint.TEXT
+      Plugin.Body.ContentTypeHint.BINARY -> ContentTypeHint.BINARY
+      else -> ContentTypeHint.DEFAULT
     }
   }
 
