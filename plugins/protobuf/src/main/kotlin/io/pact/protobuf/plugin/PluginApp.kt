@@ -208,7 +208,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         throw StatusRuntimeException(Status.INVALID_ARGUMENT)
       }
       if (!config.containsKey("message-type")) {
-        logger.error {"Config item with key 'message-type' and the protobuf message name is required" }
+        logger.error { "Config item with key 'message-type' and the protobuf message name is required" }
         throw StatusRuntimeException(Status.INVALID_ARGUMENT)
       }
 
@@ -226,7 +226,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       val fileDescriptors = protoResult.fileList.associateBy { it.name }
       val fileProtoDesc = fileDescriptors[protoFile.fileName.toString()]
       if (fileProtoDesc == null) {
-        logger.error {"Did not find a file proto descriptor for $protoFile" }
+        logger.error { "Did not find a file proto descriptor for $protoFile" }
         throw StatusRuntimeException(Status.ABORTED)
       }
 
@@ -239,8 +239,10 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
 
       val message = config["message-type"]!!.stringValue
       logger.debug { "Looking for message of type '$message'" }
-      val fileDesc = Descriptors.FileDescriptor.buildFrom(fileProtoDesc,
-        buildDependencies(fileDescriptors, fileProtoDesc.dependencyList))
+      val fileDesc = Descriptors.FileDescriptor.buildFrom(
+        fileProtoDesc,
+        buildDependencies(fileDescriptors, fileProtoDesc.dependencyList)
+      )
       logger.debug { "fileDesc = $fileDesc" }
       val descriptor = fileDesc.findMessageTypeByName(message)
       if (descriptor == null) {
@@ -258,7 +260,22 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         if (!metaKeys.contains(key)) {
           val field = descriptor.findFieldByName(key)
           if (field != null) {
-            messageBuilder.setField(field, buildFieldValue(field, value, matchingRules, generators))
+            when (field.type) {
+              Descriptors.FieldDescriptor.Type.MESSAGE -> {
+                val messageValue = configureMessageField(listOf("$"), field, value, matchingRules, generators)
+                logger.debug { "Setting field $field to value '$messageValue'" }
+                if (messageValue != null) {
+                  messageBuilder.setField(field, messageValue)
+                }
+              }
+              else -> {
+                val fieldValue = buildFieldValue(listOf("$"), field, value, matchingRules, generators)
+                logger.debug { "Setting field $field to value '$fieldValue'" }
+                if (fieldValue != null) {
+                  messageBuilder.setField(field, fieldValue)
+                }
+              }
+            }
           } else {
             logger.error { "Message $message has no field $key" }
             throw StatusRuntimeException(Status.INVALID_ARGUMENT)
@@ -280,8 +297,8 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         for (rule in rules.rules) {
           rulesBuilder.addRule(
             Plugin.MatchingRule.newBuilder()
-            .setType(rule.name)
-            .setValues(toProtoStruct(rule.attributes))
+              .setType(rule.name)
+              .setValues(toProtoStruct(rule.attributes))
               .build()
           )
         }
@@ -290,10 +307,11 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       }
 
       for ((key, generator) in generators) {
-        builder.putGenerators(key, Plugin.Generator.newBuilder()
-          .setType(generator.type)
-          .setValues(toProtoStruct(toJson(generator.toMap(PactSpecVersion.V4)).asObject()!!.entries))
-          .build()
+        builder.putGenerators(
+          key, Plugin.Generator.newBuilder()
+            .setType(generator.type)
+            .setValues(toProtoStruct(toJson(generator.toMap(PactSpecVersion.V4)).asObject()!!.entries))
+            .build()
         )
       }
 
@@ -302,10 +320,13 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       val valueBuilder = Value.newBuilder()
       val structValueBuilder = valueBuilder.structValueBuilder
       structValueBuilder
-          .putAllFields(mapOf(
+        .putAllFields(
+          mapOf(
             "protoFile" to Value.newBuilder().setStringValue(fileContents).build(),
-            "protoDescriptors" to Value.newBuilder().setStringValue(Base64.getEncoder().encodeToString(descriptorBytes)).build()
-          ))
+            "protoDescriptors" to Value.newBuilder().setStringValue(Base64.getEncoder().encodeToString(descriptorBytes))
+              .build()
+          )
+        )
         .build()
       pluginConfigurationBuilder.pactConfigurationBuilder.putAllFields(
         mapOf(descriptorHash.toString() to valueBuilder.build())
@@ -315,7 +336,9 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         .putFields("descriptorKey", Value.newBuilder().setStringValue(descriptorHash.toString()).build())
 
       builder.build()
-    } catch (ex: Exception) {
+    } catch (ex: StatusRuntimeException) {
+      throw ex
+    } catch (ex: RuntimeException) {
       logger.error(ex) { "Failed with an unknown exception" }
       throw StatusRuntimeException(Status.ABORTED)
     }
@@ -340,9 +363,8 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
   companion object : KLogging() {
     val metaKeys = setOf("proto", "message-type", "content-type")
 
-    // version=matching(semver, '0.0.0'),
-    // implementation=notEmpty('pact-jvm-driver'),
     private fun buildFieldValue(
+      path: List<String>,
       field: Descriptors.FieldDescriptor,
       value: Value?,
       matchingRules: MatchingRuleCategory,
@@ -352,12 +374,12 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         when (val ruleDefinition = parseMatchingRuleDefinition(value.stringValue)) {
           is Ok -> {
             val (fieldValue, rule, generator) = ruleDefinition.value
-            val path = "$." + field.name
+            val fieldPath = path.joinToString(".") + "." + field.name
             if (rule != null) {
-              matchingRules.addRule(path, rule)
+              matchingRules.addRule(fieldPath, rule)
             }
             if (generator != null) {
-              generators[path] = generator
+              generators[fieldPath] = generator
             }
             valueForType(fieldValue, field)
           }
@@ -373,6 +395,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
     }
 
     private fun valueForType(fieldValue: String, field: Descriptors.FieldDescriptor): Any? {
+      logger.debug { "Creating value for type ${field.type.javaType} from '$fieldValue'" }
       return when (field.type.javaType) {
         Descriptors.FieldDescriptor.JavaType.INT -> parseInt(fieldValue)
         Descriptors.FieldDescriptor.JavaType.LONG -> parseLong(fieldValue)
@@ -381,13 +404,91 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         Descriptors.FieldDescriptor.JavaType.BOOLEAN -> fieldValue == "true"
         Descriptors.FieldDescriptor.JavaType.STRING -> fieldValue
         Descriptors.FieldDescriptor.JavaType.BYTE_STRING -> ByteString.copyFromUtf8(fieldValue)
-        Descriptors.FieldDescriptor.JavaType.ENUM -> TODO("Enum support has not been implemented")
+        Descriptors.FieldDescriptor.JavaType.ENUM -> field.enumType.findValueByName(fieldValue)
         Descriptors.FieldDescriptor.JavaType.MESSAGE -> {
-          logger.error { "field ${field.name} is a Message type" }
-          throw StatusRuntimeException(Status.INVALID_ARGUMENT)
+          if (field.messageType.fullName == "google.protobuf.BytesValue") {
+            BytesValue.newBuilder().setValue(ByteString.copyFromUtf8(fieldValue)).build()
+          } else {
+            logger.error { "field ${field.name} is a Message type" }
+            throw StatusRuntimeException(Status.INVALID_ARGUMENT)
+          }
         }
         null -> null
       }
+    }
+
+    private fun configureMessageField(
+      path: List<String>,
+      messageField: Descriptors.FieldDescriptor,
+      value: Value?,
+      matchingRules: MatchingRuleCategory,
+      generators: MutableMap<String, Generator>
+    ): Any? {
+      logger.debug { "Configuring message field $messageField (type ${messageField.messageType.fullName})" }
+      return if (value != null) {
+        if (messageField.messageType.fullName == "google.protobuf.BytesValue") {
+          logger.debug { "Field is a Protobuf BytesValue" }
+          when (value.kindCase) {
+            Value.KindCase.STRING_VALUE -> buildFieldValue(path, messageField, value, matchingRules, generators)
+            else -> {
+              logger.error {
+                "Fields of type google.protobuf.BytesValue must be configured with a single string value"
+              }
+              throw StatusRuntimeException(Status.INVALID_ARGUMENT)
+            }
+          }
+        } else {
+          logger.debug { "Configuring the message from config map" }
+          when (value.kindCase) {
+            Value.KindCase.STRUCT_VALUE -> createDynamicMessage(messageField, value, path, matchingRules, generators)
+            else -> {
+              logger.error { "For message fields, you need to define a Map of expected fields. Got $value" }
+              throw StatusRuntimeException(Status.INVALID_ARGUMENT)
+            }
+          }
+        }
+      } else {
+        null
+      }
+    }
+
+    private fun createDynamicMessage(
+      messageField: Descriptors.FieldDescriptor,
+      value: Value,
+      path: List<String>,
+      matchingRules: MatchingRuleCategory,
+      generators: MutableMap<String, Generator>
+    ): DynamicMessage? {
+      val messageDescriptor = messageField.messageType
+      val messageBuilder = DynamicMessage.newBuilder(messageDescriptor)
+
+      for ((key, v) in value.structValue.fieldsMap) {
+        val field = messageDescriptor.findFieldByName(key)
+        if (field != null) {
+          val fieldPath = path + messageField.name
+          when (field.type) {
+            Descriptors.FieldDescriptor.Type.MESSAGE -> {
+              val messageValue = configureMessageField(fieldPath, field, v, matchingRules, generators)
+              logger.debug { "Setting field $field to value $messageValue" }
+              if (messageValue != null) {
+                messageBuilder.setField(field, messageValue)
+              }
+            }
+            else -> {
+              val fieldValue = buildFieldValue(fieldPath, field, v, matchingRules, generators)
+              logger.debug { "Setting field $field to value $fieldValue" }
+              if (fieldValue != null) {
+                messageBuilder.setField(field, fieldValue)
+              }
+            }
+          }
+        } else {
+          logger.error { "Message $messageField has no field $key" }
+          throw StatusRuntimeException(Status.INVALID_ARGUMENT)
+        }
+      }
+
+      return messageBuilder.build()
     }
   }
 }
