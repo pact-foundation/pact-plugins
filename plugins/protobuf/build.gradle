@@ -1,13 +1,15 @@
 import java.nio.file.Paths
 
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '1.5.21'
+    id 'org.jetbrains.kotlin.jvm' version '1.5.30'
     id 'application'
     id 'com.google.protobuf' version '0.8.14'
     id 'groovy'
 }
 
 version = '0.0.0'
+targetCompatibility = '11'
+sourceCompatibility = '11'
 
 repositories {
     mavenLocal()
@@ -16,7 +18,7 @@ repositories {
 
 dependencies {
     implementation platform('org.jetbrains.kotlin:kotlin-bom')
-    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.5.21'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.5.30'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.2'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-jdk9:1.5.2'
     implementation 'io.grpc:grpc-protobuf:1.40.1'
@@ -56,6 +58,12 @@ dependencies {
 
 application {
     mainClass = 'io.pact.protobuf.plugin.PluginAppKt'
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+    kotlinOptions {
+        jvmTarget = "11"
+    }
 }
 
 test {

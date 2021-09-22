@@ -3,10 +3,14 @@ package io.pact.protobuf.plugin
 import au.com.dius.pact.core.matchers.MatchingContext
 import au.com.dius.pact.core.model.PactSpecVersion
 import au.com.dius.pact.core.model.generators.Generator
+import au.com.dius.pact.core.model.matchingrules.EachKeyMatcher
+import au.com.dius.pact.core.model.matchingrules.EachValueMatcher
 import au.com.dius.pact.core.model.matchingrules.MatchingRule
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
-import au.com.dius.pact.core.model.matchingrules.expressions.MatchingRuleDefinition.parseMatchingRuleDefinition
+import au.com.dius.pact.core.model.matchingrules.expressions.MatchingRuleDefinition
+import au.com.dius.pact.core.model.matchingrules.expressions.ValueType
+import au.com.dius.pact.core.support.Either
 import au.com.dius.pact.core.support.Json.toJson
 import au.com.dius.pact.core.support.isNotEmpty
 import com.github.michaelbull.result.Err
@@ -19,6 +23,7 @@ import com.google.protobuf.Descriptors
 import com.google.protobuf.DynamicMessage
 import com.google.protobuf.Empty
 import com.google.protobuf.ProtocolStringList
+import com.google.protobuf.Struct
 import com.google.protobuf.Value
 import io.grpc.Server
 import io.grpc.ServerBuilder
@@ -203,17 +208,17 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
 
     return try {
       val config = request.contentsConfig.fieldsMap
-      if (!config.containsKey("proto")) {
-        logger.error { "Config item with key 'proto' and path to the proto file is required" }
+      if (!config.containsKey("pact:proto")) {
+        logger.error { "Config item with key 'pact:proto' and path to the proto file is required" }
         throw StatusRuntimeException(Status.INVALID_ARGUMENT)
       }
-      if (!config.containsKey("message-type")) {
-        logger.error { "Config item with key 'message-type' and the protobuf message name is required" }
+      if (!config.containsKey("pact:message-type")) {
+        logger.error { "Config item with key 'pact:message-type' and the protobuf message name is required" }
         throw StatusRuntimeException(Status.INVALID_ARGUMENT)
       }
 
       logger.debug { "Parsing proto file" }
-      val protoFile = Path.of(config["proto"]!!.stringValue)
+      val protoFile = Path.of(config["pact:proto"]!!.stringValue)
       val protoResult = ProtoParser.parseProtoFile(protoFile)
       val descriptorBytes = protoResult.toByteArray()
       logger.debug { "Protobuf file descriptor set is ${descriptorBytes.size} bytes" }
@@ -237,7 +242,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         }
       }
 
-      val message = config["message-type"]!!.stringValue
+      val message = config["pact:message-type"]!!.stringValue
       logger.debug { "Looking for message of type '$message'" }
       val fileDesc = Descriptors.FileDescriptor.buildFrom(
         fileProtoDesc,
@@ -257,19 +262,28 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
 
       logger.debug { "Building message from Protobuf descriptor" }
       for ((key, value) in config) {
-        if (!metaKeys.contains(key)) {
+        if (!key.startsWith("pact:")) {
           val field = descriptor.findFieldByName(key)
           if (field != null) {
             when (field.type) {
               Descriptors.FieldDescriptor.Type.MESSAGE -> {
-                val messageValue = configureMessageField(listOf("$"), field, value, matchingRules, generators)
+                val messageValue = configureMessageField(listOf("$", key), field, value, matchingRules, generators)
                 logger.debug { "Setting field $field to value '$messageValue'" }
                 if (messageValue != null) {
-                  messageBuilder.setField(field, messageValue)
+                  when {
+                    field.isRepeated -> if (messageValue is List<*>) {
+                      for (item in messageValue) {
+                        messageBuilder.addRepeatedField(field, item)
+                      }
+                    } else {
+                      messageBuilder.addRepeatedField(field, messageValue)
+                    }
+                    else -> messageBuilder.setField(field, messageValue)
+                  }
                 }
               }
               else -> {
-                val fieldValue = buildFieldValue(listOf("$"), field, value, matchingRules, generators)
+                val fieldValue = buildFieldValue(listOf("$", key), field, value, matchingRules, generators)
                 logger.debug { "Setting field $field to value '$fieldValue'" }
                 if (fieldValue != null) {
                   messageBuilder.setField(field, fieldValue)
@@ -361,8 +375,6 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
   }
 
   companion object : KLogging() {
-    val metaKeys = setOf("proto", "message-type", "content-type")
-
     private fun buildFieldValue(
       path: List<String>,
       field: Descriptors.FieldDescriptor,
@@ -370,13 +382,19 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       matchingRules: MatchingRuleCategory,
       generators: MutableMap<String, Generator>
     ): Any? {
+      logger.debug { ">>> buildFieldValue($path, $field, $value)" }
       return if (value != null) {
-        when (val ruleDefinition = parseMatchingRuleDefinition(value.stringValue)) {
+        when (val ruleDefinition = MatchingRuleDefinition.parseMatchingRuleDefinition(value.stringValue)) {
           is Ok -> {
-            val (fieldValue, rule, generator) = ruleDefinition.value
+            val (fieldValue, _, rules, generator) = ruleDefinition.value
             val fieldPath = path.joinToString(".") + "." + field.name
-            if (rule != null) {
-              matchingRules.addRule(fieldPath, rule)
+            if (rules.isNotEmpty()) {
+              for (rule in rules) {
+                when (rule) {
+                  is Either.A -> matchingRules.addRule(fieldPath, rule.value)
+                  is Either.B -> TODO()
+                }
+              }
             }
             if (generator != null) {
               generators[fieldPath] = generator
@@ -394,7 +412,8 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       }
     }
 
-    private fun valueForType(fieldValue: String, field: Descriptors.FieldDescriptor): Any? {
+    private fun valueForType(fieldValue: String?, field: Descriptors.FieldDescriptor): Any? {
+      logger.debug { ">>> valueForType($fieldValue, $field)" }
       logger.debug { "Creating value for type ${field.type.javaType} from '$fieldValue'" }
       return when (field.type.javaType) {
         Descriptors.FieldDescriptor.JavaType.INT -> parseInt(fieldValue)
@@ -403,11 +422,11 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         Descriptors.FieldDescriptor.JavaType.DOUBLE -> parseDouble(fieldValue)
         Descriptors.FieldDescriptor.JavaType.BOOLEAN -> fieldValue == "true"
         Descriptors.FieldDescriptor.JavaType.STRING -> fieldValue
-        Descriptors.FieldDescriptor.JavaType.BYTE_STRING -> ByteString.copyFromUtf8(fieldValue)
+        Descriptors.FieldDescriptor.JavaType.BYTE_STRING -> ByteString.copyFromUtf8(fieldValue ?: "")
         Descriptors.FieldDescriptor.JavaType.ENUM -> field.enumType.findValueByName(fieldValue)
         Descriptors.FieldDescriptor.JavaType.MESSAGE -> {
           if (field.messageType.fullName == "google.protobuf.BytesValue") {
-            BytesValue.newBuilder().setValue(ByteString.copyFromUtf8(fieldValue)).build()
+            BytesValue.newBuilder().setValue(ByteString.copyFromUtf8(fieldValue ?: "")).build()
           } else {
             logger.error { "field ${field.name} is a Message type" }
             throw StatusRuntimeException(Status.INVALID_ARGUMENT)
@@ -424,71 +443,262 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       matchingRules: MatchingRuleCategory,
       generators: MutableMap<String, Generator>
     ): Any? {
-      logger.debug { "Configuring message field $messageField (type ${messageField.messageType.fullName})" }
+      logger.debug { ">>> configureMessageField($path, $messageField, $value)" }
       return if (value != null) {
-        if (messageField.messageType.fullName == "google.protobuf.BytesValue") {
-          logger.debug { "Field is a Protobuf BytesValue" }
-          when (value.kindCase) {
-            Value.KindCase.STRING_VALUE -> buildFieldValue(path, messageField, value, matchingRules, generators)
-            else -> {
-              logger.error {
-                "Fields of type google.protobuf.BytesValue must be configured with a single string value"
+        when (messageField.type) {
+          Descriptors.FieldDescriptor.Type.MESSAGE -> {
+            logger.debug { "Configuring message field $messageField (type ${messageField.messageType.fullName})" }
+            when (messageField.messageType.fullName) {
+              "google.protobuf.BytesValue" -> {
+                logger.debug { "Field is a Protobuf BytesValue" }
+                when (value.kindCase) {
+                  Value.KindCase.STRING_VALUE -> buildFieldValue(path, messageField, value, matchingRules, generators)
+                  else -> {
+                    logger.error {
+                      "Fields of type google.protobuf.BytesValue must be configured with a single string value"
+                    }
+                    throw StatusRuntimeException(Status.INVALID_ARGUMENT)
+                  }
+                }
               }
-              throw StatusRuntimeException(Status.INVALID_ARGUMENT)
+              "google.protobuf.Struct" -> {
+                logger.debug { "Message field is a Struct field" }
+                createStructField(value.structValue, path, matchingRules, generators)
+              }
+              else -> {
+                if (messageField.isMapField) {
+                  logger.debug { "Message field is a Map field" }
+                  createMapField(messageField, value, path, matchingRules, generators)
+                } else {
+                  logger.debug { "Configuring the message from config map" }
+                  when (value.kindCase) {
+                    Value.KindCase.STRUCT_VALUE -> createMessage(
+                      messageField,
+                      value.structValue,
+                      path,
+                      matchingRules,
+                      generators
+                    )
+                    else -> {
+                      logger.error { "For message fields, you need to define a Map of expected fields. Got $value" }
+                      throw StatusRuntimeException(Status.INVALID_ARGUMENT)
+                    }
+                  }
+                }
+              }
             }
           }
-        } else {
-          logger.debug { "Configuring the message from config map" }
-          when (value.kindCase) {
-            Value.KindCase.STRUCT_VALUE -> createDynamicMessage(messageField, value, path, matchingRules, generators)
-            else -> {
-              logger.error { "For message fields, you need to define a Map of expected fields. Got $value" }
-              throw StatusRuntimeException(Status.INVALID_ARGUMENT)
-            }
-          }
+          else -> buildFieldValue(path, messageField, value, matchingRules, generators)
         }
       } else {
         null
       }
     }
 
-    private fun createDynamicMessage(
-      messageField: Descriptors.FieldDescriptor,
-      value: Value,
+    private fun createStructField(
+      value: Struct,
       path: List<String>,
       matchingRules: MatchingRuleCategory,
       generators: MutableMap<String, Generator>
-    ): DynamicMessage? {
-      val messageDescriptor = messageField.messageType
-      val messageBuilder = DynamicMessage.newBuilder(messageDescriptor)
+    ): Struct? {
+      logger.debug { ">>> createStructField($path, $value)" }
 
-      for ((key, v) in value.structValue.fieldsMap) {
-        val field = messageDescriptor.findFieldByName(key)
-        if (field != null) {
-          val fieldPath = path + messageField.name
-          when (field.type) {
-            Descriptors.FieldDescriptor.Type.MESSAGE -> {
-              val messageValue = configureMessageField(fieldPath, field, v, matchingRules, generators)
-              logger.debug { "Setting field $field to value $messageValue" }
-              if (messageValue != null) {
-                messageBuilder.setField(field, messageValue)
-              }
-            }
-            else -> {
-              val fieldValue = buildFieldValue(fieldPath, field, v, matchingRules, generators)
-              logger.debug { "Setting field $field to value $fieldValue" }
-              if (fieldValue != null) {
-                messageBuilder.setField(field, fieldValue)
-              }
-            }
+      val builder = Struct.newBuilder()
+      val fieldsMap = value.fieldsMap
+
+      if (fieldsMap.containsKey("pact:match")) {
+        val expression = fieldsMap["pact:match"]!!.stringValue
+        when (val ruleDefinition = MatchingRuleDefinition.parseMatchingRuleDefinition(expression)) {
+          is Ok -> TODO()
+          is Err -> {
+            logger.error { "'$expression' is not a valid matching rule definition - ${ruleDefinition.error}" }
+            throw StatusRuntimeException(Status.INVALID_ARGUMENT)
           }
-        } else {
-          logger.error { "Message $messageField has no field $key" }
-          throw StatusRuntimeException(Status.INVALID_ARGUMENT)
         }
       }
 
-      return messageBuilder.build()
+      for ((key, v) in fieldsMap) {
+        if (key != "pact:match") {
+          when (v.kindCase) {
+            Value.KindCase.STRUCT_VALUE -> {
+              val field = createStructField(v.structValue, path + key, matchingRules, generators)
+              builder.putFields(key, Value.newBuilder().setStructValue(field).build())
+            }
+            Value.KindCase.LIST_VALUE -> {
+              TODO()
+            }
+            else -> {
+              val fieldPath = path + key
+              val fieldValue = buildStructValue(fieldPath, v, matchingRules, generators)
+              logger.debug { "Setting field to value '$fieldValue' (${fieldValue?.javaClass})" }
+              if (fieldValue != null) {
+                builder.putFields(key, fieldValue)
+              }
+            }
+          }
+        }
+      }
+
+      return builder.build()
+    }
+
+    private fun buildStructValue(
+      path: List<String>,
+      value: Value,
+      matchingRules: MatchingRuleCategory,
+      generators: MutableMap<String, Generator>
+    ): Value? {
+      logger.debug { ">>> buildStructValue($path, $value)" }
+      return when (val ruleDefinition = MatchingRuleDefinition.parseMatchingRuleDefinition(value.stringValue)) {
+        is Ok -> {
+          val sPath = path.joinToString(".")
+          val (fieldValue, type, rules, generator) = ruleDefinition.value
+          if (rules.isNotEmpty()) {
+            for (rule in rules) {
+              when (rule) {
+                is Either.A -> matchingRules.addRule(sPath, rule.value)
+                is Either.B -> TODO()
+              }
+            }
+          }
+          if (generator != null) {
+            generators[sPath] = generator
+          }
+          when (type) {
+            ValueType.Unknown, ValueType.String -> Value.newBuilder().setStringValue(fieldValue).build()
+            ValueType.Number -> Value.newBuilder().setNumberValue(parseDouble(fieldValue)).build()
+            ValueType.Integer -> Value.newBuilder().setNumberValue(parseInt(fieldValue).toDouble()).build()
+            ValueType.Decimal -> Value.newBuilder().setNumberValue(parseDouble(fieldValue)).build()
+            ValueType.Boolean -> Value.newBuilder().setBoolValue(fieldValue == "true").build()
+          }
+        }
+        is Err -> {
+          logger.error { "'${value.stringValue}' is not a valid matching rule definition " +
+            "- ${ruleDefinition.error}" }
+          throw StatusRuntimeException(Status.INVALID_ARGUMENT)
+        }
+      }
+    }
+
+    private fun createMapField(
+      field: Descriptors.FieldDescriptor,
+      config: Value,
+      path: List<String>,
+      matchingRules: MatchingRuleCategory,
+      generators: MutableMap<String, Generator>
+    ): List<DynamicMessage> {
+      logger.debug { ">>> createMapField($path, $field, $config)" }
+      val messageDescriptor = field.messageType
+
+      val fieldsMap = config.structValue.fieldsMap
+      if (fieldsMap.containsKey("pact:match")) {
+        val definition = fieldsMap["pact:match"]!!.stringValue
+        logger.debug { "Parsing matching rule definition $definition" }
+        when (val ruleDefinition = MatchingRuleDefinition.parseMatchingRuleDefinition(definition)) {
+          is Ok -> {
+            val (_, _, rules, _) = ruleDefinition.value
+            val fieldPath = path.joinToString(".")
+            if (rules.isNotEmpty()) {
+              for (rule in rules) {
+                when (rule) {
+                  is Either.A -> when (rule.value) {
+                    is EachKeyMatcher -> {
+                      matchingRules.addRule(fieldPath, rule.value)
+                    }
+                    is EachValueMatcher -> {
+                      matchingRules.addRule(fieldPath, rule.value)
+                    }
+                    else -> {
+                      matchingRules.addRule(fieldPath, rule.value)
+                    }
+                  }
+                  is Either.B -> {
+
+                  }
+                }
+              }
+            }
+          }
+          is Err -> {
+            logger.error { "'$definition' is not a valid matching rule definition - ${ruleDefinition.error}" }
+            throw StatusRuntimeException(Status.INVALID_ARGUMENT)
+          }
+        }
+        return listOf()
+      } else {
+        return fieldsMap.map { (key, value) ->
+          val entryPath = path + key
+          val messageBuilder = DynamicMessage.newBuilder(messageDescriptor)
+          messageBuilder.setField(messageDescriptor.findFieldByName("key"), key)
+          val valueDescriptor = messageDescriptor.findFieldByName("value")
+          messageBuilder.setField(
+            valueDescriptor, configureMessageField(entryPath, valueDescriptor, value, matchingRules, generators)
+          )
+          messageBuilder.build()
+        }
+      }
+    }
+
+    private fun createMessage(
+      field: Descriptors.FieldDescriptor,
+      value: Struct,
+      path: List<String>,
+      matchingRules: MatchingRuleCategory,
+      generators: MutableMap<String, Generator>
+    ): DynamicMessage {
+      logger.debug { ">>> createMessage($path, $field, $value)" }
+      val builder = DynamicMessage.newBuilder(field.messageType)
+
+      val fieldsMap = value.fieldsMap
+      if (fieldsMap.containsKey("pact:match")) {
+        val definition = fieldsMap["pact:match"]!!.stringValue
+        when (val ruleDefinition = MatchingRuleDefinition.parseMatchingRuleDefinition(definition)) {
+          is Ok -> {
+
+          }
+          is Err -> {
+            logger.error { "'$definition' is not a valid matching rule definition - ${ruleDefinition.error}" }
+            throw StatusRuntimeException(Status.INVALID_ARGUMENT)
+          }
+        }
+      } else {
+        for ((key, v) in fieldsMap) {
+          val fieldPath = path + key
+          val fieldDescriptor = field.messageType.findFieldByName(key)
+          if (fieldDescriptor != null) {
+            when (fieldDescriptor.type) {
+              Descriptors.FieldDescriptor.Type.MESSAGE -> {
+                val result = configureMessageField(fieldPath, fieldDescriptor, v, matchingRules, generators)
+                logger.debug { "Setting field $fieldDescriptor to value $result" }
+                if (result != null) {
+                  when {
+                    field.isRepeated -> if (result is List<*>) {
+                      for (item in result) {
+                        builder.addRepeatedField(fieldDescriptor, item)
+                      }
+                    } else {
+                      builder.addRepeatedField(fieldDescriptor, result)
+                    }
+                    else -> builder.setField(fieldDescriptor, result)
+                  }
+                }
+              }
+              else -> {
+                val fieldValue = buildFieldValue(fieldPath, fieldDescriptor, v, matchingRules, generators)
+                logger.debug { "Setting field $fieldDescriptor to value '$fieldValue' (${fieldValue?.javaClass})" }
+                if (fieldValue != null) {
+                  builder.setField(fieldDescriptor, fieldValue)
+                }
+              }
+            }
+          } else {
+            logger.error { "Message ${field.messageType} has no field $key" }
+            throw StatusRuntimeException(Status.INVALID_ARGUMENT)
+          }
+        }
+      }
+
+      return builder.build()
     }
   }
 }

@@ -35,7 +35,7 @@ class CsvClientTest {
         "request.path", "/reports/report001.csv",
         "response.status", "200",
         "response.contents", Map.of(
-          "content-type", "text/csv",
+          "pact:content-type", "text/csv",
           "csvHeaders", false,
           "column:1", "matching(type,'Name')",
           "column:2", "matching(number,100)",
@@ -54,7 +54,7 @@ class CsvClientTest {
         "request.path", "/reports/report002.csv",
         "response.status", "200",
         "response.contents", Map.of(
-          "content-type", "text/csv",
+          "pact:content-type", "text/csv",
           "csvHeaders", true,
           "column:Name", "matching(type,'Name')",
           "column:Number", "matching(number,100)",
@@ -74,7 +74,7 @@ class CsvClientTest {
           "request.path", "/reports/report001.csv",
           "request.method", "POST",
           "request.contents", Map.of(
-            "content-type", "text/csv",
+            "pact:content-type", "text/csv",
             "csvHeaders", false,
             "column:1", "matching(type,'Name')",
             "column:2", "matching(number,100)",

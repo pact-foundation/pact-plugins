@@ -13,10 +13,13 @@ import io.pact.plugin.Plugin;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static au.com.dius.pact.consumer.dsl.PactBuilder.filePath;
 import static org.hamcrest.MatcherAssert.assertThat;
+import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.is;
 
 @ExtendWith(PactConsumerTestExt.class)
@@ -29,9 +32,9 @@ class PactConsumerTest {
           .expectsToReceive("init plugin message", "core/interaction/message")
           .with(Map.of(
             "message.contents", Map.of(
-              "proto", filePath("../../../proto/plugin.proto"),
-              "message-type", "InitPluginRequest",
-              "content-type", "application/protobuf",
+              "pact:proto", filePath("../../../proto/plugin.proto"),
+              "pact:message-type", "InitPluginRequest",
+              "pact:content-type", "application/protobuf",
               "implementation", "notEmpty('pact-jvm-driver')",
               "version", "matching(semver, '0.0.0')"
             )
@@ -54,32 +57,39 @@ class PactConsumerTest {
           .expectsToReceive("Configure Interaction Response", "core/interaction/message")
           .with(Map.of(
             "message.contents", Map.of(
-              "proto", filePath("../../../proto/plugin.proto"),
-              "message-type", "ConfigureInteractionResponse",
-              "content-type", "application/protobuf",
+              "pact:proto", filePath("../../../proto/plugin.proto"),
+              "pact:message-type", "ConfigureInteractionResponse",
+              "pact:content-type", "application/protobuf",
               "contents", Map.of(
                 "contentType", "notEmpty('application/json')",
                 "content", "matching(contentType, 'application/json', '{}')",
                 "contentTypeHint", "matching(equalTo, 'TEXT')"
+              ),
+              "rules", Map.of(
+                "pact:match", "eachKey(matching(regex, '$(\\.\\w+)+', '$.test.one'))",
+                "$.test.one", Map.of(
+                  "rules", Map.of(
+                    "pact:match", "eachValue(matching($'items'))",
+                    "items", Map.of(
+                      "type", "notEmpty('regex')"
+                    )
+                  )
+                )
+              ),
+              "generators", Map.of(
+                "$.test.one", Map.of(
+                  "type", "notEmpty('DateTime')",
+                  "values", Map.of(
+                    "format", "matching(equalTo, 'YYYY-MM-DD')"
+                  )
+                ),
+                "$.test.two", Map.of(
+                  "type", "notEmpty('DateTime')",
+                  "values", Map.of(
+                    "format", "matching(equalTo, 'YYYY-MM-DD')"
+                  )
+                )
               )
-//                // All matching rules to apply
-//                map<string, MatchingRules> rules = 2;
-//                // Generators to apply
-//                map<string, Generator> generators = 3;
-//                // For message interactions, any metadata to be applied
-//                google.protobuf.Struct messageMetadata = 4;
-//                // Plugin specific data to be persisted in the pact file
-//                PluginConfiguration pluginConfiguration = 5;
-//                // Markdown/HTML formatted text representation of the interaction
-//                string interactionMarkup = 6;
-//                // Type of markup used
-//                enum MarkupType {
-//                    // CommonMark format
-//                    COMMON_MARK = 0;
-//                    // HTML format
-//                    HTML = 1;
-//                }
-//                MarkupType interactionMarkupType = 7;
             )
           ))
           .toPact();
@@ -92,5 +102,11 @@ class PactConsumerTest {
         assertThat(response.getContents().getContentType(), is("application/json"));
         assertThat(response.getContents().getContent().getValue().toStringUtf8(), is("{}"));
         assertThat(response.getContents().getContentTypeHint(), is(Plugin.Body.ContentTypeHint.TEXT));
+
+        assertThat(response.getGeneratorsCount(), is(2));
+        Map<String, Plugin.Generator> generatorsMap = response.getGeneratorsMap();
+        assertThat(generatorsMap.keySet(), is(equalTo(Set.of("$.test.one", "$.test.two"))));
+        assertThat(generatorsMap.get("$.test.one").getType(), is(equalTo("DateTime")));
+        assertThat(generatorsMap.get("$.test.one").getValues().getFieldsMap().get("format").getStringValue(), is(equalTo("YYYY-MM-DD")));
     }
 }
