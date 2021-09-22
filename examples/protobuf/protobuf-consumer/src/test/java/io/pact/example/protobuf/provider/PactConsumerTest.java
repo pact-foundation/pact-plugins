@@ -58,7 +58,7 @@ class PactConsumerTest {
           .with(Map.of(
             "message.contents", Map.of(
               "pact:proto", filePath("../../../proto/plugin.proto"),
-              "pact:message-type", "ConfigureInteractionResponse",
+              "pact:message-type", "InteractionResponse",
               "pact:content-type", "application/protobuf",
               "contents", Map.of(
                 "contentType", "notEmpty('application/json')",
@@ -68,7 +68,7 @@ class PactConsumerTest {
               "rules", Map.of(
                 "pact:match", "eachKey(matching(regex, '$(\\.\\w+)+', '$.test.one'))",
                 "$.test.one", Map.of(
-                  "rules", Map.of(
+                  "rule", Map.of(
                     "pact:match", "eachValue(matching($'items'))",
                     "items", Map.of(
                       "type", "notEmpty('regex')"
@@ -98,7 +98,7 @@ class PactConsumerTest {
     @Test
     @PactTestFor(pactMethod = "configureInteractionResponseMessage")
     void consumeConfigureInteractionResponseMessage(V4Interaction.AsynchronousMessage message) throws InvalidProtocolBufferException {
-        Plugin.ConfigureInteractionResponse response = Plugin.ConfigureInteractionResponse.parseFrom(message.getContents().getContents().getValue());
+        Plugin.InteractionResponse response = Plugin.InteractionResponse.parseFrom(message.getContents().getContents().getValue());
         assertThat(response.getContents().getContentType(), is("application/json"));
         assertThat(response.getContents().getContent().getValue().toStringUtf8(), is("{}"));
         assertThat(response.getContents().getContentTypeHint(), is(Plugin.Body.ContentTypeHint.TEXT));
@@ -108,5 +108,12 @@ class PactConsumerTest {
         assertThat(generatorsMap.keySet(), is(equalTo(Set.of("$.test.one", "$.test.two"))));
         assertThat(generatorsMap.get("$.test.one").getType(), is(equalTo("DateTime")));
         assertThat(generatorsMap.get("$.test.one").getValues().getFieldsMap().get("format").getStringValue(), is(equalTo("YYYY-MM-DD")));
+
+        assertThat(response.getRulesCount(), is(1));
+        Map<String, Plugin.MatchingRules> rulesMap = response.getRulesMap();
+        assertThat(rulesMap.keySet().iterator().next(), is("$.test.one"));
+        Plugin.MatchingRules matchingRules = rulesMap.get("$.test.one");
+        assertThat(matchingRules.getRuleCount(), is(1));
+        assertThat(matchingRules.getRule(0).getType(), is("regex"));
     }
 }
