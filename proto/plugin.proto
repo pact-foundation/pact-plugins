@@ -164,7 +164,7 @@ message PluginConfiguration {
 }
 
 // Response to the configure/setup an interaction request
-message ConfigureInteractionResponse {
+message InteractionResponse {
   // Contents for the interaction
   Body contents = 1;
   // All matching rules to apply
@@ -185,6 +185,14 @@ message ConfigureInteractionResponse {
     HTML = 1;
   }
   MarkupType interactionMarkupType = 7;
+}
+
+// Response to the configure/setup an interaction request
+message ConfigureInteractionResponse {
+  // If an error occurred. In this case, the other fields will be ignored/not set
+  string error = 1;
+  // The actual response if no error occurred
+  InteractionResponse interaction = 2;
 }
 
 // Request to generate the contents using any defined generators
