@@ -35,8 +35,8 @@ dependencies {
     implementation 'au.com.dius.pact.core:support:4.3.0-beta.4'
     implementation 'au.com.dius.pact.core:model:4.3.0-beta.4'
     implementation 'au.com.dius.pact.core:matchers:4.3.0-beta.4'
-    implementation 'com.google.protobuf:protobuf-java:3.17.3'
-    implementation 'ch.qos.logback:logback-classic:1.2.5'
+    implementation 'com.google.protobuf:protobuf-java:3.18.0'
+    implementation 'ch.qos.logback:logback-classic:1.2.6'
     implementation 'com.github.os72:protoc-jar:3.11.4'
     implementation "io.pact.plugin.driver:core:0.0.3"
     implementation "org.apache.commons:commons-lang3:3.12.0"
@@ -45,14 +45,14 @@ dependencies {
     protobuf files('../../proto/')
 
     testImplementation "org.codehaus.groovy:groovy:3.0.8"
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.7.2'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.7.2'
-    testRuntimeOnly 'org.junit.vintage:junit-vintage-engine:5.7.2'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.8.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.8.0'
+    testRuntimeOnly 'org.junit.vintage:junit-vintage-engine:5.8.0'
     testImplementation 'org.hamcrest:hamcrest:2.2'
     testImplementation('org.spockframework:spock-core:2.0-groovy-3.0') {
         exclude group: 'org.codehaus.groovy'
     }
-    testImplementation 'net.bytebuddy:byte-buddy:1.11.15'
+    testImplementation 'net.bytebuddy:byte-buddy:1.11.16'
     testImplementation 'org.objenesis:objenesis:3.2'
 }
 

@@ -1,7 +1,9 @@
 package io.pact.protobuf.plugin
 
+import au.com.dius.pact.consumer.dsl.Dsl.matcherKey
 import au.com.dius.pact.core.matchers.MatchingContext
 import au.com.dius.pact.core.model.PactSpecVersion
+import au.com.dius.pact.core.model.constructValidPath
 import au.com.dius.pact.core.model.generators.Generator
 import au.com.dius.pact.core.model.matchingrules.EachKeyMatcher
 import au.com.dius.pact.core.model.matchingrules.EachValueMatcher
@@ -267,7 +269,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
           if (field != null) {
             when (field.type) {
               Descriptors.FieldDescriptor.Type.MESSAGE -> {
-                val messageValue = configureMessageField(listOf("$", key), field, value, matchingRules, generators)
+                val messageValue = configureMessageField(constructValidPath(key, "$"), field, value, matchingRules, generators)
                 logger.debug { "Setting field $field to value '$messageValue'" }
                 if (messageValue != null) {
                   when {
@@ -283,7 +285,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
                 }
               }
               else -> {
-                val fieldValue = buildFieldValue(listOf("$", key), field, value, matchingRules, generators)
+                val fieldValue = buildFieldValue(constructValidPath(key, "$"), field, value, matchingRules, generators)
                 logger.debug { "Setting field $field to value '$fieldValue'" }
                 if (fieldValue != null) {
                   messageBuilder.setField(field, fieldValue)
@@ -376,7 +378,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
 
   companion object : KLogging() {
     private fun buildFieldValue(
-      path: List<String>,
+      path: String,
       field: Descriptors.FieldDescriptor,
       value: Value?,
       matchingRules: MatchingRuleCategory,
@@ -387,7 +389,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         when (val ruleDefinition = MatchingRuleDefinition.parseMatchingRuleDefinition(value.stringValue)) {
           is Ok -> {
             val (fieldValue, _, rules, generator) = ruleDefinition.value
-            val fieldPath = path.joinToString(".") + "." + field.name
+            val fieldPath = constructValidPath(field.name, path)
             if (rules.isNotEmpty()) {
               for (rule in rules) {
                 when (rule) {
@@ -437,7 +439,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
     }
 
     private fun configureMessageField(
-      path: List<String>,
+      path: String,
       messageField: Descriptors.FieldDescriptor,
       value: Value?,
       matchingRules: MatchingRuleCategory,
@@ -497,7 +499,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
 
     private fun createStructField(
       value: Struct,
-      path: List<String>,
+      path: String,
       matchingRules: MatchingRuleCategory,
       generators: MutableMap<String, Generator>
     ): Struct? {
@@ -521,14 +523,14 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         if (key != "pact:match") {
           when (v.kindCase) {
             Value.KindCase.STRUCT_VALUE -> {
-              val field = createStructField(v.structValue, path + key, matchingRules, generators)
+              val field = createStructField(v.structValue, constructValidPath(key, path), matchingRules, generators)
               builder.putFields(key, Value.newBuilder().setStructValue(field).build())
             }
             Value.KindCase.LIST_VALUE -> {
               TODO()
             }
             else -> {
-              val fieldPath = path + key
+              val fieldPath = constructValidPath(key, path)
               val fieldValue = buildStructValue(fieldPath, v, matchingRules, generators)
               logger.debug { "Setting field to value '$fieldValue' (${fieldValue?.javaClass})" }
               if (fieldValue != null) {
@@ -543,7 +545,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
     }
 
     private fun buildStructValue(
-      path: List<String>,
+      path: String,
       value: Value,
       matchingRules: MatchingRuleCategory,
       generators: MutableMap<String, Generator>
@@ -551,18 +553,17 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       logger.debug { ">>> buildStructValue($path, $value)" }
       return when (val ruleDefinition = MatchingRuleDefinition.parseMatchingRuleDefinition(value.stringValue)) {
         is Ok -> {
-          val sPath = path.joinToString(".")
           val (fieldValue, type, rules, generator) = ruleDefinition.value
           if (rules.isNotEmpty()) {
             for (rule in rules) {
               when (rule) {
-                is Either.A -> matchingRules.addRule(sPath, rule.value)
+                is Either.A -> matchingRules.addRule(path, rule.value)
                 is Either.B -> TODO()
               }
             }
           }
           if (generator != null) {
-            generators[sPath] = generator
+            generators[path] = generator
           }
           when (type) {
             ValueType.Unknown, ValueType.String -> Value.newBuilder().setStringValue(fieldValue).build()
@@ -583,7 +584,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
     private fun createMapField(
       field: Descriptors.FieldDescriptor,
       config: Value,
-      path: List<String>,
+      path: String,
       matchingRules: MatchingRuleCategory,
       generators: MutableMap<String, Generator>
     ): List<DynamicMessage> {
@@ -597,19 +598,18 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         when (val ruleDefinition = MatchingRuleDefinition.parseMatchingRuleDefinition(definition)) {
           is Ok -> {
             val (_, _, rules, _) = ruleDefinition.value
-            val fieldPath = path.joinToString(".")
             if (rules.isNotEmpty()) {
               for (rule in rules) {
                 when (rule) {
                   is Either.A -> when (rule.value) {
                     is EachKeyMatcher -> {
-                      matchingRules.addRule(fieldPath, rule.value)
+                      matchingRules.addRule(path, rule.value)
                     }
                     is EachValueMatcher -> {
-                      matchingRules.addRule(fieldPath, rule.value)
+                      matchingRules.addRule(path, rule.value)
                     }
                     else -> {
-                      matchingRules.addRule(fieldPath, rule.value)
+                      matchingRules.addRule(path, rule.value)
                     }
                   }
                   is Either.B -> {
@@ -627,7 +627,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         return listOf()
       } else {
         return fieldsMap.map { (key, value) ->
-          val entryPath = path + key
+          val entryPath = constructValidPath(key, path)
           val messageBuilder = DynamicMessage.newBuilder(messageDescriptor)
           messageBuilder.setField(messageDescriptor.findFieldByName("key"), key)
           val valueDescriptor = messageDescriptor.findFieldByName("value")
@@ -642,7 +642,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
     private fun createMessage(
       field: Descriptors.FieldDescriptor,
       value: Struct,
-      path: List<String>,
+      path: String,
       matchingRules: MatchingRuleCategory,
       generators: MutableMap<String, Generator>
     ): DynamicMessage {
@@ -663,7 +663,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         }
       } else {
         for ((key, v) in fieldsMap) {
-          val fieldPath = path + key
+          val fieldPath = constructValidPath(key, path)
           val fieldDescriptor = field.messageType.findFieldByName(key)
           if (fieldDescriptor != null) {
             when (fieldDescriptor.type) {
