@@ -4,6 +4,7 @@ import au.com.dius.pact.core.model.OptionalBody
 import au.com.dius.pact.core.model.generators.Generators
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
+import com.github.michaelbull.result.Result
 import mu.KLogging
 
 data class ContentMismatch(
@@ -22,7 +23,7 @@ interface ContentMatcher {
   fun configureContent(
     contentType: String,
     bodyConfig: Map<String, Any?>
-  ): InteractionContents
+  ): Result<InteractionContents, String>
 
   fun invokeContentMatcher(
     expected: OptionalBody,
@@ -46,7 +47,7 @@ data class CatalogueContentMatcher(
   override fun configureContent(
     contentType: String,
     bodyConfig: Map<String, Any?>
-  ): InteractionContents {
+  ): Result<InteractionContents, String> {
     logger.debug { "Sending configureContentMatcherInteraction request to for plugin $catalogueEntry" }
     return DefaultPluginManager.configureContentMatcherInteraction(this, contentType, bodyConfig)
   }

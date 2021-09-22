@@ -178,7 +178,7 @@ interface PluginManager {
     matcher: ContentMatcher,
     contentType: String,
     bodyConfig: Map<String, Any?>
-  ): Any?
+  ): Result<InteractionContents, String>
 
   /**
    * Invoke the content generator to generate the contents for a body
@@ -288,7 +288,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     matcher: ContentMatcher,
     contentType: String,
     bodyConfig: Map<String, Any?>
-  ): InteractionContents {
+  ): Result<InteractionContents, String> {
     val builder = Struct.newBuilder()
     bodyConfig.forEach { (key, value) ->
       builder.putFields(key, jsonToValue(toJson(value)))
@@ -304,59 +304,65 @@ object DefaultPluginManager: KLogging(), PluginManager {
     val response = plugin.stub!!.configureInteraction(request)
     logger.debug { "Got response: $response" }
 
-    val returnedContentType = ContentType(response.contents.contentType)
-    val body = OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType,
-      toContentTypeHint(response.contents.contentTypeHint))
-    val rules = MatchingRuleCategory("body", response.rulesMap.entries.associate { (key, value) ->
-      key to MatchingRuleGroup(value.ruleList.map {
-        MatchingRule.create(it.type, structToJson(it.values))
-      }.toMutableList(), RuleLogic.AND, false)
-    }.toMutableMap())
-    val generators = Generators(mutableMapOf(Category.BODY to response.generatorsMap.mapValues {
-      createGenerator(it.value.type, structToJson(it.value.values))
-    }.toMutableMap()))
-
-    val metadata = if (response.hasMessageMetadata()) {
-       response.messageMetadata.fieldsMap.entries.associate { (key, value) -> key to valueToJson(value) }
+    return if (response.error.isNotEmpty()) {
+      Err(response.error)
     } else {
-      emptyMap()
-    }
+      val returnedContentType = ContentType(response.interaction.contents.contentType)
+      val body = OptionalBody.body(
+        response.interaction.contents.content.value.toByteArray(), returnedContentType,
+        toContentTypeHint(response.interaction.contents.contentTypeHint)
+      )
+      val rules = MatchingRuleCategory("body", response.interaction.rulesMap.entries.associate { (key, value) ->
+        key to MatchingRuleGroup(value.ruleList.map {
+          MatchingRule.create(it.type, structToJson(it.values))
+        }.toMutableList(), RuleLogic.AND, false)
+      }.toMutableMap())
+      val generators = Generators(mutableMapOf(Category.BODY to response.interaction.generatorsMap.mapValues {
+        createGenerator(it.value.type, structToJson(it.value.values))
+      }.toMutableMap()))
 
-    val pluginConfig = if (response.hasPluginConfiguration()) {
-      val pluginConfiguration = PluginConfiguration()
-
-      if (response.pluginConfiguration.hasInteractionConfiguration()) {
-        pluginConfiguration.interactionConfiguration.putAll(
-          structToJson(response.pluginConfiguration.interactionConfiguration).asObject()!!.entries
-        )
+      val metadata = if (response.interaction.hasMessageMetadata()) {
+        response.interaction.messageMetadata.fieldsMap.entries.associate { (key, value) -> key to valueToJson(value) }
+      } else {
+        emptyMap()
       }
 
-      if (response.pluginConfiguration.hasPactConfiguration()) {
-        pluginConfiguration.pactConfiguration.putAll(
-          structToJson(response.pluginConfiguration.pactConfiguration).asObject()!!.entries
-        )
+      val pluginConfig = if (response.interaction.hasPluginConfiguration()) {
+        val pluginConfiguration = PluginConfiguration()
+
+        if (response.interaction.pluginConfiguration.hasInteractionConfiguration()) {
+          pluginConfiguration.interactionConfiguration.putAll(
+            structToJson(response.interaction.pluginConfiguration.interactionConfiguration).asObject()!!.entries
+          )
+        }
+
+        if (response.interaction.pluginConfiguration.hasPactConfiguration()) {
+          pluginConfiguration.pactConfiguration.putAll(
+            structToJson(response.interaction.pluginConfiguration.pactConfiguration).asObject()!!.entries
+          )
+        }
+
+        pluginConfiguration
+      } else {
+        PluginConfiguration()
       }
 
-      pluginConfiguration
-    } else {
-      PluginConfiguration()
+      logger.debug { "body=$body" }
+      logger.debug { "rules=$rules" }
+      logger.debug { "generators=$generators" }
+      logger.debug { "metadata=$metadata" }
+      logger.debug { "pluginConfig=$pluginConfig" }
+
+      Ok(InteractionContents(
+        body,
+        rules,
+        generators,
+        metadata,
+        pluginConfig,
+        response.interaction.interactionMarkup,
+        response.interaction.interactionMarkupType.name
+      ))
     }
-
-    logger.debug { "body=$body" }
-    logger.debug { "rules=$rules" }
-    logger.debug { "generators=$generators" }
-    logger.debug { "metadata=$metadata" }
-    logger.debug { "pluginConfig=$pluginConfig" }
-
-    return InteractionContents(
-      body,
-      rules,
-      generators,
-      metadata,
-      pluginConfig,
-      response.interactionMarkup,
-      response.interactionMarkupType.name
-    )
   }
 
   private fun toContentTypeHint(override: Plugin.Body.ContentTypeHint?): ContentTypeHint {
