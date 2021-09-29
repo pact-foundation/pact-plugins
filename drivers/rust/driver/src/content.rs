@@ -24,7 +24,7 @@ use crate::proto::{
   PluginConfiguration as ProtoPluginConfiguration
 };
 use crate::proto::body;
-use crate::proto::configure_interaction_response::MarkupType;
+use crate::proto::interaction_response::MarkupType;
 use crate::utils::{proto_struct_to_json, proto_struct_to_map, to_proto_struct};
 
 /// Matcher for contents based on content type
@@ -157,86 +157,95 @@ impl ContentMatcher {
       Some(plugin) => match plugin.configure_interaction(request).await {
         Ok(response) => {
           debug!("Got response: {:?}", response);
-          let body = match &response.contents {
-            Some(body) => {
-              let returned_content_type = ContentType::parse(body.content_type.as_str()).ok();
-              let contents = body.content.as_ref().cloned().unwrap_or_default();
-              OptionalBody::Present(Bytes::from(contents), returned_content_type,
-                  Some(match body.content_type_hint() {
-                    body::ContentTypeHint::Text => ContentTypeHint::TEXT,
-                    body::ContentTypeHint::Binary => ContentTypeHint::BINARY,
-                    body::ContentTypeHint::Default => ContentTypeHint::DEFAULT,
-                  }))
-            },
-            None => OptionalBody::Missing
-          };
+          if response.error.is_empty() {
+            if let Some(response) = response.interaction {
+              let body = match &response.contents {
+                Some(body) => {
+                  let returned_content_type = ContentType::parse(body.content_type.as_str()).ok();
+                  let contents = body.content.as_ref().cloned().unwrap_or_default();
+                  OptionalBody::Present(Bytes::from(contents), returned_content_type,
+                                        Some(match body.content_type_hint() {
+                                          body::ContentTypeHint::Text => ContentTypeHint::TEXT,
+                                          body::ContentTypeHint::Binary => ContentTypeHint::BINARY,
+                                          body::ContentTypeHint::Default => ContentTypeHint::DEFAULT,
+                                        }))
+                },
+                None => OptionalBody::Missing
+              };
 
-          let rules = if !response.rules.is_empty() {
-            Some(MatchingRuleCategory {
-              name: Category::BODY,
-              rules: response.rules.iter().map(|(k, rules)| {
-                // TODO: This is unwrapping the DocPath
-                (DocPath::new(k).unwrap(), RuleList {
-                  rules: rules.rule.iter().map(|rule| {
-                    // TODO: This is unwrapping the MatchingRule
-                    MatchingRule::create(rule.r#type.as_str(), &rule.values.as_ref().map(|rule| {
-                      proto_struct_to_json(rule)
-                    }).unwrap_or_default()).unwrap()
-                  }).collect(),
-                  rule_logic: RuleLogic::And,
-                  cascaded: false
-                })}).collect()
-            })
-          } else {
-            None
-          };
+              let rules = if !response.rules.is_empty() {
+                Some(MatchingRuleCategory {
+                  name: Category::BODY,
+                  rules: response.rules.iter().map(|(k, rules)| {
+                    // TODO: This is unwrapping the DocPath
+                    (DocPath::new(k).unwrap(), RuleList {
+                      rules: rules.rule.iter().map(|rule| {
+                        // TODO: This is unwrapping the MatchingRule
+                        MatchingRule::create(rule.r#type.as_str(), &rule.values.as_ref().map(|rule| {
+                          proto_struct_to_json(rule)
+                        }).unwrap_or_default()).unwrap()
+                      }).collect(),
+                      rule_logic: RuleLogic::And,
+                      cascaded: false
+                    })
+                  }).collect()
+                })
+              } else {
+                None
+              };
 
-          let generators = if !response.generators.is_empty() {
-            Some(Generators {
-              categories: hashmap! {
-                GeneratorCategory::BODY => response.generators.iter().map(|(k, gen)| {
-                  // TODO: This is unwrapping the DocPath
-                  // TODO: This is unwrapping the Generator
-                  (DocPath::new(k).unwrap(), Generator::create(gen.r#type.as_str(),
-                    &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default()).unwrap())
-                }).collect()
-              }
-            })
-          } else {
-            None
-          };
+              let generators = if !response.generators.is_empty() {
+                Some(Generators {
+                  categories: hashmap! {
+                    GeneratorCategory::BODY => response.generators.iter().map(|(k, gen)| {
+                      // TODO: This is unwrapping the DocPath
+                      // TODO: This is unwrapping the Generator
+                      (DocPath::new(k).unwrap(), Generator::create(gen.r#type.as_str(),
+                        &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default()).unwrap())
+                    }).collect()
+                  }
+                })
+              } else {
+                None
+              };
 
-          let metadata = response.message_metadata.as_ref().map(|md| proto_struct_to_map(md));
+              let metadata = response.message_metadata.as_ref().map(|md| proto_struct_to_map(md));
 
-          let plugin_config = if let Some(plugin_configuration) = &response.plugin_configuration {
-            PluginConfiguration {
-              interaction_configuration: plugin_configuration.interaction_configuration.as_ref()
-                .map(|val| proto_struct_to_map(val)).unwrap_or_default(),
-              pact_configuration: plugin_configuration.pact_configuration.as_ref()
-                .map(|val| proto_struct_to_map(val)).unwrap_or_default()
+              let plugin_config = if let Some(plugin_configuration) = &response.plugin_configuration {
+                PluginConfiguration {
+                  interaction_configuration: plugin_configuration.interaction_configuration.as_ref()
+                    .map(|val| proto_struct_to_map(val)).unwrap_or_default(),
+                  pact_configuration: plugin_configuration.pact_configuration.as_ref()
+                    .map(|val| proto_struct_to_map(val)).unwrap_or_default()
+                }
+              } else {
+                PluginConfiguration::default()
+              };
+
+              debug!("body={}", body);
+              debug!("rules={:?}", rules);
+              debug!("generators={:?}", generators);
+              debug!("metadata={:?}", metadata);
+              debug!("pluginConfig={:?}", plugin_config);
+
+              Ok(InteractionContents {
+                body,
+                rules,
+                generators,
+                metadata,
+                plugin_config,
+                interaction_markup: response.interaction_markup.clone(),
+                interaction_markup_type: match response.interaction_markup_type() {
+                  MarkupType::Html => "HTML".to_string(),
+                  _ => "COMMON_MARK".to_string(),
+                }
+              })
+            } else {
+              Err(anyhow!("Did not receive a configured interaction from the plugin"))
             }
           } else {
-            PluginConfiguration::default()
-          };
-
-          debug!("body={}", body);
-          debug!("rules={:?}", rules);
-          debug!("generators={:?}", generators);
-          debug!("metadata={:?}", metadata);
-          debug!("pluginConfig={:?}", plugin_config);
-
-          Ok(InteractionContents {
-            body,
-            rules,
-            generators,
-            metadata,
-            plugin_config,
-            interaction_markup: response.interaction_markup.clone(),
-            interaction_markup_type: match response.interaction_markup_type() {
-              MarkupType::Html => "HTML".to_string(),
-              _ => "COMMON_MARK".to_string(),
-            }
-          })
+            Err(anyhow!("Request to configure interaction failed: {}", response.error))
+          }
         }
         Err(err) => {
           error!("Call to plugin failed - {}", err);

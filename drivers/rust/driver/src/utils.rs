@@ -61,3 +61,19 @@ pub fn proto_value_to_json(val: &prost_types::Value) -> Value {
 pub fn proto_struct_to_map(val: &prost_types::Struct) -> HashMap<String, Value> {
   val.fields.iter().map(|(k, v)| (k.clone(), proto_value_to_json(v))).collect()
 }
+
+/// Convert a proto struct into a String
+pub fn proto_value_to_string(val: &prost_types::Value) -> Option<String> {
+  match &val.kind {
+    Some(kind) => match kind {
+      Kind::NullValue(_) => None,
+      Kind::NumberValue(n) => Some(n.to_string()),
+      Kind::StringValue(s) => Some(s.clone()),
+      Kind::BoolValue(b) => Some(b.to_string()),
+      Kind::StructValue(s) => Some(proto_struct_to_json(s).to_string()),
+      Kind::ListValue(l) => Some(Value::Array(l.values.iter()
+        .map(|v| proto_value_to_json(v)).collect()).to_string())
+    }
+    None => None
+  }
+}
