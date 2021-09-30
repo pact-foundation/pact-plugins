@@ -93,6 +93,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
   }
 
   override suspend fun compareContents(request: Plugin.CompareContentsRequest): Plugin.CompareContentsResponse {
+    logger.debug { "Got compareContents request" }
     try {
       val interactionConfig = request.pluginConfiguration.interactionConfiguration.fieldsMap
       val messageKey = interactionConfig["descriptorKey"]?.stringValue
@@ -169,6 +170,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       logger.debug { "expectedMessage = \n$expectedMessage" }
       val actualMessage = DynamicMessage.parseFrom(descriptor, request.actual.content.value)
       logger.debug { "actualMessage = \n$actualMessage" }
+
       val matchingContext =
         MatchingContext(MatchingRuleCategory("body", request.rulesMap.entries.associate { (key, rules) ->
           key to MatchingRuleGroup(rules.ruleList.map {
@@ -198,7 +200,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       }
 
       return response.build()
-    } catch (ex: Exception) {
+    } catch (ex: Throwable) {
       logger.error(ex) { "Failed to generate response" }
       return Plugin.CompareContentsResponse.newBuilder()
         .setError(ex.message)
@@ -207,7 +209,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
   }
 
   override suspend fun configureInteraction(request: Plugin.ConfigureInteractionRequest): Plugin.ConfigureInteractionResponse {
-    logger.debug { "Received configureInteraction request for '${request.contentType}'" }
+    logger.debug { "\n\n\nReceived configureInteraction request for '${request.contentType}'\n\n\n" }
 
     try {
       val config = request.contentsConfig.fieldsMap
@@ -293,8 +295,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
                   }
                 }
                 else -> {
-                  val fieldValue =
-                    buildFieldValue(constructValidPath(key, "$"), field, value, matchingRules, generators)
+                  val fieldValue = buildFieldValue("$", field, value, matchingRules, generators)
                   logger.debug { "Setting field $field to value '$fieldValue'" }
                   if (fieldValue != null) {
                     messageBuilder.setField(field, fieldValue)
@@ -469,47 +470,51 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
                 logger.debug { "Configuring repeated field from a matcher definition expression" }
                 val expression = fieldsMap["pact:match"]!!.stringValue
                 when (val ruleDefinition = MatchingRuleDefinition.parseMatchingRuleDefinition(expression)) {
-                  is Ok -> if (ruleDefinition.value.rules.any { it is Either.A && it.value is EachValueMatcher }) {
-                    logger.debug { "Found each like matcher" }
-                    if (ruleDefinition.value.rules.size > 1) {
-                      logger.warn { "$path: each value matcher can not be combined with other matchers, ignoring " +
-                        "the other ${ruleDefinition.value.rules.size - 1} matching rules" }
-                    }
-                    val ruleDef = ruleDefinition.value.rules.find { it is Either.A && it.value is EachValueMatcher } as Either.A
-                    val matcher = ruleDef.value as EachValueMatcher
-                    when (val rule = matcher.definition.rules.first()) {
-                      is Either.A -> {
-                        matchingRules.addRule(path, matcher)
-                        if (matcher.definition.generator != null) {
-                          generators[path] = matcher.definition.generator!!
-                        }
-                        valueForType(matcher.definition.value, messageField)
+                  is Ok -> {
+                    logger.debug { "ruleDefinition = $ruleDefinition" }
+                    if (ruleDefinition.value.rules.any { it is Either.A && it.value is EachValueMatcher }) {
+                      logger.debug { "Found each like matcher" }
+                      if (ruleDefinition.value.rules.size > 1) {
+                        logger.warn { "$path: each value matcher can not be combined with other matchers, ignoring " +
+                          "the other ${ruleDefinition.value.rules.size - 1} matching rules" }
                       }
-                      is Either.B -> if (fieldsMap.containsKey(rule.value.name)) {
-                        matchingRules.addRule(path, TypeMatcher)
-                        configSingleField(messageField, fieldsMap[rule.value.name]!!, path, matchingRules, generators)
-                      } else {
-                        logger.error { "'$expression' refers to non-existent item '${rule.value.name}'" }
-                        throw RuntimeException("'$expression' refers to non-existent item '${rule.value.name}'")
-                      }
-                    }
-                  } else {
-                    var result: Any? = null
-                    for (rule in ruleDefinition.value.rules) {
-                      if (rule is Either.A) {
-                        matchingRules.addRule(path, rule.value)
-                        if (ruleDefinition.value.generator != null) {
-                          generators[path] = ruleDefinition.value.generator!!
+                      val ruleDef = ruleDefinition.value.rules.find { it is Either.A && it.value is EachValueMatcher } as Either.A
+                      val matcher = ruleDef.value as EachValueMatcher
+                      when (val rule = matcher.definition.rules.first()) {
+                        is Either.A -> {
+                          matchingRules.addRule(path, matcher)
+                          if (matcher.definition.generator != null) {
+                            generators[path] = matcher.definition.generator!!
+                          }
+                          valueForType(matcher.definition.value, messageField)
                         }
-                        if (result == null) {
-                          result = valueForType(ruleDefinition.value.value, messageField)
+                        is Either.B -> if (fieldsMap.containsKey(rule.value.name)) {
+                          val fieldPath = constructValidPath(messageField.name, path)
+                          matchingRules.addRule(fieldPath, TypeMatcher)
+                          configSingleField(messageField, fieldsMap[rule.value.name]!!, fieldPath, matchingRules, generators)
+                        } else {
+                          logger.error { "'$expression' refers to non-existent item '${rule.value.name}'" }
+                          throw RuntimeException("'$expression' refers to non-existent item '${rule.value.name}'")
                         }
-                      } else {
-                        logger.error { "References can only be used with an EachValue matcher" }
-                        throw RuntimeException("References can only be used with an EachValue matcher")
                       }
+                    } else {
+                      var result: Any? = null
+                      for (rule in ruleDefinition.value.rules) {
+                        if (rule is Either.A) {
+                          matchingRules.addRule(path, rule.value)
+                          if (ruleDefinition.value.generator != null) {
+                            generators[path] = ruleDefinition.value.generator!!
+                          }
+                          if (result == null) {
+                            result = valueForType(ruleDefinition.value.value, messageField)
+                          }
+                        } else {
+                          logger.error { "References can only be used with an EachValue matcher" }
+                          throw RuntimeException("References can only be used with an EachValue matcher")
+                        }
+                      }
+                      result
                     }
-                    result
                   }
                   is Err -> {
                     logger.error { "'$expression' is not a valid matching rule definition - ${ruleDefinition.error}" }
@@ -773,8 +778,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
           if (fieldDescriptor != null) {
             when (fieldDescriptor.type) {
               Descriptors.FieldDescriptor.Type.MESSAGE -> {
-                val fieldPath = constructValidPath(key, path)
-                val result = configureMessageField(fieldPath, fieldDescriptor, v, matchingRules, generators)
+                val result = configureMessageField(path, fieldDescriptor, v, matchingRules, generators)
                 logger.debug { "Setting field $fieldDescriptor to value $result ${result?.javaClass}" }
                 if (result != null) {
                   when {

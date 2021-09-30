@@ -66,7 +66,7 @@ class PactConsumerTest {
                 "contentTypeHint", "matching(equalTo, 'TEXT')"
               ),
               "rules", Map.of(
-                "pact:match", "eachKey(matching(regex, '$(\\.\\w+)+', '$.test.one'))",
+                "pact:match", "eachKey(matching(regex, '\\$(\\.\\w+)+', '$.test.one')), eachValue(matching(type, null))",
                 "$.test.one", Map.of(
                   "rule", Map.of(
                     "pact:match", "eachValue(matching($'items'))",

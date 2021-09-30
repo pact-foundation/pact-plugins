@@ -51,7 +51,7 @@ mod tests {
     let mut pact_builder = PactBuilder::new_v4("protobuf-consumer-rust", "protobuf-provider");
     let proto_service = pact_builder
       .using_plugin("protobuf", None).await
-      .message_interaction("InteractionResponse message", "core/interaction/message", |mut i| async move {
+      .message_interaction("Configure Interaction Response", "core/interaction/message", |mut i| async move {
         let proto_file = Path::new("../../../proto/plugin.proto")
           .canonicalize().unwrap().to_string_lossy().to_string();
 
@@ -65,7 +65,7 @@ mod tests {
             "contentTypeHint": "matching(equalTo, 'TEXT')"
           },
           "rules": {
-            "pact:match": "eachKey(matching(regex, '$(\\.\\w+)+', '$.test.one'))",
+            "pact:match": "eachKey(matching(regex, '\\$(\\.\\w+)+', '$.test.one'))",
             "$.test.one": {
               "rule": {
                 "pact:match": "eachValue(matching($'items'))",
