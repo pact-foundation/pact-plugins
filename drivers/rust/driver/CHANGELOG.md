@@ -1,5 +1,13 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.3 - Changes for Protobuf plugin
+
+* 7c2c122 - chore: use the published version of Pact models (Ronald Holshausen, Tue Oct 5 15:18:01 2021 +1100)
+* cf73204 - feat: working Rust consumer test with Protobuf repeated and map fields (Ronald Holshausen, Wed Sep 29 11:21:14 2021 +1000)
+* dce8418 - feat: support returning an error when configuring an interaction from the plugin (Ronald Holshausen, Wed Sep 22 17:53:44 2021 +1000)
+* e5ecd93 - refactor: rename ContentTypeOverride -> ContentTypeHint (Ronald Holshausen, Tue Sep 14 15:33:26 2021 +1000)
+* 261e155 - bump version to 0.0.3 (Ronald Holshausen, Fri Sep 10 14:30:50 2021 +1000)
+
 # 0.0.2 - interaction markup from plugins + concurrent test access
 
 * 691980a - chore: update pact models version (Ronald Holshausen, Fri Sep 10 14:20:17 2021 +1000)
