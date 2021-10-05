@@ -1,5 +1,22 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.4 - Support for Protobuf plugin
+
+* c9da97d - feat: implemented matching Protobuf map and repeated fields (Ronald Holshausen, Thu Sep 30 16:16:15 2021 +1000)
+* cf73204 - feat: working Rust consumer test with Protobuf repeated and map fields (Ronald Holshausen, Wed Sep 29 11:21:14 2021 +1000)
+* 542f587 - chore: Protobuf consumner test (Java) working with repeated and map fields (Ronald Holshausen, Wed Sep 22 17:57:07 2021 +1000)
+* dd02468 - feat: support returning an error when configuring an interaction from the plugin (Ronald Holshausen, Wed Sep 22 17:56:10 2021 +1000)
+* dce8418 - feat: support returning an error when configuring an interaction from the plugin (Ronald Holshausen, Wed Sep 22 17:53:44 2021 +1000)
+* 07a9256 - chore: correct the path expressions where they contain special chars (Ronald Holshausen, Wed Sep 22 13:51:03 2021 +1000)
+* 80ec603 - feat(protobuf): implemeneted support for map fields (Ronald Holshausen, Wed Sep 22 10:01:41 2021 +1000)
+* 95b427e - feat: implemented matching Protobuf embedded messages and enums (Ronald Holshausen, Wed Sep 15 12:31:44 2021 +1000)
+* fe44e60 - chore: update the CSV examples and plugin to latest protofile (Ronald Holshausen, Tue Sep 14 15:41:02 2021 +1000)
+* 5fd1219 - feat: added example Rust protobuf consumer project (Ronald Holshausen, Tue Sep 14 15:34:15 2021 +1000)
+* e5ecd93 - refactor: rename ContentTypeOverride -> ContentTypeHint (Ronald Holshausen, Tue Sep 14 15:33:26 2021 +1000)
+* 44efa1c - chore(CSV): use the published versions of deps (Ronald Holshausen, Mon Sep 13 11:15:46 2021 +1000)
+* 58cbeaa - feat: add a synchronized guard to loadPlugin (Ronald Holshausen, Fri Sep 10 16:47:39 2021 +1000)
+* ddb4e6b - bump version to 0.0.4 (Ronald Holshausen, Fri Sep 10 15:47:53 2021 +1000)
+
 # 0.0.3 - support getting config and interaction markup from plugins
 
 * 261e155 - bump version to 0.0.3 (Ronald Holshausen, Fri Sep 10 14:30:50 2021 +1000)
