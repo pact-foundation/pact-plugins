@@ -13,7 +13,7 @@ Each consumer has two tests, one for each of the types of request to the provide
 ## Running the consumer tests
 
 Before the consumer tests can be run, the CSV plugin needs to be built and installed into `$HOME/.pact/plugins`.
-See the plugins docs for instructions.
+See [the plugins docs](../../plugins/csv/README.md) for instructions.
 
 The Java consumer is run using Gradle, so just run `./gradlew check` in the `csv-consumer-jvm` directory and 
 if the tests pass, a pact file will be created in the `build/pacts` directory.
@@ -24,7 +24,7 @@ if the tests pass, a pact file will be created in the `target/pacts` directory.
 ## Verifying the CSV provider
 
 Before the provider can be verified, the CSV plugin needs to be built and installed into `$HOME/.pact/plugins`.
-See the plugins docs for instructions.
+See [the plugins docs](../../plugins/csv/README.md) for instructions.
 
 Build the provider in `csv-provider` using `cargo build`, then run the provider:
 
