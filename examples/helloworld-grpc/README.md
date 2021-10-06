@@ -1,4 +1,4 @@
-# Hello Example
+# Hello Example (GRPC still work in progress)
 
 This is the hello example from the GRPC getting started using a Java client talking to a Go server.
 

@@ -29,7 +29,7 @@ There are three example projects in [examples/csv](../../examples/csv) that use 
 ## CSV matching definitions
 
 The plugin matches the columns of the CSV data using matching rule definitions. The columns can be specified by
-header (if the CSV has a header row) or by index (starting with 0).
+header (if the CSV has a header row) or by index (starting with 1).
 
 Using the CSV from the example projects, it has 3 columns: Name, Number and Date. The matching rules can be specified by
 (in pseudo config)
