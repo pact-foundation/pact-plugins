@@ -1,8 +1,6 @@
 use anyhow::anyhow;
 use logos::Logos;
-use pact_models::generators::Generator;
-use pact_models::matchingrules::MatchingRule;
-use pact_models::matchingrules::expressions::parse_matcher_def;
+use pact_models::matchingrules::expressions::{MatchingRuleDefinition, parse_matcher_def};
 use prost_types::value::Kind;
 use either::Either;
 use either::Either::{Left, Right};
@@ -53,7 +51,7 @@ pub(crate) fn parse_field(s: &str) -> anyhow::Result<Either<usize, String>> {
   }
 }
 
-pub(crate) fn parse_value(v: &prost_types::Value) -> anyhow::Result<(String, Option<MatchingRule>, Option<Generator>)> {
+pub(crate) fn parse_value(v: &prost_types::Value) -> anyhow::Result<MatchingRuleDefinition> {
   if let Some(kind) = &v.kind {
     match kind {
       Kind::StringValue(s) => parse_matcher_def(&s),

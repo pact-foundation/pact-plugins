@@ -75,8 +75,8 @@ pub fn setup_csv_contents(
       }
 
       let column_values = columns.iter().map(|v| {
-        if let Some(((v, _, _), _)) = v {
-          v.as_str()
+        if let Some((md, _)) = v {
+          md.value.as_str()
         } else {
           ""
         }
@@ -90,22 +90,29 @@ pub fn setup_csv_contents(
       let mut rules = hashmap!{};
       let mut generators = hashmap!{};
       for vals in columns {
-        if let Some(((_, rule, gen), name)) = vals {
-          if let Some(rule) = rule {
-            debug!("rule.values()={:?}", rule.values());
-            rules.insert(format!("column:{}", name), proto::MatchingRules {
-              rule: vec![
-                proto::MatchingRule {
-                  r#type: rule.name(),
-                  values: Some(prost_types::Struct {
-                    fields: rule.values().iter().map(|(key, val)| (key.to_string(), to_value(val))).collect()
-                  })
-                }
-              ]
-            });
+        if let Some((md, name)) = vals {
+          for rule in md.rules {
+            if let Either::Left(rule) = rule {
+              debug!("rule.values()={:?}", rule.values());
+              rules.insert(format!("column:{}", name), proto::MatchingRules {
+                rule: vec![
+                  proto::MatchingRule {
+                    r#type: rule.name(),
+                    values: Some(prost_types::Struct {
+                      fields: rule.values().iter().map(|(key, val)| (key.to_string(), to_value(val))).collect()
+                    })
+                  }
+                ]
+              });
+            } else {
+              return Ok(Response::new(proto::ConfigureInteractionResponse {
+                error: format!("Expected a matching rule definition, but got an un-resolved reference {:?}", rule),
+                .. proto::ConfigureInteractionResponse::default()
+              }));
+            }
           }
 
-          if let Some(gen) = gen {
+          if let Some(gen) = md.generator {
             generators.insert(format!("column:{}", name), proto::Generator {
               r#type: gen.name(),
               values: Some(prost_types::Struct {
@@ -120,22 +127,25 @@ pub fn setup_csv_contents(
       debug!("generators = {:?}", generators);
 
       Ok(Response::new(proto::ConfigureInteractionResponse {
-        contents: Some(proto::Body {
-          content_type: "text/csv;charset=UTF-8".to_string(),
-          content: Some(wtr.into_inner()?),
-          content_type_hint: 0
-        }),
-        rules,
-        generators,
-        message_metadata: None,
-        plugin_configuration: Some(proto::PluginConfiguration {
-          interaction_configuration: Some(to_proto_struct(hashmap!{
+        interaction: Some(proto::InteractionResponse {
+          contents: Some(proto::Body {
+            content_type: "text/csv;charset=UTF-8".to_string(),
+            content: Some(wtr.into_inner()?),
+            content_type_hint: 0
+          }),
+          rules,
+          generators,
+          message_metadata: None,
+          plugin_configuration: Some(proto::PluginConfiguration {
+            interaction_configuration: Some(to_proto_struct(hashmap!{
             "csvHeaders".to_string() => json!(has_headers)
           })),
-          pact_configuration: None
+            pact_configuration: None
+          }),
+          interaction_markup: csv_markup,
+          interaction_markup_type: 0
         }),
-        interaction_markup: csv_markup,
-        interaction_markup_type: 0
+        .. proto::ConfigureInteractionResponse::default()
       }))
     }
     None => Err(anyhow!("No config provided to match/generate CSV content"))
