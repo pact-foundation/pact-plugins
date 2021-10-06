@@ -57,7 +57,7 @@ builder
 
 Fields that are messages can be matched by specifying a map for the attribute.
 
-For example,
+For example, with
 
 ```protobuf
 message Body {
@@ -102,7 +102,7 @@ builder
 Map and repeated fields can be specified using a similar mechanism, but need a `pact:match` entry that configures
 how each item in the collection can be matched.
 
-For example, given the following message:
+For example, given the following messages:
 
 ```protobuf
 message MatchingRule {
