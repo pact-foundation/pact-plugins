@@ -1,10 +1,14 @@
-use actix_web::{App, get, HttpResponse, HttpServer};
-use csv::Writer;
+use actix_web::{App, get, HttpResponse, HttpServer, post};
+use actix_web::error::ErrorBadRequest;
+use anyhow::anyhow;
+use csv::{ReaderBuilder, StringRecord, Writer};
+use fakeit::{datetime, name};
 use rand::prelude::*;
-use fakeit::{name, datetime};
+use log::*;
 
 #[get("/reports/{report}.csv")]
 async fn data() -> HttpResponse {
+    debug!("GET request for report");
     let rows: u8 = random();
     let mut wtr = Writer::from_writer(vec![]);
     for _row in 0..(rows + 1) {
@@ -22,10 +26,29 @@ async fn data() -> HttpResponse {
       .body(wtr.into_inner().unwrap_or_default())
 }
 
+#[post("/reports/{report}.csv")]
+async fn post_data(req_body: String) -> HttpResponse {
+    debug!("POST request with report data");
+    let mut rdr = ReaderBuilder::new()
+      .from_reader(req_body.as_bytes());
+    let records = rdr.records()
+      .collect::<Result<Vec<StringRecord>, csv::Error>>();
+
+    match records {
+        Ok(_data) => HttpResponse::Created().finish(),
+        Err(err) => {
+            HttpResponse::from_error(ErrorBadRequest(anyhow!("Error reading CSV content - {}", err)))
+        }
+    }
+}
+
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let _ = simple_log::quick();
     HttpServer::new(|| {
-        App::new().service(data)
+        App::new()
+          .service(data)
+          .service(post_data)
     })
       .bind("127.0.0.1:8080")?
       .run()
