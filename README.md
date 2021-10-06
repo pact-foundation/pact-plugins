@@ -27,6 +27,8 @@ Main responsibilities:
 
 See [Plugin driver design docs](docs/plugin-driver-design.md).
 
+There are two implementations of plugin drivers: [JVM](drivers/jvm) and [Rust](drivers/rust).
+
 ### Plugins
 
 Plugins are required to start up a GRPC server when loaded, and respond to messages from the plugin driver. They provide
@@ -38,12 +40,14 @@ Main responsibilities:
 * Provide a catalogue of features the plugin provides when the driver requests it.
 * Respond to messages from the driver.
 
-#### Plugins that provide protocol implementations
+#### Plugins that provide protocol implementations (WIP)
 
 Plugins can provide support for new protocols. The main features that the plugin would provide is to be
 able to create the protocol payloads and create a mock server that can deal with them.
 
 See [Protocol design docs](docs/protocol-plugin-design.md).
+
+This is not implemented as part of the plugin MVC, and will be added in a later update.
 
 #### Plugins that provide support for different types of content
 
@@ -52,11 +56,14 @@ with existing protocol implementations.
 
 See [Content matcher design docs](docs/content-matcher-design.md).
 
-#### Plugins that provide matchers/generators
+There are two example plugins that support matching different types of content: [Protobuf](plugins/protobuf) and 
+[CSV](plugins/csv).
+
+#### Plugins that provide matchers/generators (WIP)
 
 Plugins can also provide new matching rules and generators. 
 
-TODO
+TODO, not implemented as part of the plugin MVC, and will be added in a later update.
 
 ## Background
 
