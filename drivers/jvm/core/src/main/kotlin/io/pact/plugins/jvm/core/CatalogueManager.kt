@@ -5,9 +5,16 @@ import io.pact.plugin.Plugin
 import mu.KLogging
 import java.lang.IllegalArgumentException
 
+/**
+ * The catalogue manager stores all the entries from the core Pact framework as well as all the loaded plugins
+ */
 object CatalogueManager : KLogging() {
   private val catalogue = mutableMapOf<String, CatalogueEntry>()
 
+  /**
+   * Register the list of entries against the plugin name. Each entry will be keyed by
+   * plugin/<plugin-name>/<entry-type>/<entry-key>
+   */
   fun registerPluginEntries(name: String, catalogueList: List<Plugin.CatalogueEntry>) {
     catalogueList.forEach {
       val type = CatalogueEntryType.fromEntry(it.type)
@@ -18,6 +25,9 @@ object CatalogueManager : KLogging() {
     logger.debug { "Updated catalogue entries:\n${catalogue.keys.joinToString("\n")}" }
   }
 
+  /**
+   * INTERNAL: Register the entries as core Pact framework entries
+   */
   fun registerCoreEntries(entries: List<CatalogueEntry>) {
     entries.forEach {
       val key = "core/${it.type}/${it.key}"
@@ -27,12 +37,21 @@ object CatalogueManager : KLogging() {
     logger.debug { "Core catalogue entries:\n${catalogue.keys.joinToString("\n")}" }
   }
 
+  /**
+   * Return all the entries from the catalogue
+   */
   fun entries() = catalogue.entries
 
+  /**
+   * Lookup entry by key. Entries are keyed by <core|plugin>/<plugin-name>?/<entry-type>/<entry-key>
+   */
   fun lookupEntry(key: String): CatalogueEntry? {
     return catalogue[key]
   }
 
+  /**
+   * Lookup a content matcher in the catalogue that can handle the given content type
+   */
   fun findContentMatcher(contentType: ContentType): ContentMatcher? {
     val catalogueEntry = catalogue.values.find { entry ->
       if (entry.type == CatalogueEntryType.CONTENT_MATCHER) {
@@ -51,6 +70,9 @@ object CatalogueManager : KLogging() {
       else null
   }
 
+  /**
+   * Lookup the content generator the can handle the given content type
+   */
   fun findContentGenerator(contentType: ContentType): ContentGenerator? {
     val catalogueEntry = catalogue.values.find { entry ->
       if (entry.type == CatalogueEntryType.CONTENT_GENERATOR) {
@@ -92,6 +114,9 @@ object CatalogueManager : KLogging() {
 
 private fun ContentType.matches(type: String) = this.getBaseType().orEmpty().matches(Regex(type))
 
+/**
+ * Type of entry in the catalogue
+ */
 enum class CatalogueEntryType {
   CONTENT_MATCHER, CONTENT_GENERATOR, MOCK_SERVER, MATCHER, INTERACTION;
 
@@ -105,6 +130,9 @@ enum class CatalogueEntryType {
     }
   }
 
+  /**
+   * Convert this entry type to the matching Protobuf type
+   */
   fun toEntry(): Plugin.CatalogueEntry.EntryType {
     return when (this) {
       CONTENT_MATCHER -> Plugin.CatalogueEntry.EntryType.CONTENT_MATCHER
@@ -116,6 +144,9 @@ enum class CatalogueEntryType {
   }
 
   companion object {
+    /**
+     * Return the corresponding entry type from the given string value
+     */
     fun fromString(type: String): CatalogueEntryType {
       return when (type) {
         "content-matcher" -> CONTENT_MATCHER
@@ -127,6 +158,9 @@ enum class CatalogueEntryType {
       }
     }
 
+    /**
+     * Return the catalogue entry type from the corresponding Protobuf entry type
+     */
     fun fromEntry(type: Plugin.CatalogueEntry.EntryType?): CatalogueEntryType {
       return if (type != null) {
         when (type) {
@@ -144,14 +178,39 @@ enum class CatalogueEntryType {
   }
 }
 
+/**
+ * Entry in the catalogue
+ */
 data class CatalogueEntry(
+  /**
+   * Type of entry
+   */
   val type: CatalogueEntryType,
+
+  /**
+   * What provides the entry (core framework or plugin)
+   */
   val providerType: CatalogueEntryProviderType,
+
+  /**
+   * Plugin name that provides the entry (may not be set for core entries)
+   */
   val pluginName: String,
+
+  /**
+   * Key for the entry
+   */
   val key: String,
+
+  /**
+   * Associated values for the entry
+   */
   val values: Map<String, String> = mapOf()
 )
 
+/**
+ * Type of provider for an entry in the catalogue
+ */
 enum class CatalogueEntryProviderType {
   CORE, PLUGIN
 }

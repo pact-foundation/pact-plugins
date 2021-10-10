@@ -185,14 +185,19 @@ message InteractionResponse {
     HTML = 1;
   }
   MarkupType interactionMarkupType = 7;
+  // Description of what part this interaction belongs to (in the case of there being more than one, for instance,
+  // request/response messages)
+  string partName = 8;
 }
 
 // Response to the configure/setup an interaction request
 message ConfigureInteractionResponse {
   // If an error occurred. In this case, the other fields will be ignored/not set
   string error = 1;
-  // The actual response if no error occurred
-  InteractionResponse interaction = 2;
+  // The actual response if no error occurred.
+  repeated InteractionResponse interaction = 2;
+  // Plugin specific data to be persisted in the pact file
+  PluginConfiguration pluginConfiguration = 3;
 }
 
 // Request to generate the contents using any defined generators

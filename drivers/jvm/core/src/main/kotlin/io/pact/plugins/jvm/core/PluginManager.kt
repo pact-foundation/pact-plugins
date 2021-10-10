@@ -25,6 +25,7 @@ import com.google.protobuf.Struct
 import com.vdurmont.semver4j.Semver
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
+import io.grpc.stub.AbstractBlockingStub
 import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.PactPluginGrpc.newBlockingStub
 import io.pact.plugin.Plugin
@@ -125,11 +126,13 @@ interface PactPlugin {
   val port: Int?
   val serverKey: String?
   val processPid: Long?
-  var stub: PactPluginGrpc.PactPluginBlockingStub?
+  var stub: AbstractBlockingStub<PactPluginGrpc.PactPluginBlockingStub>?
   var catalogueEntries: List<Plugin.CatalogueEntry>?
   var channel: ManagedChannel?
 
   fun shutdown()
+
+  fun <T> withGrpcStub(callback: java.util.function.Function<PactPluginGrpc.PactPluginBlockingStub, T>): T
 }
 
 data class DefaultPactPlugin(
@@ -137,7 +140,7 @@ data class DefaultPactPlugin(
   override val manifest: PactPluginManifest,
   override val port: Int?,
   override val serverKey: String,
-  override var stub: PactPluginGrpc.PactPluginBlockingStub? = null,
+  override var stub: AbstractBlockingStub<PactPluginGrpc.PactPluginBlockingStub>? = null,
   override var catalogueEntries: List<Plugin.CatalogueEntry>? = null,
   override var channel: ManagedChannel? = null
 ) : PactPlugin {
@@ -149,6 +152,10 @@ data class DefaultPactPlugin(
     if (channel != null) {
       channel!!.shutdownNow().awaitTermination(1, TimeUnit.SECONDS)
     }
+  }
+
+  override fun <T> withGrpcStub(callback: java.util.function.Function<PactPluginGrpc.PactPluginBlockingStub, T>): T {
+    return callback.apply(stub as PactPluginGrpc.PactPluginBlockingStub)
   }
 }
 
@@ -178,7 +185,7 @@ interface PluginManager {
     matcher: ContentMatcher,
     contentType: String,
     bodyConfig: Map<String, Any?>
-  ): Result<InteractionContents, String>
+  ): Result<List<InteractionContents>, String>
 
   /**
    * Invoke the content generator to generate the contents for a body
@@ -278,7 +285,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
           .build()
         val plugin = lookupPlugin(matcher.pluginName, null) ?:
           throw PactPluginNotFoundException(matcher.pluginName, null)
-        plugin.stub!!.compareContents(request)
+        plugin.withGrpcStub { stub -> stub.compareContents(request) }
       }
       else -> throw RuntimeException("Mis-configured content type matcher $matcher")
     }
@@ -288,7 +295,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     matcher: ContentMatcher,
     contentType: String,
     bodyConfig: Map<String, Any?>
-  ): Result<InteractionContents, String> {
+  ): Result<List<InteractionContents>, String> {
     val builder = Struct.newBuilder()
     bodyConfig.forEach { (key, value) ->
       builder.putFields(key, jsonToValue(toJson(value)))
@@ -301,44 +308,20 @@ object DefaultPluginManager: KLogging(), PluginManager {
       throw PactPluginNotFoundException(matcher.pluginName, null)
 
     logger.debug { "Sending configureInteraction request to plugin ${plugin.manifest}" }
-    val response = plugin.stub!!.configureInteraction(request)
+    val response = plugin.withGrpcStub { stub -> stub.configureInteraction(request) }
     logger.debug { "Got response: $response" }
 
     return if (response.error.isNotEmpty()) {
       Err(response.error)
     } else {
-      val returnedContentType = ContentType(response.interaction.contents.contentType)
-      val body = OptionalBody.body(
-        response.interaction.contents.content.value.toByteArray(), returnedContentType,
-        toContentTypeHint(response.interaction.contents.contentTypeHint)
-      )
-      val rules = MatchingRuleCategory("body", response.interaction.rulesMap.entries.associate { (key, value) ->
-        key to MatchingRuleGroup(value.ruleList.map {
-          MatchingRule.create(it.type, structToJson(it.values))
-        }.toMutableList(), RuleLogic.AND, false)
-      }.toMutableMap())
-      val generators = Generators(mutableMapOf(Category.BODY to response.interaction.generatorsMap.mapValues {
-        createGenerator(it.value.type, structToJson(it.value.values))
-      }.toMutableMap()))
+      val results = mutableListOf<InteractionContents>()
 
-      val metadata = if (response.interaction.hasMessageMetadata()) {
-        response.interaction.messageMetadata.fieldsMap.entries.associate { (key, value) -> key to valueToJson(value) }
-      } else {
-        emptyMap()
-      }
-
-      val pluginConfig = if (response.interaction.hasPluginConfiguration()) {
+      val globalPluginConfig = if (response.hasPluginConfiguration()) {
         val pluginConfiguration = PluginConfiguration()
 
-        if (response.interaction.pluginConfiguration.hasInteractionConfiguration()) {
-          pluginConfiguration.interactionConfiguration.putAll(
-            structToJson(response.interaction.pluginConfiguration.interactionConfiguration).asObject()!!.entries
-          )
-        }
-
-        if (response.interaction.pluginConfiguration.hasPactConfiguration()) {
+        if (response.pluginConfiguration.hasPactConfiguration()) {
           pluginConfiguration.pactConfiguration.putAll(
-            structToJson(response.interaction.pluginConfiguration.pactConfiguration).asObject()!!.entries
+            structToJson(response.pluginConfiguration.pactConfiguration).asObject()!!.entries
           )
         }
 
@@ -347,21 +330,66 @@ object DefaultPluginManager: KLogging(), PluginManager {
         PluginConfiguration()
       }
 
-      logger.debug { "body=$body" }
-      logger.debug { "rules=$rules" }
-      logger.debug { "generators=$generators" }
-      logger.debug { "metadata=$metadata" }
-      logger.debug { "pluginConfig=$pluginConfig" }
+      for (interaction in response.interactionList) {
+        val returnedContentType = ContentType(interaction.contents.contentType)
+        val body = OptionalBody.body(
+          interaction.contents.content.value.toByteArray(), returnedContentType,
+          toContentTypeHint(interaction.contents.contentTypeHint)
+        )
+        val rules = MatchingRuleCategory("body", interaction.rulesMap.entries.associate { (key, value) ->
+          key to MatchingRuleGroup(value.ruleList.map {
+            MatchingRule.create(it.type, structToJson(it.values))
+          }.toMutableList(), RuleLogic.AND, false)
+        }.toMutableMap())
+        val generators = Generators(mutableMapOf(Category.BODY to interaction.generatorsMap.mapValues {
+          createGenerator(it.value.type, structToJson(it.value.values))
+        }.toMutableMap()))
 
-      Ok(InteractionContents(
-        body,
-        rules,
-        generators,
-        metadata,
-        pluginConfig,
-        response.interaction.interactionMarkup,
-        response.interaction.interactionMarkupType.name
-      ))
+        val metadata = if (interaction.hasMessageMetadata()) {
+          interaction.messageMetadata.fieldsMap.entries.associate { (key, value) -> key to valueToJson(value) }
+        } else {
+          emptyMap()
+        }
+
+        val pluginConfig = if (interaction.hasPluginConfiguration()) {
+          val pluginConfiguration = globalPluginConfig.copy()
+
+          if (interaction.pluginConfiguration.hasInteractionConfiguration()) {
+            pluginConfiguration.interactionConfiguration.putAll(
+              structToJson(interaction.pluginConfiguration.interactionConfiguration).asObject()!!.entries
+            )
+          }
+
+          if (interaction.pluginConfiguration.hasPactConfiguration()) {
+            pluginConfiguration.pactConfiguration.putAll(
+              structToJson(interaction.pluginConfiguration.pactConfiguration).asObject()!!.entries
+            )
+          }
+
+          pluginConfiguration
+        } else {
+          PluginConfiguration()
+        }
+
+        logger.debug { "body=$body" }
+        logger.debug { "rules=$rules" }
+        logger.debug { "generators=$generators" }
+        logger.debug { "metadata=$metadata" }
+        logger.debug { "pluginConfig=$pluginConfig" }
+
+        results.add(InteractionContents(
+          interaction.partName,
+          body,
+          rules,
+          generators,
+          metadata,
+          pluginConfig,
+          interaction.interactionMarkup,
+          interaction.interactionMarkupType.name
+        ))
+      }
+
+      Ok(results)
     }
   }
 
@@ -398,7 +426,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
       request.putGenerators(key, gen)
     }
     logger.debug { "Sending generateContent request to plugin ${plugin.manifest}" }
-    val response = plugin.stub!!.generateContent(request.build())
+    val response = plugin.withGrpcStub { stub -> stub.generateContent(request.build()) }
     logger.debug { "Got response: $response" }
     val returnedContentType = ContentType(response.contents.contentType)
     return OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType)
@@ -420,15 +448,11 @@ object DefaultPluginManager: KLogging(), PluginManager {
             .usePlaintext()
             .build()
           val stub = newBlockingStub(channel)
-          val response = makeInitRequest(stub)
-          logger.debug { "Got init response ${response.catalogueList} from plugin ${manifest.name}" }
-          CatalogueManager.registerPluginEntries(manifest.name, response.catalogueList)
           plugin.stub = stub
           plugin.channel = channel
-          plugin.catalogueEntries = response.catalogueList
-          Thread {
-            publishUpdatedCatalogue()
-          }.run()
+
+          initPlugin(plugin)
+
           plugin
         }.mapError { err ->
           logger.error(err) { "Init call to plugin ${manifest.name} failed" }
@@ -439,12 +463,20 @@ object DefaultPluginManager: KLogging(), PluginManager {
     }
   }
 
-  fun makeInitRequest(stub: PactPluginGrpc.PactPluginBlockingStub): Plugin.InitPluginResponse {
+  fun initPlugin(plugin: PactPlugin) {
     val request = Plugin.InitPluginRequest.newBuilder()
       .setImplementation("plugin-driver-jvm")
       .setVersion(Utils.lookupVersion(PluginManager::class.java))
       .build()
-    return stub.initPlugin(request)
+
+    val response =  plugin.withGrpcStub { stub -> stub.initPlugin(request) }
+    logger.debug { "Got init response ${response.catalogueList} from plugin ${plugin.manifest.name}" }
+    CatalogueManager.registerPluginEntries(plugin.manifest.name, response.catalogueList)
+    plugin.catalogueEntries = response.catalogueList
+
+    Thread {
+      publishUpdatedCatalogue()
+    }.run()
   }
 
   private fun publishUpdatedCatalogue() {
@@ -459,7 +491,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     val request = requestBuilder.build()
 
     PLUGIN_REGISTER.forEach { (_, plugin) ->
-      plugin.stub?.updateCatalogue(request)
+      plugin.withGrpcStub { stub -> stub.updateCatalogue(request) }
     }
   }
 
@@ -625,12 +657,47 @@ data class PluginConfiguration(
   val pactConfiguration: MutableMap<String, JsonValue> = mutableMapOf()
 )
 
+/**
+ * Interaction contents returned from the plugin
+ */
 data class InteractionContents @JvmOverloads constructor(
+  /**
+   * The part that the contents are for (like request or response). Only used if there are multiple.
+   */
+  val partName: String,
+
+  /**
+   * Body for the contents
+   */
   val body: OptionalBody,
+
+  /**
+   * Matching rules to apply
+   */
   val rules: MatchingRuleCategory? = null,
+
+  /**
+   * Generators to apply
+   */
   val generators: Generators? = null,
+
+  /**
+   * Metadata for the contents. This is only applied to messages.
+   */
   val metadata: Map<String, JsonValue> = emptyMap(),
+
+  /**
+   * Any plugin specific data to store with the interaction
+   */
   val pluginConfig: PluginConfiguration = PluginConfiguration(),
+
+  /**
+   * Markup to use to display the interaction in user interfaces
+   */
   val interactionMarkup: String = "",
+
+  /**
+   * The type of the markup. Defaults to CommonMark.
+   */
   val interactionMarkupType: String = ""
 )

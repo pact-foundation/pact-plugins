@@ -18,6 +18,7 @@ import au.com.dius.pact.core.support.Json.toJson
 import au.com.dius.pact.core.support.isNotEmpty
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
+import com.github.michaelbull.result.Result
 import com.google.common.io.BaseEncoding
 import com.google.protobuf.ByteString
 import com.google.protobuf.BytesValue
@@ -218,10 +219,12 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         return Plugin.ConfigureInteractionResponse.newBuilder()
           .setError("Config item with key 'pact:proto' and path to the proto file is required")
           .build()
-      } else if (!config.containsKey("pact:message-type")) {
-        logger.error { "Config item with key 'pact:message-type' and the protobuf message name is required" }
+      } else if (!config.containsKey("pact:message-type") && !config.containsKey("pact:proto-service")) {
+        val message = "Config item with key 'pact:message-type' and the protobuf message name " +
+          "or 'pact:proto-service' and the service name is required"
+        logger.error { message }
         return Plugin.ConfigureInteractionResponse.newBuilder()
-          .setError("Config item with key 'pact:message-type' and the protobuf message name is required")
+          .setError(message)
           .build()
       } else {
         logger.debug { "Parsing proto file" }
@@ -251,100 +254,47 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
           }
         }
 
-        val message = config["pact:message-type"]!!.stringValue
-        logger.debug { "Looking for message of type '$message'" }
-        val fileDesc = Descriptors.FileDescriptor.buildFrom(
-          fileProtoDesc,
-          buildDependencies(fileDescriptors, fileProtoDesc.dependencyList)
-        )
-        logger.debug { "fileDesc = $fileDesc" }
-        val descriptor = fileDesc.findMessageTypeByName(message)
-        if (descriptor == null) {
-          logger.error { "Message '$message' was not found in proto file '$protoFile'" }
-          return Plugin.ConfigureInteractionResponse.newBuilder()
-            .setError("Message '$message' was not found in proto file '$protoFile'")
-            .build()
-        }
+        val interactions: MutableList<Plugin.InteractionResponse.Builder> = mutableListOf()
 
-        val messageBuilder = DynamicMessage.newBuilder(descriptor)
-
-        val matchingRules = MatchingRuleCategory("body")
-        val generators = mutableMapOf<String, Generator>()
-
-        logger.debug { "Building message from Protobuf descriptor" }
-        for ((key, value) in config) {
-          if (!key.startsWith("pact:")) {
-            val field = descriptor.findFieldByName(key)
-            if (field != null) {
-              when (field.type) {
-                Descriptors.FieldDescriptor.Type.MESSAGE -> {
-                  val messageValue =
-                    configureMessageField(constructValidPath(key, "$"), field, value, matchingRules, generators)
-                  logger.debug { "Setting field $field to value '$messageValue'" }
-                  if (messageValue != null) {
-                    when {
-                      field.isRepeated -> if (messageValue is List<*>) {
-                        for (item in messageValue) {
-                          messageBuilder.addRepeatedField(field, item)
-                        }
-                      } else {
-                        messageBuilder.addRepeatedField(field, messageValue)
-                      }
-                      else -> messageBuilder.setField(field, messageValue)
-                    }
-                  }
-                }
-                else -> {
-                  val fieldValue = buildFieldValue("$", field, value, matchingRules, generators)
-                  logger.debug { "Setting field $field to value '$fieldValue'" }
-                  if (fieldValue != null) {
-                    messageBuilder.setField(field, fieldValue)
-                  }
-                }
-              }
-            } else {
-              logger.error { "Message $message has no field $key" }
+        if (config.containsKey("pact:message-type")) {
+          val message = config["pact:message-type"]!!.stringValue
+          when (val result = configureProtobufMessage(message, config, fileProtoDesc, fileDescriptors, protoFile)) {
+            is Ok -> {
+              val builder = result.value
+              val pluginConfigurationBuilder = builder.pluginConfigurationBuilder
+              pluginConfigurationBuilder.interactionConfigurationBuilder
+                .putFields("message", Value.newBuilder().setStringValue(message).build())
+                .putFields("descriptorKey", Value.newBuilder().setStringValue(descriptorHash.toString()).build())
+              interactions.add(builder)
+            }
+            is Err -> {
               return Plugin.ConfigureInteractionResponse.newBuilder()
-                .setError("Message $message has no field $key")
+                .setError(result.error)
+                .build()
+            }
+          }
+        } else {
+          val serviceName = config["pact:proto-service"]!!.stringValue
+          when (val result = configureProtobufService(serviceName, config, fileProtoDesc, fileDescriptors, protoFile)) {
+            is Ok -> {
+              val (requestPart, responsePart) = result.value
+              val pluginConfigurationBuilder = requestPart.pluginConfigurationBuilder
+              pluginConfigurationBuilder.interactionConfigurationBuilder
+                .putFields("service", Value.newBuilder().setStringValue(serviceName).build())
+                .putFields("descriptorKey", Value.newBuilder().setStringValue(descriptorHash.toString()).build())
+              interactions.add(requestPart)
+              interactions.add(responsePart)
+            }
+            is Err -> {
+              return Plugin.ConfigureInteractionResponse.newBuilder()
+                .setError(result.error)
                 .build()
             }
           }
         }
 
-        logger.debug { "Returning response" }
-        val builder = Plugin.InteractionResponse.newBuilder()
-
-        builder.contentsBuilder
-          .setContentType("application/protobuf;message=$message")
-          .setContent(BytesValue.newBuilder().setValue(messageBuilder.build().toByteString()).build())
-          .setContentTypeHint(Plugin.Body.ContentTypeHint.BINARY)
-
-        for ((key, rules) in matchingRules.matchingRules) {
-          val rulesBuilder = Plugin.MatchingRules.newBuilder()
-
-          for (rule in rules.rules) {
-            rulesBuilder.addRule(
-              Plugin.MatchingRule.newBuilder()
-                .setType(rule.name)
-                .setValues(toProtoStruct(rule.attributes))
-                .build()
-            )
-          }
-
-          builder.putRules(key, rulesBuilder.build())
-        }
-
-        for ((key, generator) in generators) {
-          builder.putGenerators(
-            key, Plugin.Generator.newBuilder()
-              .setType(generator.type)
-              .setValues(toProtoStruct(toJson(generator.toMap(PactSpecVersion.V4)).asObject()!!.entries))
-              .build()
-          )
-        }
-
+        val builder = Plugin.ConfigureInteractionResponse.newBuilder()
         val fileContents = protoFile.toFile().readText()
-        val pluginConfigurationBuilder = builder.pluginConfigurationBuilder
         val valueBuilder = Value.newBuilder()
         val structValueBuilder = valueBuilder.structValueBuilder
         structValueBuilder
@@ -357,14 +307,16 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
             )
           )
           .build()
+        val pluginConfigurationBuilder = builder.pluginConfigurationBuilder
         pluginConfigurationBuilder.pactConfigurationBuilder.putAllFields(
           mapOf(descriptorHash.toString() to valueBuilder.build())
         )
-        pluginConfigurationBuilder.interactionConfigurationBuilder
-          .putFields("message", Value.newBuilder().setStringValue(message).build())
-          .putFields("descriptorKey", Value.newBuilder().setStringValue(descriptorHash.toString()).build())
 
-        return Plugin.ConfigureInteractionResponse.newBuilder().setInteraction(builder).build()
+        for (result in interactions) {
+          builder.addInteraction(result)
+        }
+
+        return builder.build()
       }
     } catch (ex: Exception) {
       logger.error(ex) { "Failed with an exception" }
@@ -372,6 +324,167 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         .setError(ex.message)
         .build()
     }
+  }
+
+  private fun configureProtobufService(
+    serviceName: String,
+    config: Map<String, Value>,
+    fileProtoDesc: DescriptorProtos.FileDescriptorProto,
+    fileDescriptors: Map<String, DescriptorProtos.FileDescriptorProto>,
+    protoFile: Path
+  ): Result<Pair<Plugin.InteractionResponse.Builder, Plugin.InteractionResponse.Builder>, String> {
+    if (!config.containsKey("request")) {
+      return Err("A Protobuf service requires a 'request' configuration")
+    }
+    if (!config.containsKey("response")) {
+      return Err("A Protobuf service requires a 'response' configuration")
+    }
+
+    logger.debug { "Looking for service and method with name '$serviceName'" }
+    val fileDesc = Descriptors.FileDescriptor.buildFrom(
+      fileProtoDesc,
+      buildDependencies(fileDescriptors, fileProtoDesc.dependencyList)
+    )
+    val serviceAndProc = serviceName.split("/", limit = 2)
+    if (serviceAndProc.size != 2) {
+      return Err("Service name '$serviceName' is not valid, it should be of the form <SERVICE>/<METHOD>")
+    }
+
+    val service = fileDesc.findServiceByName(serviceAndProc[0])
+    logger.debug { "service = $service" }
+    if (service == null) {
+      logger.error { "Service '${serviceAndProc[0]}' was not found in proto file '$protoFile'" }
+      logger.error { "Available service names: ${fileDesc.services.joinToString(", ") { it.name }}" }
+      return Err("Service '${serviceAndProc[0]}' was not found in proto file '$protoFile'")
+    }
+
+    val method = service.findMethodByName(serviceAndProc[1])
+    if (method == null) {
+      logger.error { "Method '${serviceAndProc[1]}' was not found in proto file '$protoFile'" }
+      logger.error { "Available method names: ${service.methods.joinToString(", ") { it.name }}" }
+      return Err("Method '${serviceAndProc[1]}' was not found in proto file '$protoFile'")
+    }
+
+    val request = constructProtobufMessageForDescriptor(method.inputType, config["request"]!!.structValue.fieldsMap, method.inputType.name)
+    if (request is Err) {
+      return request
+    }
+
+    val response = constructProtobufMessageForDescriptor(method.outputType, config["response"]!!.structValue.fieldsMap, method.outputType.name)
+    if (response is Err) {
+      return response
+    }
+
+    request as Ok
+    response as Ok
+    request.value.partName = "request"
+    response.value.partName = "response"
+    return Ok(request.value to response.value)
+  }
+
+  private fun configureProtobufMessage(
+    message: String,
+    config: Map<String, Value>,
+    fileProtoDesc: DescriptorProtos.FileDescriptorProto,
+    fileDescriptors: Map<String, DescriptorProtos.FileDescriptorProto>,
+    protoFile: Path
+  ): Result<Plugin.InteractionResponse.Builder, String> {
+    logger.debug { "Looking for message of type '$message'" }
+    val fileDesc = Descriptors.FileDescriptor.buildFrom(
+      fileProtoDesc,
+      buildDependencies(fileDescriptors, fileProtoDesc.dependencyList)
+    )
+    logger.debug { "fileDesc = $fileDesc" }
+    val descriptor = fileDesc.findMessageTypeByName(message)
+    if (descriptor == null) {
+      logger.error { "Message '$message' was not found in proto file '$protoFile'" }
+      return Err("Message '$message' was not found in proto file '$protoFile'")
+    }
+
+    return constructProtobufMessageForDescriptor(descriptor, config, message)
+  }
+
+  private fun constructProtobufMessageForDescriptor(
+    descriptor: Descriptors.Descriptor,
+    config: Map<String, Value>,
+    message: String
+  ): Result<Plugin.InteractionResponse.Builder, String> {
+    val messageBuilder = DynamicMessage.newBuilder(descriptor)
+
+    val matchingRules = MatchingRuleCategory("body")
+    val generators = mutableMapOf<String, Generator>()
+
+    logger.debug { "Building message from Protobuf descriptor" }
+    for ((key, value) in config) {
+      if (!key.startsWith("pact:")) {
+        val field = descriptor.findFieldByName(key)
+        if (field != null) {
+          when (field.type) {
+            Descriptors.FieldDescriptor.Type.MESSAGE -> {
+              val messageValue =
+                configureMessageField(constructValidPath(key, "$"), field, value, matchingRules, generators)
+              logger.debug { "Setting field $field to value '$messageValue'" }
+              if (messageValue != null) {
+                when {
+                  field.isRepeated -> if (messageValue is List<*>) {
+                    for (item in messageValue) {
+                      messageBuilder.addRepeatedField(field, item)
+                    }
+                  } else {
+                    messageBuilder.addRepeatedField(field, messageValue)
+                  }
+                  else -> messageBuilder.setField(field, messageValue)
+                }
+              }
+            }
+            else -> {
+              val fieldValue = buildFieldValue("$", field, value, matchingRules, generators)
+              logger.debug { "Setting field $field to value '$fieldValue'" }
+              if (fieldValue != null) {
+                messageBuilder.setField(field, fieldValue)
+              }
+            }
+          }
+        } else {
+          logger.error { "Message $message has no field $key" }
+          return Err("Message $message has no field $key")
+        }
+      }
+    }
+
+    logger.debug { "Returning response" }
+    val builder = Plugin.InteractionResponse.newBuilder()
+
+    builder.contentsBuilder
+      .setContentType("application/protobuf;message=$message")
+      .setContent(BytesValue.newBuilder().setValue(messageBuilder.build().toByteString()).build())
+      .setContentTypeHint(Plugin.Body.ContentTypeHint.BINARY)
+
+    for ((key, rules) in matchingRules.matchingRules) {
+      val rulesBuilder = Plugin.MatchingRules.newBuilder()
+
+      for (rule in rules.rules) {
+        rulesBuilder.addRule(
+          Plugin.MatchingRule.newBuilder()
+            .setType(rule.name)
+            .setValues(toProtoStruct(rule.attributes))
+            .build()
+        )
+      }
+
+      builder.putRules(key, rulesBuilder.build())
+    }
+
+    for ((key, generator) in generators) {
+      builder.putGenerators(
+        key, Plugin.Generator.newBuilder()
+          .setType(generator.type)
+          .setValues(toProtoStruct(toJson(generator.toMap(PactSpecVersion.V4)).asObject()!!.entries))
+          .build()
+      )
+    }
+
+    return Ok(builder)
   }
 
   private fun buildDependencies(

@@ -6,10 +6,16 @@ import java.util.concurrent.LinkedBlockingDeque
 import javax.json.Json
 import javax.json.JsonObject
 
+/**
+ * This class manages the running child process for a plugin
+ */
 open class ChildProcess(
   val pb: ProcessBuilder,
-  val manifest: PactPluginManifest
+  private val manifest: PactPluginManifest
 ) {
+  /**
+   * Child process PID
+   */
   val pid: Long
     get() = process.pid()
 
@@ -18,6 +24,10 @@ open class ChildProcess(
   private lateinit var process: Process
   val channel: LinkedBlockingDeque<JsonObject> = LinkedBlockingDeque()
 
+  /**
+   * Starts the child process and attach threads to read the standard output and error. Will scan the standard output
+   * for the child process startup message.
+   */
   open fun start(): ChildProcess {
     process = pb.start()
     logger.debug { "Child process started = ${process.info()}" }
@@ -28,7 +38,7 @@ open class ChildProcess(
         if (bufferedReader.ready()) {
           val line = bufferedReader.readLine()
           if (line != null) {
-            logger.debug { "Plugin ${manifest.name} [${process.pid()}] $line" }
+            logger.debug { "Plugin ${manifest.name} [${process.pid()}] || $line" }
             if (line.trim().startsWith("{")) {
               logger.debug("Got JSON message from plugin process")
               val jsonReader = Json.createReader(StringReader(line.trim()));
@@ -44,7 +54,7 @@ open class ChildProcess(
         if (bufferedReader.ready()) {
           val line = bufferedReader.readLine()
           if (line != null) {
-            logger.error { "Plugin ${manifest.name} [${process.pid()}] $line" }
+            logger.error { "Plugin ${manifest.name} [${process.pid()}] || $line" }
           }
         }
       }
@@ -57,6 +67,9 @@ open class ChildProcess(
     return this
   }
 
+  /**
+   * Destroy the child process.
+   */
   open fun destroy() {
     process.destroy()
   }
