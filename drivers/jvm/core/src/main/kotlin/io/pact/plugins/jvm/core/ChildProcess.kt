@@ -36,7 +36,7 @@ open class ChildProcess(
 
     this.ioThread = Thread {
       val bufferedReader = process.inputStream.bufferedReader()
-//      while (process.isAlive) {
+      while (process.isAlive) {
         if (bufferedReader.ready()) {
           val line = bufferedReader.readLine()
           if (line != null) {
@@ -48,18 +48,18 @@ open class ChildProcess(
             }
           }
         }
-//      }
+      }
     }
     this.errorThread = Thread {
       val bufferedReader = process.errorStream.bufferedReader()
-//      while (process.isAlive) {
+      while (process.isAlive) {
         if (bufferedReader.ready()) {
           val line = bufferedReader.readLine()
           if (line != null) {
             logger.error { "Plugin ${manifest.name} [${process.pid()}] || $line" }
           }
         }
-//      }
+      }
     }
     this.ioThread.start()
     this.errorThread.start()

@@ -55,6 +55,7 @@ class PluginApp(
   fun start() {
     server.start()
     println("{\"port\":${server.port}, \"serverKey\":\"$serverKey\"}")
+    System.out.flush()
     Runtime.getRuntime().addShutdownHook(
       Thread {
         println("*** shutting down gRPC server since JVM is shutting down")
