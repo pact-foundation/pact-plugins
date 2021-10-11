@@ -611,6 +611,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
       ProcessBuilder(command.asList() + manifest.pluginDir.resolve(manifest.entryPoint).toString())
     } else {
       val osName = System.getProperty("os.name")?.lowercase()
+      logger.debug { "Detected OS: $osName" }
       if (manifest.entryPoints.containsKey(osName)) {
         ProcessBuilder(manifest.pluginDir.resolve(manifest.entryPoints[osName]!!).toString())
       } else {
