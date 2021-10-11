@@ -31,6 +31,10 @@ jobs:
     - name: Run plugin driver tests
       run: ./gradlew -s --no-daemon -i check
       working-directory: drivers/jvm
+    - name: Publish driver Pact file
+      run: env
+      working-directory: drivers/jvm
+      if: runner.os == 'Linux'
 
   supported_jdks:
     runs-on: ubuntu-latest
