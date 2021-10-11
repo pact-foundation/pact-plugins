@@ -2,6 +2,7 @@ package io.pact.plugins.jvm.core
 
 import mu.KLogging
 import java.io.StringReader
+import java.lang.Thread.sleep
 import java.util.concurrent.LinkedBlockingDeque
 import javax.json.Json
 import javax.json.JsonObject
@@ -31,10 +32,11 @@ open class ChildProcess(
   open fun start(): ChildProcess {
     process = pb.start()
     logger.debug { "Child process started = ${process.info()}" }
+    sleep(100)
 
     this.ioThread = Thread {
       val bufferedReader = process.inputStream.bufferedReader()
-      while (process.isAlive) {
+//      while (process.isAlive) {
         if (bufferedReader.ready()) {
           val line = bufferedReader.readLine()
           if (line != null) {
@@ -46,18 +48,18 @@ open class ChildProcess(
             }
           }
         }
-      }
+//      }
     }
     this.errorThread = Thread {
       val bufferedReader = process.errorStream.bufferedReader()
-      while (process.isAlive) {
+//      while (process.isAlive) {
         if (bufferedReader.ready()) {
           val line = bufferedReader.readLine()
           if (line != null) {
             logger.error { "Plugin ${manifest.name} [${process.pid()}] || $line" }
           }
         }
-      }
+//      }
     }
     this.ioThread.start()
     this.errorThread.start()
