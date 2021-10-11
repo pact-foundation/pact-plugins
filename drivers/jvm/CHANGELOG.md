@@ -1,5 +1,39 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.5 - Fixes for loading plugins on Windows
+
+* 4225a47 - chore: update CI (Ronald Holshausen, Mon Oct 11 14:50:11 2021 +1100)
+* f03627b - chore: try fix passing in GIT SHA from CI (Ronald Holshausen, Mon Oct 11 14:35:41 2021 +1100)
+* 376bf98 - chore: try fix passing in GIT SHA from CI (Ronald Holshausen, Mon Oct 11 14:34:56 2021 +1100)
+* 39dc4ab - chore: publish JVM driver pact file in CI build (Ronald Holshausen, Mon Oct 11 14:21:40 2021 +1100)
+* b8448c2 - chore: CI build changes (Ronald Holshausen, Mon Oct 11 14:13:47 2021 +1100)
+* 390013f - feat: make plugin load timeout configurable (Ronald Holshausen, Mon Oct 11 14:08:58 2021 +1100)
+* 65b036f - chore: debugging plugin load on windows (Ronald Holshausen, Mon Oct 11 14:01:44 2021 +1100)
+* 84252b8 - chore: debugging plugin load on windows (Ronald Holshausen, Mon Oct 11 13:54:56 2021 +1100)
+* c10aea1 - chore: increase the timeout for waiting for plugin to start (Ronald Holshausen, Mon Oct 11 13:00:49 2021 +1100)
+* 6404019 - fix: entry point for windows (Ronald Holshausen, Mon Oct 11 12:53:20 2021 +1100)
+* f3ad025 - chore: add debug logs for Windows (Ronald Holshausen, Mon Oct 11 12:42:58 2021 +1100)
+* 178c15f - chore: fix tests after adding entryPoints (Ronald Holshausen, Mon Oct 11 12:32:11 2021 +1100)
+* 0f93dd2 - feat: support additional entry points for other operating systems (i.e. requiring a .bat file for Windows) (Ronald Holshausen, Mon Oct 11 12:22:39 2021 +1100)
+* b72772f - fix(Windows): use user.home system property to get the directory for the plugins (Ronald Holshausen, Mon Oct 11 11:36:48 2021 +1100)
+* 55954b1 - chore: fix build (Ronald Holshausen, Mon Oct 11 11:13:00 2021 +1100)
+* cade023 - chore: Upgrade Protobuf plugin build to Gradle 7 to JDK 16 support (Ronald Holshausen, Mon Oct 11 11:08:29 2021 +1100)
+* 53d0d85 - chore: JVM driver build needs the Protobuf plugin (Ronald Holshausen, Mon Oct 11 11:00:52 2021 +1100)
+* d3f54d9 - feat: Support synchronous messages with plugins + added JVM Pact test (Ronald Holshausen, Mon Oct 11 09:30:46 2021 +1100)
+* 22c86ae - chore: more README (Ronald Holshausen, Wed Oct 6 17:05:07 2021 +1100)
+* ccb84e3 - chore: README (Ronald Holshausen, Wed Oct 6 17:00:07 2021 +1100)
+* dacbf09 - chore: add readme for Protobuf examples (Ronald Holshausen, Wed Oct 6 16:58:20 2021 +1100)
+* e8eb43f - chore: add readme for the protobuf plugin (Ronald Holshausen, Wed Oct 6 16:42:17 2021 +1100)
+* 4493904 - chore: update CSV plugin and examples (Ronald Holshausen, Wed Oct 6 14:48:16 2021 +1100)
+* da41699 - chore: update the CSV examples with latest driver changes (Ronald Holshausen, Wed Oct 6 14:35:45 2021 +1100)
+* ceee4f4 - chore: update driver readmes (Ronald Holshausen, Tue Oct 5 16:22:28 2021 +1100)
+* ebe6473 - chore: add readme (Ronald Holshausen, Tue Oct 5 16:00:10 2021 +1100)
+* b2c664b - chore: use the published pact models and driver versions (Ronald Holshausen, Tue Oct 5 15:30:14 2021 +1100)
+* 233f68d - bump version to 0.0.4 (Ronald Holshausen, Tue Oct 5 15:27:03 2021 +1100)
+* 56f8395 - update changelog for release 0.0.3 (Ronald Holshausen, Tue Oct 5 15:24:46 2021 +1100)
+* 7c2c122 - chore: use the published version of Pact models (Ronald Holshausen, Tue Oct 5 15:18:01 2021 +1100)
+* 8032fbc - bump version to 0.0.5 (Ronald Holshausen, Tue Oct 5 14:03:18 2021 +1100)
+
 # 0.0.4 - Support for Protobuf plugin
 
 * c9da97d - feat: implemented matching Protobuf map and repeated fields (Ronald Holshausen, Thu Sep 30 16:16:15 2021 +1000)
