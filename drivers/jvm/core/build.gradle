@@ -7,7 +7,7 @@ plugins {
 
 ext {
     description = "Pact Plugin Driver core implementation"
-    gitSha = "0"
+    gitSha = System.getenv("GIT_SHA") ?: '0'
 }
 
 dependencies {
@@ -72,7 +72,7 @@ sourceSets {
 pact {
     publish {
         pactBrokerUrl = 'https://pact-foundation.pact.dius.com.au'
-        consumerVersion = "${project.version}+${project.gitSha}"
+        consumerVersion = "${project.version}+${gitSha}"
         if (project.hasProperty('pactBrokerToken')) {
             pactBrokerToken = project.pactBrokerToken
         }
