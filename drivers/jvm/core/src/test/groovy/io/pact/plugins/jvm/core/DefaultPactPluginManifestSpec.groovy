@@ -22,6 +22,7 @@ class DefaultPactPluginManifestSpec extends Specification {
       'exec',
       null,
       'exec',
+      [:],
       []
     )
 
@@ -46,6 +47,7 @@ class DefaultPactPluginManifestSpec extends Specification {
       'ruby',
       '1.7.1',
       'exec.rb',
+      [:],
       []
     )
 
@@ -71,6 +73,7 @@ class DefaultPactPluginManifestSpec extends Specification {
       'ruby',
       '1.7.1',
       'exec.rb',
+      [:],
       [
         new PluginDependency('dep1', '1.0', PluginDependencyType.Plugin),
         new PluginDependency('dep2', '2.0', PluginDependencyType.Library)
@@ -93,6 +96,33 @@ class DefaultPactPluginManifestSpec extends Specification {
     ]
   }
 
+  def 'converting manifest to JSON - with additional entryPoints'() {
+    given:
+    def manifest = new DefaultPactPluginManifest(
+      pluginFile,
+      1,
+      'TestPlugin',
+      '1.2.3',
+      'ruby',
+      '1.7.1',
+      'exec.rb',
+      [windows: 'exec.bat'],
+      []
+    )
+
+    expect:
+    manifest.toMap() == [
+      pluginDir: pluginFile.toString(),
+      pluginInterfaceVersion: 1,
+      name: 'TestPlugin',
+      version: '1.2.3',
+      executableType: 'ruby',
+      entryPoint: 'exec.rb',
+      minimumRequiredVersion: '1.7.1',
+      entryPoints: [windows: 'exec.bat']
+    ]
+  }
+
   def 'loading manifest from JSON'() {
     given:
     InputStream pluginFile = DefaultPactPluginManifestSpec.getResourceAsStream('/pact-plugin.json')
@@ -110,6 +140,7 @@ class DefaultPactPluginManifestSpec extends Specification {
       'exec',
       null,
       'pact-plugins/plugins/csv/target/debug/pact-plugin-csv',
+      [:],
       []
     )
   }
