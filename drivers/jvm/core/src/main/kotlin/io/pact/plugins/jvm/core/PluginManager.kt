@@ -614,6 +614,8 @@ object DefaultPluginManager: KLogging(), PluginManager {
       logger.debug { "Detected OS: $osName" }
       if (manifest.entryPoints.containsKey(osName)) {
         ProcessBuilder(manifest.pluginDir.resolve(manifest.entryPoints[osName]!!).toString())
+      } else if (SystemUtils.IS_OS_WINDOWS && manifest.entryPoints.containsKey("windows")) {
+        ProcessBuilder(manifest.pluginDir.resolve(manifest.entryPoints["windows"]!!).toString())
       } else {
         ProcessBuilder(manifest.pluginDir.resolve(manifest.entryPoint).toString())
       }.directory(manifest.pluginDir)
