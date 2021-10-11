@@ -1,7 +1,8 @@
 use core::pin::Pin;
 use core::task::{Context, Poll};
 use std::collections::HashMap;
-use std::io::Read;
+use std::io;
+use std::io::{Read, Stdout, Write};
 use std::net::SocketAddr;
 
 use anyhow::anyhow;
@@ -18,7 +19,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tonic::{Response, transport::Server};
 use uuid::Uuid;
 
-use crate::csv_content::{setup_csv_contents, generate_csv_content, has_headers};
+use crate::csv_content::{generate_csv_content, has_headers, setup_csv_contents};
 use crate::proto::body::ContentTypeHint;
 use crate::proto::catalogue_entry::EntryType;
 use crate::proto::pact_plugin_server::{PactPlugin, PactPluginServer};
@@ -357,6 +358,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
   let server_key = Uuid::new_v4().to_string();
   println!("{{\"port\":{}, \"serverKey\":\"{}\"}}", address.port(), server_key);
+  let _ = io::stdout().flush();
 
   let plugin = CsvPactPlugin::default();
   Server::builder()
