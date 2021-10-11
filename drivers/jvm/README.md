@@ -8,3 +8,9 @@
 * [X] Provide a catalogue of features provided by the plugins.
 * [ ] Provide a messaging bus to facilitate communication between the language implementation and the plugins.
 * [X] Manage the plugin lifecycles.
+
+## Building the JVM driver
+
+The JVM driver is built with Gradle. The build can be run with `./gradlew build`, but there is a test `DriverPactTest`
+that requires a Protobuf plugin to work. Either disable that test, or install the prototype Protobuf plugin before
+running the build.

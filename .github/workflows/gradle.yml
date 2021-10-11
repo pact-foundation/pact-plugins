@@ -23,6 +23,9 @@ jobs:
         key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
         restore-keys: ${{ runner.os }}-gradle
     - run: gradle -v
+    - name: Build and install Protobuf plugin
+      run: ./gradlew -s --no-daemon -i installLocal
+      working-directory: plugins/protobuf
     - name: Build plugin driver
       run: ./gradlew -s --no-daemon -i build
       working-directory: drivers/jvm
@@ -31,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        jdk: [ 11, 12, 13, 14, 15 ]
+        jdk: [ 11, 12, 13, 14, 15, 16 ]
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK
@@ -45,6 +48,9 @@ jobs:
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
           restore-keys: ${{ runner.os }}-gradle
       - run: gradle -v
+      - name: Build and install Protobuf plugin
+        run: ./gradlew -s --no-daemon -i installLocal
+        working-directory: plugins/protobuf
       - name: Build plugin driver
         run: ./gradlew -s --no-daemon -i build
         working-directory: drivers/jvm
