@@ -22,12 +22,14 @@ jobs:
         path: ~/.gradle/caches
         key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
         restore-keys: ${{ runner.os }}-gradle
-    - run: gradle -v
+    - name: Build plugin driver
+      run: ./gradlew -s --no-daemon -i publishToMavenLocal
+      working-directory: drivers/jvm
     - name: Build and install Protobuf plugin
       run: ./gradlew -s --no-daemon -i installLocal
       working-directory: plugins/protobuf
-    - name: Build plugin driver
-      run: ./gradlew -s --no-daemon -i build
+    - name: Run plugin driver tests
+      run: ./gradlew -s --no-daemon -i check
       working-directory: drivers/jvm
 
   supported_jdks:
@@ -47,10 +49,12 @@ jobs:
           path: ~/.gradle/caches
           key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
           restore-keys: ${{ runner.os }}-gradle
-      - run: gradle -v
+      - name: Build plugin driver
+        run: ./gradlew -s --no-daemon -i publishToMavenLocal
+        working-directory: drivers/jvm
       - name: Build and install Protobuf plugin
         run: ./gradlew -s --no-daemon -i installLocal
         working-directory: plugins/protobuf
-      - name: Build plugin driver
-        run: ./gradlew -s --no-daemon -i build
+      - name: Run plugin driver tests
+        run: ./gradlew -s --no-daemon -i check
         working-directory: drivers/jvm
