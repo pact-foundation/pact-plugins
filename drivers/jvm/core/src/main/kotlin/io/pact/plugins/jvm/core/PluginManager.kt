@@ -631,7 +631,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
       logger.debug { "Starting plugin ${manifest.name} process ${pb.command()}" }
       cp.start()
       logger.debug { "Plugin ${manifest.name} started with PID ${cp.pid}" }
-      val startupInfo = cp.channel.poll(2000, TimeUnit.MILLISECONDS)
+      val startupInfo = cp.channel.poll(10000, TimeUnit.MILLISECONDS)
       if (startupInfo is JsonObject) {
         Ok(DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), toString(startupInfo["serverKey"])!!))
       } else {
