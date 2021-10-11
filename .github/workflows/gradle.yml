@@ -32,7 +32,7 @@ jobs:
       run: ./gradlew -s --no-daemon -i check
       working-directory: drivers/jvm
     - name: Publish driver Pact file
-      run: env
+      run: ./gradlew pactPublish -PpactBrokerToken=${{ secrets.PACTFLOW_TOKEN }} -PgitSha=$GITHUB_SHA
       working-directory: drivers/jvm
       if: runner.os == 'Linux'
 

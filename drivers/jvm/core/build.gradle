@@ -2,10 +2,12 @@ plugins {
     id 'java-library'
     id 'com.google.protobuf' version '0.8.17'
     id 'groovy'
+    id 'au.com.dius.pact' version '4.3.0-beta.5'
 }
 
 ext {
     description = "Pact Plugin Driver core implementation"
+    gitSha = "0"
 }
 
 dependencies {
@@ -63,6 +65,16 @@ sourceSets {
         java {
             srcDirs 'build/generated/source/proto/main/grpc'
             srcDirs 'build/generated/source/proto/main/java'
+        }
+    }
+}
+
+pact {
+    publish {
+        pactBrokerUrl = 'https://pact-foundation.pact.dius.com.au'
+        consumerVersion = "${project.version}+${project.gitSha}"
+        if (project.hasProperty('pactBrokerToken')) {
+            pactBrokerToken = project.pactBrokerToken
         }
     }
 }
