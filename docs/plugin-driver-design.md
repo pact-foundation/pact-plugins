@@ -29,6 +29,7 @@ The plugin manifest file describes what the plugin provides and how to load it. 
 | executableType | Executable type of the plugin. Supported types are: exec (executable binary) |
 | minimumRequiredVersion | Minimum required version of the runtime/interpreter to run the plugin |
 | entryPoint | The main executable for the plugin |
+| entryPoints | Optional map of additional entry points. This allows additional entry points for other operating systems (i.e. requiring a .bat file for Windows) |
 | dependencies | List of system dependencies or plugins required to be able to execute this plugin |
 
 Example of a manifest for a plugin written in Ruby that provides matching CSV files:

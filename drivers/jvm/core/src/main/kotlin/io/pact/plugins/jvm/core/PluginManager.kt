@@ -48,24 +48,69 @@ import java.util.concurrent.TimeUnit
 import javax.json.Json
 import javax.json.JsonObject
 
+/**
+ * Type of plugin dependency
+ */
 enum class PluginDependencyType {
   OSPackage, Plugin, Library, Executable
 }
 
+/**
+ * Details of a plugin dependency
+ */
 data class PluginDependency(
   val name: String,
   val version: String?,
   val type: PluginDependencyType
 )
 
+/**
+ * Manifest entry that describes a plugin
+ */
 interface PactPluginManifest {
+  /**
+   * Directory where the manifest file is
+   */
   val pluginDir: File
+
+  /**
+   * Plugin interface version
+   */
   val pluginInterfaceVersion: Int
+
+  /**
+   * Plugin name
+   */
   val name: String
+
+  /**
+   * Plugin version
+   */
   val version: String
+
+  /**
+   * Executable type. Supported types are: exec (executable binary)
+   */
   val executableType: String
+
+  /**
+   * Minimum required version of the runtime/interpreter to run the plugin
+   */
   val minimumRequiredVersion: String?
+
+  /**
+   * The main executable for the plugin
+   */
   val entryPoint: String
+
+  /**
+   * Additional entry points for other operating systems (i.e. requiring a .bat file for Windows)
+   */
+  val entryPoints: Map<String, String?>
+
+  /**
+   * List of system dependencies or plugins required to be able to execute this plugin
+   */
   val dependencies: List<PluginDependency>
 }
 
@@ -77,6 +122,7 @@ data class DefaultPactPluginManifest(
   override val executableType: String,
   override val minimumRequiredVersion: String?,
   override val entryPoint: String,
+  override val entryPoints: Map<String, String?>,
   override val dependencies: List<PluginDependency>
 ): PactPluginManifest {
 
@@ -89,9 +135,15 @@ data class DefaultPactPluginManifest(
       "executableType" to executableType,
       "entryPoint" to entryPoint
     )
+
     if (!minimumRequiredVersion.isNullOrEmpty()) {
       map["minimumRequiredVersion"] = minimumRequiredVersion
     }
+
+    if (entryPoints.isNotEmpty()) {
+      map["entryPoints"] = entryPoints
+    }
+
     if (dependencies.isNotEmpty()) {
       map["dependencies"] = dependencies.map {
         mapOf(
@@ -101,12 +153,25 @@ data class DefaultPactPluginManifest(
         )
       }
     }
+
     return map
   }
 
-  companion object {
+  companion object : KLogging() {
     @JvmStatic
     fun fromJson(pluginDir: File, pluginJson: JsonObject): PactPluginManifest {
+      val entryPoints = if (pluginJson.containsKey("entryPoints")) {
+        when (val ep = pluginJson["entryPoints"]) {
+          is JsonObject -> ep.entries.associate { it.key to toString(it.value) }
+          else -> {
+            logger.warn { "entryPoints field in plugin manifest is invalid" }
+            emptyMap()
+          }
+        }
+      } else {
+        emptyMap()
+      }
+
       return DefaultPactPluginManifest(
         pluginDir,
         toInteger(pluginJson["pluginInterfaceVersion"]) ?: 1,
@@ -115,6 +180,7 @@ data class DefaultPactPluginManifest(
         toString(pluginJson["executableType"])!!,
         toString(pluginJson["minimumRequiredVersion"]),
         toString(pluginJson["entryPoint"])!!,
+        entryPoints,
         listOf()
       )
     }
@@ -544,8 +610,13 @@ object DefaultPluginManager: KLogging(), PluginManager {
     val pb = if (command.isNotEmpty()) {
       ProcessBuilder(command.asList() + manifest.pluginDir.resolve(manifest.entryPoint).toString())
     } else {
-      ProcessBuilder(manifest.pluginDir.resolve(manifest.entryPoint).toString())
-    }.directory(manifest.pluginDir)
+      val osName = System.getProperty("os.name")?.lowercase()
+      if (manifest.entryPoints.containsKey(osName)) {
+        ProcessBuilder(manifest.pluginDir.resolve(manifest.entryPoints[osName]!!).toString())
+      } else {
+        ProcessBuilder(manifest.pluginDir.resolve(manifest.entryPoint).toString())
+      }.directory(manifest.pluginDir)
+    }
 
     val logLevel = logLevel()
     pb.environment()["LOG_LEVEL"] = logLevel

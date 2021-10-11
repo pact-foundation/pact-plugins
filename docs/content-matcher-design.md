@@ -17,7 +17,7 @@ For a content matcher or generator, the entries need to be:
 
 #### Entry Type
 
-The entry type must be set to `CONTENT_MATCHER` or `CONTENT_GENERATOR`. 
+The entry type must be set to `CONTENT_MATCHER` or `CONTENT_GENERATOR`.
 
 #### Entry Key
 
