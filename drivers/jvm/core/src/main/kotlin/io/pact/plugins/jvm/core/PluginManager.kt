@@ -631,12 +631,13 @@ object DefaultPluginManager: KLogging(), PluginManager {
       logger.debug { "Starting plugin ${manifest.name} process ${pb.command()}" }
       cp.start()
       logger.debug { "Plugin ${manifest.name} started with PID ${cp.pid}" }
-      val startupInfo = cp.channel.poll(10000, TimeUnit.MILLISECONDS)
+      val timeout = System.getProperty("pact.plugin.loadTimeoutInMs")?.toLongOrNull() ?: 10000
+      val startupInfo = cp.channel.poll(timeout, TimeUnit.MILLISECONDS)
       if (startupInfo is JsonObject) {
         Ok(DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), toString(startupInfo["serverKey"])!!))
       } else {
         cp.destroy()
-        Err("Plugin process did not output the correct startup message - got $startupInfo")
+        Err("Plugin process did not output the correct startup message in $timeout ms - got $startupInfo")
       }
     } catch (e: Exception) {
       logger.error(e) { "Plugin process did not start correctly" }
