@@ -609,7 +609,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     return if (manifest != null) {
       Ok(manifest)
     } else {
-      val pluginDir = System.getenv("PACT_PLUGIN_DIR") ?: (System.getenv("HOME") + "/.pact/plugins")
+      val pluginDir = pluginInstallDirectory()
       for (file in File(pluginDir).walk()) {
         if (file.isFile && file.name == "pact-plugin.json") {
           logger.debug { "Found plugin manifest: $file" }
@@ -624,6 +624,17 @@ object DefaultPluginManager: KLogging(), PluginManager {
         }
       }
       Err("No plugin with name '$name' and version '${version ?: "any"}' was found in the Pact plugin directory '$pluginDir'")
+    }
+  }
+
+  private fun pluginInstallDirectory(): String {
+    val pluginDirEnvVar = System.getenv("PACT_PLUGIN_DIR")
+    return if (pluginDirEnvVar.isNotEmpty()) {
+      pluginDirEnvVar
+    } else if (System.getProperty("user.home").isNotEmpty()) {
+      System.getProperty("user.home") + "/.pact/plugins"
+    } else {
+      System.getenv("HOME") + "/.pact/plugins"
     }
   }
 
