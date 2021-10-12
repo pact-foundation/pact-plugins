@@ -8,12 +8,11 @@ jobs:
     strategy:
       matrix:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
-        rust: [ stable, beta ]
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: ${{ matrix.rust }}
+          toolchain: stable
           components: clippy
       - name: Set up JDK 11
         uses: actions/setup-java@v1
