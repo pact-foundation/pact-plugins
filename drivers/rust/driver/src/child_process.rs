@@ -45,7 +45,7 @@ impl ChildPluginProcess {
       let plugin_name = mfso.name.as_str();
       while let Ok(line) = lines.next_line().await {
         if let Some(line) = line {
-          debug!("Plugin({}, {}, STDOUT): {}", plugin_name, child_pid, line);
+          debug!("Plugin({}, {}, STDOUT) || {}", plugin_name, child_pid, line);
           if !startup_read {
             let line = line.trim();
             if line.starts_with("{") {
@@ -78,7 +78,7 @@ impl ChildPluginProcess {
       let mut lines = reader.lines();
       while let Ok(line) = lines.next_line().await {
         if let Some(line) = line {
-          debug!("Plugin({}, {}, STDERR): {}", plugin_name, child_pid, line);
+          debug!("Plugin({}, {}, STDERR) || {}", plugin_name, child_pid, line);
         }
       }
       trace!("Task to poll plugin stderr done");

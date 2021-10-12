@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use log::trace;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -44,7 +45,7 @@ pub struct PluginDependency {
 }
 
 /// Manifest of a plugin
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct PactPluginManifest {
   /// Directory were the plugin was loaded from
@@ -76,6 +77,22 @@ impl PactPluginManifest {
   }
 }
 
+/// Trait with remote-calling methods for a running plugin
+#[async_trait]
+pub trait PactPluginRpc {
+  /// Send an init request to the plugin process
+  async fn init_plugin(&self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse>;
+
+  /// Send a compare contents request to the plugin process
+  async fn compare_contents(&self, request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse>;
+
+  /// Send a configure contents request to the plugin process
+  async fn configure_interaction(&self, request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse>;
+
+  /// Send a generate content request to the plugin
+  async fn generate_content(&self, request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse>;
+}
+
 /// Running plugin details
 #[derive(Debug, Clone)]
 pub struct PactPlugin {
@@ -87,6 +104,37 @@ pub struct PactPlugin {
 
   /// Count of access to the plugin. If this is ever zero, the plugin process will be shutdown
   access_count: usize
+}
+
+#[async_trait]
+impl PactPluginRpc for PactPlugin {
+  /// Send an init request to the plugin process
+  async fn init_plugin(&self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
+    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
+    let response = client.init_plugin(tonic::Request::new(request)).await?;
+    Ok(response.get_ref().clone())
+  }
+
+  /// Send a compare contents request to the plugin process
+  async fn compare_contents(&self, request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
+    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
+    let response = client.compare_contents(tonic::Request::new(request)).await?;
+    Ok(response.get_ref().clone())
+  }
+
+  /// Send a configure contents request to the plugin process
+  async fn configure_interaction(&self, request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
+    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
+    let response = client.configure_interaction(tonic::Request::new(request)).await?;
+    Ok(response.get_ref().clone())
+  }
+
+  /// Send a generate content request to the plugin
+  async fn generate_content(&self, request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
+    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
+    let response = client.generate_content(tonic::Request::new(request)).await?;
+    Ok(response.get_ref().clone())
+  }
 }
 
 impl PactPlugin {
@@ -103,34 +151,6 @@ impl PactPlugin {
   /// Kill the running plugin process
   pub fn kill(&self) {
     self.child.kill();
-  }
-
-  /// Send an init request to the plugin process
-  pub async fn init_plugin(&self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
-    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
-    let response = client.init_plugin(tonic::Request::new(request)).await?;
-    Ok(response.get_ref().clone())
-  }
-
-  /// Send a compare contents request to the plugin process
-  pub async fn compare_contents(&self, request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
-    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
-    let response = client.compare_contents(tonic::Request::new(request)).await?;
-    Ok(response.get_ref().clone())
-  }
-
-  /// Send a configure contents request to the plugin process
-  pub async fn configure_interaction(&self, request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
-    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
-    let response = client.configure_interaction(tonic::Request::new(request)).await?;
-    Ok(response.get_ref().clone())
-  }
-
-  /// Send a generate content request to the plugin
-  pub async fn generate_content(&self, request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
-    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
-    let response = client.generate_content(tonic::Request::new(request)).await?;
-    Ok(response.get_ref().clone())
   }
 
   /// Update the access of the plugin

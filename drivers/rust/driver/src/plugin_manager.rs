@@ -18,7 +18,7 @@ use tokio::process::Command;
 use crate::catalogue_manager::{register_plugin_entries, remove_plugin_entries};
 use crate::child_process::ChildPluginProcess;
 use crate::metrics::send_metrics;
-use crate::plugin_models::{PactPlugin, PactPluginManifest, PluginDependency};
+use crate::plugin_models::{PactPlugin, PactPluginRpc, PactPluginManifest, PluginDependency};
 use crate::proto::InitPluginRequest;
 
 lazy_static! {
@@ -151,17 +151,10 @@ async fn initialise_plugin(
       let plugin = start_plugin_process(manifest).await?;
       debug!("Plugin process started OK (port = {}), sending init message", plugin.port());
 
-      let request = InitPluginRequest {
-        implementation: "Pact-Rust".to_string(),
-        version: "0".to_string()
-      };
-      let response = plugin.init_plugin(request).await.map_err(|err| {
+      init_handshake(manifest, &plugin).await.map_err(|err| {
         plugin.kill();
         anyhow!("Failed to send init request to the plugin - {}", err)
       })?;
-      debug!("Got init response {:?} from plugin {}", response, manifest.name);
-      register_plugin_entries(manifest, &response.catalogue);
-      tokio::task::spawn(async { publish_updated_catalogue() });
 
       let key = format!("{}/{}", manifest.name, manifest.version);
       plugin_register.insert(key, plugin.clone());
@@ -170,6 +163,19 @@ async fn initialise_plugin(
     }
     _ => Err(anyhow!("Plugin executable type of {} is not supported", manifest.executable_type))
   }
+}
+
+/// Internal function: public for testing
+pub async fn init_handshake(manifest: &PactPluginManifest, plugin: &dyn PactPluginRpc) -> anyhow::Result<()> {
+  let request = InitPluginRequest {
+    implementation: "plugin-driver-rust".to_string(),
+    version: option_env!("CARGO_PKG_VERSION").unwrap_or("0").to_string()
+  };
+  let response = plugin.init_plugin(request).await?;
+  debug!("Got init response {:?} from plugin {}", response, manifest.name);
+  register_plugin_entries(manifest, &response.catalogue);
+  tokio::task::spawn(async { publish_updated_catalogue() });
+  Ok(())
 }
 
 async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<PactPlugin> {

@@ -15,7 +15,7 @@ use serde_json::Value;
 
 use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
 use crate::plugin_manager::lookup_plugin;
-use crate::plugin_models::{PluginInteractionConfig, PactPluginManifest};
+use crate::plugin_models::{PactPluginManifest, PluginInteractionConfig, PactPluginRpc};
 use crate::proto::{
   Body,
   CompareContentsRequest,
@@ -61,18 +61,28 @@ pub struct ContentMismatch {
 /// Interaction contents setup by the plugin
 #[derive(Clone, Debug)]
 pub struct InteractionContents {
+  /// Description of what part this interaction belongs to (in the case of there being more than
+  /// one, for instance, request/response messages)
+  pub part_name: String,
+
   /// Body/Contents of the interaction
   pub body: OptionalBody,
+
   /// Matching rules to apply
   pub rules: Option<MatchingRuleCategory>,
+
   /// Generators to apply
   pub generators: Option<Generators>,
+
   /// Message metadata
   pub metadata: Option<HashMap<String, Value>>,
+
   /// Plugin configuration data to apply to the interaction
   pub plugin_config: PluginConfiguration,
+
   /// Markup for the interaction to display in any UI
   pub interaction_markup: String,
+
   /// The type of the markup (CommonMark or HTML)
   pub interaction_markup_type: String
 }
@@ -80,13 +90,14 @@ pub struct InteractionContents {
 impl Default for InteractionContents {
   fn default() -> Self {
     InteractionContents {
+      part_name: Default::default(),
       body: Default::default(),
       rules: None,
       generators: None,
       metadata: None,
       plugin_config: Default::default(),
-      interaction_markup: "".to_string(),
-      interaction_markup_type: "".to_string()
+      interaction_markup: Default::default(),
+      interaction_markup_type: Default::default()
     }
   }
 }
@@ -112,6 +123,15 @@ impl Default for PluginConfiguration {
     PluginConfiguration {
       interaction_configuration: Default::default(),
       pact_configuration: Default::default()
+    }
+  }
+}
+
+impl From<ProtoPluginConfiguration> for PluginConfiguration {
+  fn from(config: ProtoPluginConfiguration) -> Self {
+    PluginConfiguration {
+      interaction_configuration: config.interaction_configuration.as_ref().map(|c| proto_struct_to_map(c)).unwrap_or_default(),
+      pact_configuration: config.pact_configuration.as_ref().map(|c| proto_struct_to_map(c)).unwrap_or_default()
     }
   }
 }
@@ -144,7 +164,7 @@ impl ContentMatcher {
     &self,
     content_type: &ContentType,
     definition: HashMap<String, Value>
-  ) -> anyhow::Result<InteractionContents> {
+  ) -> anyhow::Result<(Vec<InteractionContents>, Option<PluginConfiguration>)> {
     debug!("Sending ConfigureContents request to plugin {:?}", self.catalogue_entry);
     let request = ConfigureInteractionRequest {
       content_type: content_type.to_string(),
@@ -158,7 +178,9 @@ impl ContentMatcher {
         Ok(response) => {
           debug!("Got response: {:?}", response);
           if response.error.is_empty() {
-            if let Some(response) = response.interaction {
+            let mut results = vec![];
+
+            for response in response.interaction {
               let body = match &response.contents {
                 Some(body) => {
                   let returned_content_type = ContentType::parse(body.content_type.as_str()).ok();
@@ -228,7 +250,8 @@ impl ContentMatcher {
               debug!("metadata={:?}", metadata);
               debug!("pluginConfig={:?}", plugin_config);
 
-              Ok(InteractionContents {
+              results.push(InteractionContents {
+                part_name: response.part_name.clone(),
                 body,
                 rules,
                 generators,
@@ -240,9 +263,9 @@ impl ContentMatcher {
                   _ => "COMMON_MARK".to_string(),
                 }
               })
-            } else {
-              Err(anyhow!("Did not receive a configured interaction from the plugin"))
             }
+
+            Ok((results, response.plugin_configuration.map(|config| PluginConfiguration::from(config))))
           } else {
             Err(anyhow!("Request to configure interaction failed: {}", response.error))
           }
