@@ -38,7 +38,7 @@ async-trait = "0.1.51"
 [dev-dependencies]
 expectest = "0.12.0"
 env_logger = "0.8"
-#pact_consumer = { version = "0.8.0-beta.1", path = "../../../../pact-reference/rust/pact_consumer" }
+pact_consumer = "0.8.0-beta.1"
 
 [build-dependencies]
 tonic-build = "0.5"
