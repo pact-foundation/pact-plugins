@@ -9,9 +9,10 @@ use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Mutex;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Error};
 use lazy_static::lazy_static;
 use log::{debug, max_level, trace, warn};
+use os_info::Type;
 use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
 use tokio::process::Command;
 
@@ -80,52 +81,60 @@ pub fn load_plugin_manifest(plugin_dep: &PluginDependency) -> anyhow::Result<Pac
   debug!("Loading plugin manifest for plugin {:?}", plugin_dep);
   match lookup_plugin_manifest(plugin_dep) {
     Some(manifest) => Ok(manifest),
-    None => {
-      let env_var = env::var_os("PACT_PLUGIN_DIR");
-      let plugin_dir = env_var.unwrap_or_default();
-      let plugin_dir = plugin_dir.to_string_lossy();
-      let plugin_dir = if plugin_dir.is_empty() {
-        home::home_dir().map(|dir| dir.join(".pact/plugins"))
-      } else {
-        PathBuf::from_str(plugin_dir.as_ref()).ok()
-      }.ok_or_else(|| anyhow!("No Pact plugin directory was found (in $HOME/.pact/plugins or $PACT_PLUGIN_DIR)"))?;
-      debug!("Looking for plugin in {:?}", plugin_dir);
-      if plugin_dir.exists() {
-        for entry in fs::read_dir(plugin_dir)? {
-          let path = entry?.path();
-          trace!("Found: {:?}", path);
-          if path.is_dir() {
-            let manifest_file = path.join("pact-plugin.json");
-            if manifest_file.exists() && manifest_file.is_file() {
-              debug!("Found plugin manifest: {:?}", manifest_file);
-              let file = File::open(manifest_file)?;
-              let reader = BufReader::new(file);
-              let manifest: PactPluginManifest = serde_json::from_reader(reader)?;
-              let version = manifest.version.clone();
-              if manifest.name == plugin_dep.name && (plugin_dep.version.is_none() ||
-                plugin_dep.version.as_ref().unwrap() == &version) {
-                debug!("Parsed plugin manifest: {:?}", manifest);
-                let manifest = PactPluginManifest {
-                  plugin_dir: path.to_string_lossy().to_string(),
-                  .. manifest
-                };
-                let key = format!("{}/{}", manifest.name, version);
-                {
-                  let manifest = manifest.clone();
-                  let mut guard = PLUGIN_MANIFEST_REGISTER.lock().unwrap();
-                  guard.insert(key.clone(), manifest.clone());
-                }
-                return Ok(manifest);
-              }
+    None => load_manifest_from_disk(plugin_dep)
+  }
+}
+
+fn load_manifest_from_disk(plugin_dep: &PluginDependency) -> Result<PactPluginManifest, Error> {
+  let plugin_dir = pact_plugin_dir()?;
+  debug!("Looking for plugin in {:?}", plugin_dir);
+
+  if plugin_dir.exists() {
+    for entry in fs::read_dir(plugin_dir)? {
+      let path = entry?.path();
+      trace!("Found: {:?}", path);
+
+      if path.is_dir() {
+        let manifest_file = path.join("pact-plugin.json");
+        if manifest_file.exists() && manifest_file.is_file() {
+          debug!("Found plugin manifest: {:?}", manifest_file);
+          let file = File::open(manifest_file)?;
+          let reader = BufReader::new(file);
+          let manifest: PactPluginManifest = serde_json::from_reader(reader)?;
+          let version = manifest.version.clone();
+          if manifest.name == plugin_dep.name && (plugin_dep.version.is_none() ||
+            plugin_dep.version.as_ref().unwrap() == &version) {
+            debug!("Parsed plugin manifest: {:?}", manifest);
+            let manifest = PactPluginManifest {
+              plugin_dir: path.to_string_lossy().to_string(),
+              ..manifest
+            };
+            let key = format!("{}/{}", manifest.name, version);
+            {
+              let manifest = manifest.clone();
+              let mut guard = PLUGIN_MANIFEST_REGISTER.lock().unwrap();
+              guard.insert(key.clone(), manifest.clone());
             }
+            return Ok(manifest);
           }
         }
-        Err(anyhow!("Plugin {:?} was not found (in $HOME/.pact/plugins or $PACT_PLUGIN_DIR)", plugin_dep))
-      } else {
-        Err(anyhow!("Plugin directory {:?} does not exist", plugin_dir))
       }
     }
+    Err(anyhow!("Plugin {:?} was not found (in $HOME/.pact/plugins or $PACT_PLUGIN_DIR)", plugin_dep))
+  } else {
+    Err(anyhow!("Plugin directory {:?} does not exist", plugin_dir))
   }
+}
+
+fn pact_plugin_dir() -> anyhow::Result<PathBuf> {
+  let env_var = env::var_os("PACT_PLUGIN_DIR");
+  let plugin_dir = env_var.unwrap_or_default();
+  let plugin_dir = plugin_dir.to_string_lossy();
+  if plugin_dir.is_empty() {
+    home::home_dir().map(|dir| dir.join(".pact/plugins"))
+  } else {
+    PathBuf::from_str(plugin_dir.as_ref()).ok()
+  }.ok_or_else(|| anyhow!("No Pact plugin directory was found (in $HOME/.pact/plugins or $PACT_PLUGIN_DIR)"))
 }
 
 /// Lookup the plugin manifest in the global plugin manifest registry.
@@ -180,11 +189,22 @@ pub async fn init_handshake(manifest: &PactPluginManifest, plugin: &dyn PactPlug
 
 async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<PactPlugin> {
   debug!("Starting plugin with manifest {:?}", manifest);
-  let mut path = PathBuf::from(manifest.entry_point.clone());
+
+  let os_info = os_info::get();
+  debug!("Detected OS: {}", os_info);
+  let mut path = if let Some(entry_point) = manifest.entry_points.get(&os_info.to_string()) {
+    PathBuf::from(entry_point)
+  } else if os_info.os_type() == Type::Windows && manifest.entry_points.contains_key("windows") {
+    PathBuf::from(manifest.entry_points.get("windows").unwrap())
+  } else {
+    PathBuf::from(&manifest.entry_point)
+  };
+
   if !path.is_absolute() || !path.exists() {
-    path = PathBuf::from(manifest.plugin_dir.clone()).join(manifest.entry_point.clone());
+    path = PathBuf::from(manifest.plugin_dir.clone()).join(path);
   }
   debug!("Starting plugin using {:?}", path);
+
   let log_level = max_level();
   let child = Command::new(path)
     .env("LOG_LEVEL", log_level.as_str())

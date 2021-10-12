@@ -1022,6 +1022,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "os_info"
+version = "3.0.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ac91020bfed8cc3f8aa450d4c3b5fa1d3373fc091c8a92009f3b27749d5a227"
+dependencies = [
+ "log",
+ "serde",
+ "winapi",
+]
+
+[[package]]
 name = "pact-plugin-driver"
 version = "0.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1060,6 +1071,7 @@ dependencies = [
  "lazy_static",
  "log",
  "maplit",
+ "os_info",
  "pact_models",
  "prost",
  "prost-types",

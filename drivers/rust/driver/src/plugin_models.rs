@@ -51,18 +51,28 @@ pub struct PactPluginManifest {
   /// Directory were the plugin was loaded from
   #[serde(skip)]
   pub plugin_dir: String,
+
   /// Interface version supported by the plugin
   pub plugin_interface_version: u8,
+
   /// Plugin name
   pub name: String,
+
   /// Plugin version in semver format
   pub version: String,
+
   /// Type if executable of the plugin
   pub executable_type: String,
+
   /// Minimum required version for the executable type
   pub minimum_required_version: Option<String>,
+
   /// How to invoke the plugin
   pub entry_point: String,
+
+  /// Additional entry points for other operating systems (i.e. requiring a .bat file for Windows)
+  pub entry_points: HashMap<String, String>,
+
   /// Dependencies required to invoke the plugin
   pub dependencies: Option<Vec<PluginDependency>>
 }
