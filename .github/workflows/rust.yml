@@ -60,8 +60,7 @@ jobs:
         run: ./gradlew -s --no-daemon -i installLocal
         working-directory: plugins/protobuf
       - run: |
-         echo $HOME/.pact
-         ls -la $HOME/.pact
          docker run --rm -v $(pwd):/workspace -v $HOME/.pact:/root/.pact \
            -w /workspace/drivers/rust -t pactfoundation/rust-musl-build \
-           -c 'echo $HOME && ls -la $HOME && apk add protoc && cargo build && cargo test'
+           -e RUST_LOG=debug \
+           -c 'apk add protoc && cargo build && cargo test -- --nocapture'
