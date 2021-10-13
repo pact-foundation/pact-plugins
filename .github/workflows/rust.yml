@@ -62,5 +62,5 @@ jobs:
       - run: |
          docker run --rm -v $(pwd):/workspace -v $HOME/.pact:/root/.pact \
            -w /workspace/drivers/rust -t pactfoundation/rust-musl-build \
-           -e RUST_LOG=debug \
+           -e 'RUST_LOG=debug' \
            -c 'apk add protoc && cargo build && cargo test -- --nocapture'
