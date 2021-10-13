@@ -1,5 +1,30 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.6 - Support Windows + Alpine Linux
+
+* 3419747 - fix: system protoc needs the well known types - unpacked from protobuf jar (Ronald Holshausen, Wed Oct 13 14:55:55 2021 +1100)
+* f51293d - fix: use of temp directory on windows (Ronald Holshausen, Wed Oct 13 13:35:27 2021 +1100)
+* d20b9dc - chore: alpine build on CI was failing do to missing protobuf plugin (Ronald Holshausen, Wed Oct 13 13:04:25 2021 +1100)
+* d8506fb - chore: debug musl build (Ronald Holshausen, Wed Oct 13 11:17:23 2021 +1100)
+* 8984b95 - chore: debug musl build (Ronald Holshausen, Wed Oct 13 11:11:11 2021 +1100)
+* 49c03f5 - chore: debug musl build (Ronald Holshausen, Wed Oct 13 11:01:17 2021 +1100)
+* ffc21d1 - chore: debug musl build (Ronald Holshausen, Wed Oct 13 10:59:39 2021 +1100)
+* 5646ce8 - chore: debug musl build (Ronald Holshausen, Wed Oct 13 10:49:56 2021 +1100)
+* 4ec42ce - chore: Alpine build needs the protobuf plugin in the docker container (Ronald Holshausen, Wed Oct 13 10:40:41 2021 +1100)
+* ced8d43 - feat: support additional entry points for other operating systems (i.e. requiring a .bat file for Windows) (Ronald Holshausen, Wed Oct 13 10:26:30 2021 +1100)
+* 6dff2a3 - chore: fix CI (Ronald Holshausen, Tue Oct 12 18:08:19 2021 +1100)
+* bf41876 - chore: remove beta rust from CI (Ronald Holshausen, Tue Oct 12 18:00:52 2021 +1100)
+* 6d538fd - chore: publish pact file in CI (Ronald Holshausen, Tue Oct 12 17:59:37 2021 +1100)
+* 8a10ebe - chore: CI needs JDK 11 (Ronald Holshausen, Tue Oct 12 17:26:09 2021 +1100)
+* 5cd47cd - chore: CI build needs the protobuf plugin installed (Ronald Holshausen, Tue Oct 12 17:12:33 2021 +1100)
+* 23c1929 - chore: add pact cli to build (Ronald Holshausen, Tue Oct 12 16:58:41 2021 +1100)
+* 409be18 - feat: Add protobuf consumer pact test (Ronald Holshausen, Tue Oct 12 16:50:52 2021 +1100)
+* c3d1585 - bump version to 0.0.5 (Ronald Holshausen, Tue Oct 12 15:42:47 2021 +1100)
+* 3dc59f6 - update changelog for release 0.0.4 (Ronald Holshausen, Tue Oct 12 15:40:04 2021 +1100)
+* a7c6339 - feat: Support synchronous messages with plugins in Rust (Ronald Holshausen, Tue Oct 12 15:35:02 2021 +1100)
+* 9cbafc3 - chore: add a flush to stdout for the CVS plugin (Ronald Holshausen, Mon Oct 11 15:22:26 2021 +1100)
+* fc03ba5 - bump version to 0.0.6 (Ronald Holshausen, Mon Oct 11 14:55:34 2021 +1100)
+
 # 0.0.5 - Fixes for loading plugins on Windows
 
 * 4225a47 - chore: update CI (Ronald Holshausen, Mon Oct 11 14:50:11 2021 +1100)
