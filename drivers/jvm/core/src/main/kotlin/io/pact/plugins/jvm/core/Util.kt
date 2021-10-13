@@ -9,7 +9,12 @@ import com.google.protobuf.NullValue
 import com.google.protobuf.Struct
 import com.google.protobuf.Value
 import mu.KLogging
+import org.apache.commons.lang3.SystemUtils
+import java.io.BufferedReader
 import java.io.IOException
+import java.io.InputStreamReader
+import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.jar.JarInputStream
 
 object Utils : KLogging() {
@@ -102,6 +107,30 @@ object Utils : KLogging() {
       builder.putFields(key, jsonToValue(value))
     }
     return builder.build()
+  }
+
+  /**
+   * Looks for a program in the system path using the which/where command
+   */
+  fun lookForProgramInPath(desiredProgram: String): Result<Path, String> {
+    val pb = ProcessBuilder(if (SystemUtils.IS_OS_WINDOWS) "where" else "which", desiredProgram)
+    return try {
+      val proc = pb.start()
+      val errCode = proc.waitFor()
+      if (errCode == 0) {
+        BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
+          Ok(Paths.get(reader.readLine()))
+        }
+      } else {
+        Err("$desiredProgram not found in in PATH")
+      }
+    } catch (ex: IOException) {
+      logger.error(ex) { "Something went wrong while searching for $desiredProgram - ${ex.message}" }
+      Err("Something went wrong while searching for $desiredProgram - ${ex.message}")
+    } catch (ex: InterruptedException) {
+      logger.error(ex) { "Something went wrong while searching for $desiredProgram - ${ex.message}" }
+      Err("Something went wrong while searching for $desiredProgram - ${ex.message}")
+    }
   }
 }
 

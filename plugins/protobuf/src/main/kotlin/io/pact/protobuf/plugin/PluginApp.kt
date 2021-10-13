@@ -228,8 +228,8 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
           .setError(message)
           .build()
       } else {
-        logger.debug { "Parsing proto file" }
         val protoFile = Path.of(config["pact:proto"]!!.stringValue)
+        logger.debug { "Parsing proto file '$protoFile'" }
         val protoResult = ProtoParser.parseProtoFile(protoFile)
         val descriptorBytes = protoResult.toByteArray()
         logger.debug { "Protobuf file descriptor set is ${descriptorBytes.size} bytes" }

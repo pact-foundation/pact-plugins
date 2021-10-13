@@ -32,9 +32,13 @@ pact_models = "0.2.0-beta.4"
 regex = "1.4"
 bytes = "1.0.1"
 uuid = { version = "0.8.2", features = ["v4"] }
-reqwest = "0.11.4"
 async-trait = "0.1.51"
 os_info = "3.0.7"
+
+[dependencies.reqwest]
+version = "0.11"
+default-features = false
+features = ["rustls-tls", "rustls-tls-native-roots", "json", "gzip", "deflate"]
 
 [dev-dependencies]
 expectest = "0.12.0"

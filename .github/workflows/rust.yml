@@ -61,6 +61,7 @@ jobs:
         working-directory: plugins/protobuf
       - run: |
          docker run --rm -v $(pwd):/workspace -v $HOME/.pact:/root/.pact \
-           -w /workspace/drivers/rust -t pactfoundation/rust-musl-build \
-           -e 'RUST_LOG=debug' \
+           -w /workspace/drivers/rust -t  \
+           -e 'RUST_LOG=debug' -e 'pact_do_not_track=true' \
+           pactfoundation/rust-musl-build \
            -c 'apk add protoc && cargo build && cargo test -- --nocapture'

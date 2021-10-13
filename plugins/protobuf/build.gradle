@@ -38,7 +38,7 @@ dependencies {
     implementation 'com.google.protobuf:protobuf-java:3.18.0'
     implementation 'ch.qos.logback:logback-classic:1.2.6'
     implementation 'com.github.os72:protoc-jar:3.11.4'
-    implementation "io.pact.plugin.driver:core:0.0.3"
+    implementation "io.pact.plugin.driver:core:0.0.6"
     implementation "org.apache.commons:commons-lang3:3.12.0"
     implementation 'com.google.guava:guava:31.0.1-jre'
 

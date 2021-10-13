@@ -31,6 +31,7 @@ import io.pact.plugin.PactPluginGrpc.newBlockingStub
 import io.pact.plugin.Plugin
 import io.pact.plugins.jvm.core.Utils.handleWith
 import io.pact.plugins.jvm.core.Utils.jsonToValue
+import io.pact.plugins.jvm.core.Utils.lookForProgramInPath
 import io.pact.plugins.jvm.core.Utils.structToJson
 import io.pact.plugins.jvm.core.Utils.toProtoStruct
 import io.pact.plugins.jvm.core.Utils.valueToJson
@@ -702,7 +703,10 @@ object DefaultPluginManager: KLogging(), PluginManager {
     }
   }
 
-  private fun pluginInstallDirectory(): String {
+  /**
+   * Returns the directory where the plugins are installed
+   */
+  fun pluginInstallDirectory(): String {
     val pluginDirEnvVar = System.getenv("PACT_PLUGIN_DIR")
     return if (pluginDirEnvVar.isNotEmpty()) {
       pluginDirEnvVar
@@ -710,27 +714,6 @@ object DefaultPluginManager: KLogging(), PluginManager {
       System.getProperty("user.home") + "/.pact/plugins"
     } else {
       System.getenv("HOME") + "/.pact/plugins"
-    }
-  }
-
-  private fun lookForProgramInPath(desiredProgram: String): Result<Path, String> {
-    val pb = ProcessBuilder(if (SystemUtils.IS_OS_WINDOWS) "where" else "which", desiredProgram)
-    return try {
-      val proc = pb.start()
-      val errCode = proc.waitFor()
-      if (errCode == 0) {
-        BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
-          Ok(Paths.get(reader.readLine()))
-        }
-      } else {
-        Err("$desiredProgram not found in in PATH")
-      }
-    } catch (ex: IOException) {
-      logger.error(ex) { "Something went wrong while searching for $desiredProgram - ${ex.message}" }
-      Err("Something went wrong while searching for $desiredProgram - ${ex.message}")
-    } catch (ex: InterruptedException) {
-      logger.error(ex) { "Something went wrong while searching for $desiredProgram - ${ex.message}" }
-      Err("Something went wrong while searching for $desiredProgram - ${ex.message}")
     }
   }
 }

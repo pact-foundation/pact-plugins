@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
@@ -47,7 +47,8 @@ async fn test_proto_client() {
   let proto_service = pact_builder
     .using_plugin("protobuf", None).await
     .synchronous_message_interaction("init plugin request", "core/interaction/synchronous-message", |mut i| async move {
-      let proto_file = Path::new("../../../proto/plugin.proto")
+      let project_dir = Path::new(option_env!("CARGO_MANIFEST_DIR").unwrap());
+      let proto_file = project_dir.join("plugin.proto")
         .canonicalize().unwrap().to_string_lossy().to_string();
       i.contents_from(json!({
           "pact:proto": proto_file,

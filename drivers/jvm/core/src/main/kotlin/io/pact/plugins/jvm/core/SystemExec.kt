@@ -19,7 +19,8 @@ object SystemExec: KLogging() {
           Ok(reader.readText())
         }
       } else {
-        Err(errCode to  proc.errorStream.readAllBytes().toString())
+        val errorOut = BufferedReader(InputStreamReader(proc.errorStream)).use { reader -> reader.readText() }
+        Err(errCode to errorOut)
       }
     } catch (ex: IOException) {
       logger.error(ex) { "Failed to execute $prog - ${ex.message}" }
