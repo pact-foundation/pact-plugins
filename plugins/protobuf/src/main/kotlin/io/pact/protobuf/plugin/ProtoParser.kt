@@ -15,9 +15,8 @@ object ProtoParser : KLogging() {
   fun parseProtoFile(protoFile: Path): DescriptorProtos.FileDescriptorSet {
     logger.debug { "Parsing protobuf proto file $protoFile" }
 
-    val tmpDir = Path.of("/tmp/")
-    tmpDir.toFile().mkdirs()
-    val outFile = Files.createTempFile(tmpDir, null, null)
+    val tempdir = Files.createTempDirectory(null)
+    val outFile = Files.createTempFile(tempdir, null, null)
 
     val args = arrayOf("--include_std_types", "-o${outFile}", "-I${protoFile.parent}", "--include_imports", protoFile.toString())
     logger.debug { "Invoking bundled protoc with ${args.toList()}" }
