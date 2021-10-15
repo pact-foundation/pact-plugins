@@ -11,6 +11,7 @@ import au.com.dius.pact.core.model.matchingrules.MatchingRule
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
 import au.com.dius.pact.core.model.matchingrules.TypeMatcher
+import au.com.dius.pact.core.model.matchingrules.ValuesMatcher
 import au.com.dius.pact.core.model.matchingrules.expressions.MatchingRuleDefinition
 import au.com.dius.pact.core.model.matchingrules.expressions.ValueType
 import au.com.dius.pact.core.support.Either
@@ -647,6 +648,8 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
                       }
                       val ruleDef = ruleDefinition.value.rules.find { it is Either.A && it.value is EachValueMatcher } as Either.A
                       val matcher = ruleDef.value as EachValueMatcher
+                      matchingRules.addRule(path, ValuesMatcher)
+                      matchingRules.addRule("$path.*", TypeMatcher)
                       when (val rule = matcher.definition.rules.first()) {
                         is Either.A -> {
                           matchingRules.addRule(path, matcher)
@@ -656,7 +659,6 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
                           valueForType(matcher.definition.value, messageField)
                         }
                         is Either.B -> if (fieldsMap.containsKey(rule.value.name)) {
-                          matchingRules.addRule("$path.*", TypeMatcher)
                           configSingleField(messageField, fieldsMap[rule.value.name]!!, path, matchingRules, generators)
                         } else {
                           logger.error { "'$expression' refers to non-existent item '${rule.value.name}'" }
