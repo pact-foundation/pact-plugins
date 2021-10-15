@@ -1,6 +1,7 @@
 package io.pact.protobuf.plugin
 
 import au.com.dius.pact.core.matchers.MatchingContext
+import au.com.dius.pact.core.model.ContentType
 import au.com.dius.pact.core.model.PactSpecVersion
 import au.com.dius.pact.core.model.constructValidPath
 import au.com.dius.pact.core.model.generators.Generator
@@ -10,7 +11,6 @@ import au.com.dius.pact.core.model.matchingrules.MatchingRule
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
 import au.com.dius.pact.core.model.matchingrules.TypeMatcher
-import au.com.dius.pact.core.model.matchingrules.ValuesMatcher
 import au.com.dius.pact.core.model.matchingrules.expressions.MatchingRuleDefinition
 import au.com.dius.pact.core.model.matchingrules.expressions.ValueType
 import au.com.dius.pact.core.support.Either
@@ -31,8 +31,6 @@ import com.google.protobuf.Struct
 import com.google.protobuf.Value
 import io.grpc.Server
 import io.grpc.ServerBuilder
-import io.grpc.Status
-import io.grpc.StatusRuntimeException
 import io.pact.plugin.PactPluginGrpcKt
 import io.pact.plugin.Plugin
 import io.pact.plugins.jvm.core.Utils.structToJson
@@ -95,7 +93,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
   }
 
   override suspend fun compareContents(request: Plugin.CompareContentsRequest): Plugin.CompareContentsResponse {
-    logger.debug { "Got compareContents request" }
+    logger.debug { "Got compareContents request $request" }
     try {
       val interactionConfig = request.pluginConfiguration.interactionConfiguration.fieldsMap
       val messageKey = interactionConfig["descriptorKey"]?.stringValue
@@ -117,14 +115,13 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       }
 
       val message = interactionConfig["message"]?.stringValue
-      if (message == null) {
-        logger.error { "Plugin configuration item with key 'message' is required" }
+      val service = interactionConfig["service"]?.stringValue
+      if (message.isNullOrEmpty() && service.isNullOrEmpty()) {
+        logger.error { "Plugin configuration item with key 'message' or 'service' is required" }
         return Plugin.CompareContentsResponse.newBuilder()
-          .setError("Plugin configuration item with key 'message' is required")
+          .setError("Plugin configuration item with key 'message' or 'service' is required")
           .build()
       }
-
-      logger.debug { "Received compareContents request for message $message" }
 
       val descriptorBytes = Base64.getDecoder().decode(descriptorBytesEncoded)
       logger.debug { "Protobuf file descriptor set is ${descriptorBytes.size} bytes" }
@@ -142,30 +139,86 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         DescriptorProtos.FileDescriptorSet.parseFrom(descriptorBytes)
       }
       val fileDescriptors = descriptors.fileList.associateBy { it.name }
-      logger.debug { "Looking for message '$message'" }
-      val fileDescriptorForMessage = fileDescriptors.entries.find { entry ->
-        logger.debug { "Looking for message in file descriptor ${entry.key}" }
-        entry.value.messageTypeList.any {
-          it.name == message
-        }
-      }?.value
-      if (fileDescriptorForMessage == null) {
-        logger.error { "Did not find the Protobuf file descriptor containing message '$message'" }
-        return Plugin.CompareContentsResponse.newBuilder()
-          .setError("Did not find the Protobuf file descriptor containing message '$message'")
-          .build()
-      }
 
-      val fileDesc = Descriptors.FileDescriptor.buildFrom(
-        fileDescriptorForMessage,
-        buildDependencies(fileDescriptors, fileDescriptorForMessage.dependencyList)
-      )
-      val descriptor = fileDesc.findMessageTypeByName(message)
-      if (descriptor == null) {
-        logger.error { "Did not find the Protobuf descriptor for message '$message'" }
-        return Plugin.CompareContentsResponse.newBuilder()
-          .setError("Did not find the Protobuf descriptor for message '$message'")
-          .build()
+      val descriptor = if (message.isNotEmpty()) {
+        logger.debug { "Received compareContents request for message $message" }
+        logger.debug { "Looking for message '$message'" }
+        val fileDescriptorForMessage = fileDescriptors.entries.find { entry ->
+          logger.debug { "Looking for message in file descriptor ${entry.key}" }
+          entry.value.messageTypeList.any {
+            it.name == message
+          }
+        }?.value
+        if (fileDescriptorForMessage == null) {
+          logger.error { "Did not find the Protobuf file descriptor containing message '$message'" }
+          return Plugin.CompareContentsResponse.newBuilder()
+            .setError("Did not find the Protobuf file descriptor containing message '$message'")
+            .build()
+        }
+
+        val fileDesc = Descriptors.FileDescriptor.buildFrom(
+          fileDescriptorForMessage,
+          buildDependencies(fileDescriptors, fileDescriptorForMessage.dependencyList)
+        )
+        val descriptor = fileDesc.findMessageTypeByName(message)
+        if (descriptor == null) {
+          logger.error { "Did not find the Protobuf descriptor for message '$message'" }
+          return Plugin.CompareContentsResponse.newBuilder()
+            .setError("Did not find the Protobuf descriptor for message '$message'")
+            .build()
+        }
+        descriptor
+      } else {
+        logger.debug { "Received compareContents request for service $service" }
+
+        val serviceAndProc = service!!.split("/", limit = 2)
+        if (serviceAndProc.size != 2) {
+          return Plugin.CompareContentsResponse.newBuilder()
+            .setError("Service name '$service' is not valid, it should be of the form <SERVICE>/<METHOD>")
+            .build()
+        }
+
+        val fileDescriptorForService = fileDescriptors.entries.find { entry ->
+          logger.debug { "Looking for service in file descriptor ${entry.key}" }
+          entry.value.serviceList.any {
+            it.name == serviceAndProc[0]
+          }
+        }?.value
+        if (fileDescriptorForService == null) {
+          logger.error { "Did not find the Protobuf file descriptor containing service '$service'" }
+          return Plugin.CompareContentsResponse.newBuilder()
+            .setError("Did not find the Protobuf file descriptor containing service '$service'")
+            .build()
+        }
+
+        val fileDesc = Descriptors.FileDescriptor.buildFrom(
+          fileDescriptorForService,
+          buildDependencies(fileDescriptors, fileDescriptorForService.dependencyList)
+        )
+        val descriptor = fileDesc.findServiceByName(serviceAndProc[0])
+        if (descriptor == null) {
+          logger.error { "Did not find the Protobuf descriptor for service '${serviceAndProc[0]}'" }
+          return Plugin.CompareContentsResponse.newBuilder()
+            .setError("Did not find the Protobuf descriptor for message '${serviceAndProc[0]}'")
+            .build()
+        }
+        val method = descriptor.findMethodByName(serviceAndProc[1])
+        if (method == null) {
+          logger.error {
+            "Did not find the method ${serviceAndProc[1]} in the Protobuf file descriptor for service '$service'"
+          }
+          return Plugin.CompareContentsResponse.newBuilder()
+            .setError("Did not find the method ${serviceAndProc[1]} in the Protobuf file descriptor for service '$service'")
+            .build()
+        }
+
+        val expectedContentType = ContentType.fromString(request.expected.contentType).contentType
+        val expectedMessageType = expectedContentType?.parameters?.get("message")
+        if (method.inputType.name == expectedMessageType) {
+          method.inputType
+        } else {
+          method.outputType
+        }
       }
 
       val expectedMessage = DynamicMessage.parseFrom(descriptor, request.expected.content.value)
@@ -603,9 +656,8 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
                           valueForType(matcher.definition.value, messageField)
                         }
                         is Either.B -> if (fieldsMap.containsKey(rule.value.name)) {
-                          val fieldPath = constructValidPath(messageField.name, path)
-                          matchingRules.addRule(fieldPath, TypeMatcher)
-                          configSingleField(messageField, fieldsMap[rule.value.name]!!, fieldPath, matchingRules, generators)
+                          matchingRules.addRule("$path.*", TypeMatcher)
+                          configSingleField(messageField, fieldsMap[rule.value.name]!!, path, matchingRules, generators)
                         } else {
                           logger.error { "'$expression' refers to non-existent item '${rule.value.name}'" }
                           throw RuntimeException("'$expression' refers to non-existent item '${rule.value.name}'")
