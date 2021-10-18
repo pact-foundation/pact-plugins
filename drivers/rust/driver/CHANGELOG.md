@@ -1,5 +1,14 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.6 - Bugfix Release
+
+* 856492a - Revert "fix: making entryPoints optional broke loading on Windows" (Ronald Holshausen, Tue Oct 19 09:00:32 2021 +1100)
+* b111439 - chore: debugging windows (Ronald Holshausen, Mon Oct 18 17:56:05 2021 +1100)
+* b0df1a8 - fix: making entryPoints optional broke loading on Windows (Ronald Holshausen, Mon Oct 18 16:56:15 2021 +1100)
+* 1f8acb8 - fix: entry_points should be optional (Ronald Holshausen, Mon Oct 18 15:05:10 2021 +1100)
+* cce4258 - fix: handle content types with attributes (Ronald Holshausen, Mon Oct 18 15:04:38 2021 +1100)
+* d34e4fe - bump version to 0.0.6 (Ronald Holshausen, Mon Oct 18 13:36:22 2021 +1100)
+
 # 0.0.5 - Support additional plugin entry points
 
 * 403ccbb - chore: update to the latest pact models crate (Ronald Holshausen, Mon Oct 18 13:29:58 2021 +1100)
