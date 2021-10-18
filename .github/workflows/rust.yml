@@ -19,7 +19,9 @@ jobs:
         with:
           java-version: 11
       - name: Build and install Protobuf plugin
-        run: ./gradlew -s --no-daemon -i installLocal
+        run: |
+          ./gradlew -s --no-daemon -i installLocal
+          cat ~/.pact/plugins/protobuf-0.0.0/pact-plugin.json
         working-directory: plugins/protobuf
       - name: Tests
         uses: marcopolo/cargo@master # TODO: - use actions-rs/cargo@v1 when PR merged https://github.com/actions-rs/cargo/pull/59
@@ -27,7 +29,7 @@ jobs:
           working-directory: drivers/rust
           command: test
         env:
-          RUST_LOG: debug
+          RUST_LOG: trace
           RUST_BACKTRACE: 1
       - name: Build Components
         uses: marcopolo/cargo@master
