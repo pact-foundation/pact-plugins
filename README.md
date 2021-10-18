@@ -40,6 +40,8 @@ Main responsibilities:
 * Provide a catalogue of features the plugin provides when the driver requests it.
 * Respond to messages from the driver.
 
+See the [guide to writing a Pact plugin](docs/writing-plugin-guide.md).
+
 #### Plugins that provide protocol implementations (WIP)
 
 Plugins can provide support for new protocols. The main features that the plugin would provide is to be
