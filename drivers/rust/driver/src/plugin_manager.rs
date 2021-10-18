@@ -31,6 +31,7 @@ lazy_static! {
 /// plugin registry.
 pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<PactPlugin> {
   debug!("Loading plugin {:?}", plugin);
+  trace!("Rust plugin driver version {}", option_env!("CARGO_PKG_VERSION").unwrap_or_default());
   trace!("Waiting on PLUGIN_REGISTER lock");
   let mut inner = PLUGIN_REGISTER.lock().unwrap();
   trace!("Got PLUGIN_REGISTER lock");
