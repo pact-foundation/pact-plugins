@@ -2,7 +2,7 @@ plugins {
     id 'java-library'
     id 'com.google.protobuf' version '0.8.17'
     id 'groovy'
-    id 'au.com.dius.pact' version '4.3.0-beta.5'
+    id 'au.com.dius.pact' version '4.3.0-beta.6'
 }
 
 ext {
@@ -28,8 +28,8 @@ dependencies {
     implementation 'javax.json:javax.json-api:1.1.4'
     implementation 'org.glassfish:javax.json:1.1.4'
     implementation 'org.apache.commons:commons-lang3:3.12.0'
-    implementation 'au.com.dius.pact.core:support:4.3.0-beta.5'
-    implementation 'au.com.dius.pact.core:model:4.3.0-beta.5'
+    implementation 'au.com.dius.pact.core:support:4.3.0-beta.6'
+    implementation 'au.com.dius.pact.core:model:4.3.0-beta.6'
     implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.1'
 
     protobuf files('../../../proto/')
@@ -44,7 +44,7 @@ dependencies {
     }
     testImplementation 'net.bytebuddy:byte-buddy:1.11.18'
     testImplementation 'org.objenesis:objenesis:3.2'
-    testImplementation 'au.com.dius.pact.consumer:junit5:4.3.0-beta.5'
+    testImplementation 'au.com.dius.pact.consumer:junit5:4.3.0-beta.6'
     testImplementation 'ch.qos.logback:logback-classic:1.2.6'
     testImplementation 'org.mockito:mockito-core:3.12.4'
     testImplementation 'org.mockito:mockito-junit-jupiter:3.12.4'
