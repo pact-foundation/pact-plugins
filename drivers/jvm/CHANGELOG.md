@@ -1,5 +1,13 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.7 - Fix for EachValues matcher
+
+* cea8cc4 - chore: fix for failing build: 4.3.0-beta.6 is not available yet (Ronald Holshausen, Mon Oct 18 12:43:42 2021 +1100)
+* ea597c6 - chore: update to latest Pact-JVM (Ronald Holshausen, Mon Oct 18 12:39:05 2021 +1100)
+* 70691d4 - fix: EachValues matcher was not setting matching rules for repaeted fields correctly (Ronald Holshausen, Fri Oct 15 16:32:25 2021 +1100)
+* 5dea72d - fix: matching rule path for repeated fields was not correct (Ronald Holshausen, Fri Oct 15 16:03:03 2021 +1100)
+* 797d5dc - bump version to 0.0.7 (Ronald Holshausen, Wed Oct 13 15:23:52 2021 +1100)
+
 # 0.0.6 - Support Windows + Alpine Linux
 
 * 3419747 - fix: system protoc needs the well known types - unpacked from protobuf jar (Ronald Holshausen, Wed Oct 13 14:55:55 2021 +1100)
