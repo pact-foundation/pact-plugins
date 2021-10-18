@@ -71,7 +71,6 @@ pub struct PactPluginManifest {
   pub entry_point: String,
 
   /// Additional entry points for other operating systems (i.e. requiring a .bat file for Windows)
-  #[serde(default)]
   pub entry_points: HashMap<String, String>,
 
   /// Dependencies required to invoke the plugin
