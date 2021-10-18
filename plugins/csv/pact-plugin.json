@@ -4,6 +4,5 @@
   "name": "csv",
   "version": "0.0.0",
   "executableType": "exec",
-  "entryPoint": "pact-plugin-csv",
-  "entryPoints": {}
+  "entryPoint": "pact-plugin-csv"
 }
