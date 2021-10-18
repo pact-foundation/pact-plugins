@@ -9,7 +9,7 @@ use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Mutex;
 
-use anyhow::{anyhow, Error};
+use anyhow::anyhow;
 use lazy_static::lazy_static;
 use log::{debug, max_level, trace, warn};
 use os_info::Type;
@@ -85,7 +85,7 @@ pub fn load_plugin_manifest(plugin_dep: &PluginDependency) -> anyhow::Result<Pac
   }
 }
 
-fn load_manifest_from_disk(plugin_dep: &PluginDependency) -> Result<PactPluginManifest, Error> {
+fn load_manifest_from_disk(plugin_dep: &PluginDependency) -> anyhow::Result<PactPluginManifest> {
   let plugin_dir = pact_plugin_dir()?;
   debug!("Looking for plugin in {:?}", plugin_dir);
 
@@ -101,10 +101,10 @@ fn load_manifest_from_disk(plugin_dep: &PluginDependency) -> Result<PactPluginMa
           let file = File::open(manifest_file)?;
           let reader = BufReader::new(file);
           let manifest: PactPluginManifest = serde_json::from_reader(reader)?;
+          trace!("Parsed plugin manifest: {:?}", manifest);
           let version = manifest.version.clone();
           if manifest.name == plugin_dep.name && (plugin_dep.version.is_none() ||
             plugin_dep.version.as_ref().unwrap() == &version) {
-            debug!("Parsed plugin manifest: {:?}", manifest);
             let manifest = PactPluginManifest {
               plugin_dir: path.to_string_lossy().to_string(),
               ..manifest

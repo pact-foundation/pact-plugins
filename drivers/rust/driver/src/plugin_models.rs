@@ -45,7 +45,7 @@ pub struct PluginDependency {
 }
 
 /// Manifest of a plugin
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug, Default)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct PactPluginManifest {
   /// Directory were the plugin was loaded from
@@ -71,6 +71,7 @@ pub struct PactPluginManifest {
   pub entry_point: String,
 
   /// Additional entry points for other operating systems (i.e. requiring a .bat file for Windows)
+  #[serde(default)]
   pub entry_points: HashMap<String, String>,
 
   /// Dependencies required to invoke the plugin
@@ -83,6 +84,22 @@ impl PactPluginManifest {
       name: self.name.clone(),
       version: Some(self.version.clone()),
       dependency_type: PluginDependencyType::Plugin
+    }
+  }
+}
+
+impl Default for PactPluginManifest {
+  fn default() -> Self {
+    PactPluginManifest {
+      plugin_dir: "".to_string(),
+      plugin_interface_version: 1,
+      name: "".to_string(),
+      version: "".to_string(),
+      executable_type: "".to_string(),
+      minimum_required_version: None,
+      entry_point: "".to_string(),
+      entry_points: Default::default(),
+      dependencies: None
     }
   }
 }
