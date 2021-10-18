@@ -1,6 +1,6 @@
 //! Manages the catalogue of features provided by plugins
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::fmt::{self, Display, Formatter};
 use std::sync::Mutex;
 
@@ -185,9 +185,9 @@ pub fn find_content_matcher(content_type: &ContentType) -> Option<ContentMatcher
 }
 
 fn matches_pattern(pattern: &str, content_type: &ContentType) -> bool {
-  let content_type = ContentType { attributes: BTreeMap::default(), .. content_type.clone() }.to_string();
+  let base_type = content_type.base_type().to_string();
   match Regex::new(pattern) {
-    Ok(regex) => regex.is_match(content_type.as_str()),
+    Ok(regex) => regex.is_match(content_type.to_string().as_str()) || regex.is_match(base_type.as_str()),
     Err(err) => {
       error!("Failed to parse '{}' as a regex - {}", pattern, err);
       false
