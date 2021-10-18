@@ -1,5 +1,13 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.5 - Support additional plugin entry points
+
+* 403ccbb - chore: update to the latest pact models crate (Ronald Holshausen, Mon Oct 18 13:29:58 2021 +1100)
+* d20b9dc - chore: alpine build on CI was failing do to missing protobuf plugin (Ronald Holshausen, Wed Oct 13 13:04:25 2021 +1100)
+* ced8d43 - feat: support additional entry points for other operating systems (i.e. requiring a .bat file for Windows) (Ronald Holshausen, Wed Oct 13 10:26:30 2021 +1100)
+* 409be18 - feat: Add protobuf consumer pact test (Ronald Holshausen, Tue Oct 12 16:50:52 2021 +1100)
+* c3d1585 - bump version to 0.0.5 (Ronald Holshausen, Tue Oct 12 15:42:47 2021 +1100)
+
 # 0.0.4 - synchronous messages with plugins
 
 * a7c6339 - feat: Support synchronous messages with plugins in Rust (Ronald Holshausen, Tue Oct 12 15:35:02 2021 +1100)
