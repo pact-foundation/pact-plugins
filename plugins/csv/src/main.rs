@@ -2,7 +2,7 @@ use core::pin::Pin;
 use core::task::{Context, Poll};
 use std::collections::HashMap;
 use std::io;
-use std::io::{Read, Stdout, Write};
+use std::io::{Read, Write};
 use std::net::SocketAddr;
 
 use anyhow::anyhow;

@@ -127,7 +127,7 @@ pub fn setup_csv_contents(
       debug!("generators = {:?}", generators);
 
       Ok(Response::new(proto::ConfigureInteractionResponse {
-        interaction: Some(proto::InteractionResponse {
+        interaction: vec![proto::InteractionResponse {
           contents: Some(proto::Body {
             content_type: "text/csv;charset=UTF-8".to_string(),
             content: Some(wtr.into_inner()?),
@@ -143,8 +143,9 @@ pub fn setup_csv_contents(
             pact_configuration: None
           }),
           interaction_markup: csv_markup,
-          interaction_markup_type: 0
-        }),
+          interaction_markup_type: 0,
+          .. proto::InteractionResponse::default()
+        }],
         .. proto::ConfigureInteractionResponse::default()
       }))
     }
