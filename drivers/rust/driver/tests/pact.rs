@@ -51,12 +51,9 @@ async fn test_proto_client() {
       println!("project_dir = {:?}", project_dir);
       let proto_file = project_dir.join("plugin.proto");
       println!("proto_file = {:?}", proto_file);
-      let proto_file_can = proto_file.canonicalize().unwrap();
-      println!("proto_file_can = {:?}", proto_file_can);
-      println!("proto_file_s = {:?}", proto_file_can.to_str());
 
       i.contents_from(json!({
-          "pact:proto": proto_file_can.to_str().unwrap(),
+          "pact:proto": proto_file.to_str().unwrap(),
           "pact:content-type": "application/protobuf",
           "pact:proto-service": "PactPlugin/InitPlugin",
           "request": {
