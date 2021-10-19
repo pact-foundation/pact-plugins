@@ -968,6 +968,35 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "299c4e0898de136eb8da291a5bdf62740b41c1c8607b76e9ae8d087ada258784"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "home",
+ "itertools",
+ "lazy_static",
+ "log",
+ "maplit",
+ "os_info",
+ "pact_models",
+ "prost",
+ "prost-types",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "tokio",
+ "tonic",
+ "tonic-build",
+ "uuid",
+]
+
+[[package]]
+name = "pact-plugin-driver"
 version = "0.0.7"
 dependencies = [
  "anyhow",
@@ -998,7 +1027,9 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "0.8.0-beta.3"
+version = "0.8.0-beta.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6df890c2e974c3f0bec6fed8b929f5df143f0a9c505151ab71453e2482a4eca"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1009,7 +1040,7 @@ dependencies = [
  "libc",
  "log",
  "maplit",
- "pact-plugin-driver",
+ "pact-plugin-driver 0.0.6",
  "pact_matching",
  "pact_mock_server",
  "pact_models",
@@ -1022,7 +1053,9 @@ dependencies = [
 
 [[package]]
 name = "pact_matching"
-version = "0.11.0-beta.4"
+version = "0.11.0-beta.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "db755d5d490e6c84387e1f86de27af043cd9bf0ecdf618daaedd5aff3be15d71"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -1041,7 +1074,7 @@ dependencies = [
  "multipart",
  "nom",
  "onig",
- "pact-plugin-driver",
+ "pact-plugin-driver 0.0.6",
  "pact_models",
  "rand 0.8.4",
  "semver 0.11.0",
@@ -1055,7 +1088,9 @@ dependencies = [
 
 [[package]]
 name = "pact_mock_server"
-version = "0.8.0-beta.4"
+version = "0.8.0-beta.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2148d84fd2659305d21516b57f09244945fd014a3195dc1badfd5419ab8c9b0c"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1066,7 +1101,7 @@ dependencies = [
  "lazy_static",
  "log",
  "maplit",
- "pact-plugin-driver",
+ "pact-plugin-driver 0.0.6",
  "pact_matching",
  "pact_models",
  "rustls",
