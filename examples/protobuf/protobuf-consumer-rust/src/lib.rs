@@ -65,7 +65,7 @@ mod tests {
             "contentTypeHint": "matching(equalTo, 'TEXT')"
           },
           "rules": {
-            "pact:match": "eachKey(matching(regex, '\\$(\\.\\w+)+', '$.test.one'))",
+            "pact:match": "eachKey(matching(regex, '\\$(\\.\\w+)+', '$.test.one')), eachValue(matching(type, null))",
             "$.test.one": {
               "rule": {
                 "pact:match": "eachValue(matching($'items'))",
