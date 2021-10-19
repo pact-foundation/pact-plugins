@@ -48,10 +48,15 @@ async fn test_proto_client() {
     .using_plugin("protobuf", None).await
     .synchronous_message_interaction("init plugin request", "core/interaction/synchronous-message", |mut i| async move {
       let project_dir = Path::new(option_env!("CARGO_MANIFEST_DIR").unwrap());
-      let proto_file = project_dir.join("plugin.proto")
-        .canonicalize().unwrap().to_string_lossy().to_string();
+      println!("project_dir = {:?}", project_dir);
+      let proto_file = project_dir.join("plugin.proto");
+      println!("proto_file = {:?}", proto_file);
+      let proto_file_can = proto_file.canonicalize().unwrap();
+      println!("proto_file_can = {:?}", proto_file_can);
+      println!("proto_file_s = {:?}", proto_file_can.to_str());
+
       i.contents_from(json!({
-          "pact:proto": proto_file,
+          "pact:proto": proto_file_can.to_str().unwrap(),
           "pact:content-type": "application/protobuf",
           "pact:proto-service": "PactPlugin/InitPlugin",
           "request": {
