@@ -2,6 +2,10 @@ To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD 
 
 # 0.0.7 - Bugfix Release
 
+* 2219e31 - chore: cargo manifest was pointing to dev consumer crate (Ronald Holshausen, Tue Oct 19 16:55:04 2021 +1100)
+
+# 0.0.7 - Bugfix Release
+
 * 1b4ba6e - fix: update pact-models to fix -> EachValue was outputting the wrong JSON (Ronald Holshausen, Tue Oct 19 16:50:52 2021 +1100)
 * 8df13ed - chore: update to the latest pact consumer crate (Ronald Holshausen, Tue Oct 19 12:00:03 2021 +1100)
 * 0184113 - bump version to 0.0.7 (Ronald Holshausen, Tue Oct 19 10:34:49 2021 +1100)
