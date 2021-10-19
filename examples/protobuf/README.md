@@ -30,7 +30,7 @@ In another terminal, use the pact_verifier_cli to verify the pacts from the cons
 version 0.9.0+ to support plugins. The provider will be running on port 8111.
 
 ```
-$ pact_verifier_cli -f ../protobuf-consumer/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
+$ pact_verifier_cli -f ../protobuf-consumer-jvm/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
 05:56:37 [WARN] 
 
 Please note:
