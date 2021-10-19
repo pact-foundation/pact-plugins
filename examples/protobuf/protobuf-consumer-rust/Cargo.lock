@@ -1111,7 +1111,7 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.0.5"
+version = "0.0.7"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1226,9 +1226,9 @@ dependencies = [
 
 [[package]]
 name = "pact_models"
-version = "0.2.0-beta.4"
+version = "0.2.0-beta.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "23ef4a7068a9bb1ce3c7e9c02423a560b6d33de369ad0312674fc89618f586bf"
+checksum = "d314d769266d775b742184c204f4e804730d01b673a925744fb9fab4ec5287bf"
 dependencies = [
  "anyhow",
  "base64",
@@ -1459,7 +1459,7 @@ dependencies = [
  "expectest",
  "fakeit",
  "maplit",
- "pact-plugin-driver 0.0.5",
+ "pact-plugin-driver 0.0.7",
  "pact_consumer",
  "pact_models",
  "prost",
