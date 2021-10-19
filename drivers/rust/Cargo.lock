@@ -330,21 +330,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f9eec918d3f24069decb9af1554cad7c880e2da24a9afd88aca000531ab82c1"
 
 [[package]]
-name = "foreign-types"
-version = "0.3.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f6f339eb8adc052cd2ca78910fda869aefa38d22d5cb648e6485e4d3fc06f3b1"
-dependencies = [
- "foreign-types-shared",
-]
-
-[[package]]
-name = "foreign-types-shared"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00b0228411908ca8685dba7fc2cdd70ec9990a6e753e89b6ac91a84c40fbaf4b"
-
-[[package]]
 name = "form_urlencoded"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -634,19 +619,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hyper-tls"
-version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d6183ddfa99b85da61a140bea0efc93fdf56ceaa041b37d553518030827f9905"
-dependencies = [
- "bytes",
- "hyper",
- "native-tls",
- "tokio",
- "tokio-native-tls",
-]
-
-[[package]]
 name = "idna"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -901,24 +873,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "native-tls"
-version = "0.2.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48ba9f7719b5a0f42f338907614285fb5fd70e53858141f69898a1fb7203b24d"
-dependencies = [
- "lazy_static",
- "libc",
- "log",
- "openssl",
- "openssl-probe",
- "openssl-sys",
- "schannel",
- "security-framework",
- "security-framework-sys",
- "tempfile",
-]
-
-[[package]]
 name = "nom"
 version = "7.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -996,37 +950,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "openssl"
-version = "0.10.36"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d9facdb76fec0b73c406f125d44d86fdad818d66fef0531eec9233ca425ff4a"
-dependencies = [
- "bitflags",
- "cfg-if",
- "foreign-types",
- "libc",
- "once_cell",
- "openssl-sys",
-]
-
-[[package]]
 name = "openssl-probe"
 version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "28988d872ab76095a6e6ac88d99b54fd267702734fd7ffe610ca27f533ddb95a"
-
-[[package]]
-name = "openssl-sys"
-version = "0.9.67"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "69df2d8dfc6ce3aaf44b40dec6f487d5a886516cf6879c49e98e0710f310a058"
-dependencies = [
- "autocfg",
- "cc",
- "libc",
- "pkg-config",
- "vcpkg",
-]
 
 [[package]]
 name = "os_info"
@@ -1041,9 +968,9 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.0.4"
+version = "0.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c7f51bd375f33de4cf54f6f63ed7c8bdbff428c7cc34690afdebe1d18c85de75"
+checksum = "299c4e0898de136eb8da291a5bdf62740b41c1c8607b76e9ae8d087ada258784"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1053,6 +980,7 @@ dependencies = [
  "lazy_static",
  "log",
  "maplit",
+ "os_info",
  "pact_models",
  "prost",
  "prost-types",
@@ -1099,9 +1027,9 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "0.8.0-beta.1"
+version = "0.8.0-beta.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6a6d1ce6377a78803efc3f64102661d359002f22f8122ae0766d692f15c5d287"
+checksum = "b6df890c2e974c3f0bec6fed8b929f5df143f0a9c505151ab71453e2482a4eca"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1112,7 +1040,7 @@ dependencies = [
  "libc",
  "log",
  "maplit",
- "pact-plugin-driver 0.0.4",
+ "pact-plugin-driver 0.0.6",
  "pact_matching",
  "pact_mock_server",
  "pact_models",
@@ -1125,9 +1053,9 @@ dependencies = [
 
 [[package]]
 name = "pact_matching"
-version = "0.11.0-beta.2"
+version = "0.11.0-beta.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2f8634ef156d7f572fce2e5919b21feaba8d860bb0c40fe5bb719c45e7e3104f"
+checksum = "db755d5d490e6c84387e1f86de27af043cd9bf0ecdf618daaedd5aff3be15d71"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -1146,7 +1074,7 @@ dependencies = [
  "multipart",
  "nom",
  "onig",
- "pact-plugin-driver 0.0.4",
+ "pact-plugin-driver 0.0.6",
  "pact_models",
  "rand 0.8.4",
  "semver 0.11.0",
@@ -1160,9 +1088,9 @@ dependencies = [
 
 [[package]]
 name = "pact_mock_server"
-version = "0.8.0-beta.2"
+version = "0.8.0-beta.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3572fc88b9664f0da492c9b6cdc4ee5070f7956b96db9538a8600d614a0c4403"
+checksum = "2148d84fd2659305d21516b57f09244945fd014a3195dc1badfd5419ab8c9b0c"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1173,7 +1101,7 @@ dependencies = [
  "lazy_static",
  "log",
  "maplit",
- "pact-plugin-driver 0.0.4",
+ "pact-plugin-driver 0.0.6",
  "pact_matching",
  "pact_models",
  "rustls",
@@ -1593,13 +1521,11 @@ dependencies = [
  "http-body",
  "hyper",
  "hyper-rustls",
- "hyper-tls",
  "ipnet",
  "js-sys",
  "lazy_static",
  "log",
  "mime",
- "native-tls",
  "percent-encoding",
  "pin-project-lite",
  "rustls",
@@ -1608,7 +1534,6 @@ dependencies = [
  "serde_json",
  "serde_urlencoded",
  "tokio",
- "tokio-native-tls",
  "tokio-rustls",
  "tokio-util",
  "url",
@@ -1971,16 +1896,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tokio-native-tls"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f7d995660bd2b7f8c1568414c1126076c13fbb725c40112dc0120b78eb9b717b"
-dependencies = [
- "native-tls",
- "tokio",
-]
-
-[[package]]
 name = "tokio-rustls"
 version = "0.22.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2244,12 +2159,6 @@ checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
  "getrandom 0.2.3",
 ]
-
-[[package]]
-name = "vcpkg"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "version_check"
