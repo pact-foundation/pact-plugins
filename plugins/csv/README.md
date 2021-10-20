@@ -9,7 +9,8 @@ in the `target/release/` directory.
 
 ## Installing the plugin
 
-The plugin binary and [manifest file pact-plugin.json](pact-plugin.json) need to be copied into the `$HOME/.pact/plugins/csv-0.0.0` directory.
+The plugin binary and [manifest file pact-plugin.json](pact-plugin.json) need to be copied into the `$HOME/.pact/plugins/csv-0.0.0` directory. You can download
+those from the release for the plugin.
 
 ## Running with a development version of the plugin
 
