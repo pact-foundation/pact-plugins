@@ -10,8 +10,9 @@ The plugin is built with Gradle. Just run `./gradlew installDist`. This will cre
 ## Installing the plugin
 
 The plugin bundle and [manifest file pact-plugin.json](pact-plugin.json) need to be unpacked/copied into the `$HOME/.pact/plugins/protobuf-0.0.0` directory.
+You can download the bundle and manifest from the release for the plugin.
 
-There is a Gradle task `installLocal` to do that. 
+There is also a Gradle task `installLocal` that will build the plugin and unpack it into the installation directory. 
 
 ## Example Projects
 
