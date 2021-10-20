@@ -1,6 +1,7 @@
 //! Module for managing running child processes
 
 use std::time::Duration;
+use std::sync::mpsc::channel;
 
 use anyhow::anyhow;
 use log::{debug, error, trace, warn};
@@ -8,8 +9,6 @@ use serde::{Deserialize, Serialize};
 use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child;
-use tokio::sync::mpsc::channel;
-use tokio::time::timeout;
 
 use crate::plugin_models::PactPluginManifest;
 
@@ -31,9 +30,7 @@ pub struct ChildPluginProcess {
 impl ChildPluginProcess {
   /// Start the child process and try read the startup JSON message from its standard output.
   pub async fn new(mut child: Child, manifest: &PactPluginManifest) -> anyhow::Result<Self> {
-    // TODO: can't use a oneshot channel, as the startup thread loops over the standard output
-    // and the oneshot channel can't be cloned per loop iteration
-    let (tx, mut rx) = channel(2);
+    let (tx, rx) = channel();
     let child_pid = child.id()
       .ok_or_else(|| anyhow!("Could not get the child process ID"))?;
     let child_out = child.stdout.take()
@@ -61,12 +58,12 @@ impl ChildPluginProcess {
                     child_pid: child_pid as usize,
                     manifest: mfso.clone(),
                     plugin_info
-                  })).await.unwrap_or_default()
+                  })).unwrap_or_default()
                 }
                 Err(err) => {
                   error!("Failed to read startup info from plugin - {}", err);
                   tx.send(Err(anyhow!("Failed to read startup info from plugin - {}", err)))
-                    .await.unwrap_or_default()
+                    .unwrap_or_default()
                 }
               }
             }
@@ -91,14 +88,8 @@ impl ChildPluginProcess {
 
     // TODO: This timeout needs to be configurable
     // TODO: Timeout is not working on Alpine, waits indefinitly if the plugin does not start properly
-    match timeout(Duration::from_secs(60), rx.recv()).await {
-      Ok(value) => match value {
-        Some(result) => result,
-        None => {
-          error!("Did not get the startup message from the plugin");
-          Err(anyhow!("Did not get the startup message from the plugin"))
-        }
-      }
+    match rx.recv_timeout(Duration::from_secs(60)) {
+      Ok(value) => value,
       Err(err) => {
         error!("Timeout waiting to get plugin startup info: {}", err);
         Err(anyhow!("Plugin process did not output the correct startup message in 60 seconds: {}", err))
