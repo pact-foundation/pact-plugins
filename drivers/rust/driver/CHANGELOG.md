@@ -1,5 +1,17 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.8 - Bugfix Release
+
+* eaa3f49 - chore: switch to non-beta pact models version (Ronald Holshausen, Thu Oct 21 17:59:27 2021 +1100)
+* cd26cd1 - chore: use the channel from the Rust stdlib (Ronald Holshausen, Wed Oct 20 12:09:55 2021 +1100)
+* 522f3f0 - chore: fix build on alpine (Ronald Holshausen, Wed Oct 20 11:51:22 2021 +1100)
+* 77218b7 - chore: canonicalize() is broken with Windows absolute paths (Ronald Holshausen, Wed Oct 20 10:01:46 2021 +1100)
+* d43b68d - chore: debug windows build (Ronald Holshausen, Wed Oct 20 09:23:47 2021 +1100)
+* b1106e6 - chore: update to latest pact consumer crate (Ronald Holshausen, Tue Oct 19 17:56:58 2021 +1100)
+* 885963c - bump version to 0.0.8 (Ronald Holshausen, Tue Oct 19 17:01:13 2021 +1100)
+* 47cc81d - update changelog for release 0.0.7 (Ronald Holshausen, Tue Oct 19 16:57:19 2021 +1100)
+* 2219e31 - chore: cargo manifest was pointing to dev consumer crate (Ronald Holshausen, Tue Oct 19 16:55:04 2021 +1100)
+
 # 0.0.7 - Bugfix Release
 
 * 2219e31 - chore: cargo manifest was pointing to dev consumer crate (Ronald Holshausen, Tue Oct 19 16:55:04 2021 +1100)
