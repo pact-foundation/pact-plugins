@@ -368,6 +368,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
         )
 
         for (result in interactions) {
+          logger.debug { "Adding interaction $result" }
           builder.addInteraction(result)
         }
 
@@ -462,7 +463,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
   private fun constructProtobufMessageForDescriptor(
     descriptor: Descriptors.Descriptor,
     config: Map<String, Value>,
-    message: String
+    messageName: String
   ): Result<Plugin.InteractionResponse.Builder, String> {
     val messageBuilder = DynamicMessage.newBuilder(descriptor)
 
@@ -501,18 +502,27 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
             }
           }
         } else {
-          logger.error { "Message $message has no field $key" }
-          return Err("Message $message has no field $key")
+          logger.error { "Message $messageName has no field $key" }
+          return Err("Message $messageName has no field $key")
         }
       }
     }
 
+
     logger.debug { "Returning response" }
+    val message = messageBuilder.build()
     val builder = Plugin.InteractionResponse.newBuilder()
+      .setInteractionMarkup("""
+        |## ${descriptor.name}
+        |```
+        |$message
+        |```
+        |
+      """.trimMargin("|"))
 
     builder.contentsBuilder
       .setContentType("application/protobuf;message=$message")
-      .setContent(BytesValue.newBuilder().setValue(messageBuilder.build().toByteString()).build())
+      .setContent(BytesValue.newBuilder().setValue(message.toByteString()).build())
       .setContentTypeHint(Plugin.Body.ContentTypeHint.BINARY)
 
     for ((key, rules) in matchingRules.matchingRules) {
