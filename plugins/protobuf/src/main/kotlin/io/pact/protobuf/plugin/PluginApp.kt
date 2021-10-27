@@ -521,7 +521,7 @@ class PactPluginService : PactPluginGrpcKt.PactPluginCoroutineImplBase() {
       """.trimMargin("|"))
 
     builder.contentsBuilder
-      .setContentType("application/protobuf;message=$message")
+      .setContentType("application/protobuf;message=$messageName")
       .setContent(BytesValue.newBuilder().setValue(message.toByteString()).build())
       .setContentTypeHint(Plugin.Body.ContentTypeHint.BINARY)
 
