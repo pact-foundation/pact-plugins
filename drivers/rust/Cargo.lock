@@ -968,35 +968,6 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43fe7c4bda4ebd774348b5a5cc535f3617af7896f84bd07d50ca3d5e121ae49e"
-dependencies = [
- "anyhow",
- "async-trait",
- "bytes",
- "home",
- "itertools",
- "lazy_static",
- "log",
- "maplit",
- "os_info",
- "pact_models",
- "prost",
- "prost-types",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "sysinfo",
- "tokio",
- "tonic",
- "tonic-build",
- "uuid",
-]
-
-[[package]]
-name = "pact-plugin-driver"
 version = "0.0.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3f40b35ded42b35b624c1e53763c48e9d8280596182d3f1215aad4d146a10897"
@@ -1056,9 +1027,9 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "0.8.0-beta.3"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3905a38fd0ffaea15b257a7abec37d4e50b8f371f676a2f24e34c80633e9306e"
+checksum = "3ba2be9aa5d63290a28cac313db1d74eb1645ae60c5ab291b0788f7cb7b4c0dd"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1069,7 +1040,7 @@ dependencies = [
  "libc",
  "log",
  "maplit",
- "pact-plugin-driver 0.0.7",
+ "pact-plugin-driver 0.0.8",
  "pact_matching",
  "pact_mock_server",
  "pact_models",
@@ -1117,9 +1088,9 @@ dependencies = [
 
 [[package]]
 name = "pact_mock_server"
-version = "0.8.0-beta.4"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d20a5620b80b3b888660e3f416392444f1802893b0a6c7263f92febd0b496c8"
+checksum = "549b72bd352399e5a18e146547580a4d93d7c5538e6bbf2126ecc9c879857ae8"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1130,7 +1101,7 @@ dependencies = [
  "lazy_static",
  "log",
  "maplit",
- "pact-plugin-driver 0.0.7",
+ "pact-plugin-driver 0.0.8",
  "pact_matching",
  "pact_models",
  "rustls",
