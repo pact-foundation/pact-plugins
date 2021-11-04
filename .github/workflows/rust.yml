@@ -24,8 +24,7 @@ jobs:
         working-directory: plugins/protobuf
       - name: Tests
         run: cargo test
-        with:
-          working-directory: drivers/rust
+        working-directory: drivers/rust
         env:
           RUST_LOG: trace
           RUST_BACKTRACE: 1
