@@ -23,10 +23,9 @@ jobs:
           ./gradlew -s --no-daemon -i installLocal
         working-directory: plugins/protobuf
       - name: Tests
-        uses: marcopolo/cargo@master # TODO: - use actions-rs/cargo@v1 when PR merged https://github.com/actions-rs/cargo/pull/59
+        run: cargo test
         with:
           working-directory: drivers/rust
-          command: test
         env:
           RUST_LOG: trace
           RUST_BACKTRACE: 1
