@@ -183,7 +183,7 @@ impl PactPlugin {
   /// Update the access of the plugin
   pub fn update_access(&mut self) {
     self.access_count += 1;
-    trace!("update_access: Plugin {}{} access is now {}", self.manifest.name, self.manifest.version,
+    trace!("update_access: Plugin {}/{} access is now {}", self.manifest.name, self.manifest.version,
       self.access_count);
   }
 
@@ -192,7 +192,7 @@ impl PactPlugin {
     if self.access_count > 0 {
       self.access_count -= 1;
     }
-    trace!("drop_access: Plugin {}{} access is now {}", self.manifest.name, self.manifest.version,
+    trace!("drop_access: Plugin {}/{} access is now {}", self.manifest.name, self.manifest.version,
       self.access_count);
     self.access_count
   }
