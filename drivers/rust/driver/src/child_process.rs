@@ -38,6 +38,8 @@ impl ChildPluginProcess {
     let child_err = child.stderr.take()
       .ok_or_else(|| anyhow!("Could not get the child process standard error stream"))?;
 
+    trace!("Starting output polling tasks...");
+
     let mfso = manifest.clone();
     tokio::task::spawn(async move {
       trace!("Starting task to poll plugin stdout");
@@ -86,8 +88,10 @@ impl ChildPluginProcess {
       trace!("Task to poll plugin stderr done");
     });
 
+    trace!("Starting output polling tasks... DONE");
+
     // TODO: This timeout needs to be configurable
-    // TODO: Timeout is not working on Alpine, waits indefinitly if the plugin does not start properly
+    // TODO: Timeout is not working on Alpine, waits indefinitely if the plugin does not start properly
     match rx.recv_timeout(Duration::from_secs(60)) {
       Ok(value) => value,
       Err(err) => {
