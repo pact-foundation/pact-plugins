@@ -38,6 +38,7 @@ jobs:
         with:
           working-directory: drivers/rust
           command: clippy
+        if: runner.os == 'Linux'
       - name: Publish pact files
         run: |
           curl -LO https://github.com/pact-foundation/pact-ruby-standalone/releases/download/v1.88.77/pact-1.88.77-linux-x86_64.tar.gz
