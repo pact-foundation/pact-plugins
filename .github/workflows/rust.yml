@@ -26,7 +26,7 @@ jobs:
         run: |
           mkdir -p ~/.pact/plugins/csv-0.0.0
           cargo build
-          cp pact-plugin.json target/debug/pact-plugin-csv ~/.pact/plugins/csv-0.0.0/
+          cp pact-plugin.json target/debug/pact-plugin-csv* ~/.pact/plugins/csv-0.0.0/
         working-directory: plugins/csv
       - name: Tests
         run: cargo test
@@ -65,6 +65,12 @@ jobs:
       - name: Build and install Protobuf plugin
         run: ./gradlew -s --no-daemon -i installLocal
         working-directory: plugins/protobuf
+      - name: Build and install csv plugin
+        run: |
+          mkdir -p ~/.pact/plugins/csv-0.0.0
+          cargo build
+          cp pact-plugin.json target/debug/pact-plugin-csv ~/.pact/plugins/csv-0.0.0/
+        working-directory: plugins/csv
       - run: |
          docker run --rm -v $(pwd):/workspace -v $HOME/.pact:/root/.pact \
            -w /workspace/drivers/rust -t  \
