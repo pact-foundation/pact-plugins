@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.10 - Fix for race condition in Pact FFI calls
+
+* ab64c95 - chore: add additional trace logs for diagnosing race condition (Ronald Holshausen, Tue Nov 16 15:58:19 2021 +1100)
+* 6c46e1c - chore: update to the published pact crates (Ronald Holshausen, Tue Nov 16 14:09:07 2021 +1100)
+* 2c7849b - bump version to 0.0.10 (Ronald Holshausen, Tue Nov 16 11:46:23 2021 +1100)
+
 # 0.0.9 - Bugfix Release
 
 * 51e7d78 - chore: test using plugin needs to use multi_thread tokio reactor (Ronald Holshausen, Tue Nov 16 11:28:15 2021 +1100)
