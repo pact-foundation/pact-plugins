@@ -1,5 +1,5 @@
 [workspace]
 members = [
     "driver",
-#    "driver_ffi",
+    "driver_ffi",
 ]
