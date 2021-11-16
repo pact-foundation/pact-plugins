@@ -22,6 +22,12 @@ jobs:
         run: |
           ./gradlew -s --no-daemon -i installLocal
         working-directory: plugins/protobuf
+      - name: Build and install csv plugin
+        run: |
+          mkdir -p ~/.pact/plugins/csv-0.0.0
+          cargo build
+          cp pact-plugin.json target/debug/pact-plugin-csv ~/.pact/plugins/csv-0.0.0/
+        working-directory: plugins/csv
       - name: Tests
         run: cargo test
         working-directory: drivers/rust
