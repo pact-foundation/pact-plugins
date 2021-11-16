@@ -28,6 +28,7 @@ jobs:
           cargo build
           cp pact-plugin.json target/debug/pact-plugin-csv* ~/.pact/plugins/csv-0.0.0/
         working-directory: plugins/csv
+        shell: bash
       - name: Tests
         run: cargo test
         working-directory: drivers/rust
