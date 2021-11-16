@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::process::Stdio;
 use std::str::FromStr;
 use std::sync::Mutex;
+use std::thread;
 
 use anyhow::anyhow;
 use lazy_static::lazy_static;
@@ -19,7 +20,7 @@ use tokio::process::Command;
 use crate::catalogue_manager::{register_plugin_entries, remove_plugin_entries};
 use crate::child_process::ChildPluginProcess;
 use crate::metrics::send_metrics;
-use crate::plugin_models::{PactPlugin, PactPluginRpc, PactPluginManifest, PluginDependency};
+use crate::plugin_models::{PactPlugin, PactPluginManifest, PactPluginRpc, PluginDependency};
 use crate::proto::InitPluginRequest;
 
 lazy_static! {
@@ -30,11 +31,12 @@ lazy_static! {
 /// Load the plugin defined by the dependency information. Will first look in the global
 /// plugin registry.
 pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<PactPlugin> {
+  let thread_id = thread::current().id();
   debug!("Loading plugin {:?}", plugin);
   trace!("Rust plugin driver version {}", option_env!("CARGO_PKG_VERSION").unwrap_or_default());
-  trace!("Waiting on PLUGIN_REGISTER lock");
+  trace!("load_plugin {:?}: Waiting on PLUGIN_REGISTER lock", thread_id);
   let mut inner = PLUGIN_REGISTER.lock().unwrap();
-  trace!("Got PLUGIN_REGISTER lock");
+  trace!("load_plugin {:?}: Got PLUGIN_REGISTER lock", thread_id);
   let result = match lookup_plugin_inner(plugin, &mut inner) {
     Some(plugin) => {
       debug!("Found running plugin {:?}", plugin);
@@ -48,7 +50,7 @@ pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<PactPlugin
       initialise_plugin(&manifest, &mut inner).await
     }
   };
-  trace!("Releasing PLUGIN_REGISTER lock");
+  trace!("load_plugin {:?}: Releasing PLUGIN_REGISTER lock", thread_id);
   result
 }
 
@@ -68,11 +70,12 @@ fn lookup_plugin_inner<'a>(
 
 /// Look up the plugin in the global plugin register
 pub fn lookup_plugin(plugin: &PluginDependency) -> Option<PactPlugin> {
-  trace!("Waiting on PLUGIN_REGISTER lock");
+  let thread_id = thread::current().id();
+  trace!("lookup_plugin {:?}: Waiting on PLUGIN_REGISTER lock", thread_id);
   let mut inner = PLUGIN_REGISTER.lock().unwrap();
-  trace!("Got PLUGIN_REGISTER lock");
+  trace!("lookup_plugin {:?}: Got PLUGIN_REGISTER lock", thread_id);
   let entry = lookup_plugin_inner(plugin, &mut inner);
-  trace!("Releasing PLUGIN_REGISTER lock");
+  trace!("lookup_plugin {:?}: Releasing PLUGIN_REGISTER lock", thread_id);
   entry.cloned()
 }
 
@@ -233,14 +236,18 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
 
 /// Shut down all plugin processes
 pub fn shutdown_plugins() {
+  let thread_id = thread::current().id();
   debug!("Shutting down all plugins");
+  trace!("shutdown_plugins {:?}: Waiting on PLUGIN_REGISTER lock", thread_id);
   let mut guard = PLUGIN_REGISTER.lock().unwrap();
+  trace!("shutdown_plugins {:?}: Got PLUGIN_REGISTER lock", thread_id);
   for plugin in guard.values() {
     debug!("Shutting down plugin {:?}", plugin);
     plugin.kill();
     remove_plugin_entries(&plugin.manifest.name);
   }
-  guard.clear()
+  guard.clear();
+  trace!("shutdown_plugins {:?}: Releasing PLUGIN_REGISTER lock", thread_id);
 }
 
 /// Shutdown the given plugin
@@ -269,24 +276,19 @@ fn publish_updated_catalogue() {
 
 /// Decrement access to the plugin. If the current access could is zero, shut down the plugin
 pub fn drop_plugin_access(plugin: &PluginDependency) {
-  let access_count = {
-    trace!("Waiting on PLUGIN_REGISTER lock");
-    let mut inner = PLUGIN_REGISTER.lock().unwrap();
-    trace!("Got PLUGIN_REGISTER lock");
-    let entry = lookup_plugin_inner(plugin, &mut inner);
-    trace!("Releasing PLUGIN_REGISTER lock");
-    entry.map(|entry| {
-      (entry.drop_access(), entry.clone())
-    })
-  };
-  if let Some((access_count, mut plugin)) = access_count {
-    if access_count == 0 {
-      shutdown_plugin(&mut plugin);
-      trace!("Waiting on PLUGIN_REGISTER lock");
-      let mut inner = PLUGIN_REGISTER.lock().unwrap();
-      trace!("Got PLUGIN_REGISTER lock");
-      inner.remove(format!("{}/{}", plugin.manifest.name, plugin.manifest.version).as_str());
-      trace!("Releasing PLUGIN_REGISTER lock");
+  let thread_id = thread::current().id();
+
+  trace!("drop_plugin_access {:?}: Waiting on PLUGIN_REGISTER lock", thread_id);
+  let mut inner = PLUGIN_REGISTER.lock().unwrap();
+  trace!("drop_plugin_access {:?}: Got PLUGIN_REGISTER lock", thread_id);
+
+  if let Some(plugin) = lookup_plugin_inner(plugin, &mut inner) {
+    let key = format!("{}/{}", plugin.manifest.name, plugin.manifest.version);
+    if plugin.drop_access() == 0 {
+      shutdown_plugin(plugin);
+      inner.remove(key.as_str());
     }
   }
+
+  trace!("drop_plugin_access {:?}: Releasing PLUGIN_REGISTER lock", thread_id);
 }

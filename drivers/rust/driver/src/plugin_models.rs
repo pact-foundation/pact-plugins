@@ -13,7 +13,7 @@ use crate::proto::*;
 use crate::proto::pact_plugin_client::PactPluginClient;
 
 /// Type of plugin dependencies
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
 pub enum PluginDependencyType {
   /// Required operating system package
   OSPackage,
@@ -32,7 +32,7 @@ impl Default for PluginDependencyType {
 }
 
 /// Plugin dependency
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginDependency {
   /// Dependency name

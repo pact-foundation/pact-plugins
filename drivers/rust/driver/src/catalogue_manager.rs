@@ -6,7 +6,7 @@ use std::sync::Mutex;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use log::{debug, error};
+use log::{debug, error, trace};
 use maplit::hashset;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
@@ -113,6 +113,8 @@ pub struct CatalogueEntry {
 
 /// Register the entries in the global catalogue
 pub fn register_plugin_entries(plugin: &PactPluginManifest, catalogue_list: &Vec<ProtoCatalogueEntry>) {
+  trace!("register_plugin_entries({:?}, {:?})", plugin, catalogue_list);
+
   let mut guard = CATALOGUE_REGISTER.lock().unwrap();
 
   for entry in catalogue_list {
@@ -132,6 +134,8 @@ pub fn register_plugin_entries(plugin: &PactPluginManifest, catalogue_list: &Vec
 
 /// Register the core Pact framework entries in the global catalogue
 pub fn register_core_entries(entries: &Vec<CatalogueEntry>) {
+  trace!("register_core_entries({:?})", entries);
+
   let mut inner = CATALOGUE_REGISTER.lock().unwrap();
 
   let mut updated_keys = hashset!();
@@ -150,6 +154,8 @@ pub fn register_core_entries(entries: &Vec<CatalogueEntry>) {
 
 /// Remove entries for a plugin
 pub fn remove_plugin_entries(name: &String) {
+  trace!("remove_plugin_entries({})", name);
+
   let prefix = format!("plugin/{}/", name);
   let keys: Vec<String> = {
     let guard = CATALOGUE_REGISTER.lock().unwrap();
