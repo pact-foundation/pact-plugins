@@ -42,6 +42,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ee10e43ae4a853c0a3591d4e2ada1719e553be18199d9da9d4a83f5927c2f5c7"
 
 [[package]]
+name = "ariadne"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7080ae01b2f0c312065d4914cd0f0de045eb8832e9415b355106a6cff3073cb4"
+dependencies = [
+ "yansi",
+]
+
+[[package]]
 name = "async-compression"
 version = "0.3.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1106,6 +1115,35 @@ dependencies = [
 [[package]]
 name = "pact-plugin-driver"
 version = "0.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b995798e00b82e3e1be7c729e6e7927ed02e52c4fa589ca81db67aac99f086d2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bytes",
+ "home",
+ "itertools",
+ "lazy_static",
+ "log",
+ "maplit",
+ "os_info",
+ "pact_models",
+ "prost",
+ "prost-types",
+ "regex",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "tokio",
+ "tonic",
+ "tonic-build",
+ "uuid",
+]
+
+[[package]]
+name = "pact-plugin-driver"
+version = "0.0.11"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1140,7 +1178,7 @@ dependencies = [
  "csv",
  "env_logger",
  "expectest",
- "pact-plugin-driver 0.0.10",
+ "pact-plugin-driver 0.0.11",
  "pact_ffi",
  "prost",
  "prost-types",
@@ -1164,8 +1202,8 @@ dependencies = [
  "log",
  "maplit",
  "pact-plugin-driver 0.0.9",
- "pact_matching",
- "pact_mock_server",
+ "pact_matching 0.11.1",
+ "pact_mock_server 0.8.1",
  "pact_models",
  "regex",
  "serde_json",
@@ -1176,9 +1214,7 @@ dependencies = [
 
 [[package]]
 name = "pact_ffi"
-version = "0.1.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d941a12c25d1ffde50e4be37c06e127972c03a63e8cda432faf0a20630a78d3"
+version = "0.1.3"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1196,9 +1232,9 @@ dependencies = [
  "multipart",
  "onig",
  "os_info",
- "pact-plugin-driver 0.0.9",
- "pact_matching",
- "pact_mock_server",
+ "pact-plugin-driver 0.0.10",
+ "pact_matching 0.11.2",
+ "pact_mock_server 0.8.3",
  "pact_models",
  "pact_verifier",
  "rand 0.8.4",
@@ -1251,6 +1287,39 @@ dependencies = [
 ]
 
 [[package]]
+name = "pact_matching"
+version = "0.11.2"
+dependencies = [
+ "ansi_term 0.12.1",
+ "anyhow",
+ "base64",
+ "bytes",
+ "chrono",
+ "difference",
+ "hex",
+ "http",
+ "itertools",
+ "lazy_static",
+ "lenient_semver",
+ "log",
+ "maplit",
+ "mime",
+ "multipart",
+ "nom",
+ "onig",
+ "pact-plugin-driver 0.0.10",
+ "pact_models",
+ "rand 0.8.4",
+ "semver 0.11.0",
+ "serde",
+ "serde_json",
+ "sxd-document",
+ "tokio",
+ "tree_magic_mini",
+ "uuid",
+]
+
+[[package]]
 name = "pact_mock_server"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1266,7 +1335,32 @@ dependencies = [
  "log",
  "maplit",
  "pact-plugin-driver 0.0.9",
- "pact_matching",
+ "pact_matching 0.11.1",
+ "pact_models",
+ "rustls",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-rustls",
+ "uuid",
+]
+
+[[package]]
+name = "pact_mock_server"
+version = "0.8.3"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "futures",
+ "hyper",
+ "hyper-rustls",
+ "itertools",
+ "lazy_static",
+ "log",
+ "maplit",
+ "pact-plugin-driver 0.0.10",
+ "pact_matching 0.11.2",
  "pact_models",
  "rustls",
  "serde",
@@ -1279,11 +1373,12 @@ dependencies = [
 
 [[package]]
 name = "pact_models"
-version = "0.2.1"
+version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbaf0b007c0e60194a9391e821be1b7054a53cbdb17c45efc0729f0346c07672"
+checksum = "5e0df32ee5914220ce50cfdbcd0b1c53fd480d35772e0150400ac7d2c8f650f6"
 dependencies = [
  "anyhow",
+ "ariadne",
  "base64",
  "bytes",
  "chrono",
@@ -1306,6 +1401,7 @@ dependencies = [
  "regex",
  "regex-syntax",
  "reqwest",
+ "semver 1.0.4",
  "serde",
  "serde_json",
  "sxd-document",
@@ -1314,9 +1410,7 @@ dependencies = [
 
 [[package]]
 name = "pact_verifier"
-version = "0.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af56cc007addf0eee89b56eee4d3573e507be9fbc997057759e5557574139d7c"
+version = "0.11.2"
 dependencies = [
  "ansi_term 0.12.1",
  "anyhow",
@@ -1332,8 +1426,8 @@ dependencies = [
  "log",
  "maplit",
  "mime",
- "pact-plugin-driver 0.0.9",
- "pact_matching",
+ "pact-plugin-driver 0.0.10",
+ "pact_matching 0.11.2",
  "pact_models",
  "regex",
  "reqwest",
@@ -2609,6 +2703,12 @@ checksum = "0120db82e8a1e0b9fb3345a539c478767c0048d842860994d96113d5b667bd69"
 dependencies = [
  "winapi",
 ]
+
+[[package]]
+name = "yansi"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9fc79f4a1e39857fc00c3f662cbf2651c771f00e9c15fe2abc341806bd46bd71"
 
 [[package]]
 name = "zeroize"
