@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.11 - config section in plugin manifest
+
+* 01c3a5c - feat: support config section in plugin manifest (Ronald Holshausen, Mon Nov 29 12:34:00 2021 +1100)
+* fc194db - chore: Update to latest models crate (Ronald Holshausen, Mon Nov 29 12:33:29 2021 +1100)
+* 601dd9b - chore: bump version (Ronald Holshausen, Tue Nov 16 16:16:03 2021 +1100)
+
 # 0.0.10 - Fix for race condition in Pact FFI calls
 
 * ab64c95 - chore: add additional trace logs for diagnosing race condition (Ronald Holshausen, Tue Nov 16 15:58:19 2021 +1100)
