@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod tests {
+  use std::env;
   use std::ffi::{CStr, CString};
   use std::fs::{create_dir_all, remove_dir_all, write};
   use std::panic::catch_unwind;
@@ -100,7 +101,8 @@ mod tests {
     let plugin_name = CString::new("protobuf").unwrap();
     let pact_handle = pactffi_new_pact(consumer_name.as_ptr(), provider_name.as_ptr());
 
-    let dir = PathBuf::from("/tmp/test_message_client");
+    let mut dir = env::temp_dir();
+    dir = dir.join("test_message_client");
     create_dir_all(dir.clone()).unwrap();
     let file_path = dir.join("plugin.proto");
     let proto_file = include_str!("../../driver/plugin.proto");
@@ -160,7 +162,8 @@ mod tests {
     let plugin_name = CString::new("protobuf").unwrap();
     let pact_handle = pactffi_new_pact(consumer_name.as_ptr(), provider_name.as_ptr());
 
-    let dir = PathBuf::from("/tmp/test_proto_service");
+    let mut dir = env::temp_dir();
+    dir = dir.join("test_proto_service");
     create_dir_all(dir.clone()).unwrap();
     let file_path = dir.join("plugin.proto");
     let proto_file = include_str!("../../driver/plugin.proto");
