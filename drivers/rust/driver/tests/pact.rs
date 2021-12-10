@@ -39,7 +39,7 @@ impl PactPluginRpc for MockPlugin {
   }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
 async fn test_proto_client() {
   let _ = env_logger::builder().is_test(true).try_init();
 

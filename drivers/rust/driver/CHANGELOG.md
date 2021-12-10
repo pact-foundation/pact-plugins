@@ -1,5 +1,26 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.11 - config section in plugin manifest
+
+* 01c3a5c - feat: support config section in plugin manifest (Ronald Holshausen, Mon Nov 29 12:34:00 2021 +1100)
+* fc194db - chore: Update to latest models crate (Ronald Holshausen, Mon Nov 29 12:33:29 2021 +1100)
+* 601dd9b - chore: bump version (Ronald Holshausen, Tue Nov 16 16:16:03 2021 +1100)
+
+# 0.0.10 - Fix for race condition in Pact FFI calls
+
+* ab64c95 - chore: add additional trace logs for diagnosing race condition (Ronald Holshausen, Tue Nov 16 15:58:19 2021 +1100)
+* 6c46e1c - chore: update to the published pact crates (Ronald Holshausen, Tue Nov 16 14:09:07 2021 +1100)
+* 2c7849b - bump version to 0.0.10 (Ronald Holshausen, Tue Nov 16 11:46:23 2021 +1100)
+
+# 0.0.9 - Bugfix Release
+
+* 51e7d78 - chore: test using plugin needs to use multi_thread tokio reactor (Ronald Holshausen, Tue Nov 16 11:28:15 2021 +1100)
+* 948218c - chore: update to latest pact models (Ronald Holshausen, Tue Nov 16 10:46:17 2021 +1100)
+* 9c95244 - feat: add message FFI test using protobuf plugin (Ronald Holshausen, Wed Nov 10 17:09:32 2021 +1100)
+* 9e15c48 - feat: update content manager to expose plugin version (Ronald Holshausen, Tue Nov 9 16:08:30 2021 +1100)
+* b12590b - chore: use the non-beta pact libs (Ronald Holshausen, Thu Nov 4 16:22:06 2021 +1100)
+* 8d2c092 - bump version to 0.0.9 (Ronald Holshausen, Thu Oct 21 18:07:33 2021 +1100)
+
 # 0.0.8 - Bugfix Release
 
 * eaa3f49 - chore: switch to non-beta pact models version (Ronald Holshausen, Thu Oct 21 17:59:27 2021 +1100)

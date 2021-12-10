@@ -1,6 +1,6 @@
 [package]
 name = "pact-plugin-driver"
-version = "0.0.9"
+version = "0.0.12"
 description = "Pact support library that provides an interface for interacting with Pact plugins"
 edition = "2018"
 documentation = "https://docs.rs/pact-plugin-driver"
@@ -28,7 +28,7 @@ prost-types = "0.8.0"
 tokio = { version = "1.0", features = ["full"] }
 sysinfo = "0.20.0"
 itertools = "0.10.1"
-pact_models = "0.2.0"
+pact_models = "0.2.2"
 regex = "1.4"
 bytes = "1.0.1"
 uuid = { version = "0.8.2", features = ["v4"] }
@@ -43,7 +43,7 @@ features = ["rustls-tls", "rustls-tls-native-roots", "json", "gzip", "deflate"]
 [dev-dependencies]
 expectest = "0.12.0"
 env_logger = "0.8"
-pact_consumer = "0.8.0-beta.3"
+pact_consumer = "0.8.1"
 
 [build-dependencies]
 tonic-build = "0.5"

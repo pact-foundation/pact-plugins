@@ -158,6 +158,13 @@ impl ContentMatcher {
       .unwrap_or("core".to_string())
   }
 
+  /// Plugin version that provides this matcher
+  pub fn plugin_version(&self) -> String {
+    self.catalogue_entry.plugin.as_ref()
+      .map(|p| p.version.clone())
+      .unwrap_or_default()
+  }
+
   /// Get the plugin to configure the interaction contents for the interaction part based on the
   /// provided definition
   pub async fn configure_interation(

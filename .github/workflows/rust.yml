@@ -22,11 +22,16 @@ jobs:
         run: |
           ./gradlew -s --no-daemon -i installLocal
         working-directory: plugins/protobuf
+      - name: Build and install csv plugin
+        run: |
+          mkdir -p ~/.pact/plugins/csv-0.0.0
+          cargo build
+          cp pact-plugin.json target/debug/pact-plugin-csv* ~/.pact/plugins/csv-0.0.0/
+        working-directory: plugins/csv
+        shell: bash
       - name: Tests
-        uses: marcopolo/cargo@master # TODO: - use actions-rs/cargo@v1 when PR merged https://github.com/actions-rs/cargo/pull/59
-        with:
-          working-directory: drivers/rust
-          command: test
+        run: cargo test
+        working-directory: drivers/rust
         env:
           RUST_LOG: trace
           RUST_BACKTRACE: 1
@@ -40,6 +45,7 @@ jobs:
         with:
           working-directory: drivers/rust
           command: clippy
+        if: runner.os == 'Linux'
       - name: Publish pact files
         run: |
           curl -LO https://github.com/pact-foundation/pact-ruby-standalone/releases/download/v1.88.77/pact-1.88.77-linux-x86_64.tar.gz
@@ -60,9 +66,16 @@ jobs:
       - name: Build and install Protobuf plugin
         run: ./gradlew -s --no-daemon -i installLocal
         working-directory: plugins/protobuf
+      - name: Build and install csv plugin
+        run: |
+          docker run --rm -v $(pwd):/workspace -v $HOME/.pact:/root/.pact \
+           -w /workspace/plugins/csv -t  \
+           -e 'RUST_LOG=debug' -e 'pact_do_not_track=true' \
+           pactfoundation/rust-musl-build \
+           -c 'mkdir -p ~/.pact/plugins/csv-0.0.0 && cargo build && cp pact-plugin.json target/debug/pact-plugin-csv ~/.pact/plugins/csv-0.0.0/'
       - run: |
          docker run --rm -v $(pwd):/workspace -v $HOME/.pact:/root/.pact \
            -w /workspace/drivers/rust -t  \
-           -e 'RUST_LOG=debug' -e 'pact_do_not_track=true' \
+           -e 'RUST_LOG=trace' -e 'pact_do_not_track=true' \
            pactfoundation/rust-musl-build \
-           -c 'apk add protoc openjdk11 && cargo build && cargo test -- --nocapture'
+           -c 'apk add protoc openjdk11 && cargo build && cargo test'

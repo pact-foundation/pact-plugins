@@ -13,7 +13,7 @@ use crate::proto::*;
 use crate::proto::pact_plugin_client::PactPluginClient;
 
 /// Type of plugin dependencies
-#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
 pub enum PluginDependencyType {
   /// Required operating system package
   OSPackage,
@@ -32,7 +32,7 @@ impl Default for PluginDependencyType {
 }
 
 /// Plugin dependency
-#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
 #[serde(rename_all = "camelCase")]
 pub struct PluginDependency {
   /// Dependency name
@@ -75,7 +75,11 @@ pub struct PactPluginManifest {
   pub entry_points: HashMap<String, String>,
 
   /// Dependencies required to invoke the plugin
-  pub dependencies: Option<Vec<PluginDependency>>
+  pub dependencies: Option<Vec<PluginDependency>>,
+
+  /// Plugin specific config
+  #[serde(default)]
+  pub plugin_config: HashMap<String, Value>
 }
 
 impl PactPluginManifest {
@@ -99,7 +103,8 @@ impl Default for PactPluginManifest {
       minimum_required_version: None,
       entry_point: "".to_string(),
       entry_points: Default::default(),
-      dependencies: None
+      dependencies: None,
+      plugin_config: Default::default()
     }
   }
 }
@@ -183,7 +188,7 @@ impl PactPlugin {
   /// Update the access of the plugin
   pub fn update_access(&mut self) {
     self.access_count += 1;
-    trace!("update_access: Plugin {}{} access is now {}", self.manifest.name, self.manifest.version,
+    trace!("update_access: Plugin {}/{} access is now {}", self.manifest.name, self.manifest.version,
       self.access_count);
   }
 
@@ -192,7 +197,7 @@ impl PactPlugin {
     if self.access_count > 0 {
       self.access_count -= 1;
     }
-    trace!("drop_access: Plugin {}{} access is now {}", self.manifest.name, self.manifest.version,
+    trace!("drop_access: Plugin {}/{} access is now {}", self.manifest.name, self.manifest.version,
       self.access_count);
     self.access_count
   }
