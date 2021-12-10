@@ -69,6 +69,11 @@ sourceSets {
     }
 }
 
+test {
+    // Set the load plugin timeout to 30 seconds for Windows
+    systemProperty('pact.plugin.loadTimeoutInMs', '30000')
+}
+
 pact {
     publish {
         pactBrokerUrl = 'https://pact-foundation.pact.dius.com.au'
