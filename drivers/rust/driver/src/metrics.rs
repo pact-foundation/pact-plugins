@@ -1,9 +1,12 @@
 use std::env::consts::{ARCH, OS};
 use std::env::var;
+use std::process::Command;
+use std::str;
 
+use anyhow::anyhow;
 use log::{debug, warn};
+use maplit::hashmap;
 use reqwest::Client;
-use serde_json::json;
 use uuid::Uuid;
 
 use crate::plugin_models::PactPluginManifest;
@@ -58,27 +61,30 @@ pub(crate) fn send_metrics(manifest: &PactPluginManifest) {
           } else {
             "unknown"
           };
-          let event_payload = json!({
-          "v": 1,                                         // Version of the API
-          "tid": "UA-117778936-1",                        // Property ID
-          "cid": Uuid::new_v4().to_string(),              // Anonymous Client ID.
-          "an": "pact-plugins-rust",                      // App name.
-          "aid": "pact-plugins-rust",                     // App Id
-          "av": env!("CARGO_PKG_VERSION"),                // App version.
-          "aip": true,                                    // Anonymise IP address
-          "ds": "pact-plugins-rust",                      // Data source
-          "cd1": "pact-plugins-rust",                     // Custom Dimension 1: library
-          "cd2": ci_context,                              // Custom Dimension 2: context
-          "cd3": format!("{}-{}", OS, ARCH),              // Custom Dimension 3: osarch
-          "cd4": manifest.name,                           // Custom Dimension 4: plugin_name
-          "cd5": manifest.version,                        // Custom Dimension 5: plugin_version
-          "el": "Plugin loaded",                          // Event
-          "ec": "Plugin",                                 // Category
-          "ea": "Loaded",                                 // Action
-          "ev": 1                                         // Value
-        });
+          let osarch = format!("{}-{}", OS, ARCH);
+          let uid = hostname_hash();
+
+          let event_payload = hashmap!{
+            "v" => "1",                                       // Version of the API
+            "t" => "event",                                   // Hit type, Specifies the metric is for an event
+            "tid" => "UA-117778936-1",                        // Property ID
+            "uid" => uid.as_str(),                            // Anonymous Client ID.
+            "an" => "pact-plugins-rust",                      // App name.
+            "aid" => "pact-plugins-rust",                     // App Id
+            "av" => env!("CARGO_PKG_VERSION"),                // App version.
+            "aip" => "true",                                  // Anonymise IP address
+            "ds" => "pact-plugins-rust",                      // Data source
+            "cd2" => ci_context,                              // Custom Dimension 2: context
+            "cd3" => osarch.as_str(),                         // Custom Dimension 3: osarch
+            "cd4" => manifest.name.as_str(),                  // Custom Dimension 4: plugin_name
+            "cd5" => manifest.version.as_str(),               // Custom Dimension 5: plugin_version
+            "el" => "Plugin loaded",                          // Event
+            "ec" => "Plugin",                                 // Category
+            "ea" => "Loaded",                                 // Action
+            "ev" => "1"                                       // Value
+          };
           let result = Client::new().post("https://www.google-analytics.com/collect")
-            .json(&event_payload)
+            .form(&event_payload)
             .send()
             .await;
           if let Err(err) = result {
@@ -90,5 +96,31 @@ pub(crate) fn send_metrics(manifest: &PactPluginManifest) {
         debug!("Could not get the tokio runtime, will not send metrics - {}", err)
       }
     }
+  }
+}
+
+fn hostname_hash() -> String {
+  let host_name = if OS == "windows" {
+    var("COMPUTERNAME")
+  } else {
+    var("HOSTNAME")
+  }.or_else(|_| {
+    exec_hostname_command()
+  }).unwrap_or_else(|_| {
+    Uuid::new_v4().to_string()
+  });
+
+  let digest = md5::compute(host_name.as_bytes());
+  format!("{:x}", digest)
+}
+
+fn exec_hostname_command() -> anyhow::Result<String> {
+  match Command::new("hostname").output() {
+    Ok(output) => if output.status.success() {
+      Ok(str::from_utf8(&*output.stdout)?.to_string())
+    } else {
+      Err(anyhow!("Failed to invoke hostname command: status {}", output.status))
+    }
+    Err(err) => Err(anyhow!("Failed to invoke hostname command: {}", err))
   }
 }

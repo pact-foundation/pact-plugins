@@ -4,7 +4,7 @@ mod tests {
   use std::ffi::{CStr, CString};
   use std::fs::{create_dir_all, remove_dir_all, write};
   use std::panic::catch_unwind;
-  use std::path::{Path, PathBuf};
+  use std::path::Path;
   use std::ptr::null;
 
   use expectest::prelude::*;
