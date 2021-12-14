@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.12 - Bugfix Release
+
+* 085de61 - fix: correct the plugin load metric call which needs to be a URL encoded FORM POST (Ronald Holshausen, Fri Dec 10 16:56:11 2021 +1100)
+* aa19339 - bump version to 0.0.12 (Ronald Holshausen, Mon Nov 29 12:49:39 2021 +1100)
+
 # 0.0.11 - config section in plugin manifest
 
 * 01c3a5c - feat: support config section in plugin manifest (Ronald Holshausen, Mon Nov 29 12:34:00 2021 +1100)
