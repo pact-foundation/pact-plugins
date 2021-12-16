@@ -1077,35 +1077,6 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60db8fa6bea53e84288d8923571bfa739aafa5da285bd55f5903d78aef3a92f2"
-dependencies = [
- "anyhow",
- "async-trait",
- "bytes",
- "home",
- "itertools",
- "lazy_static",
- "log",
- "maplit",
- "os_info",
- "pact_models",
- "prost",
- "prost-types",
- "regex",
- "reqwest",
- "serde",
- "serde_json",
- "sysinfo",
- "tokio",
- "tonic",
- "tonic-build",
- "uuid",
-]
-
-[[package]]
-name = "pact-plugin-driver"
 version = "0.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "98941d4883c1fd233f7e59b71f7217e9d1f2c8277923e53fe2ab137ecfe918f6"
@@ -1208,9 +1179,9 @@ dependencies = [
 
 [[package]]
 name = "pact_ffi"
-version = "0.1.3"
+version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "687d4301a38cacd803a590c8dd0946af26fd76f79b2f0b4c8639b215daadadad"
+checksum = "593fab1d17384037594ef8f75ee34b110b83bfeac6793ab6c85a420437a684bd"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1228,7 +1199,7 @@ dependencies = [
  "multipart",
  "onig",
  "os_info",
- "pact-plugin-driver 0.0.11",
+ "pact-plugin-driver 0.0.12",
  "pact_matching",
  "pact_mock_server",
  "pact_models",
@@ -1351,9 +1322,9 @@ dependencies = [
 
 [[package]]
 name = "pact_verifier"
-version = "0.11.2"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "11366196dea5e714227a10afddc1b486d17dff43a4583df8ff12dca5f7d38114"
+checksum = "c008394d5958ca618ed53add45fff24ac786840e7d3d16c1c073f842909ca255"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -1369,7 +1340,7 @@ dependencies = [
  "log",
  "maplit",
  "mime",
- "pact-plugin-driver 0.0.11",
+ "pact-plugin-driver 0.0.12",
  "pact_matching",
  "pact_models",
  "regex",
