@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.13 - Bugfix Release
+
+* 5cec4c6 - fix(metrics): swap uid for cid (Ronald Holshausen, Mon Dec 20 11:12:48 2021 +1100)
+* b83fa60 - chore: update to latest pact consumer crate (Ronald Holshausen, Wed Dec 15 14:41:44 2021 +1100)
+* 653aa89 - bump version to 0.0.13 (Ronald Holshausen, Tue Dec 14 13:35:26 2021 +1100)
+
 # 0.0.12 - Bugfix Release
 
 * 085de61 - fix: correct the plugin load metric call which needs to be a URL encoded FORM POST (Ronald Holshausen, Fri Dec 10 16:56:11 2021 +1100)
