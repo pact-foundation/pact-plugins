@@ -32,13 +32,13 @@ dependencies {
     implementation('com.michael-bull.kotlin-result:kotlin-result:1.1.12') {
         exclude group: 'org.jetbrains.kotlin'
     }
-    implementation 'au.com.dius.pact.core:support:4.3.0-beta.6'
-    implementation 'au.com.dius.pact.core:model:4.3.0-beta.6'
-    implementation 'au.com.dius.pact.core:matchers:4.3.0-beta.6'
+    implementation 'au.com.dius.pact.core:support:4.3.2'
+    implementation 'au.com.dius.pact.core:model:4.3.2'
+    implementation 'au.com.dius.pact.core:matchers:4.3.2'
     implementation 'com.google.protobuf:protobuf-java:3.18.0'
     implementation 'ch.qos.logback:logback-classic:1.2.6'
     implementation 'com.github.os72:protoc-jar:3.11.4'
-    implementation "io.pact.plugin.driver:core:0.0.6"
+    implementation "io.pact.plugin.driver:core:0.0.9"
     implementation "org.apache.commons:commons-lang3:3.12.0"
     implementation 'com.google.guava:guava:31.0.1-jre'
     implementation 'org.apache.tika:tika-core:1.27'
