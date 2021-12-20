@@ -30,11 +30,11 @@ object PluginMetrics: KLogging() {
         try {
           val osName = lookupProperty("os.name")?.lowercase().orEmpty()
           val osArch = "$osName-${lookupProperty("os.arch")?.lowercase()}"
-          val entity = mapOf(
+          val attributes = mapOf(
             "v" to 1,                                               // Version of the API
             "t" to "event",                                         // Hit type, Specifies the metric is for an event
             "tid" to GA_ID,                                         // Property ID
-            "uid" to hostnameHash(osName),                          // Anonymous Client ID.
+            "cid" to hostnameHash(osName),                          // Anonymous Client ID.
             "an" to "pact-plugins-jvm",                             // App name.
             "aid" to "pact-plugins-jvm",                            // App Id
             "av" to lookupVersion(PluginMetrics::class.java),       // App version.
@@ -50,11 +50,13 @@ object PluginMetrics: KLogging() {
             "ea" to "Loaded",                                       // Action
             "ev" to 1                                               // Value
           )
+          val entity = attributes
             .filterValues { it != null }
             .map {
               BasicNameValuePair(it.key, it.value.toString())
             }
 
+          logger.debug { "Sending event to GA - $attributes" }
           val response = Request.post(GA_URL)
             .bodyForm(entity)
             .execute()

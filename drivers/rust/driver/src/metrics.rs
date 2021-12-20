@@ -68,7 +68,7 @@ pub(crate) fn send_metrics(manifest: &PactPluginManifest) {
             "v" => "1",                                       // Version of the API
             "t" => "event",                                   // Hit type, Specifies the metric is for an event
             "tid" => "UA-117778936-1",                        // Property ID
-            "uid" => uid.as_str(),                            // Anonymous Client ID.
+            "cid" => uid.as_str(),                            // Anonymous Client ID.
             "an" => "pact-plugins-rust",                      // App name.
             "aid" => "pact-plugins-rust",                     // App Id
             "av" => env!("CARGO_PKG_VERSION"),                // App version.
@@ -83,6 +83,7 @@ pub(crate) fn send_metrics(manifest: &PactPluginManifest) {
             "ea" => "Loaded",                                 // Action
             "ev" => "1"                                       // Value
           };
+          debug!("Sending event to GA - {:?}", event_payload);
           let result = Client::new().post("https://www.google-analytics.com/collect")
             .form(&event_payload)
             .send()
