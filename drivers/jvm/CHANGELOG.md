@@ -1,5 +1,17 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.9 - Bugfix Release
+
+* 5cec4c6 - fix(metrics): swap uid for cid (Ronald Holshausen, Mon Dec 20 11:12:48 2021 +1100)
+* 2b5664b - chore: update to the latest pact-ffi crate (Ronald Holshausen, Thu Dec 16 11:31:11 2021 +1100)
+* b83fa60 - chore: update to latest pact consumer crate (Ronald Holshausen, Wed Dec 15 14:41:44 2021 +1100)
+* 653aa89 - bump version to 0.0.13 (Ronald Holshausen, Tue Dec 14 13:35:26 2021 +1100)
+* fd704f4 - update changelog for release 0.0.12 (Ronald Holshausen, Tue Dec 14 13:27:25 2021 +1100)
+* 896e70e - chore: update crates (Ronald Holshausen, Tue Dec 14 13:22:30 2021 +1100)
+* 085de61 - fix: correct the plugin load metric call which needs to be a URL encoded FORM POST (Ronald Holshausen, Fri Dec 10 16:56:11 2021 +1100)
+* e0ea958 - fix: correct the protobuf FFI tests on Windows (Ronald Holshausen, Fri Dec 10 15:50:59 2021 +1100)
+* 92dbe94 - bump version to 0.0.9 (Ronald Holshausen, Fri Dec 10 12:08:22 2021 +1100)
+
 # 0.0.8 - Bugfix Release
 
 * 6d8da11 - chore: increase the plugin load timeout on CI for Windows build (Ronald Holshausen, Fri Dec 10 11:55:23 2021 +1100)
