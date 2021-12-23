@@ -1,5 +1,12 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.14 - Maintenance Release
+
+* 61f3d4c - chore: update pact models to 0.2.5 (Ronald Holshausen, Thu Dec 23 12:03:43 2021 +1100)
+* cbf7bd9 - chore: update pact models crate to latest (Ronald Holshausen, Tue Dec 21 13:19:42 2021 +1100)
+* f3b4c0d - chore: Update tonic, prost and pact_matching crates (Ronald Holshausen, Mon Dec 20 12:27:35 2021 +1100)
+* c5248a9 - bump version to 0.0.14 (Ronald Holshausen, Mon Dec 20 12:05:21 2021 +1100)
+
 # 0.0.13 - Bugfix Release
 
 * 5cec4c6 - fix(metrics): swap uid for cid (Ronald Holshausen, Mon Dec 20 11:12:48 2021 +1100)
