@@ -1102,9 +1102,9 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.0.13"
+version = "0.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a25530047d34eeda262b3648fcb25c2e17a42460077ce53661e52e5b084e407e"
+checksum = "5301905fe94e2c28e4d08042e915f8a6b81b11f0c1b7af8560c6b82390e156bf"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1117,16 +1117,16 @@ dependencies = [
  "md5",
  "os_info",
  "pact_models",
- "prost 0.8.0",
- "prost-types 0.8.0",
+ "prost 0.9.0",
+ "prost-types 0.9.0",
  "regex",
  "reqwest",
  "serde",
  "serde_json",
  "sysinfo",
  "tokio",
- "tonic 0.5.2",
- "tonic-build 0.5.2",
+ "tonic 0.6.2",
+ "tonic-build 0.6.2",
  "uuid",
 ]
 
@@ -1178,9 +1178,9 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "0.8.2"
+version = "0.8.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eefb7727d31bcc6031ab37141c09b1e23c4b49f736f9cacbcfc255121171a04f"
+checksum = "d87899f6a832e74709ec62f61557f8b80a77893f6970fcfaa47486f5f5d45966"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1191,7 +1191,7 @@ dependencies = [
  "libc",
  "log",
  "maplit",
- "pact-plugin-driver 0.0.12",
+ "pact-plugin-driver 0.0.14",
  "pact_matching",
  "pact_mock_server",
  "pact_models",
@@ -1245,9 +1245,9 @@ dependencies = [
 
 [[package]]
 name = "pact_matching"
-version = "0.11.4"
+version = "0.11.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0068a14bbf351aa1eff77d6b49e6e660c9240cc58552b17925bee8f1b2e653f7"
+checksum = "08c57544bbdca47a93c1d99a80764006f6e501b48ad2e7e1370ab57c86cf8659"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -1267,7 +1267,7 @@ dependencies = [
  "multipart",
  "nom",
  "onig",
- "pact-plugin-driver 0.0.13",
+ "pact-plugin-driver 0.0.14",
  "pact_models",
  "rand 0.8.4",
  "reqwest",
@@ -1282,9 +1282,9 @@ dependencies = [
 
 [[package]]
 name = "pact_mock_server"
-version = "0.8.3"
+version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1991b6a99cb4fdfca5f337c85beb4b4083dd247bf9d90bcb9a3734c351ce4be"
+checksum = "c014f538ca62cc2aaa244792a3624429bfc47515a30fbb4013cdb08baf5b883a"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1295,7 +1295,7 @@ dependencies = [
  "lazy_static",
  "log",
  "maplit",
- "pact-plugin-driver 0.0.12",
+ "pact-plugin-driver 0.0.14",
  "pact_matching",
  "pact_models",
  "rustls",
