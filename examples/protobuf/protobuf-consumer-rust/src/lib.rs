@@ -15,7 +15,7 @@ mod tests {
 
   use super::*;
 
-  #[tokio::test]
+  #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
   async fn test_proto_client() {
     let _ = env_logger::builder().is_test(true).try_init();
 
@@ -44,7 +44,7 @@ mod tests {
     }
   }
 
-  #[tokio::test]
+  #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
   async fn proto_with_message_fields() {
     let _ = env_logger::builder().is_test(true).try_init();
 

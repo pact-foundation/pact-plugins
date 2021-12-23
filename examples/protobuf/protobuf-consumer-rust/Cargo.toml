@@ -6,9 +6,9 @@ edition = "2018"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 anyhow = "1.0.43"
-tonic = "0.5.0"
-prost = "0.8.0"
-prost-types = "0.8.0"
+tonic = "0.6.2"
+prost = "0.9.0"
+prost-types = "0.9.0"
 
 [dev-dependencies]
 expectest = "0.12.0"
@@ -23,4 +23,4 @@ rand = "0.8.4"
 maplit = "1.0.2"
 
 [build-dependencies]
-tonic-build = "0.5"
+tonic-build = "0.6.2"
