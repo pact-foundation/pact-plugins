@@ -103,17 +103,17 @@ class PactConsumerTest {
         assertThat(response.getContents().getContent().getValue().toStringUtf8(), is("{}"));
         assertThat(response.getContents().getContentTypeHint(), is(Plugin.Body.ContentTypeHint.TEXT));
 
-        assertThat(response.getGeneratorsCount(), is(2));
-        Map<String, Plugin.Generator> generatorsMap = response.getGeneratorsMap();
-        assertThat(generatorsMap.keySet(), is(equalTo(Set.of("$.test.one", "$.test.two"))));
-        assertThat(generatorsMap.get("$.test.one").getType(), is(equalTo("DateTime")));
-        assertThat(generatorsMap.get("$.test.one").getValues().getFieldsMap().get("format").getStringValue(), is(equalTo("YYYY-MM-DD")));
-
         assertThat(response.getRulesCount(), is(1));
         Map<String, Plugin.MatchingRules> rulesMap = response.getRulesMap();
         assertThat(rulesMap.keySet().iterator().next(), is("$.test.one"));
         Plugin.MatchingRules matchingRules = rulesMap.get("$.test.one");
         assertThat(matchingRules.getRuleCount(), is(1));
         assertThat(matchingRules.getRule(0).getType(), is("regex"));
+
+        assertThat(response.getGeneratorsCount(), is(2));
+        Map<String, Plugin.Generator> generatorsMap = response.getGeneratorsMap();
+        assertThat(generatorsMap.keySet(), is(equalTo(Set.of("$.test.one", "$.test.two"))));
+        assertThat(generatorsMap.get("$.test.one").getType(), is(equalTo("DateTime")));
+        assertThat(generatorsMap.get("$.test.one").getValues().getFieldsMap().get("format").getStringValue(), is(equalTo("YYYY-MM-DD")));
     }
 }
