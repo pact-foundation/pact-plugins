@@ -129,7 +129,7 @@ class DriverPactTest {
           'catalogue': [
             'pact:match' : "eachValue(matching(\$'CatalogueEntry'))",
             'CatalogueEntry': [
-              'type': "matching(regex, 'content-matcher|content-generator', 'content-matcher')",
+              'type': "matching(regex, 'CONTENT_MATCHER|CONTENT_GENERATOR', 'CONTENT_MATCHER')",
               'key': "notEmpty('test')"
             ]
           ]
