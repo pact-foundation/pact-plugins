@@ -37,13 +37,9 @@ import io.pact.plugins.jvm.core.Utils.toProtoStruct
 import io.pact.plugins.jvm.core.Utils.valueToJson
 import mu.KLogging
 import org.apache.commons.lang3.SystemUtils
-import java.io.BufferedReader
 import java.io.File
-import java.io.IOException
-import java.io.InputStreamReader
 import java.lang.Runtime.getRuntime
 import java.nio.file.Path
-import java.nio.file.Paths
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.TimeUnit
 import javax.json.Json
@@ -692,9 +688,12 @@ object DefaultPluginManager: KLogging(), PluginManager {
           val pluginJson = file.bufferedReader().use { Json.createReader(it).readObject() }
           if (pluginJson != null) {
             val plugin = DefaultPactPluginManifest.fromJson(file.parentFile, pluginJson)
-            if (plugin.name == name && version == null || plugin.version == version) {
-              PLUGIN_MANIFEST_REGISTER["$name/${plugin.version}"] = plugin
-              return Ok(plugin)
+            if (plugin.name == name) {
+              val pluginVersion = Semver(plugin.version)
+              if (version == null || pluginVersion.satisfies("~$version")) {
+                PLUGIN_MANIFEST_REGISTER["$name/${plugin.version}"] = plugin
+                return Ok(plugin)
+              }
             }
           }
         }

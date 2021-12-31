@@ -31,6 +31,7 @@ dependencies {
     implementation 'au.com.dius.pact.core:support:4.3.2'
     implementation 'au.com.dius.pact.core:model:4.3.2'
     implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.1.1'
+    implementation 'com.vdurmont:semver4j:3.1.0'
 
     protobuf files('../../../proto/')
 
