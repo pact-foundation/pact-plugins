@@ -1,5 +1,13 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.15 - Bugfix Release
+
+* d3af83b - chore: Upgrade to pact_models 0.2.6 (Ronald Holshausen, Fri Dec 31 14:54:40 2021 +1100)
+* 7270c75 - fix: allow plugin versions to differ in patch version (Ronald Holshausen, Fri Dec 31 14:42:44 2021 +1100)
+* 8289071 - chore: correct the Protobuf pact tests to correctly reflect the proto file (Ronald Holshausen, Thu Dec 30 14:48:21 2021 +1100)
+* 27759eb - chore: Update pact_consumer crate to 0.8.3 (Ronald Holshausen, Thu Dec 23 13:51:02 2021 +1100)
+* 950b6ad - bump version to 0.0.15 (Ronald Holshausen, Thu Dec 23 12:50:35 2021 +1100)
+
 # 0.0.14 - Maintenance Release
 
 * 61f3d4c - chore: update pact models to 0.2.5 (Ronald Holshausen, Thu Dec 23 12:03:43 2021 +1100)
