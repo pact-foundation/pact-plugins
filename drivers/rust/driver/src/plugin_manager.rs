@@ -22,6 +22,7 @@ use crate::child_process::ChildPluginProcess;
 use crate::metrics::send_metrics;
 use crate::plugin_models::{PactPlugin, PactPluginManifest, PactPluginRpc, PluginDependency};
 use crate::proto::InitPluginRequest;
+use crate::utils::versions_compatible;
 
 lazy_static! {
   static ref PLUGIN_MANIFEST_REGISTER: Mutex<HashMap<String, PactPluginManifest>> = Mutex::new(HashMap::new());
@@ -107,15 +108,13 @@ fn load_manifest_from_disk(plugin_dep: &PluginDependency) -> anyhow::Result<Pact
           let manifest: PactPluginManifest = serde_json::from_reader(reader)?;
           trace!("Parsed plugin manifest: {:?}", manifest);
           let version = manifest.version.clone();
-          if manifest.name == plugin_dep.name && (plugin_dep.version.is_none() ||
-            plugin_dep.version.as_ref().unwrap() == &version) {
+          if manifest.name == plugin_dep.name && versions_compatible(version.as_str(), &plugin_dep.version) {
             let manifest = PactPluginManifest {
               plugin_dir: path.to_string_lossy().to_string(),
               ..manifest
             };
             let key = format!("{}/{}", manifest.name, version);
             {
-              let manifest = manifest.clone();
               let mut guard = PLUGIN_MANIFEST_REGISTER.lock().unwrap();
               guard.insert(key.clone(), manifest.clone());
             }

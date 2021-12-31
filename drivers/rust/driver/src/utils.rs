@@ -4,6 +4,7 @@ use std::collections::HashMap;
 
 use prost_types::{ListValue, Struct};
 use prost_types::value::Kind;
+use semver::{Version, VersionReq};
 use serde_json::{json, Value};
 
 /// Converts a map of key -> JSON to a prost Struct
@@ -75,5 +76,37 @@ pub fn proto_value_to_string(val: &prost_types::Value) -> Option<String> {
         .map(|v| proto_value_to_json(v)).collect()).to_string())
     }
     None => None
+  }
+}
+
+/// Check if the versions are compatible (differ in patch version only)
+pub fn versions_compatible(version: &str, required: &Option<String>) -> bool {
+  match required {
+    None => true,
+    Some(required) => if let Ok(version) = Version::parse(version) {
+      if let Ok(req) = VersionReq::parse(format!("~{}", required).as_str()) {
+        req.matches(&version)
+      } else {
+        false
+      }
+    } else {
+      false
+    }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use expectest::prelude::*;
+
+  use super::versions_compatible;
+
+  #[test]
+  fn versions_compatible_test() {
+    expect!(versions_compatible("1.0.0", &None)).to(be_true());
+    expect!(versions_compatible("1.0.0", &Some("1.0.0".to_string()))).to(be_true());
+    expect!(versions_compatible("1.0.0", &Some("1.0.1".to_string()))).to(be_false());
+    expect!(versions_compatible("1.0.4", &Some("1.0.3".to_string()))).to(be_true());
+    expect!(versions_compatible("1.0.1", &Some("1.1.0".to_string()))).to(be_false());
   }
 }
