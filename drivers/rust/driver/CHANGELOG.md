@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.16 - Maintenance Release
+
+* e0b779d - chore: add some trace statements for looking up content handlers (Ronald Holshausen, Tue Jan 4 09:17:06 2022 +1100)
+* 3e58db9 - bump version to 0.0.16 (Ronald Holshausen, Fri Dec 31 15:00:13 2021 +1100)
+
 # 0.0.15 - Bugfix Release
 
 * d3af83b - chore: Upgrade to pact_models 0.2.6 (Ronald Holshausen, Fri Dec 31 14:54:40 2021 +1100)
