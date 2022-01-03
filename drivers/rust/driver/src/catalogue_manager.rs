@@ -177,8 +177,11 @@ pub fn remove_plugin_entries(name: &String) {
 pub fn find_content_matcher(content_type: &ContentType) -> Option<ContentMatcher> {
   debug!("Looking for a content matcher for {}", content_type);
   let guard = CATALOGUE_REGISTER.lock().unwrap();
+  trace!("Catalogue has {} entries", guard.len());
   guard.values().find(|entry| {
+    trace!("Catalogue entry {:?}", entry);
     if entry.entry_type == CatalogueEntryType::CONTENT_MATCHER {
+      trace!("Catalogue entry is a content matcher for {:?}", entry.values.get("content-types"));
       if let Some(content_types) = entry.values.get("content-types") {
         content_types.split(";").any(|ct| matches_pattern(ct.trim(), content_type))
       } else {
