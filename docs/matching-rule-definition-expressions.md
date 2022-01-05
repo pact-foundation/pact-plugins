@@ -72,4 +72,4 @@ For example: `eachValue(matching(type, 100))`
 
 ## Grammar
 
-There is a grammar for the definitions in [ANTLR4 format](./matching-rule-definition.g4).
+There is a grammar for the definitions in [ANTLR4 format](https://github.com/pact-foundation/pact-plugins/blob/main/docs/matching-rule-definition.g4).
