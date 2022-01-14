@@ -107,7 +107,7 @@ mod tests {
         interaction
           .request
           .post()
-          .contents("application/protobuf;message=ShapeMessage".into(), json!({
+          .contents("application/protobuf".into(), json!({
             "pact:proto": proto_file.to_str().unwrap(),
             "pact:message-type": "ShapeMessage",
             "rectangle": {
@@ -117,7 +117,7 @@ mod tests {
           }))
           .await
           .path("/calculate");
-        interaction.response.contents("application/protobuf;message=AreaResponse".into(), json!({
+        interaction.response.contents("application/protobuf".into(), json!({
             "pact:proto": proto_file.to_str().unwrap(),
             "pact:message-type": "AreaResponse",
             "value": "matching(number, 12)"
