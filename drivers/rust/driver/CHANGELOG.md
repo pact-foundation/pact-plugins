@@ -1,5 +1,12 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.17 - Bugfix Release
+
+* d97daeb - chore: Upgrade pact-models crate to 0.2.7 (Ronald Holshausen, Mon Jan 17 10:58:01 2022 +1100)
+* e871081 - fix: log crate version must be fixed across all pact crates (i.e. pact FFI) (Ronald Holshausen, Fri Jan 14 16:12:48 2022 +1100)
+* 883a414 - chore: Update pact_consumer to 0.8.4 (Ronald Holshausen, Tue Jan 4 12:55:06 2022 +1100)
+* 676a728 - bump version to 0.0.17 (Ronald Holshausen, Tue Jan 4 09:25:39 2022 +1100)
+
 # 0.0.16 - Maintenance Release
 
 * e0b779d - chore: add some trace statements for looking up content handlers (Ronald Holshausen, Tue Jan 4 09:17:06 2022 +1100)
