@@ -1075,9 +1075,9 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.0.14"
+version = "0.0.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5301905fe94e2c28e4d08042e915f8a6b81b11f0c1b7af8560c6b82390e156bf"
+checksum = "59c93e9f4cfb0b9164beeea95b126f846cddce59c9d81b4c8f2636cfe5c8b94e"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1094,6 +1094,7 @@ dependencies = [
  "prost-types",
  "regex",
  "reqwest",
+ "semver 1.0.4",
  "serde",
  "serde_json",
  "sysinfo",
@@ -1105,9 +1106,9 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.0.16"
+version = "0.0.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59c93e9f4cfb0b9164beeea95b126f846cddce59c9d81b4c8f2636cfe5c8b94e"
+checksum = "66754036142fadeb2d30fc184d4df61c80ff5d606c0c038782f2bf41cb26479b"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1183,9 +1184,9 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "0.8.4"
+version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f3839647e3696c0ee608df8f8d53dbe2c2840d7230914b1545c996af4f5a27f"
+checksum = "e621b806fc92031b9ec88738174692b61c82758423c3aee8d4f668ec1703dd34"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1196,7 +1197,7 @@ dependencies = [
  "libc",
  "log",
  "maplit",
- "pact-plugin-driver 0.0.16",
+ "pact-plugin-driver 0.0.17",
  "pact_matching",
  "pact_mock_server",
  "pact_models",
@@ -1250,9 +1251,9 @@ dependencies = [
 
 [[package]]
 name = "pact_matching"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6617f927633c96a92f961f84aecacbf93376e90c33b6836391bc4e4ff296b868"
+checksum = "c070a3ee842aba1ad1baf5e0828976d34e10d1b2e9b2f3f186dfa070b9c0e371"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -1272,7 +1273,7 @@ dependencies = [
  "multipart",
  "nom",
  "onig",
- "pact-plugin-driver 0.0.14",
+ "pact-plugin-driver 0.0.17",
  "pact_models",
  "rand 0.8.4",
  "reqwest",
@@ -1287,9 +1288,9 @@ dependencies = [
 
 [[package]]
 name = "pact_mock_server"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9bbf27930ea95ba1accccc76312525a10cd7c6fbe3f1e7141a284db1ac869b0b"
+checksum = "1a42dc9efc2c74f374849d1eb84ded3a1ecaf642c5bad7ca7f41e4e212d9e6f2"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1300,7 +1301,7 @@ dependencies = [
  "lazy_static",
  "log",
  "maplit",
- "pact-plugin-driver 0.0.16",
+ "pact-plugin-driver 0.0.17",
  "pact_matching",
  "pact_models",
  "rustls",
