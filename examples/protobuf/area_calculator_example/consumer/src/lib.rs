@@ -109,7 +109,7 @@ mod tests {
           .post()
           .contents("application/protobuf".into(), json!({
             "pact:proto": proto_file.to_str().unwrap(),
-            "pact:message-type": "ShapeMessage",
+            "pact:proto-service": "Calculator/calculate:request",
             "rectangle": {
               "length": "matching(number, 3)",
               "width": "matching(number, 4)"
@@ -119,7 +119,7 @@ mod tests {
           .path("/calculate");
         interaction.response.contents("application/protobuf".into(), json!({
             "pact:proto": proto_file.to_str().unwrap(),
-            "pact:message-type": "AreaResponse",
+            "pact:proto-service": "Calculator/calculate:response",
             "value": "matching(number, 12)"
           })).await;
 
@@ -145,7 +145,7 @@ mod tests {
       .bytes()
       .await
       .unwrap();
-    let area = AreaResponse::decode(response).unwrap();
+    let area = AreaResponse::decode(dbg!(response)).unwrap();
     expect!(area.value).to(be_equal_to(12.0));
   }
 }
