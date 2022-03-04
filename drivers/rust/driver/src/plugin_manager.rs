@@ -273,7 +273,7 @@ fn publish_updated_catalogue() {
   // }
 }
 
-/// Decrement access to the plugin. If the current access could is zero, shut down the plugin
+/// Decrement access to the plugin. If the current access count is zero, shut down the plugin
 pub fn drop_plugin_access(plugin: &PluginDependency) {
   let thread_id = thread::current().id();
 

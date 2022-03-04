@@ -6,6 +6,7 @@ import java.lang.Thread.sleep
 import java.util.concurrent.LinkedBlockingDeque
 import javax.json.Json
 import javax.json.JsonObject
+import javax.json.stream.JsonParsingException
 
 /**
  * This class manages the running child process for a plugin
@@ -43,8 +44,12 @@ open class ChildProcess(
             logger.debug { "Plugin ${manifest.name} [${process.pid()}] || $line" }
             if (line.trim().startsWith("{")) {
               logger.debug("Got JSON message from plugin process")
-              val jsonReader = Json.createReader(StringReader(line.trim()));
-              channel.offer(jsonReader.readObject())
+              try {
+                val jsonReader = Json.createReader(StringReader(line.trim()));
+                channel.offer(jsonReader.readObject())
+              } catch (ex: JsonParsingException) {
+                logger.debug(ex) { "Failed to parse JSON message, ignoring it" }
+              }
             }
           }
         }

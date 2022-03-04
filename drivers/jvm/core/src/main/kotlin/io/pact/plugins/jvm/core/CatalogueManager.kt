@@ -46,7 +46,9 @@ object CatalogueManager : KLogging() {
    * Lookup entry by key. Entries are keyed by <core|plugin>/<plugin-name>?/<entry-type>/<entry-key>
    */
   fun lookupEntry(key: String): CatalogueEntry? {
-    return catalogue[key]
+    return catalogue[key] ?: catalogue.entries.firstOrNull {
+      it.key.endsWith(key)
+    }?.value
   }
 
   /**
@@ -91,25 +93,17 @@ object CatalogueManager : KLogging() {
     else null
   }
 
-  // TODO
-  // /// Remove entries for a plugin
-  //pub fn remove_plugin_entries(name: &String) {
-  //  let prefix = format!("plugin/{}/", name);
-  //  let keys: Vec<String> = {
-  //    let guard = CATALOGUE_REGISTER.lock().unwrap();
-  //    guard.keys()
-  //      .filter(|key| key.starts_with(&prefix))
-  //      .cloned()
-  //      .collect()
-  //  };
-  //
-  //  let mut guard = CATALOGUE_REGISTER.lock().unwrap();
-  //  for key in keys {
-  //    guard.remove(&key);
-  //  }
-  //
-  //  debug!("Removed all catalogue entries for plugin {}", name);
-  //}
+  /**
+   * Remove entries for a plugin
+   */
+  fun removePluginEntries(name: String) {
+    val prefix = "plugin/$name/"
+    catalogue.values.removeIf {
+      it.key.startsWith(prefix)
+    }
+
+    logger.debug { "Removed all catalogue entries for plugin $name" }
+  }
 }
 
 private fun ContentType.matches(type: String) = this.getBaseType().orEmpty().matches(Regex(type))

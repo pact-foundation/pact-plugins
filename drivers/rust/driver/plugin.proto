@@ -215,6 +215,49 @@ message GenerateContentResponse {
   Body contents = 1;
 }
 
+// Request to start a mock server
+message StartMockServerRequest {
+  // Interface to bind to. Will default to the loopback adapter
+  string hostInterface = 1;
+  // Port to bind to. Default (or a value of 0) get the OS to open a random port
+  uint32 port = 2;
+  // If TLS should be used (if supported by the mock server)
+  bool tls = 3;
+  // Pact as JSON to use for the mock server behaviour
+  string pact = 4;
+}
+
+// Response to the start mock server request
+message StartMockServerResponse {
+  oneof response {
+    // If an error occurred
+    string error = 1;
+
+    // Mock server details
+    MockServerDetails details = 2;
+  }
+}
+
+// Details on a running mock server
+message MockServerDetails {
+  // Mock server unique key
+  string key = 1;
+  // Port the mock server is running on
+  uint32 port = 2;
+  // IP address the mock server is bound to. Probably an IP6 address, but may be IP4
+  string address = 3;
+}
+
+// Request to shut down a running mock server
+message ShutdownMockServerRequest {
+
+}
+
+// Response to the shut down mock server request
+message ShutdownMockServerResponse {
+
+}
+
 service PactPlugin {
   // Check that the plugin loaded OK. Returns the catalogue entries describing what the plugin provides
   rpc InitPlugin(InitPluginRequest) returns (InitPluginResponse);
@@ -226,4 +269,9 @@ service PactPlugin {
   rpc ConfigureInteraction(ConfigureInteractionRequest) returns (ConfigureInteractionResponse);
   // Request to generate the content using any defined generators
   rpc GenerateContent(GenerateContentRequest) returns (GenerateContentResponse);
+
+  // Start a mock server
+  rpc StartMockServer(StartMockServerRequest) returns (StartMockServerResponse);
+  // Shutdown a running mock server
+  rpc ShutdownMockServer(ShutdownMockServerRequest) returns (ShutdownMockServerResponse);
 }

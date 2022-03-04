@@ -2,7 +2,9 @@ package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.model.ContentType
 import au.com.dius.pact.core.model.ContentTypeHint
+import au.com.dius.pact.core.model.DefaultPactWriter
 import au.com.dius.pact.core.model.OptionalBody
+import au.com.dius.pact.core.model.Pact
 import au.com.dius.pact.core.model.PactSpecVersion
 import au.com.dius.pact.core.model.generators.Category
 import au.com.dius.pact.core.model.generators.Generator
@@ -23,8 +25,10 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.BytesValue
 import com.google.protobuf.Struct
 import com.vdurmont.semver4j.Semver
+import io.grpc.CallCredentials
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
+import io.grpc.Metadata
 import io.grpc.stub.AbstractBlockingStub
 import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.PactPluginGrpc.newBlockingStub
@@ -38,9 +42,12 @@ import io.pact.plugins.jvm.core.Utils.valueToJson
 import mu.KLogging
 import org.apache.commons.lang3.SystemUtils
 import java.io.File
+import java.io.PrintWriter
+import java.io.StringWriter
 import java.lang.Runtime.getRuntime
 import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import javax.json.Json
 import javax.json.JsonObject
@@ -184,6 +191,9 @@ data class DefaultPactPluginManifest(
   }
 }
 
+/**
+ * Interface to a running Pact Plugin
+ */
 interface PactPlugin {
   val manifest: PactPluginManifest
   val port: Int?
@@ -193,11 +203,20 @@ interface PactPlugin {
   var catalogueEntries: List<Plugin.CatalogueEntry>?
   var channel: ManagedChannel?
 
+  /**
+   * Shutdown the running plugin
+   */
   fun shutdown()
 
+  /**
+   * Invoke the callback with a gRPC stub connected to the running plugin
+   */
   fun <T> withGrpcStub(callback: java.util.function.Function<PactPluginGrpc.PactPluginBlockingStub, T>): T
 }
 
+/**
+ * Default implementation of a Pact Plugin
+ */
 data class DefaultPactPlugin(
   val cp: ChildProcess,
   override val manifest: PactPluginManifest,
@@ -222,6 +241,9 @@ data class DefaultPactPlugin(
   }
 }
 
+/**
+ * Interface to a plugin manager that provides access to a plugin running as a child process
+ */
 interface PluginManager {
   /**
    * Loads the plugin by name
@@ -259,6 +281,16 @@ interface PluginManager {
     generators: Map<String, Generator>,
     body: OptionalBody
   ): OptionalBody
+
+  /**
+   * Starts a mock server given the catalog entry for it and a Pact
+   */
+  fun startMockServer(catalogueEntry: CatalogueEntry, config: MockServerConfig, pact: Pact): MockServerDetails
+
+  /**
+   * Shutdowns a running mock server. Will return an error message if the mock server can not be shutdown.
+   */
+  fun shutdownMockServer(mockServer: MockServerDetails): String?
 }
 
 object DefaultPluginManager: KLogging(), PluginManager {
@@ -495,6 +527,41 @@ object DefaultPluginManager: KLogging(), PluginManager {
     return OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType)
   }
 
+  override fun startMockServer(
+    catalogueEntry: CatalogueEntry,
+    config: MockServerConfig,
+    pact: Pact
+  ): MockServerDetails {
+    val plugin = lookupPlugin(catalogueEntry.pluginName, null) ?:
+      throw PactPluginNotFoundException(catalogueEntry.pluginName, null)
+
+    val writer = StringWriter()
+    DefaultPactWriter.writePact(pact, PrintWriter(writer), PactSpecVersion.V4)
+
+    val request = Plugin.StartMockServerRequest.newBuilder()
+      .setPact(writer.toString())
+
+    logger.debug { "Sending startMockServer request to plugin ${plugin.manifest}" }
+    val response = plugin.withGrpcStub { stub -> stub.startMockServer(request.build()) }
+    logger.debug { "Got response: $response" }
+
+    if (response.hasError()) {
+      throw PactPluginMockServerErrorException(catalogueEntry.pluginName, response.error)
+    }
+    val details = response.details
+    return MockServerDetails(details.key, details.address, details.port, plugin)
+  }
+
+  override fun shutdownMockServer(mockServer: MockServerDetails): String? {
+    val request = Plugin.ShutdownMockServerRequest.newBuilder()
+
+    logger.debug { "Sending shutdownMockServer request to plugin ${mockServer.plugin.manifest}" }
+    val response = mockServer.plugin.withGrpcStub { stub -> stub.shutdownMockServer(request.build()) }
+    logger.debug { "Got response: $response" }
+
+    return "" // TODO: extract any error here
+  }
+
   private fun initialisePlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
     val result = when (manifest.executableType) {
       "exec" -> startPluginProcess(manifest)
@@ -510,7 +577,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
           val channel = ManagedChannelBuilder.forTarget("127.0.0.1:${plugin.port}")
             .usePlaintext()
             .build()
-          val stub = newBlockingStub(channel)
+          val stub = newBlockingStub(channel).withCallCredentials(BearerCredentials(plugin.serverKey))
           plugin.stub = stub
           plugin.channel = channel
 
@@ -539,7 +606,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
 
     Thread {
       publishUpdatedCatalogue()
-    }.run()
+    }.start()
   }
 
   private fun publishUpdatedCatalogue() {
@@ -689,8 +756,8 @@ object DefaultPluginManager: KLogging(), PluginManager {
           if (pluginJson != null) {
             val plugin = DefaultPactPluginManifest.fromJson(file.parentFile, pluginJson)
             if (plugin.name == name) {
-              val pluginVersion = Semver(plugin.version)
-              if (version == null || pluginVersion.satisfies("~$version")) {
+              val pluginVersion = Semver(plugin.version, Semver.SemverType.NPM)
+              if (version == null || plugin.version == version || pluginVersion.satisfies("~$version")) {
                 PLUGIN_MANIFEST_REGISTER["$name/${plugin.version}"] = plugin
                 return Ok(plugin)
               }
@@ -715,6 +782,22 @@ object DefaultPluginManager: KLogging(), PluginManager {
       System.getenv("HOME") + "/.pact/plugins"
     }
   }
+}
+
+class BearerCredentials(private val serverKey: String?) : CallCredentials() {
+  override fun applyRequestMetadata(
+    requestInfo: RequestInfo,
+    appExecutor: Executor,
+    applier: MetadataApplier
+  ) {
+    if (serverKey.isNotEmpty()) {
+      val metadata = Metadata()
+      metadata.put(Metadata.Key.of("authorization", Metadata.ASCII_STRING_MARSHALLER), serverKey)
+      applier.apply(metadata)
+    }
+  }
+
+  override fun thisUsesUnstableApi() {}
 }
 
 /**
