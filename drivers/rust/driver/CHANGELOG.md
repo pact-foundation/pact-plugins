@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.18 - Upgrade pact-models to 0.3.0
+
+* ca7d4d1 - chore: Upgrade pact-models to 0.3.0 (Ronald Holshausen, Fri Mar 4 12:02:06 2022 +1100)
+* 686bbca - chore: Upgrade pact consumer crate to 0.8.5 (Ronald Holshausen, Wed Jan 19 11:30:59 2022 +1100)
+* a45fac8 - bump version to 0.0.18 (Ronald Holshausen, Mon Jan 17 11:19:34 2022 +1100)
+
 # 0.0.17 - Bugfix Release
 
 * d97daeb - chore: Upgrade pact-models crate to 0.2.7 (Ronald Holshausen, Mon Jan 17 10:58:01 2022 +1100)

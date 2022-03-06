@@ -26,26 +26,26 @@ tonic = "0.6.2"
 prost = "0.9.0"
 prost-types = "0.9.0"
 tokio = { version = "1.0", features = ["full"] }
-sysinfo = "0.20.0"
-itertools = "0.10.1"
-pact_models = "0.2.7"
-regex = "1.4"
-bytes = "1.0.1"
+sysinfo = "0.21.2"
+itertools = "0.10.3"
+pact_models = "0.3.0"
+regex = "1.5.4"
+bytes = "1.1.0"
 uuid = { version = "0.8.2", features = ["v4"] }
-async-trait = "0.1.51"
-os_info = "3.0.7"
+async-trait = "0.1.52"
+os_info = "3.2.0"
 md5 = "0.7.0"
-semver = "1.0.4"
+semver = "1.0.6"
 
 [dependencies.reqwest]
-version = "0.11"
+version = "0.11.9"
 default-features = false
 features = ["rustls-tls", "rustls-tls-native-roots", "json", "gzip", "deflate"]
 
 [dev-dependencies]
 expectest = "0.12.0"
-env_logger = "0.8"
-pact_consumer = "0.8.5"
+env_logger = "0.9.0"
+pact_consumer = "0.8.6"
 
 [build-dependencies]
 tonic-build = "0.6.2"
