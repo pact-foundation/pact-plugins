@@ -4,7 +4,6 @@ use std::str::from_utf8;
 
 use anyhow::anyhow;
 use bytes::Bytes;
-use log::{debug, error};
 use maplit::hashmap;
 use pact_models::bodies::OptionalBody;
 use pact_models::content_types::ContentTypeHint;
@@ -12,10 +11,11 @@ use pact_models::matchingrules::{Category, MatchingRule, MatchingRuleCategory, R
 use pact_models::path_exp::DocPath;
 use pact_models::prelude::{ContentType, Generator, GeneratorCategory, Generators, RuleLogic};
 use serde_json::Value;
+use tracing::{debug, error};
 
 use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
 use crate::plugin_manager::lookup_plugin;
-use crate::plugin_models::{PactPluginManifest, PluginInteractionConfig, PactPluginRpc};
+use crate::plugin_models::{PactPluginManifest, PactPluginRpc, PluginInteractionConfig};
 use crate::proto::{
   Body,
   CompareContentsRequest,

@@ -12,10 +12,11 @@ use std::thread;
 
 use anyhow::anyhow;
 use lazy_static::lazy_static;
-use log::{debug, max_level, trace, warn};
+use log::max_level;
 use os_info::Type;
 use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
 use tokio::process::Command;
+use tracing::{debug, trace, warn};
 
 use crate::catalogue_manager::{register_plugin_entries, remove_plugin_entries};
 use crate::child_process::ChildPluginProcess;

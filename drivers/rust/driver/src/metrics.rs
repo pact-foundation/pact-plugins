@@ -4,9 +4,9 @@ use std::process::Command;
 use std::str;
 
 use anyhow::anyhow;
-use log::{debug, warn};
 use maplit::hashmap;
 use reqwest::Client;
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::plugin_models::PactPluginManifest;

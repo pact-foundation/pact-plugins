@@ -1153,6 +1153,7 @@ dependencies = [
  "tokio",
  "tonic",
  "tonic-build",
+ "tracing",
  "uuid",
 ]
 

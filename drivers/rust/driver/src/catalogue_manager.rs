@@ -6,16 +6,15 @@ use std::sync::Mutex;
 
 use itertools::Itertools;
 use lazy_static::lazy_static;
-use log::{debug, error, trace};
 use maplit::hashset;
+use pact_models::content_types::ContentType;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use tracing::{debug, error, trace};
 
-use pact_models::content_types::ContentType;
-
-use crate::content::{ContentMatcher, ContentGenerator};
+use crate::content::{ContentGenerator, ContentMatcher};
 use crate::plugin_models::PactPluginManifest;
-use crate::proto::{CatalogueEntry as ProtoCatalogueEntry};
+use crate::proto::CatalogueEntry as ProtoCatalogueEntry;
 use crate::proto::catalogue_entry::EntryType;
 
 lazy_static! {

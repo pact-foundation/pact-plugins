@@ -1,14 +1,14 @@
 //! Module for managing running child processes
 
-use std::time::Duration;
 use std::sync::mpsc::channel;
+use std::time::Duration;
 
 use anyhow::anyhow;
-use log::{debug, error, trace, warn};
 use serde::{Deserialize, Serialize};
 use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child;
+use tracing::{debug, error, trace, warn};
 
 use crate::plugin_models::PactPluginManifest;
 
