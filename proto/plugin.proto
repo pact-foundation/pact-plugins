@@ -240,7 +240,7 @@ message StartMockServerResponse {
 
 // Details on a running mock server
 message MockServerDetails {
-  // Mock server unique key
+  // Mock server unique ID
   string key = 1;
   // Port the mock server is running on
   uint32 port = 2;
@@ -250,12 +250,26 @@ message MockServerDetails {
 
 // Request to shut down a running mock server
 message ShutdownMockServerRequest {
+  // The server ID to shutdown
+  string serverKey = 1;
+}
 
+// Result of a request that the mock server received
+message MockServerResult {
+  // service + method that was requested
+  string path = 1;
+  // If an error occurred trying to handle the request
+  string error = 2;
+  // Any mismatches that occurred
+  repeated ContentMismatches mismatches = 3;
 }
 
 // Response to the shut down mock server request
 message ShutdownMockServerResponse {
-
+  // If the mock status is all ok
+  bool ok = 1;
+  // The results of the test run, will contain an entry for each request received by the mock server
+  repeated MockServerResult results = 2;
 }
 
 service PactPlugin {
