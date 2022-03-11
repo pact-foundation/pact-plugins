@@ -45,3 +45,31 @@ data class MockServerDetails(
    */
   val plugin: PactPlugin
 )
+
+/**
+ * Results from the mock server. These will be returned when the mock server is shutdown
+ */
+data class MockServerResults(
+  /** service + method that was requested */
+  val path: String,
+  /** If an error occurred trying to handle the request */
+  val error: String?,
+  /** Any mismatches that occurred */
+  val mismatches: List<MockServerMismatch>
+)
+
+/**
+ * Mismatch detected by the mock server
+ */
+data class MockServerMismatch(
+  /** Expected data bytes */
+  val expected: Any?,
+  /** Actual data bytes */
+  val actual: Any?,
+  /** Description of the mismatch */
+  val mismatch: String,
+  /** Path to the item that was matched. This is the value as per the documented Pact matching rule expressions. */
+  val path: String,
+  /** Optional diff of the contents */
+  val diff: String?
+)

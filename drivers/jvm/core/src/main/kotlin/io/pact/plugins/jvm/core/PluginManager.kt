@@ -288,9 +288,9 @@ interface PluginManager {
   fun startMockServer(catalogueEntry: CatalogueEntry, config: MockServerConfig, pact: Pact): MockServerDetails
 
   /**
-   * Shutdowns a running mock server. Will return an error message if the mock server can not be shutdown.
+   * Shutdowns a running mock server. Will return any errors from the mock server.
    */
-  fun shutdownMockServer(mockServer: MockServerDetails): String?
+  fun shutdownMockServer(mockServer: MockServerDetails): List<MockServerResults>?
 }
 
 object DefaultPluginManager: KLogging(), PluginManager {
@@ -552,14 +552,21 @@ object DefaultPluginManager: KLogging(), PluginManager {
     return MockServerDetails(details.key, details.address, details.port, plugin)
   }
 
-  override fun shutdownMockServer(mockServer: MockServerDetails): String? {
+  override fun shutdownMockServer(mockServer: MockServerDetails): List<MockServerResults>? {
     val request = Plugin.ShutdownMockServerRequest.newBuilder()
+      .setServerKey(mockServer.key)
 
     logger.debug { "Sending shutdownMockServer request to plugin ${mockServer.plugin.manifest}" }
     val response = mockServer.plugin.withGrpcStub { stub -> stub.shutdownMockServer(request.build()) }
     logger.debug { "Got response: $response" }
 
-    return "" // TODO: extract any error here
+    return if (response.ok) null else response.resultsList.map { result ->
+      MockServerResults(result.path, result.error, result.mismatchesList.map {
+        MockServerMismatch(
+          it.expected, it.actual, it.mismatch, it.path, it.diff
+        )
+      })
+    }
   }
 
   private fun initialisePlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
