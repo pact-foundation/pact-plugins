@@ -261,7 +261,7 @@ message MockServerResult {
   // If an error occurred trying to handle the request
   string error = 2;
   // Any mismatches that occurred
-  repeated ContentMismatches mismatches = 3;
+  repeated ContentMismatch mismatches = 3;
 }
 
 // Response to the shut down mock server request
