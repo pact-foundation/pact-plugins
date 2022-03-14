@@ -1,6 +1,7 @@
 package io.pact.example.grpc.consumer;
 
 import area_calculator.AreaCalculator;
+import area_calculator.CalculatorGrpc;
 import au.com.dius.pact.consumer.MockServer;
 import au.com.dius.pact.consumer.dsl.PactBuilder;
 import au.com.dius.pact.consumer.junit.MockServerConfig;
@@ -55,14 +56,21 @@ public class PactConsumerTest {
   @Test
   @PactTestFor(pactMethod = "calculateRectangleArea")
   @MockServerConfig(implementation = MockServerImplementation.Plugin, registryEntry = "protobuf/mock-server/grpc")
-  void consumeInitPluginMessage(MockServer mockServer, V4Interaction.SynchronousMessages interaction) throws InvalidProtocolBufferException {
-    AreaCalculator.ShapeMessage shapeMessage = AreaCalculator.ShapeMessage.parseFrom(interaction.getRequest().getContents().getValue());
-
-    ManagedChannel channel = ManagedChannelBuilder.forTarget("127.0.0.1:" + mockServer.getPort())
+  void calculateRectangleArea(MockServer mockServer, V4Interaction.SynchronousMessages interaction) throws InvalidProtocolBufferException {
+    ManagedChannel channel = ManagedChannelBuilder.forTarget("[::1]:" + mockServer.getPort())
       .usePlaintext()
       .build();
-    AreaCalculator.AreaResponse response = newBlockingStub(channel).calculate(shapeMessage);
+    CalculatorGrpc.CalculatorBlockingStub stub = newBlockingStub(channel);
 
-    assertThat(response.getValue(), equalTo(12.0));
+    // Correct request
+    AreaCalculator.ShapeMessage shapeMessage = AreaCalculator.ShapeMessage.parseFrom(interaction.getRequest().getContents().getValue());
+    AreaCalculator.AreaResponse response = stub.calculate(shapeMessage);
+    assertThat(response.getValue(), equalTo(12.0F));
+
+    // Incorrect request, missing the length field
+    //AreaCalculator.ShapeMessage.Builder builder = AreaCalculator.ShapeMessage.newBuilder();
+    //AreaCalculator.Rectangle rectangle = builder.getRectangleBuilder().setWidth(22).build();
+    //shapeMessage = builder.setRectangle(rectangle).build();
+    //stub.calculate(shapeMessage);
   }
 }
