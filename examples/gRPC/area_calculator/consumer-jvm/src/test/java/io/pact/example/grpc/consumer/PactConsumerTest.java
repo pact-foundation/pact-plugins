@@ -37,7 +37,7 @@ public class PactConsumerTest {
       .expectsToReceive("calculate rectangle area request", "core/interaction/synchronous-message")
       .with(Map.of(
         "pact:proto", filePath("../proto/area_calculator.proto"),
-        "pact:content-type", "application/protobuf",
+        "pact:content-type", "application/grpc",
         "pact:proto-service", "Calculator/calculate",
         "request", Map.of(
           "rectangle", Map.of(
