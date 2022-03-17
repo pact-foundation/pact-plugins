@@ -581,7 +581,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
         PLUGIN_REGISTER["${manifest.name}/${manifest.version}"] = plugin
         logger.debug { "Plugin process started OK (port = ${plugin.port}), sending init message" }
         handleWith<PactPlugin> {
-          val channel = ManagedChannelBuilder.forTarget("127.0.0.1:${plugin.port}")
+          val channel = ManagedChannelBuilder.forTarget("[::1]:${plugin.port}")
             .usePlaintext()
             .build()
           val stub = newBlockingStub(channel).withCallCredentials(BearerCredentials(plugin.serverKey))

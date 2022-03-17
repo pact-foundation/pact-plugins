@@ -61,7 +61,7 @@ object CatalogueManager : KLogging() {
         if (contentTypes.isNullOrEmpty()) {
           false
         } else {
-          contentTypes.any { contentType.matches(it) }
+          contentTypes.any { contentType.matches(it.trim()) }
         }
       } else {
         false
@@ -82,7 +82,7 @@ object CatalogueManager : KLogging() {
         if (contentTypes.isNullOrEmpty()) {
           false
         } else {
-          contentTypes.any { contentType.matches(it) }
+          contentTypes.any { contentType.matches(it.trim()) }
         }
       } else {
         false
