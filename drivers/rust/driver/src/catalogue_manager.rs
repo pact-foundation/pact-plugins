@@ -151,8 +151,14 @@ pub fn register_core_entries(entries: &Vec<CatalogueEntry>) {
   }
 }
 
-/// Remove entries for a plugin
-pub fn remove_plugin_entries(name: &String) {
+/// Lookup an entry in the catalogie by the key
+pub fn lookup_entry(key: &str) -> Option<CatalogueEntry> {
+  let inner = CATALOGUE_REGISTER.lock().unwrap();
+  inner.get(key).cloned()
+}
+
+/// Remove all entries for a plugin given the plugin name
+pub fn remove_plugin_entries(name: &str) {
   trace!("remove_plugin_entries({})", name);
 
   let prefix = format!("plugin/{}/", name);

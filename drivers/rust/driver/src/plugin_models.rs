@@ -6,6 +6,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tonic::metadata::MetadataValue;
+use tonic::transport::Channel;
 use tracing::trace;
 
 use crate::child_process::ChildPluginProcess;
@@ -123,6 +125,12 @@ pub trait PactPluginRpc {
 
   /// Send a generate content request to the plugin
   async fn generate_content(&self, request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse>;
+
+  /// Start a mock server
+  async fn start_mock_server(&self, request: StartMockServerRequest) -> anyhow::Result<StartMockServerResponse>;
+
+  /// Shutdown a running mock server
+  async fn shutdown_mock_server(&self, request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse>;
 }
 
 /// Running plugin details
@@ -142,29 +150,77 @@ pub struct PactPlugin {
 impl PactPluginRpc for PactPlugin {
   /// Send an init request to the plugin process
   async fn init_plugin(&self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
-    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
+    let channel = Channel::from_shared(format!("http://[::1]:{}", self.child.port()))?.connect().await?;
+    let auth_str = self.child.plugin_info.server_key.as_str();
+    let token = MetadataValue::from_str(auth_str)?;
+    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
+      req.metadata_mut().insert("authorization", token.clone());
+      Ok(req)
+    });
     let response = client.init_plugin(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   /// Send a compare contents request to the plugin process
   async fn compare_contents(&self, request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
-    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
+    let channel = Channel::from_shared(format!("http://[::1]:{}", self.child.port()))?.connect().await?;
+    let auth_str = self.child.plugin_info.server_key.as_str();
+    let token = MetadataValue::from_str(auth_str)?;
+    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
+      req.metadata_mut().insert("authorization", token.clone());
+      Ok(req)
+    });
     let response = client.compare_contents(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   /// Send a configure contents request to the plugin process
   async fn configure_interaction(&self, request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
-    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
+    let channel = Channel::from_shared(format!("http://[::1]:{}", self.child.port()))?.connect().await?;
+    let auth_str = self.child.plugin_info.server_key.as_str();
+    let token = MetadataValue::from_str(auth_str)?;
+    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
+      req.metadata_mut().insert("authorization", token.clone());
+      Ok(req)
+    });
     let response = client.configure_interaction(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   /// Send a generate content request to the plugin
   async fn generate_content(&self, request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
-    let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", self.child.port())).await?;
+    let channel = Channel::from_shared(format!("http://[::1]:{}", self.child.port()))?.connect().await?;
+    let auth_str = self.child.plugin_info.server_key.as_str();
+    let token = MetadataValue::from_str(auth_str)?;
+    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
+      req.metadata_mut().insert("authorization", token.clone());
+      Ok(req)
+    });
     let response = client.generate_content(tonic::Request::new(request)).await?;
+    Ok(response.get_ref().clone())
+  }
+
+  async fn start_mock_server(&self, request: StartMockServerRequest) -> anyhow::Result<StartMockServerResponse> {
+    let channel = Channel::from_shared(format!("http://[::1]:{}", self.child.port()))?.connect().await?;
+    let auth_str = self.child.plugin_info.server_key.as_str();
+    let token = MetadataValue::from_str(auth_str)?;
+    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
+      req.metadata_mut().insert("authorization", token.clone());
+      Ok(req)
+    });
+    let response = client.start_mock_server(tonic::Request::new(request)).await?;
+    Ok(response.get_ref().clone())
+  }
+
+  async fn shutdown_mock_server(&self, request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse> {
+    let channel = Channel::from_shared(format!("http://[::1]:{}", self.child.port()))?.connect().await?;
+    let auth_str = self.child.plugin_info.server_key.as_str();
+    let token = MetadataValue::from_str(auth_str)?;
+    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
+      req.metadata_mut().insert("authorization", token.clone());
+      Ok(req)
+    });
+    let response = client.shutdown_mock_server(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 }

@@ -8,3 +8,4 @@ pub mod catalogue_manager;
 pub mod content;
 pub mod utils;
 mod metrics;
+pub mod mock_server;

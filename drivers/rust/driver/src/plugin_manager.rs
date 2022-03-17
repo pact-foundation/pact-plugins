@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
 use std::process::Stdio;
+use std::str::from_utf8;
 use std::str::FromStr;
 use std::sync::Mutex;
 use std::thread;
@@ -14,15 +15,24 @@ use anyhow::anyhow;
 use lazy_static::lazy_static;
 use log::max_level;
 use os_info::Type;
+use pact_models::PactSpecification;
+use pact_models::prelude::Pact;
 use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
 use tokio::process::Command;
 use tracing::{debug, trace, warn};
 
-use crate::catalogue_manager::{register_plugin_entries, remove_plugin_entries};
+use crate::catalogue_manager::{CatalogueEntry, register_plugin_entries, remove_plugin_entries};
 use crate::child_process::ChildPluginProcess;
+use crate::content::ContentMismatch;
 use crate::metrics::send_metrics;
+use crate::mock_server::{MockServerConfig, MockServerDetails, MockServerResults};
 use crate::plugin_models::{PactPlugin, PactPluginManifest, PactPluginRpc, PluginDependency};
-use crate::proto::InitPluginRequest;
+use crate::proto::{
+  InitPluginRequest,
+  ShutdownMockServerRequest,
+  start_mock_server_response,
+  StartMockServerRequest
+};
 use crate::utils::versions_compatible;
 
 lazy_static! {
@@ -291,4 +301,83 @@ pub fn drop_plugin_access(plugin: &PluginDependency) {
   }
 
   trace!("drop_plugin_access {:?}: Releasing PLUGIN_REGISTER lock", thread_id);
+}
+
+/// Starts a mock server given the catalog entry for it and a Pact
+pub async fn start_mock_server(
+  catalogue_entry: &CatalogueEntry,
+  pact: Box<dyn Pact + Send + Sync>,
+  config: MockServerConfig
+) -> anyhow::Result<MockServerDetails> {
+  let manifest = catalogue_entry.plugin.as_ref()
+    .ok_or_else(|| anyhow!("Catalogue entry did not have an associated plugin manifest"))?;
+  let plugin = lookup_plugin(&manifest.as_dependency())
+    .ok_or_else(|| anyhow!("Did not find a running plugin for manifest {:?}", manifest))?;
+
+  debug!(plugin_name = manifest.name.as_str(), plugin_version = manifest.version.as_str(),
+    "Sending startMockServer request to plugin");
+  let request = StartMockServerRequest {
+    host_interface: config.host_interface.unwrap_or_default(),
+    port: config.port,
+    tls: config.tls,
+    pact: pact.to_json(PactSpecification::V4)?.to_string()
+  };
+  let response = plugin.start_mock_server(request).await?;
+  debug!("Got response ${response:?}");
+
+  let mock_server_response = response.response
+    .ok_or_else(|| anyhow!("Did not get a valid response from the start mock server call"))?;
+  match mock_server_response {
+    start_mock_server_response::Response::Error(err) => Err(anyhow!("Mock server failed to start: {}", err)),
+    start_mock_server_response::Response::Details(details) => Ok(MockServerDetails {
+      key: details.key.clone(),
+      base_url: details.address.clone(),
+      port: details.port,
+      plugin
+    })
+  }
+}
+
+/// Shutdowns a running mock server. Will return any errors from the mock server.
+pub async fn shutdown_mock_server(mock_server: &MockServerDetails) -> anyhow::Result<Vec<MockServerResults>> {
+  let request = ShutdownMockServerRequest {
+    server_key: mock_server.key.to_string()
+  };
+
+  debug!(
+    plugin_name = mock_server.plugin.manifest.name.as_str(),
+    plugin_version = mock_server.plugin.manifest.version.as_str(),
+    server_key = mock_server.key.as_str(),
+    "Sending shutdownMockServer request to plugin"
+  );
+  let response = mock_server.plugin.shutdown_mock_server(request).await?;
+  debug!("Got response: {response:?}");
+
+  if response.ok {
+    Ok(vec![])
+  } else {
+    Ok(response.results.iter().map(|result| {
+      MockServerResults {
+        path: result.path.clone(),
+        error: result.error.clone(),
+        mismatches: result.mismatches.iter().map(|mismatch| {
+          ContentMismatch {
+            expected: mismatch.expected.as_ref()
+              .map(|e| from_utf8(&e).unwrap_or_default().to_string())
+              .unwrap_or_default(),
+            actual: mismatch.actual.as_ref()
+              .map(|a| from_utf8(&a).unwrap_or_default().to_string())
+              .unwrap_or_default(),
+            mismatch: mismatch.mismatch.clone(),
+            path: mismatch.path.clone(),
+            diff: if mismatch.diff.is_empty() {
+              None
+            } else {
+              Some(mismatch.diff.clone())
+            }
+          }
+        }).collect()
+      }
+    }).collect())
+  }
 }

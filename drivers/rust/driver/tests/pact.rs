@@ -37,6 +37,14 @@ impl PactPluginRpc for MockPlugin {
   async fn generate_content(&self, _request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
     todo!()
   }
+
+  async fn start_mock_server(&self, _request: StartMockServerRequest) -> anyhow::Result<StartMockServerResponse> {
+    todo!()
+  }
+
+  async fn shutdown_mock_server(&self, _request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse> {
+    todo!()
+  }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]

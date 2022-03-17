@@ -22,9 +22,10 @@ pub struct RunningPluginInfo {
 /// Running child process
 #[derive(Debug, Clone)]
 pub struct ChildPluginProcess {
-  child_pid: usize,
-  manifest: PactPluginManifest,
-  plugin_info: RunningPluginInfo
+  /// OS PID of the running process
+  pub child_pid: usize,
+  /// Info on the running plugin
+  pub plugin_info: RunningPluginInfo
 }
 
 impl ChildPluginProcess {
@@ -58,7 +59,6 @@ impl ChildPluginProcess {
                 Ok(plugin_info) => {
                   tx.send(Ok(ChildPluginProcess {
                     child_pid: child_pid as usize,
-                    manifest: mfso.clone(),
                     plugin_info
                   })).unwrap_or_default()
                 }
