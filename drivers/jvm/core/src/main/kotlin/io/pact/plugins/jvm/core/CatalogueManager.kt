@@ -19,7 +19,7 @@ object CatalogueManager : KLogging() {
     catalogueList.forEach {
       val type = CatalogueEntryType.fromEntry(it.type)
       val key = "plugin/$name/${type}/${it.key}"
-      catalogue[key] = CatalogueEntry(type, CatalogueEntryProviderType.PLUGIN, name, it.key, it.valuesMap)
+      catalogue[key] = CatalogueEntry(type, CatalogueEntryProviderType.PLUGIN, name, it.key, it.valuesMap, key)
     }
 
     logger.debug { "Updated catalogue entries:\n${catalogue.keys.joinToString("\n")}" }
@@ -31,7 +31,7 @@ object CatalogueManager : KLogging() {
   fun registerCoreEntries(entries: List<CatalogueEntry>) {
     entries.forEach {
       val key = "core/${it.type}/${it.key}"
-      catalogue[key] = it
+      catalogue[key] = it.copy(catalogueKey = key)
     }
 
     logger.debug { "Core catalogue entries:\n${catalogue.keys.joinToString("\n")}" }
@@ -175,7 +175,7 @@ enum class CatalogueEntryType {
 /**
  * Entry in the catalogue
  */
-data class CatalogueEntry(
+data class CatalogueEntry @JvmOverloads constructor(
   /**
    * Type of entry
    */
@@ -199,7 +199,12 @@ data class CatalogueEntry(
   /**
    * Associated values for the entry
    */
-  val values: Map<String, String> = mapOf()
+  val values: Map<String, String> = mapOf(),
+
+  /**
+   * Catalogue key the entry is stored under
+   */
+  val catalogueKey: String? = null
 )
 
 /**
