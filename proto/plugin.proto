@@ -25,8 +25,8 @@ message CatalogueEntry {
     CONTENT_MATCHER = 0;
     // Generator for contents of messages, requests or response bodies
     CONTENT_GENERATOR = 1;
-    // Mock server for a network protocol
-    MOCK_SERVER = 2;
+    // Transport for a network protocol
+    TRANSPORT = 2;
     // Matching rule for content field/values
     MATCHER = 3;
     // Type of interaction

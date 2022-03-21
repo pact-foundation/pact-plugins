@@ -19,7 +19,7 @@ object CatalogueManager : KLogging() {
     catalogueList.forEach {
       val type = CatalogueEntryType.fromEntry(it.type)
       val key = "plugin/$name/${type}/${it.key}"
-      catalogue[key] = CatalogueEntry(type, CatalogueEntryProviderType.PLUGIN, name, it.key, it.valuesMap, key)
+      catalogue[key] = CatalogueEntry(type, CatalogueEntryProviderType.PLUGIN, name, it.key, it.valuesMap)
     }
 
     logger.debug { "Updated catalogue entries:\n${catalogue.keys.joinToString("\n")}" }
@@ -31,7 +31,7 @@ object CatalogueManager : KLogging() {
   fun registerCoreEntries(entries: List<CatalogueEntry>) {
     entries.forEach {
       val key = "core/${it.type}/${it.key}"
-      catalogue[key] = it.copy(catalogueKey = key)
+      catalogue[key] = it
     }
 
     logger.debug { "Core catalogue entries:\n${catalogue.keys.joinToString("\n")}" }
@@ -112,13 +112,13 @@ private fun ContentType.matches(type: String) = this.getBaseType().orEmpty().mat
  * Type of entry in the catalogue
  */
 enum class CatalogueEntryType {
-  CONTENT_MATCHER, CONTENT_GENERATOR, MOCK_SERVER, MATCHER, INTERACTION;
+  CONTENT_MATCHER, CONTENT_GENERATOR, TRANSPORT, MATCHER, INTERACTION;
 
   override fun toString(): String {
     return when (this) {
       CONTENT_MATCHER -> "content-matcher"
       CONTENT_GENERATOR -> "content-generator"
-      MOCK_SERVER -> "mock-server"
+      TRANSPORT -> "transport"
       MATCHER -> "matcher"
       INTERACTION -> "interaction"
     }
@@ -131,7 +131,7 @@ enum class CatalogueEntryType {
     return when (this) {
       CONTENT_MATCHER -> Plugin.CatalogueEntry.EntryType.CONTENT_MATCHER
       CONTENT_GENERATOR -> Plugin.CatalogueEntry.EntryType.CONTENT_GENERATOR
-      MOCK_SERVER -> Plugin.CatalogueEntry.EntryType.MOCK_SERVER
+      TRANSPORT -> Plugin.CatalogueEntry.EntryType.TRANSPORT
       MATCHER -> Plugin.CatalogueEntry.EntryType.MATCHER
       INTERACTION -> Plugin.CatalogueEntry.EntryType.INTERACTION
     }
@@ -147,7 +147,7 @@ enum class CatalogueEntryType {
         "content-generator" -> CONTENT_GENERATOR
         "interaction" -> INTERACTION
         "matcher" -> MATCHER
-        "mock-server" -> MOCK_SERVER
+        "transport" -> TRANSPORT
         else -> throw IllegalArgumentException("'$type' is not a valid CatalogueEntryType value")
       }
     }
@@ -160,7 +160,7 @@ enum class CatalogueEntryType {
         when (type) {
           Plugin.CatalogueEntry.EntryType.CONTENT_MATCHER -> CONTENT_MATCHER
           Plugin.CatalogueEntry.EntryType.CONTENT_GENERATOR -> CONTENT_GENERATOR
-          Plugin.CatalogueEntry.EntryType.MOCK_SERVER -> MOCK_SERVER
+          Plugin.CatalogueEntry.EntryType.TRANSPORT -> TRANSPORT
           Plugin.CatalogueEntry.EntryType.MATCHER -> MATCHER
           Plugin.CatalogueEntry.EntryType.INTERACTION -> INTERACTION
           Plugin.CatalogueEntry.EntryType.UNRECOGNIZED -> CONTENT_MATCHER
@@ -199,12 +199,7 @@ data class CatalogueEntry @JvmOverloads constructor(
   /**
    * Associated values for the entry
    */
-  val values: Map<String, String> = mapOf(),
-
-  /**
-   * Catalogue key the entry is stored under
-   */
-  val catalogueKey: String? = null
+  val values: Map<String, String> = mapOf()
 )
 
 /**
