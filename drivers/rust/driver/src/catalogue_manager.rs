@@ -29,8 +29,8 @@ pub enum CatalogueEntryType {
   CONTENT_MATCHER,
   /// Content generator (based on content type)
   CONTENT_GENERATOR,
-  /// Mock server
-  MOCK_SERVER,
+  /// Network transport
+  TRANSPORT,
   /// Matching rule
   MATCHER,
   /// Generator
@@ -42,7 +42,7 @@ impl Display for CatalogueEntryType {
     match self {
       CatalogueEntryType::CONTENT_MATCHER => write!(f, "content-matcher"),
       CatalogueEntryType::CONTENT_GENERATOR => write!(f, "content-generator"),
-      CatalogueEntryType::MOCK_SERVER => write!(f, "mock-server"),
+      CatalogueEntryType::TRANSPORT => write!(f, "transport"),
       CatalogueEntryType::MATCHER => write!(f, "matcher"),
       CatalogueEntryType::INTERACTION => write!(f, "interaction"),
     }
@@ -56,7 +56,7 @@ impl From<&str> for CatalogueEntryType {
       "content-generator" => CatalogueEntryType::CONTENT_GENERATOR,
       "interaction" => CatalogueEntryType::INTERACTION,
       "matcher" => CatalogueEntryType::MATCHER,
-      "mock-server" => CatalogueEntryType::MOCK_SERVER,
+      "transport" => CatalogueEntryType::TRANSPORT,
       _ => {
         let message = format!("'{}' is not a valid CatalogueEntryType value", s);
         error!("{}", message);
@@ -77,7 +77,7 @@ impl From<EntryType> for CatalogueEntryType {
     match t {
       EntryType::ContentMatcher => CatalogueEntryType::CONTENT_MATCHER,
       EntryType::ContentGenerator => CatalogueEntryType::CONTENT_GENERATOR,
-      EntryType::MockServer => CatalogueEntryType::MOCK_SERVER,
+      EntryType::Transport => CatalogueEntryType::TRANSPORT,
       EntryType::Matcher => CatalogueEntryType::MATCHER,
       EntryType::Interaction => CatalogueEntryType::INTERACTION
     }
@@ -151,10 +151,13 @@ pub fn register_core_entries(entries: &Vec<CatalogueEntry>) {
   }
 }
 
-/// Lookup an entry in the catalogie by the key
+/// Lookup an entry in the catalogie by the key. Will find the first entry that ends with the
+/// given key.
 pub fn lookup_entry(key: &str) -> Option<CatalogueEntry> {
   let inner = CATALOGUE_REGISTER.lock().unwrap();
-  inner.get(key).cloned()
+  inner.iter()
+    .find(|(k, _)| k.ends_with(key))
+    .map(|(_, v)| v.clone())
 }
 
 /// Remove all entries for a plugin given the plugin name
