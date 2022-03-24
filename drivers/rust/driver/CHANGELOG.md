@@ -1,5 +1,19 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.0 - Support mock servers from plugins
+
+* 13ee5e1 - chore: tmp disable Pact tests to resolve cyclic dependency issue (Ronald Holshausen, Thu Mar 24 12:47:47 2022 +1100)
+* 04d982f - refactor: rename mock-server -> transport in Rust code (Ronald Holshausen, Mon Mar 21 15:57:03 2022 +1100)
+* 3259859 - chore: update pact models to 0.3.1 (Ronald Holshausen, Fri Mar 18 14:58:25 2022 +1100)
+* a36e2d3 - feat: support for plugins supplying mock servers (Ronald Holshausen, Thu Mar 17 16:32:29 2022 +1100)
+* 3624f36 - feat: correct MockServerResult message, remove double repeated field (Ronald Holshausen, Fri Mar 11 14:10:47 2022 +1100)
+* 1d3700f - chore: switch from log crate to tracing crate (Ronald Holshausen, Thu Mar 10 14:34:41 2022 +1100)
+* bb0b2b3 - feat: Update plugin interface to return the results from the mock server (Ronald Holshausen, Thu Mar 10 14:28:52 2022 +1100)
+* 6777c17 - Merge branch 'main' into feat/grpc-mock-server (Ronald Holshausen, Mon Mar 7 10:31:12 2022 +1100)
+* 65f680d - chore: update dependencies (Ronald Holshausen, Mon Mar 7 10:28:47 2022 +1100)
+* b725d2c - bump version to 0.0.19 (Ronald Holshausen, Fri Mar 4 12:17:25 2022 +1100)
+* 3ab2701 - wip: started support for plugins providing mock servers (Ronald Holshausen, Fri Mar 4 11:14:46 2022 +1100)
+
 # 0.0.18 - Upgrade pact-models to 0.3.0
 
 * ca7d4d1 - chore: Upgrade pact-models to 0.3.0 (Ronald Holshausen, Fri Mar 4 12:02:06 2022 +1100)
