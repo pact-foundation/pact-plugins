@@ -115,7 +115,7 @@ class DriverPactTest {
   @Pact(consumer = 'pact-jvm-driver')
   V4Pact initInteraction(PactBuilder builder) {
     return builder
-      .usingPlugin('protobuf', '0.1.0')
+      .usingPlugin('protobuf')
       .expectsToReceive('init plugin request', 'core/interaction/synchronous-message')
       .with([
         'pact:proto': filePath("../../../proto/plugin.proto"),
