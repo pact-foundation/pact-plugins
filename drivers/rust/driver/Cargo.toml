@@ -46,7 +46,7 @@ features = ["rustls-tls", "rustls-tls-native-roots", "json", "gzip", "deflate"]
 [dev-dependencies]
 expectest = "0.12.0"
 env_logger = "0.9.0"
-pact_consumer = { version = "0.9.0", path = "../../../../pact-reference/rust/pact_consumer" }
+#pact_consumer = { version = "0.9.0", path = "../../../../pact-reference/rust/pact_consumer" }
 
 [build-dependencies]
 tonic-build = "0.6.2"
