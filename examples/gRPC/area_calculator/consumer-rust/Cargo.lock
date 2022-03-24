@@ -997,6 +997,8 @@ dependencies = [
 [[package]]
 name = "pact-plugin-driver"
 version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9139adef1a944ff6193487e1d03571acb69220c8c2d7fed5eab495b0da7dbf09"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1026,7 +1028,7 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "0.9.0"
+version = "0.9.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1051,7 +1053,7 @@ dependencies = [
 
 [[package]]
 name = "pact_matching"
-version = "0.12.4"
+version = "0.12.5"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -1086,7 +1088,7 @@ dependencies = [
 
 [[package]]
 name = "pact_mock_server"
-version = "0.8.8"
+version = "0.8.9"
 dependencies = [
  "anyhow",
  "bytes",
