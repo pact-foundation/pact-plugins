@@ -53,7 +53,7 @@ async fn test_proto_client() {
 
   let mut pact_builder = PactBuilder::new_v4("pact-rust-driver", "plugin");
   let proto_service = pact_builder
-    .using_plugin("protobuf", Some("0.1".into())).await
+    .using_plugin("protobuf", None).await
     .synchronous_message_interaction("init plugin request", |mut i| async move {
       let project_dir = Path::new(option_env!("CARGO_MANIFEST_DIR").unwrap());
       println!("project_dir = {:?}", project_dir);
