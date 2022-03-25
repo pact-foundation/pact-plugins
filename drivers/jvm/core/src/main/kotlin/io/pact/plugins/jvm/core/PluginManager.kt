@@ -762,17 +762,26 @@ object DefaultPluginManager: KLogging(), PluginManager {
           val pluginJson = file.bufferedReader().use { Json.createReader(it).readObject() }
           if (pluginJson != null) {
             val plugin = DefaultPactPluginManifest.fromJson(file.parentFile, pluginJson)
-            if (plugin.name == name) {
-              val pluginVersion = Semver(plugin.version, Semver.SemverType.NPM)
-              if (version == null || plugin.version == version || pluginVersion.satisfies("~$version")) {
-                PLUGIN_MANIFEST_REGISTER["$name/${plugin.version}"] = plugin
-                return Ok(plugin)
-              }
+            if (plugin.name == name && versionsCompatible(plugin.version, version)) {
+              PLUGIN_MANIFEST_REGISTER["$name/${plugin.version}"] = plugin
+              return Ok(plugin)
             }
           }
         }
       }
       Err("No plugin with name '$name' and version '${version ?: "any"}' was found in the Pact plugin directory '$pluginDir'")
+    }
+  }
+
+  /**
+   * If the plugin version is compatible with the given version
+   */
+  fun versionsCompatible(version: String, required: String?): Boolean {
+    return if (required == null || required == version) {
+      true
+    } else {
+      val pluginVersion = Semver(version, Semver.SemverType.NPM)
+      pluginVersion.satisfies(">${required}")
     }
   }
 

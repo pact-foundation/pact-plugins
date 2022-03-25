@@ -83,14 +83,18 @@ pub fn proto_value_to_string(val: &prost_types::Value) -> Option<String> {
 pub fn versions_compatible(version: &str, required: &Option<String>) -> bool {
   match required {
     None => true,
-    Some(required) => if let Ok(version) = Version::parse(version) {
-      if let Ok(req) = VersionReq::parse(format!("~{}", required).as_str()) {
-        req.matches(&version)
+    Some(required) => {
+      if required == version {
+        true
+      } else if let Ok(version) = Version::parse(version) {
+        if let Ok(req) = VersionReq::parse(format!(">={}", required).as_str()) {
+          req.matches(&version)
+        } else {
+          false
+        }
       } else {
         false
       }
-    } else {
-      false
     }
   }
 }
@@ -107,6 +111,9 @@ mod tests {
     expect!(versions_compatible("1.0.0", &Some("1.0.0".to_string()))).to(be_true());
     expect!(versions_compatible("1.0.0", &Some("1.0.1".to_string()))).to(be_false());
     expect!(versions_compatible("1.0.4", &Some("1.0.3".to_string()))).to(be_true());
-    expect!(versions_compatible("1.0.1", &Some("1.1.0".to_string()))).to(be_false());
+    expect!(versions_compatible("1.1.0", &Some("1.0.3".to_string()))).to(be_true());
+    expect!(versions_compatible("2.0.1", &Some("1.1.0".to_string()))).to(be_true());
+    expect!(versions_compatible("1.0.1", &Some("2.1.0".to_string()))).to(be_false());
+    expect!(versions_compatible("0.1.0", &Some("0.0.3".to_string()))).to(be_true());
   }
 }
