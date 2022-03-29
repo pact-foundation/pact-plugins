@@ -15,6 +15,7 @@ import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
 import au.com.dius.pact.core.model.matchingrules.RuleLogic
 import au.com.dius.pact.core.support.Json.toJson
+import au.com.dius.pact.core.support.Utils.lookupEnvironmentValue
 import au.com.dius.pact.core.support.isNotEmpty
 import au.com.dius.pact.core.support.json.JsonValue
 import com.github.michaelbull.result.Err
@@ -35,7 +36,6 @@ import io.pact.plugin.PactPluginGrpc.newBlockingStub
 import io.pact.plugin.Plugin
 import io.pact.plugins.jvm.core.Utils.handleWith
 import io.pact.plugins.jvm.core.Utils.jsonToValue
-import io.pact.plugins.jvm.core.Utils.lookForProgramInPath
 import io.pact.plugins.jvm.core.Utils.structToJson
 import io.pact.plugins.jvm.core.Utils.toProtoStruct
 import io.pact.plugins.jvm.core.Utils.valueToJson
@@ -45,7 +45,6 @@ import java.io.File
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.lang.Runtime.getRuntime
-import java.nio.file.Path
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
@@ -572,7 +571,6 @@ object DefaultPluginManager: KLogging(), PluginManager {
   private fun initialisePlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
     val result = when (manifest.executableType) {
       "exec" -> startPluginProcess(manifest)
-      "ruby" -> loadRubyPlugin(manifest)
       else -> Err("Plugin executable type of ${manifest.executableType} is not supported")
     }
     return when (result) {
@@ -632,46 +630,6 @@ object DefaultPluginManager: KLogging(), PluginManager {
     }
   }
 
-  private fun loadRubyPlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
-    val rvm = lookForProgramInPath("rvm")
-    return if (rvm is Ok && manifest.minimumRequiredVersion != null) {
-      logger.debug { "Found RVM at ${rvm.value}" }
-      startPluginProcess(manifest, mapOf(), rvm.value.toString(), manifest.minimumRequiredVersion.toString(), "do")
-    } else {
-      when (val ruby = lookForProgramInPath("ruby")) {
-        is Ok -> {
-          logger.debug { "Found Ruby interpreter at ${ruby.value}" }
-          val versionCheck = checkRubyVersion(manifest, ruby)
-          if (versionCheck is Err) {
-            Err(versionCheck.error)
-          } else {
-            //            val parent = ruby.value.parent
-            //          when (val bundler = lookForProgramInPath("bundle")) {
-            //            is Ok -> startPluginProcess(manifest,
-            //              mapOf("BUNDLE_GEMFILE" to manifest.pluginDir.resolve("Gemfile").toString()),
-            //              bundler.value.toString(), "exec", ruby.value.toString(), "-C${manifest.pluginDir}")
-            //            is Err -> {
-            //              logger.debug { "Bundler not found in path - ${bundler.error}" }
-            //              val bundlePath = parent.resolve("bundle")
-            //              if (bundlePath.toFile().exists()) {
-            //                startPluginProcess(manifest,
-            //                  mapOf("BUNDLE_GEMFILE" to manifest.pluginDir.resolve("Gemfile").toString()),
-            //                  bundlePath.toString(), "exec", ruby.value.toString(), "-C${manifest.pluginDir}")
-            //              } else {
-            //                startPluginProcess(manifest, mapOf(), ruby.value.toString(), "-C${manifest.pluginDir}")
-            //              }
-            //            }
-            //          }
-            startPluginProcess(manifest,
-              mapOf("BUNDLE_GEMFILE" to manifest.pluginDir.resolve("Gemfile").toString()),
-              ruby.value.toString(), "-C${manifest.pluginDir}")
-          }
-        }
-        is Err -> Err(ruby.error)
-      }
-    }
-  }
-
   private fun startPluginProcess(
     manifest: PactPluginManifest,
     env: Map<String, String> = mapOf(),
@@ -726,35 +684,15 @@ object DefaultPluginManager: KLogging(), PluginManager {
     else -> ""
   }
 
-  private fun checkRubyVersion(manifest: PactPluginManifest, ruby: Ok<Path>) =
-    if (manifest.minimumRequiredVersion != null) {
-      logger.debug { "Checking if Ruby version meets minimum version of ${manifest.minimumRequiredVersion}" }
-      when (val rubyOut = SystemExec.execute(ruby.value.toString(), "--version")) {
-        is Ok -> {
-          logger.debug { "Got Ruby version: ${rubyOut.value}" }
-          val rubyVersionStr = rubyOut.value.split(Regex("\\s+"))
-          if (rubyVersionStr.size > 1) {
-            val rubyVersion = Semver(rubyVersionStr[1].replace(Regex("(p\\d+)"), "+$1"), Semver.SemverType.NPM)
-            if (rubyVersion.isLowerThan(manifest.minimumRequiredVersion)) {
-              Err("Ruby version $rubyVersion does not meet the minimum version of ${manifest.minimumRequiredVersion}")
-            } else {
-              Ok("")
-            }
-          } else {
-            Err("Unrecognised ruby version format: ${rubyOut.value}")
-          }
-        }
-        is Err -> Err("Could not execute Ruby interpreter - ${rubyOut.error}")
-      }
-    } else {
-      Ok("")
-    }
-
-  private fun loadPluginManifest(name: String, version: String?): Result<PactPluginManifest, String> {
+  /**
+   * Searches for a plugin manifest given the name and versions
+   */
+  fun loadPluginManifest(name: String, version: String?): Result<PactPluginManifest, String> {
     val manifest = lookupPluginManifest(name, version)
     return if (manifest != null) {
       Ok(manifest)
     } else {
+      val manifestList = mutableListOf<PactPluginManifest>()
       val pluginDir = pluginInstallDirectory()
       for (file in File(pluginDir).walk()) {
         if (file.isFile && file.name == "pact-plugin.json") {
@@ -763,13 +701,21 @@ object DefaultPluginManager: KLogging(), PluginManager {
           if (pluginJson != null) {
             val plugin = DefaultPactPluginManifest.fromJson(file.parentFile, pluginJson)
             if (plugin.name == name && versionsCompatible(plugin.version, version)) {
-              PLUGIN_MANIFEST_REGISTER["$name/${plugin.version}"] = plugin
-              return Ok(plugin)
+              logger.trace { "Manifest version is ${plugin.version}" }
+              manifestList.add(plugin)
             }
           }
         }
       }
-      Err("No plugin with name '$name' and version '${version ?: "any"}' was found in the Pact plugin directory '$pluginDir'")
+
+      if (manifestList.isNotEmpty()) {
+        manifestList.sortByDescending { it.version }
+        val selectedManifest = manifestList.first()
+        PLUGIN_MANIFEST_REGISTER["$name/${selectedManifest.version}"] = selectedManifest
+        Ok(selectedManifest)
+      } else {
+        Err("No plugin with name '$name' and version '${version ?: "any"}' was found in the Pact plugin directory '$pluginDir'")
+      }
     }
   }
 
@@ -789,9 +735,9 @@ object DefaultPluginManager: KLogging(), PluginManager {
    * Returns the directory where the plugins are installed
    */
   fun pluginInstallDirectory(): String {
-    val pluginDirEnvVar = System.getenv("PACT_PLUGIN_DIR")
+    val pluginDirEnvVar = lookupEnvironmentValue("pact.plugin.dir")
     return if (pluginDirEnvVar.isNotEmpty()) {
-      pluginDirEnvVar
+      pluginDirEnvVar!!
     } else if (System.getProperty("user.home").isNotEmpty()) {
       System.getProperty("user.home") + "/.pact/plugins"
     } else {
