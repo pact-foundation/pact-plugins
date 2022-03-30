@@ -8,3 +8,9 @@ class PactPluginEntryNotFoundException(val type: String) :
 
 class PactPluginMockServerErrorException(val name: String, val error: String) :
   RuntimeException("Plugin $name failed to start a mock server: $error")
+
+class PactPluginValidationForInteractionException(val name: String, val error: String) :
+  RuntimeException("Plugin $name failed to validate the interaction: $error")
+
+class PactPluginInteractionVerificationException(val name: String, val error: String) :
+  RuntimeException("Plugin $name failed to run the verification for the interaction: $error")

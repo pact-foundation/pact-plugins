@@ -1,5 +1,6 @@
 package io.pact.plugins.jvm.core
 
+import au.com.dius.pact.core.support.Utils.objectToJsonMap
 import au.com.dius.pact.core.support.json.JsonValue
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
@@ -99,6 +100,27 @@ object Utils : KLogging() {
   }
 
   /**
+   * Convert a Protobuf Struct into a Map structure
+   */
+  fun structToMap(struct: Struct?): Map<String, Any?> {
+    return struct?.fieldsMap?.mapValues { fromProtoValue(it.value) } ?: emptyMap()
+  }
+
+  /**
+   * Unpack a Protobuf value to the native JVM value
+   */
+  fun fromProtoValue(value: Value): Any? {
+    return when (value.kindCase) {
+      Value.KindCase.NUMBER_VALUE -> value.numberValue
+      Value.KindCase.STRING_VALUE -> value.stringValue
+      Value.KindCase.BOOL_VALUE -> value.boolValue
+      Value.KindCase.STRUCT_VALUE -> structToMap(value.structValue)
+      Value.KindCase.LIST_VALUE -> value.listValue.valuesList.map { fromProtoValue(it) }
+      else -> null
+    }
+  }
+
+  /**
    * Convert a map of JSON values to a Protobuf Struct
    */
   fun toProtoStruct(attributes: Map<String, JsonValue>): Struct {
@@ -107,6 +129,49 @@ object Utils : KLogging() {
       builder.putFields(key, jsonToValue(value))
     }
     return builder.build()
+  }
+
+  /**
+   * Convert a map structure to a Protobuf Struct
+   */
+  fun mapToProtoStruct(config: Map<String, Any?>): Struct {
+    val builder = Struct.newBuilder()
+    for (entry in config) {
+      builder.putFields(entry.key, toProtoValue(entry.value))
+    }
+    return builder.build()
+  }
+
+  /**
+   * Converts any JVM value to a Protobuf Value
+   */
+  fun toProtoValue(value: Any?): Value {
+    return if (value != null) {
+      when (value) {
+        is Boolean -> Value.newBuilder().setBoolValue(value).build()
+        is String -> Value.newBuilder().setStringValue(value).build()
+        is Number -> Value.newBuilder().setNumberValue(value.toDouble()).build()
+        is Enum<*> -> Value.newBuilder().setStringValue(value.toString()).build()
+        is Map<*, *> -> Value.newBuilder().setStructValue(mapToProtoStruct(value as Map<String, Any?>)).build()
+        is Collection<*> -> {
+          val builder = ListValue.newBuilder()
+          for (item in value) {
+            builder.addValues(toProtoValue(item))
+          }
+          Value.newBuilder().setListValue(builder.build()).build()
+        }
+        else -> {
+          val map = objectToJsonMap(value)
+          if (map != null) {
+            Value.newBuilder().setStructValue(mapToProtoStruct(map)).build()
+          } else {
+            Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build()
+          }
+        }
+      }
+    } else {
+      Value.newBuilder().setNullValue(NullValue.NULL_VALUE).build()
+    }
   }
 
   /**

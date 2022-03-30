@@ -6,6 +6,8 @@ import au.com.dius.pact.core.model.DefaultPactWriter
 import au.com.dius.pact.core.model.OptionalBody
 import au.com.dius.pact.core.model.Pact
 import au.com.dius.pact.core.model.PactSpecVersion
+import au.com.dius.pact.core.model.V4Interaction
+import au.com.dius.pact.core.model.V4Pact
 import au.com.dius.pact.core.model.generators.Category
 import au.com.dius.pact.core.model.generators.Generator
 import au.com.dius.pact.core.model.generators.Generators
@@ -34,10 +36,13 @@ import io.grpc.stub.AbstractBlockingStub
 import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.PactPluginGrpc.newBlockingStub
 import io.pact.plugin.Plugin
+import io.pact.plugins.jvm.core.Utils.fromProtoValue
 import io.pact.plugins.jvm.core.Utils.handleWith
 import io.pact.plugins.jvm.core.Utils.jsonToValue
+import io.pact.plugins.jvm.core.Utils.mapToProtoStruct
 import io.pact.plugins.jvm.core.Utils.structToJson
 import io.pact.plugins.jvm.core.Utils.toProtoStruct
+import io.pact.plugins.jvm.core.Utils.toProtoValue
 import io.pact.plugins.jvm.core.Utils.valueToJson
 import mu.KLogging
 import org.apache.commons.lang3.SystemUtils
@@ -290,6 +295,26 @@ interface PluginManager {
    * Shutdowns a running mock server. Will return any errors from the mock server.
    */
   fun shutdownMockServer(mockServer: MockServerDetails): List<MockServerResults>?
+
+  /**
+   * Sets up a transport request to be made. This is the first phase when verifying, and it allows the
+   * users to add additional values to any requests that are made.
+   */
+  fun prepareValidationForInteraction(
+    transportEntry: CatalogueEntry,
+    pact: V4Pact,
+    interaction: V4Interaction,
+    config: Map<String, Any?>
+  ): Result<InteractionVerificationData, String>
+
+  /**
+   * Executes the verification of the interaction that was configured with the prepareValidationForInteraction call
+   */
+  fun verifyInteraction(
+    transportEntry: CatalogueEntry,
+    verificationData: InteractionVerificationData,
+    config: Map<String, Any?>
+  ): Result<InteractionVerificationResult, String>
 }
 
 object DefaultPluginManager: KLogging(), PluginManager {
@@ -566,6 +591,81 @@ object DefaultPluginManager: KLogging(), PluginManager {
         )
       })
     }
+  }
+
+  override fun prepareValidationForInteraction(
+    transportEntry: CatalogueEntry,
+    pact: V4Pact,
+    interaction: V4Interaction,
+    config: Map<String, Any?>
+  ): Result<InteractionVerificationData, String> {
+    val plugin = lookupPlugin(transportEntry.pluginName, null) ?:
+      throw PactPluginNotFoundException(transportEntry.pluginName, null)
+
+    val writer = StringWriter()
+    DefaultPactWriter.writePact(pact, PrintWriter(writer), PactSpecVersion.V4)
+
+    val request = Plugin.VerificationPreparationRequest.newBuilder()
+      .setPact(writer.toString())
+      .setInteractionKey(interaction.uniqueKey())
+      .setConfig(mapToProtoStruct(config))
+
+    logger.debug { "Sending prepareValidationForInteraction request to plugin ${plugin.manifest}" }
+    val response = plugin.withGrpcStub { stub -> stub.prepareInteractionForVerification(request.build()) }
+    logger.debug { "Got response: $response" }
+
+    if (response.hasError()) {
+      throw PactPluginValidationForInteractionException(transportEntry.pluginName, response.error)
+    }
+
+    return Ok(InteractionVerificationData(
+      OptionalBody.body(response.interactionData.body.toByteArray(), ContentType(response.interactionData.body.contentType)),
+      response.interactionData.metadataMap.mapValues {
+        when (it.value.valueCase) {
+          Plugin.MetadataValue.ValueCase.NONBINARYVALUE -> fromProtoValue(it.value.nonBinaryValue)
+          Plugin.MetadataValue.ValueCase.BINARYVALUE -> it.value.binaryValue.toByteArray()
+          else -> null
+        }
+      }
+    ))
+  }
+
+  override fun verifyInteraction(
+    transportEntry: CatalogueEntry,
+    verificationData: InteractionVerificationData,
+    config: Map<String, Any?>
+  ): Result<InteractionVerificationResult, String> {
+    val plugin = lookupPlugin(transportEntry.pluginName, null) ?:
+      throw PactPluginNotFoundException(transportEntry.pluginName, null)
+
+    val request = Plugin.VerifyInteractionRequest.newBuilder()
+      .setInteractionData(Plugin.InteractionData.newBuilder()
+        .setBody(Plugin.Body.newBuilder()
+          .setContent(BytesValue.newBuilder().setValue(ByteString.copyFrom(verificationData.requestData.value)).build())
+          .setContentType(verificationData.requestData.contentType.toString())
+          .build())
+        .putAllMetadata(verificationData.metadata.mapValues {
+          val builder = Plugin.MetadataValue.newBuilder()
+
+          when (val value = it.value) {
+            is ByteArray -> builder.binaryValue = ByteString.copyFrom(value)
+            else -> builder.nonBinaryValue = toProtoValue(value)
+          }
+
+          builder.build()
+        })
+        .build())
+      .setConfig(mapToProtoStruct(config))
+
+    logger.debug { "Sending verifyInteraction request to plugin ${plugin.manifest}" }
+    val response = plugin.withGrpcStub { stub -> stub.verifyInteraction(request.build()) }
+    logger.debug { "Got response: $response" }
+
+    if (response.hasError()) {
+      throw PactPluginInteractionVerificationException(transportEntry.pluginName, response.error)
+    }
+
+    return Ok(InteractionVerificationResult(false))
   }
 
   private fun initialisePlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
