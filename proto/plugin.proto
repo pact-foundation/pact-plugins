@@ -276,7 +276,7 @@ message ShutdownMockServerResponse {
 message VerificationPreparationRequest {
   // Pact as JSON to use for the verification
   string pact = 1;
-  // Interaction key that is being verified
+  // Interaction key for the interaction from the Pact that is being verified
   string interactionKey = 2;
   // Any data supplied by the user to verify the interaction
   google.protobuf.Struct config = 3;
@@ -315,6 +315,10 @@ message VerifyInteractionRequest {
   InteractionData interactionData = 1;
   // Any data supplied by the user to verify the interaction
   google.protobuf.Struct config = 2;
+  // Pact as JSON to use for the verification
+  string pact = 3;
+  // Interaction key for the interaction from the Pact that is being verified
+  string interactionKey = 4;
 }
 
 // Result of running the verification

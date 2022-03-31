@@ -313,7 +313,9 @@ interface PluginManager {
   fun verifyInteraction(
     transportEntry: CatalogueEntry,
     verificationData: InteractionVerificationData,
-    config: Map<String, Any?>
+    config: Map<String, Any?>,
+    pact: V4Pact,
+    interaction: V4Interaction
   ): Result<InteractionVerificationResult, String>
 }
 
@@ -633,10 +635,15 @@ object DefaultPluginManager: KLogging(), PluginManager {
   override fun verifyInteraction(
     transportEntry: CatalogueEntry,
     verificationData: InteractionVerificationData,
-    config: Map<String, Any?>
+    config: Map<String, Any?>,
+    pact: V4Pact,
+    interaction: V4Interaction
   ): Result<InteractionVerificationResult, String> {
     val plugin = lookupPlugin(transportEntry.pluginName, null) ?:
       throw PactPluginNotFoundException(transportEntry.pluginName, null)
+
+    val writer = StringWriter()
+    DefaultPactWriter.writePact(pact, PrintWriter(writer), PactSpecVersion.V4)
 
     val request = Plugin.VerifyInteractionRequest.newBuilder()
       .setInteractionData(Plugin.InteractionData.newBuilder()
@@ -656,6 +663,8 @@ object DefaultPluginManager: KLogging(), PluginManager {
         })
         .build())
       .setConfig(mapToProtoStruct(config))
+      .setPact(writer.toString())
+      .setInteractionKey(interaction.uniqueKey())
 
     logger.debug { "Sending verifyInteraction request to plugin ${plugin.manifest}" }
     val response = plugin.withGrpcStub { stub -> stub.verifyInteraction(request.build()) }
