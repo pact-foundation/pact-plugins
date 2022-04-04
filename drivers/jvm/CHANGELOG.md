@@ -1,5 +1,23 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.1 - Maintenance Release
+
+* 949ec66 - feat: add the pact and integration into the verify call (Ronald Holshausen, Thu Mar 31 11:41:50 2022 +1100)
+* 8699571 - feat: interface to verify an interaction via a plugin (Ronald Holshausen, Wed Mar 30 16:46:19 2022 +1100)
+* 3f1e34d - fix: return the max version when there are multiple plugin versions found (Ronald Holshausen, Tue Mar 29 13:33:32 2022 +1100)
+* 983727e - chore: added basic calculator server (Ronald Holshausen, Fri Mar 25 14:02:41 2022 +1100)
+* 84257b5 - chore: add skeleton gRPC provider (Ronald Holshausen, Fri Mar 25 13:42:39 2022 +1100)
+* 22606f1 - fix: correct the plugin version check when loading plugins (Ronald Holshausen, Fri Mar 25 11:47:34 2022 +1100)
+* 5473a72 - fix: do not include the plugin version in the test (Ronald Holshausen, Thu Mar 24 17:30:48 2022 +1100)
+* fdff6a7 - fix: do not include the plugin version in the test (Ronald Holshausen, Thu Mar 24 17:19:36 2022 +1100)
+* ee303fe - chore: use the published version of pact_consumer crate (Ronald Holshausen, Thu Mar 24 15:20:44 2022 +1100)
+* fda31e6 - Revert "chore: tmp disable Pact tests to resolve cyclic dependency issue" (Ronald Holshausen, Thu Mar 24 15:18:43 2022 +1100)
+* 0ca4c28 - bump version to 0.1.1 (Ronald Holshausen, Thu Mar 24 13:29:15 2022 +1100)
+* 50a4074 - update changelog for release 0.1.0 (Ronald Holshausen, Thu Mar 24 13:26:50 2022 +1100)
+* 3d69bc4 - fix: csv plugin needs the V1 proto file to build (Ronald Holshausen, Thu Mar 24 13:04:04 2022 +1100)
+* 13ee5e1 - chore: tmp disable Pact tests to resolve cyclic dependency issue (Ronald Holshausen, Thu Mar 24 12:47:47 2022 +1100)
+* 67db34b - bump version to 0.1.1 (Ronald Holshausen, Tue Mar 22 12:46:01 2022 +1100)
+
 # 0.1.0 - Beta mock server support
 
 * 8b7d0ee - refactor: update Rust example tests after refactor (Ronald Holshausen, Mon Mar 21 15:57:53 2022 +1100)
