@@ -290,11 +290,11 @@ message MetadataValue {
   }
 }
 
-// Interaction request data to be sent for verification
+// Interaction request data to be sent or received for verification
 message InteractionData {
-  // Request body as bytes
+  // Request/Response body as bytes
   Body body = 1;
-  // Metadata associated with the request
+  // Metadata associated with the request/response
   map<string, MetadataValue> metadata = 2;
 }
 
@@ -322,13 +322,20 @@ message VerifyInteractionRequest {
 }
 
 // Result of running the verification
+message VerificationResult {
+  // Was the verification successful?
+  bool success = 1;
+  // Interaction data retrieved from the provider
+  InteractionData responseData = 2;
+}
+
+// Result of running the verification
 message VerifyInteractionResponse {
   oneof response {
     // If an error occurred trying to run the verification
     string error = 1;
 
-    // Interaction data retrieved from the provider
-    InteractionData responseData = 2;
+    VerificationResult result = 2;
   }
 }
 

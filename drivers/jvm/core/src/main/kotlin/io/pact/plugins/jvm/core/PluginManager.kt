@@ -670,11 +670,11 @@ object DefaultPluginManager: KLogging(), PluginManager {
     val response = plugin.withGrpcStub { stub -> stub.verifyInteraction(request.build()) }
     logger.debug { "Got response: $response" }
 
-    if (response.hasError()) {
-      throw PactPluginInteractionVerificationException(transportEntry.pluginName, response.error)
+    return if (response.hasError()) {
+      Err(response.error)
+    } else {
+      Ok(InteractionVerificationResult(response.result.success))
     }
-
-    return Ok(InteractionVerificationResult(false))
   }
 
   private fun initialisePlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
