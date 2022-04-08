@@ -26,6 +26,9 @@ dependencies {
     }
     implementation 'ch.qos.logback:logback-classic:1.2.6'
 
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.8.1'
+    testImplementation 'au.com.dius.pact.provider:junit5:4.4.0-beta.1'
+
     protobuf files('../../proto/')
 }
 
@@ -33,6 +36,10 @@ tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
     kotlinOptions {
         jvmTarget = "11"
     }
+}
+
+test {
+    useJUnitPlatform()
 }
 
 application {
