@@ -621,7 +621,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     }
 
     return Ok(InteractionVerificationData(
-      OptionalBody.body(response.interactionData.body.content.toByteArray(), ContentType(response.interactionData.body.contentType)),
+      OptionalBody.body(response.interactionData.body.content.value.toByteArray(), ContentType(response.interactionData.body.contentType)),
       response.interactionData.metadataMap.mapValues {
         when (it.value.valueCase) {
           Plugin.MetadataValue.ValueCase.NONBINARYVALUE -> fromProtoValue(it.value.nonBinaryValue)
