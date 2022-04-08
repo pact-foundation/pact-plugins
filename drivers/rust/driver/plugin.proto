@@ -321,12 +321,21 @@ message VerifyInteractionRequest {
   string interactionKey = 4;
 }
 
+message VerificationResultItem {
+  oneof result {
+    string error = 1;
+    ContentMismatch mismatch = 2;
+  }
+}
+
 // Result of running the verification
 message VerificationResult {
   // Was the verification successful?
   bool success = 1;
   // Interaction data retrieved from the provider
   InteractionData responseData = 2;
+  // Any mismatches that occurred
+  repeated VerificationResultItem mismatches = 3;
 }
 
 // Result of running the verification
