@@ -1,5 +1,17 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.1 - Supports verifying interactions via plugins
+
+* a01d903 - feat: update interface to return mismatch info from verification call (Ronald Holshausen, Fri Apr 8 14:29:08 2022 +1000)
+* 09874d1 - fix: return failed verification error instead of throwing an exception (Ronald Holshausen, Thu Apr 7 12:13:55 2022 +1000)
+* 949ec66 - feat: add the pact and integration into the verify call (Ronald Holshausen, Thu Mar 31 11:41:50 2022 +1100)
+* 8699571 - feat: interface to verify an interaction via a plugin (Ronald Holshausen, Wed Mar 30 16:46:19 2022 +1100)
+* 22606f1 - fix: correct the plugin version check when loading plugins (Ronald Holshausen, Fri Mar 25 11:47:34 2022 +1100)
+* 5473a72 - fix: do not include the plugin version in the test (Ronald Holshausen, Thu Mar 24 17:30:48 2022 +1100)
+* ee303fe - chore: use the published version of pact_consumer crate (Ronald Holshausen, Thu Mar 24 15:20:44 2022 +1100)
+* fda31e6 - Revert "chore: tmp disable Pact tests to resolve cyclic dependency issue" (Ronald Holshausen, Thu Mar 24 15:18:43 2022 +1100)
+* 0ca4c28 - bump version to 0.1.1 (Ronald Holshausen, Thu Mar 24 13:29:15 2022 +1100)
+
 # 0.1.0 - Support mock servers from plugins
 
 * 13ee5e1 - chore: tmp disable Pact tests to resolve cyclic dependency issue (Ronald Holshausen, Thu Mar 24 12:47:47 2022 +1100)
