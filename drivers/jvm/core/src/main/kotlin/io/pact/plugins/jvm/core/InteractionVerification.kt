@@ -21,5 +21,26 @@ data class InteractionVerificationData(
  * Result of running an integration verification
  */
 data class InteractionVerificationResult(
-  val ok: Boolean = false
+  val ok: Boolean = false,
+  val details: List<InteractionVerificationDetails> = emptyList()
 )
+
+/**
+ * Details on an individual failure
+ */
+sealed class InteractionVerificationDetails {
+  /**
+   * Error occurred
+   */
+  data class Error(val message: String) : InteractionVerificationDetails()
+
+  /**
+   * Mismatch occurred
+   */
+  data class Mismatch(
+    val expected: Any?,
+    val actual: Any?,
+    val mismatch: String,
+    val path: String
+  ) : InteractionVerificationDetails()
+}

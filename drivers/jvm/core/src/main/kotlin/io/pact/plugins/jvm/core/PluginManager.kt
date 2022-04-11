@@ -673,7 +673,14 @@ object DefaultPluginManager: KLogging(), PluginManager {
     return if (response.hasError()) {
       Err(response.error)
     } else {
-      Ok(InteractionVerificationResult(response.result.success))
+      Ok(InteractionVerificationResult(response.result.success, response.result.mismatchesList.map {
+        if (it.hasError()) {
+          InteractionVerificationDetails.Error(it.error)
+        } else {
+          InteractionVerificationDetails.Mismatch(it.mismatch.expected.value.toByteArray(),
+            it.mismatch.actual.value.toByteArray(), it.mismatch.mismatch, it.mismatch.path)
+        }
+      }))
     }
   }
 
