@@ -1,5 +1,15 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.2 - Supports verifying interactions via plugins
+
+* 9260a14 - fix: return the mismatches back to the calling party (Ronald Holshausen, Mon Apr 11 15:34:23 2022 +1000)
+* e0a56bc - feat: add JVM gRPC provider test (Ronald Holshausen, Fri Apr 8 15:52:31 2022 +1000)
+* 12db53b - fix: was passing an incorrect body to verification call (Ronald Holshausen, Fri Apr 8 15:51:07 2022 +1000)
+* a01d903 - feat: update interface to return mismatch info from verification call (Ronald Holshausen, Fri Apr 8 14:29:08 2022 +1000)
+* 28c19e8 - fix: was returning an incorrect body from verification prep call (Ronald Holshausen, Fri Apr 8 14:25:03 2022 +1000)
+* 09874d1 - fix: return failed verification error instead of throwing an exception (Ronald Holshausen, Thu Apr 7 12:13:55 2022 +1000)
+* 14307b8 - bump version to 0.1.2 (Ronald Holshausen, Tue Apr 5 09:17:25 2022 +1000)
+
 # 0.1.1 - Maintenance Release
 
 * 949ec66 - feat: add the pact and integration into the verify call (Ronald Holshausen, Thu Mar 31 11:41:50 2022 +1100)
