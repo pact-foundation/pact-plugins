@@ -57,7 +57,7 @@ mod tests {
     let mut pact_builder = PactBuilder::new_v4("area_calculator-consumer", "area_calculator-provider");
     let proto_service = pact_builder
       .using_plugin("protobuf", None).await
-      .synchronous_message_interaction("request for calculate shape area", "core/interaction/synchronous-message", |mut i| async move {
+      .synchronous_message_interaction("request for calculate shape area", |mut i| async move {
         let project_dir = Path::new(option_env!("CARGO_MANIFEST_DIR").unwrap());
         let proto_file = project_dir.join("..").join("area_calculator.proto");
 
@@ -126,9 +126,9 @@ mod tests {
         interaction
       })
       .await
-      .start_mock_server();
+      .start_mock_server(None);
 
-    let mock_url = mock_service.url().as_ref();
+    let mock_url = mock_service.url();
 
     let shape = ShapeMessage {
       shape: Some(shape_message::Shape::Rectangle(Rectangle { length: 3.0, width: 4.0 }))
