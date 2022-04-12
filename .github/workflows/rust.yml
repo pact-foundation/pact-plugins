@@ -31,7 +31,13 @@ jobs:
         shell: bash
       - name: Tests
         run: cargo test
-        working-directory: drivers/rust
+        working-directory: drivers/rust/driver
+        env:
+          RUST_LOG: trace
+          RUST_BACKTRACE: 1
+      - name: FFI Tests
+        run: cargo test -- --test-threads 1
+        working-directory: drivers/rust/driver_ffi
         env:
           RUST_LOG: trace
           RUST_BACKTRACE: 1
@@ -75,7 +81,7 @@ jobs:
            -c 'mkdir -p ~/.pact/plugins/csv-0.0.0 && cargo build && cp pact-plugin.json target/debug/pact-plugin-csv ~/.pact/plugins/csv-0.0.0/'
       - run: |
          docker run --rm -v $(pwd):/workspace -v $HOME/.pact:/root/.pact \
-           -w /workspace/drivers/rust -t  \
+           -w /workspace/drivers/rust/driver -t  \
            -e 'RUST_LOG=trace' -e 'pact_do_not_track=true' \
            pactfoundation/rust-musl-build \
            -c 'apk add protoc openjdk11 && cargo build && cargo test'
