@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.3 - Maintenance Release
+
+* a47a327 - fix: Upgrade pact-models to 0.3.3 (fixes issue with handling bad system DER certs) (Ronald Holshausen, Wed Apr 13 13:52:48 2022 +1000)
+* d3865e3 - bump version to 0.1.3 (Ronald Holshausen, Wed Apr 13 12:31:28 2022 +1000)
+
 # 0.1.2 - Bugfix Release
 
 * f543f99 - fix: async funtions can not use closures (Ronald Holshausen, Wed Apr 13 11:55:25 2022 +1000)
