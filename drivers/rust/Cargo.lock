@@ -1207,9 +1207,9 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "0.9.0"
+version = "0.9.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "885e978d29f4f14e884eb0bcd206e13f27a3d9759f6454970977e7e9dc01cec6"
+checksum = "e3d47a0bf988298ed4c5bef0127890c11e365f23c7f296c910b9384de41c6d5f"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1276,9 +1276,9 @@ dependencies = [
 
 [[package]]
 name = "pact_matching"
-version = "0.12.4"
+version = "0.12.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78a3748dac0cca80f6d03988d77acc429edcc821d506c2a588ae04d7bc2e3147"
+checksum = "9d4234261a118b99cd0ebd1c95effde8099873f049aa3dc3e9a90d57c1258a1f"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -1313,9 +1313,9 @@ dependencies = [
 
 [[package]]
 name = "pact_mock_server"
-version = "0.8.8"
+version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8146d6173c7dfd8325f66c6b1475756000fd53560eb9f323a51770a0e521b74c"
+checksum = "152c8f0657f28fee3cc3e9f1cf1723cd9a450bbf8fdc82a3e49ffaae26eee4ca"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1379,9 +1379,9 @@ dependencies = [
 
 [[package]]
 name = "pact_verifier"
-version = "0.13.3"
+version = "0.13.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdb6036ba1ca272d677ce8728cfea5a1a7354436c332dca55c5849f22a57b2ce"
+checksum = "c33451574d4e6a93165d3b60bf8a2a7d476ec33bf7ba8ad6a09defdadc29b436"
 dependencies = [
  "ansi_term",
  "anyhow",
