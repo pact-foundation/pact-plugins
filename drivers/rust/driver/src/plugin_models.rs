@@ -7,8 +7,8 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tonic::metadata::MetadataValue;
-use tonic::transport::Channel;
-use tracing::trace;
+use tonic::transport::{Channel, Error};
+use tracing::{debug, trace};
 
 use crate::child_process::ChildPluginProcess;
 use crate::proto::*;
@@ -150,7 +150,7 @@ pub struct PactPlugin {
 impl PactPluginRpc for PactPlugin {
   /// Send an init request to the plugin process
   async fn init_plugin(&self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
-    let channel = Channel::from_shared(format!("http://[::1]:{}", self.child.port()))?.connect().await?;
+    let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::from_str(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -163,7 +163,7 @@ impl PactPluginRpc for PactPlugin {
 
   /// Send a compare contents request to the plugin process
   async fn compare_contents(&self, request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
-    let channel = Channel::from_shared(format!("http://[::1]:{}", self.child.port()))?.connect().await?;
+    let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::from_str(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -176,7 +176,7 @@ impl PactPluginRpc for PactPlugin {
 
   /// Send a configure contents request to the plugin process
   async fn configure_interaction(&self, request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
-    let channel = Channel::from_shared(format!("http://[::1]:{}", self.child.port()))?.connect().await?;
+    let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::from_str(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -189,7 +189,7 @@ impl PactPluginRpc for PactPlugin {
 
   /// Send a generate content request to the plugin
   async fn generate_content(&self, request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
-    let channel = Channel::from_shared(format!("http://[::1]:{}", self.child.port()))?.connect().await?;
+    let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::from_str(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -201,7 +201,7 @@ impl PactPluginRpc for PactPlugin {
   }
 
   async fn start_mock_server(&self, request: StartMockServerRequest) -> anyhow::Result<StartMockServerResponse> {
-    let channel = Channel::from_shared(format!("http://[::1]:{}", self.child.port()))?.connect().await?;
+    let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::from_str(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -213,7 +213,7 @@ impl PactPluginRpc for PactPlugin {
   }
 
   async fn shutdown_mock_server(&self, request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse> {
-    let channel = Channel::from_shared(format!("http://[::1]:{}", self.child.port()))?.connect().await?;
+    let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::from_str(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -256,6 +256,15 @@ impl PactPlugin {
     trace!("drop_access: Plugin {}/{} access is now {}", self.manifest.name, self.manifest.version,
       self.access_count);
     self.access_count
+  }
+
+  async fn connect_channel(&self) -> Result<Channel, Error> {
+    let port = self.child.port();
+    Channel::from_shared(format!("http://[::1]:{}", port))?.connect().await
+      .or_else(|err| {
+        debug!("IP6 connection failed, will try IP4 address - {err}");
+        Channel::from_shared(format!("http://127.0.0.1:{}", port))?.connect().await
+      })
   }
 }
 
