@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.2 - Bugfix Release
+
+* f543f99 - fix: async funtions can not use closures (Ronald Holshausen, Wed Apr 13 11:55:25 2022 +1000)
+* e4a8b68 - fix: try an IP4 connection if the IP6 one to the plugin fails (Ronald Holshausen, Wed Apr 13 11:33:44 2022 +1000)
+* 83c701f - bump version to 0.1.2 (Ronald Holshausen, Mon Apr 11 17:35:27 2022 +1000)
+
 # 0.1.1 - Supports verifying interactions via plugins
 
 * a01d903 - feat: update interface to return mismatch info from verification call (Ronald Holshausen, Fri Apr 8 14:29:08 2022 +1000)
