@@ -1341,9 +1341,9 @@ dependencies = [
 
 [[package]]
 name = "pact_models"
-version = "0.3.2"
+version = "0.3.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a0810bceaca938296490046238c63d6e86286463bced5c1c4019ad243e1aba9"
+checksum = "f7d4562deeff397294f8784f81b4327d5842170f52b523443fcb3915e9fb3c2b"
 dependencies = [
  "anyhow",
  "ariadne",
