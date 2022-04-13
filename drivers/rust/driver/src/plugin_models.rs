@@ -2,12 +2,13 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
+use anyhow::anyhow;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tonic::metadata::MetadataValue;
-use tonic::transport::{Channel, Error};
+use tonic::transport::Channel;
 use tracing::{debug, trace};
 
 use crate::child_process::ChildPluginProcess;
@@ -258,13 +259,16 @@ impl PactPlugin {
     self.access_count
   }
 
-  async fn connect_channel(&self) -> Result<Channel, Error> {
+  async fn connect_channel(&self) -> anyhow::Result<Channel> {
     let port = self.child.port();
-    Channel::from_shared(format!("http://[::1]:{}", port))?.connect().await
-      .or_else(|err| {
+    match Channel::from_shared(format!("http://[::1]:{}", port))?.connect().await {
+      Ok(channel) => Ok(channel),
+      Err(err) => {
         debug!("IP6 connection failed, will try IP4 address - {err}");
         Channel::from_shared(format!("http://127.0.0.1:{}", port))?.connect().await
-      })
+          .map_err(|err| anyhow!(err))
+      }
+    }
   }
 }
 
