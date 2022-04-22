@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.4 - Plugin Verification
+
+* f1c147e - feat: add support for plugins verifying interactions (Ronald Holshausen, Fri Apr 22 14:16:30 2022 +1000)
+* 2fc040e - chore: Upgrade pact_consumer to 0.9.1 and reqwest to 0.11.10 (Ronald Holshausen, Wed Apr 13 16:23:05 2022 +1000)
+* ac47083 - bump version to 0.1.4 (Ronald Holshausen, Wed Apr 13 13:59:17 2022 +1000)
+
 # 0.1.3 - Maintenance Release
 
 * a47a327 - fix: Upgrade pact-models to 0.3.3 (fixes issue with handling bad system DER certs) (Ronald Holshausen, Wed Apr 13 13:52:48 2022 +1000)
