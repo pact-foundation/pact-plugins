@@ -151,7 +151,7 @@ pub fn register_core_entries(entries: &Vec<CatalogueEntry>) {
   }
 }
 
-/// Lookup an entry in the catalogie by the key. Will find the first entry that ends with the
+/// Lookup an entry in the catalogue by the key. Will find the first entry that ends with the
 /// given key.
 pub fn lookup_entry(key: &str) -> Option<CatalogueEntry> {
   let inner = CATALOGUE_REGISTER.lock().unwrap();
@@ -212,7 +212,7 @@ fn matches_pattern(pattern: &str, content_type: &ContentType) -> bool {
   }
 }
 
-/// Find a content genetrator in the global catalogue for the provided content type
+/// Find a content generator in the global catalogue for the provided content type
 pub fn find_content_generator(content_type: &ContentType) -> Option<ContentGenerator> {
   debug!("Looking for a content generator for {}", content_type);
   let guard = CATALOGUE_REGISTER.lock().unwrap();

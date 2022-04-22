@@ -8,7 +8,7 @@ use semver::{Version, VersionReq};
 use serde_json::{json, Value};
 
 /// Converts a map of key -> JSON to a prost Struct
-pub fn to_proto_struct(values: HashMap<String, Value>) -> Struct {
+pub fn to_proto_struct(values: &HashMap<String, Value>) -> Struct {
   Struct {
     fields: values.iter().map(|(k, v)| (k.clone(), to_proto_value(v))).collect()
   }

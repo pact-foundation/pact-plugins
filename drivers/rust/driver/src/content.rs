@@ -175,7 +175,7 @@ impl ContentMatcher {
     debug!("Sending ConfigureContents request to plugin {:?}", self.catalogue_entry);
     let request = ConfigureInteractionRequest {
       content_type: content_type.to_string(),
-      contents_config: Some(to_proto_struct(definition)),
+      contents_config: Some(to_proto_struct(&definition)),
     };
 
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()
@@ -319,14 +319,14 @@ impl ContentMatcher {
           rule: r.rules.iter().map(|rule|{
             crate::proto::MatchingRule {
               r#type: rule.name(),
-              values: Some(to_proto_struct(rule.values().iter().map(|(k, v)| (k.to_string(), v.clone())).collect())),
+              values: Some(to_proto_struct(&rule.values().iter().map(|(k, v)| (k.to_string(), v.clone())).collect())),
             }
           }).collect()
         })
       }).collect(),
       plugin_configuration: plugin_config.map(|config| ProtoPluginConfiguration {
-        interaction_configuration: Some(to_proto_struct(config.interaction_configuration)),
-        pact_configuration: Some(to_proto_struct(config.pact_configuration))
+        interaction_configuration: Some(to_proto_struct(&config.interaction_configuration)),
+        pact_configuration: Some(to_proto_struct(&config.pact_configuration))
       })
     };
 
@@ -460,7 +460,7 @@ impl ContentGenerator {
       generators: generators.iter().map(|(k, v)| {
         (k.clone(), crate::proto::Generator {
           r#type: v.name(),
-          values: Some(to_proto_struct(v.values().iter()
+          values: Some(to_proto_struct(&v.values().iter()
             .map(|(k, v)| (k.to_string(), v.clone())).collect())),
         })
       }).collect(),

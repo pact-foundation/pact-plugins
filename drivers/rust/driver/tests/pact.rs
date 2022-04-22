@@ -27,23 +27,31 @@ impl PactPluginRpc for MockPlugin {
   }
 
   async fn compare_contents(&self, _request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
-    todo!()
+    unimplemented!()
   }
 
   async fn configure_interaction(&self, _request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
-    todo!()
+    unimplemented!()
   }
 
   async fn generate_content(&self, _request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
-    todo!()
+    unimplemented!()
   }
 
   async fn start_mock_server(&self, _request: StartMockServerRequest) -> anyhow::Result<StartMockServerResponse> {
-    todo!()
+    unimplemented!()
   }
 
   async fn shutdown_mock_server(&self, _request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse> {
-    todo!()
+    unimplemented!()
+  }
+
+  async fn prepare_interaction_for_verification(&self, _request: VerificationPreparationRequest) -> anyhow::Result<VerificationPreparationResponse> {
+    unimplemented!()
+  }
+
+  async fn verify_interaction(&self, _request: VerifyInteractionRequest) -> anyhow::Result<VerifyInteractionResponse> {
+    unimplemented!()
   }
 }
 

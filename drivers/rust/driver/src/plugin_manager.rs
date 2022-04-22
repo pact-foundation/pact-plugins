@@ -12,11 +12,17 @@ use std::sync::Mutex;
 use std::thread;
 
 use anyhow::anyhow;
+use bytes::Bytes;
+use itertools::Either;
 use lazy_static::lazy_static;
 use log::max_level;
 use os_info::Type;
+use pact_models::bodies::OptionalBody;
 use pact_models::PactSpecification;
-use pact_models::prelude::Pact;
+use pact_models::prelude::{ContentType, Pact};
+use pact_models::prelude::v4::V4Pact;
+use pact_models::v4::interaction::V4Interaction;
+use serde_json::Value;
 use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
 use tokio::process::Command;
 use tracing::{debug, trace, warn};
@@ -27,13 +33,9 @@ use crate::content::ContentMismatch;
 use crate::metrics::send_metrics;
 use crate::mock_server::{MockServerConfig, MockServerDetails, MockServerResults};
 use crate::plugin_models::{PactPlugin, PactPluginManifest, PactPluginRpc, PluginDependency};
-use crate::proto::{
-  InitPluginRequest,
-  ShutdownMockServerRequest,
-  start_mock_server_response,
-  StartMockServerRequest
-};
-use crate::utils::versions_compatible;
+use crate::proto::*;
+use crate::utils::{proto_value_to_json, to_proto_struct, to_proto_value, versions_compatible};
+use crate::verification::{InteractionVerificationData, InteractionVerificationResult};
 
 lazy_static! {
   static ref PLUGIN_MANIFEST_REGISTER: Mutex<HashMap<String, PactPluginManifest>> = Mutex::new(HashMap::new());
@@ -379,5 +381,95 @@ pub async fn shutdown_mock_server(mock_server: &MockServerDetails) -> anyhow::Re
         }).collect()
       }
     }).collect())
+  }
+}
+
+/// Sets up a transport request to be made. This is the first phase when verifying, and it allows the
+/// users to add additional values to any requests that are made.
+pub async fn prepare_validation_for_interaction(
+  transport_entry: &CatalogueEntry,
+  pact: &V4Pact,
+  interaction: &(dyn V4Interaction + Send + Sync),
+  context: &HashMap<String, Value>
+) -> anyhow::Result<InteractionVerificationData> {
+  let manifest = transport_entry.plugin.as_ref()
+    .ok_or_else(|| anyhow!("Transport catalogue entry did not have an associated plugin manifest"))?;
+  let plugin = lookup_plugin(&manifest.as_dependency())
+    .ok_or_else(|| anyhow!("Did not find a running plugin for manifest {:?}", manifest))?;
+
+  let request = VerificationPreparationRequest {
+    pact: pact.to_json(PactSpecification::V4)?.to_string(),
+    interaction_key: interaction.unique_key(),
+    config: Some(to_proto_struct(context))
+  };
+
+  debug!(plugin_name = manifest.name.as_str(), plugin_version = manifest.version.as_str(),
+    "Sending prepareValidationForInteraction request to plugin");
+  let response = plugin.prepare_interaction_for_verification(request).await?;
+  debug!("Got response: {response:?}");
+
+  let validation_response = response.response
+    .ok_or_else(|| anyhow!("Did not get a valid response from the prepare interaction for verification call"))?;
+  match &validation_response {
+    verification_preparation_response::Response::Error(err) => Err(anyhow!("Failed to prepate the request: {}", err)),
+    verification_preparation_response::Response::InteractionData(data) => {
+      let content_type = data.body.as_ref().and_then(|body| ContentType::parse(body.content_type.as_str()).ok());
+      Ok(InteractionVerificationData {
+        request_data: data.body.as_ref()
+          .and_then(|body| body.content.as_ref())
+          .map(|body| OptionalBody::Present(Bytes::from(body.clone()), content_type, None)).unwrap_or_default(),
+        metadata: data.metadata.iter().map(|(k, v)| {
+          let value = match &v.value {
+            Some(v) => match &v {
+              metadata_value::Value::NonBinaryValue(v) => Either::Left(proto_value_to_json(v)),
+              metadata_value::Value::BinaryValue(b) => Either::Right(Bytes::from(b.clone()))
+            }
+            None => Either::Left(Value::Null)
+          };
+          (k.clone(), value)
+        }).collect()
+      })
+    }
+  }
+}
+
+/// Executes the verification of the interaction that was configured with the prepare_validation_for_interaction call
+pub async fn verify_interaction(
+  transport_entry: &CatalogueEntry,
+  verification_data: &InteractionVerificationData,
+  config: &HashMap<String, Value>,
+  pact: &V4Pact,
+  interaction: &(dyn V4Interaction + Send + Sync)
+) -> anyhow::Result<InteractionVerificationResult> {
+  let manifest = transport_entry.plugin.as_ref()
+    .ok_or_else(|| anyhow!("Transport catalogue entry did not have an associated plugin manifest"))?;
+  let plugin = lookup_plugin(&manifest.as_dependency())
+    .ok_or_else(|| anyhow!("Did not find a running plugin for manifest {:?}", manifest))?;
+
+  let request = VerifyInteractionRequest {
+    pact: pact.to_json(PactSpecification::V4)?.to_string(),
+    interaction_key: interaction.unique_key(),
+    config: Some(to_proto_struct(config)),
+    interaction_data: Some(InteractionData {
+      body: Some((&verification_data.request_data).into()),
+      metadata: verification_data.metadata.iter().map(|(k, v)| {
+        (k.clone(), MetadataValue { value: Some(match v {
+          Either::Left(value) => metadata_value::Value::NonBinaryValue(to_proto_value(value)),
+          Either::Right(b) => metadata_value::Value::BinaryValue(b.to_vec())
+        }) })
+      }).collect()
+    })
+  };
+
+  debug!(plugin_name = manifest.name.as_str(), plugin_version = manifest.version.as_str(),
+    "Sending verifyInteraction request to plugin");
+  let response = plugin.verify_interaction(request).await?;
+  debug!("Got response: {response:?}");
+
+  let validation_response = response.response
+    .ok_or_else(|| anyhow!("Did not get a valid response from the verification call"))?;
+  match &validation_response {
+    verify_interaction_response::Response::Error(err) => Err(anyhow!("Failed to verify the request: {}", err)),
+    verify_interaction_response::Response::Result(data) => Ok(data.into())
   }
 }
