@@ -1,0 +1,12 @@
+[package]
+name = "driver_pact_tests"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+
+[dev-dependencies]
+pact-plugin-driver = { version = "0.1", path = "../driver" }
+expectest = "0.12.0"
+env_logger = "0.9.0"
+pact_consumer = "0.9.1"

@@ -2,4 +2,5 @@
 members = [
     "driver",
     "driver_ffi",
+    "driver_pact_tests"
 ]

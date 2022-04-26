@@ -370,6 +370,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "524cbf6897b527295dff137cec09ecf3a05f4fddffd7dfcd1585403449e74198"
 
 [[package]]
+name = "driver_pact_tests"
+version = "0.1.0"
+dependencies = [
+ "env_logger",
+ "expectest",
+ "pact-plugin-driver 0.1.5",
+ "pact_consumer",
+]
+
+[[package]]
 name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1142,7 +1152,6 @@ dependencies = [
  "maplit",
  "md5",
  "os_info",
- "pact_consumer",
  "pact_models 0.4.0",
  "prost",
  "prost-types",
