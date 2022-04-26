@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.5 - Maintenance Release
+
+* aa04485 - chore: move pact tests into a seperate crate (Ronald Holshausen, Tue Apr 26 13:25:20 2022 +1000)
+* 3bb8a49 - feat: support plugins returning user output for verification (Ronald Holshausen, Tue Apr 26 13:19:41 2022 +1000)
+* addce70 - bump version to 0.1.5 (Ronald Holshausen, Fri Apr 22 14:40:58 2022 +1000)
+
 # 0.1.4 - Plugin Verification
 
 * f1c147e - feat: add support for plugins verifying interactions (Ronald Holshausen, Fri Apr 22 14:16:30 2022 +1000)
