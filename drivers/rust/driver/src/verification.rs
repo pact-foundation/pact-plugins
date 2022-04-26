@@ -25,7 +25,9 @@ pub struct InteractionVerificationResult {
   /// If the verification was successful
   pub ok: bool,
   /// List of errors if not successful
-  pub details: Vec<InteractionVerificationDetails>
+  pub details: Vec<InteractionVerificationDetails>,
+  /// Output to display to the user
+  pub output: Vec<String>
 }
 
 /// Details on an individual failure
@@ -57,7 +59,8 @@ impl From<&VerificationResult> for InteractionVerificationResult {
             path: mismatch.path.to_string()
           }
         }))
-        .collect()
+        .collect(),
+      output: result.output.clone()
     }
   }
 }

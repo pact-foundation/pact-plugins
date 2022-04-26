@@ -332,10 +332,12 @@ message VerificationResultItem {
 message VerificationResult {
   // Was the verification successful?
   bool success = 1;
-  // Interaction data retrieved from the provider
+  // Interaction data retrieved from the provider (optional)
   InteractionData responseData = 2;
   // Any mismatches that occurred
   repeated VerificationResultItem mismatches = 3;
+  // Output for the verification to display to the user
+  repeated string output = 4;
 }
 
 // Result of running the verification
