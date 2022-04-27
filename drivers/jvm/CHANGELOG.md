@@ -1,5 +1,34 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.3 - Supports verification output from plugins
+
+* c4d418a - feat: deal with verification output from plugins (Ronald Holshausen, Wed Apr 27 13:31:26 2022 +1000)
+* 75bf662 - bump version to 0.1.6 (Ronald Holshausen, Tue Apr 26 13:51:05 2022 +1000)
+* ae5e702 - update changelog for release 0.1.5 (Ronald Holshausen, Tue Apr 26 13:48:46 2022 +1000)
+* 7eddc72 - chore: update dependencies (Ronald Holshausen, Tue Apr 26 13:45:54 2022 +1000)
+* 6fe23d1 - chore: add seperate pact test step in CI (Ronald Holshausen, Tue Apr 26 13:28:00 2022 +1000)
+* aa04485 - chore: move pact tests into a seperate crate (Ronald Holshausen, Tue Apr 26 13:25:20 2022 +1000)
+* 3bb8a49 - feat: support plugins returning user output for verification (Ronald Holshausen, Tue Apr 26 13:19:41 2022 +1000)
+* addce70 - bump version to 0.1.5 (Ronald Holshausen, Fri Apr 22 14:40:58 2022 +1000)
+* 03b6f9a - update changelog for release 0.1.4 (Ronald Holshausen, Fri Apr 22 14:38:12 2022 +1000)
+* f1c147e - feat: add support for plugins verifying interactions (Ronald Holshausen, Fri Apr 22 14:16:30 2022 +1000)
+* 0422267 - chore: Upgrade pact-ffi to 0.2.5 (Ronald Holshausen, Tue Apr 19 15:32:55 2022 +1000)
+* 2fc040e - chore: Upgrade pact_consumer to 0.9.1 and reqwest to 0.11.10 (Ronald Holshausen, Wed Apr 13 16:23:05 2022 +1000)
+* ac47083 - bump version to 0.1.4 (Ronald Holshausen, Wed Apr 13 13:59:17 2022 +1000)
+* ba24c89 - update changelog for release 0.1.3 (Ronald Holshausen, Wed Apr 13 13:56:37 2022 +1000)
+* a47a327 - fix: Upgrade pact-models to 0.3.3 (fixes issue with handling bad system DER certs) (Ronald Holshausen, Wed Apr 13 13:52:48 2022 +1000)
+* d3865e3 - bump version to 0.1.3 (Ronald Holshausen, Wed Apr 13 12:31:28 2022 +1000)
+* 859b807 - update changelog for release 0.1.2 (Ronald Holshausen, Wed Apr 13 12:25:45 2022 +1000)
+* 1211cdf - chore: update crates (Ronald Holshausen, Wed Apr 13 12:14:32 2022 +1000)
+* f543f99 - fix: async funtions can not use closures (Ronald Holshausen, Wed Apr 13 11:55:25 2022 +1000)
+* e4a8b68 - fix: try an IP4 connection if the IP6 one to the plugin fails (Ronald Holshausen, Wed Apr 13 11:33:44 2022 +1000)
+* 383ec5b - chore: run ffi tests on CI sequentually (Ronald Holshausen, Tue Apr 12 16:11:29 2022 +1000)
+* ebac0c6 - chore: Update FFI tests to use pact ffi 0.2.4 (Ronald Holshausen, Tue Apr 12 15:51:39 2022 +1000)
+* ebc5f85 - chore: Update examples for newer plugin driver (Ronald Holshausen, Tue Apr 12 12:46:45 2022 +1000)
+* 83c701f - bump version to 0.1.2 (Ronald Holshausen, Mon Apr 11 17:35:27 2022 +1000)
+* 0befc71 - update changelog for release 0.1.1 (Ronald Holshausen, Mon Apr 11 17:32:35 2022 +1000)
+* b2948ba - bump version to 0.1.3 (Ronald Holshausen, Mon Apr 11 15:56:52 2022 +1000)
+
 # 0.1.2 - Supports verifying interactions via plugins
 
 * 9260a14 - fix: return the mismatches back to the calling party (Ronald Holshausen, Mon Apr 11 15:34:23 2022 +1000)
