@@ -373,10 +373,16 @@ checksum = "524cbf6897b527295dff137cec09ecf3a05f4fddffd7dfcd1585403449e74198"
 name = "driver_pact_tests"
 version = "0.1.0"
 dependencies = [
+ "anyhow",
+ "async-trait",
  "env_logger",
  "expectest",
  "pact-plugin-driver 0.1.6",
  "pact_consumer",
+ "prost",
+ "prost-types",
+ "serde_json",
+ "tokio",
 ]
 
 [[package]]
