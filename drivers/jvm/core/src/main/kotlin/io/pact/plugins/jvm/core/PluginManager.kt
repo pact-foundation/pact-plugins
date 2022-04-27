@@ -680,7 +680,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
           InteractionVerificationDetails.Mismatch(it.mismatch.expected.value.toByteArray(),
             it.mismatch.actual.value.toByteArray(), it.mismatch.mismatch, it.mismatch.path)
         }
-      }))
+      }, response.result.outputList))
     }
   }
 

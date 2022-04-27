@@ -22,7 +22,9 @@ data class InteractionVerificationData(
  */
 data class InteractionVerificationResult(
   val ok: Boolean = false,
-  val details: List<InteractionVerificationDetails> = emptyList()
+  val details: List<InteractionVerificationDetails> = emptyList(),
+  /** Output to display to the user */
+  val output: List<String> = emptyList()
 )
 
 /**
