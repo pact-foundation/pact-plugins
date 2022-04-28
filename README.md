@@ -42,14 +42,14 @@ Main responsibilities:
 
 See the [guide to writing a Pact plugin](docs/writing-plugin-guide.md).
 
-#### Plugins that provide protocol implementations (WIP)
+#### Plugins that provide protocol transport implementations
 
 Plugins can provide support for new protocols. The main features that the plugin would provide is to be
-able to create the protocol payloads and create a mock server that can deal with them.
+able to create the protocol transport payloads and create a mock server that can deal with them.
 
 See [Protocol design docs](docs/protocol-plugin-design.md).
 
-This is not implemented as part of the plugin MVC, and will be added in a later update.
+For an example, see the [gRPC plugin](https://github.com/pactflow/pact-protobuf-plugin), it supports gRPC over HTTP/2.
 
 #### Plugins that provide support for different types of content
 

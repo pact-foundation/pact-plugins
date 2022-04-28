@@ -1,0 +1,43 @@
+@startuml
+skinparam responseMessageBelowArrow true
+participant "System under test" as P1
+participant "Pact framework" as P2
+participant "Plugin Driver" as P3
+participant "Plugin" as P4
+participant "Mock server" as P5
+P1 -> P2: Configure Test, define Pact
+P2 -> P3: Load plugin required by test
+P3 -> P4: Start plugin and send InitPluginRequest
+P3 <- P4: Send catalogue entries (InitPluginResponse)
+P2 <- P3:
+note right of P2: Setup Pact interaction
+P2 -> P3: Configure interaction
+P3 -> P4: ConfigureInteractionRequest
+P3 <- P4: ConfigureInteractionResponse
+P2 <- P3:
+P2 -> P3: Start mock server
+P3 -> P4: StartMockServerRequest
+P4 -> P5: Create mock server
+P4 <- P5: Return mock server details
+P3 <- P4: StartMockServerResponse
+P2 <- P3: Return mock server details
+P1 <- P2: Return mock server details
+P1 -> P5: Make requests to mock server
+note right of P5: Match requests\n and record results
+P1 <- P5: Return response
+P1 -> P2: Shutdown mock server
+P2 -> P3: Shutdown mock server
+P3 -> P4: ShutdownMockServerRequest
+P4 -> P5: Shutdown mock server
+P4 <- P5: Return results
+P3 <- P4: ShutdownMockServerResponse
+P2 <- P3: Return results
+P1 <- P2: Return results
+P1 -> P2: Finish Test
+P2 -> P3: Decrement access to plugin
+P3 -> P4: Shutdown plugin if no longer used
+P3 <- P4:
+P2 <- P3:
+note right of P2: Write Pact file if test passed
+P1 <- P2:
+@enduml
