@@ -65,7 +65,7 @@ async fn test_proto_client() {
     .synchronous_message_interaction("init plugin request", |mut i| async move {
       let project_dir = Path::new(option_env!("CARGO_MANIFEST_DIR").unwrap());
       println!("project_dir = {:?}", project_dir);
-      let proto_file = project_dir.join("plugin.proto");
+      let proto_file = project_dir.join("..").join("driver").join("plugin.proto");
       println!("proto_file = {:?}", proto_file);
 
       i.contents_from(json!({
