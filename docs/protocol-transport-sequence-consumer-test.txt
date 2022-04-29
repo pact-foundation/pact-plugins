@@ -23,7 +23,7 @@ P3 <- P4: StartMockServerResponse
 P2 <- P3: Return mock server details
 P1 <- P2: Return mock server details
 P1 -> P5: Make requests to mock server
-note right of P5: Match requests\n and record results
+note right of P5: Match requests \nand record results
 P1 <- P5: Return response
 P1 -> P2: Shutdown mock server
 P2 -> P3: Shutdown mock server

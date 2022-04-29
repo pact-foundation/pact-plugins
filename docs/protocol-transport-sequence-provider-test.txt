@@ -1,0 +1,42 @@
+@startuml
+skinparam responseMessageBelowArrow true
+participant "System under test" as P1
+participant "Pact framework" as P2
+participant "Plugin Driver" as P3
+participant "Plugin" as P4
+participant "Provider" as P5
+P1 -> P2: Configure Test, fetch Pact file to verify
+P2 -> P3: Load plugin required by Pact file
+P3 -> P4: Start plugin and send InitPluginRequest
+P3 <- P4: Send catalogue entries (InitPluginResponse)
+P2 <- P3:
+P1 <- P2:
+P1 -> P5: Start gRPC provider for test
+P1 <- P5:
+P1 -> P2: Start test
+  loop For each interaction in Pact
+    P2 -> P3: Configure request to provider
+    activate P2
+    P3 -> P4: VerificationPreparationRequest
+    note right of P4: Setup request \nbased on interaction \nfrom Pact file
+    P3 <- P4: VerificationPreparationResponse
+    P2 <- P3: Return request data
+    P1 <- P2: Invoke user callback with request data
+    P1 -> P2:
+    P2 -> P3: Validate interaction with request data \nand provider details
+    P3 -> P4: VerifyInteractionRequest
+    P4 -> P5: Create request to provider
+    P4 <- P5: Return provider response
+    note right of P4: Validate response against \nPact interaction
+    P3 <- P4: VerifyInteractionResponse
+    P2 <- P3: Return results
+    deactivate P2
+  end
+P1 <- P2: Return results
+P1 -> P2: Finish Test
+P2 -> P3: Decrement access to plugin
+P3 -> P4: Shutdown plugin if no longer used
+P3 <- P4:
+P2 <- P3:
+P1 <- P2:
+@enduml
