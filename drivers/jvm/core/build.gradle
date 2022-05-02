@@ -78,7 +78,7 @@ test {
 
 pact {
     publish {
-        pactBrokerUrl = 'https://pact-foundation.pact.dius.com.au'
+        pactBrokerUrl = 'https://pact-foundation.pactflow.io'
         consumerVersion = "${project.version}+${gitSha}"
         if (project.hasProperty('pactBrokerToken')) {
             pactBrokerToken = project.pactBrokerToken
