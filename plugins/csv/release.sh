@@ -14,25 +14,25 @@ cargo build --release
 
 case "$1" in
   Linux)    echo "Building for Linux"
-            gzip -c target/release/pact-protobuf-plugin > /tmp/artifacts/pact-protobuf-plugin-linux-x86_64.gz
-            openssl dgst -sha256 -r /tmp/artifacts/pact-protobuf-plugin-linux-x86_64.gz > /tmp/artifacts/pact-protobuf-plugin-linux-x86_64.gz.sha256
+            gzip -c target/release/pact-plugin-csv > /tmp/artifacts/pact-plugin-csv-linux-x86_64.gz
+            openssl dgst -sha256 -r /tmp/artifacts/pact-plugin-csv-linux-x86_64.gz > /tmp/artifacts/pact-plugin-csv-linux-x86_64.gz.sha256
             cp pact-plugin.json /tmp/artifacts/
             ;;
   Windows)  echo  "Building for Windows"
-            gzip -c target/release/pact-protobuf-plugin.exe > /tmp/artifacts/pact-protobuf-plugin-windows-x86_64.exe.gz
-            openssl dgst -sha256 -r /tmp/artifacts/pact-protobuf-plugin-windows-x86_64.exe.gz > /tmp/artifacts/pact-protobuf-plugin-windows-x86_64.exe.gz.sha256
+            gzip -c target/release/pact-plugin-csv.exe > /tmp/artifacts/pact-plugin-csv-windows-x86_64.exe.gz
+            openssl dgst -sha256 -r /tmp/artifacts/pact-plugin-csv-windows-x86_64.exe.gz > /tmp/artifacts/pact-plugin-csv-windows-x86_64.exe.gz.sha256
             ;;
   macOS)    echo  "Building for OSX"
-            gzip -c target/release/pact-protobuf-plugin > /tmp/artifacts/pact-protobuf-plugin-osx-x86_64.gz
-            openssl dgst -sha256 -r /tmp/artifacts/pact-protobuf-plugin-osx-x86_64.gz > /tmp/artifacts/pact-protobuf-plugin-osx-x86_64.gz.sha256
+            gzip -c target/release/pact-plugin-csv > /tmp/artifacts/pact-plugin-csv-osx-x86_64.gz
+            openssl dgst -sha256 -r /tmp/artifacts/pact-plugin-csv-osx-x86_64.gz > /tmp/artifacts/pact-plugin-csv-osx-x86_64.gz.sha256
 
             # M1
             export SDKROOT=$(xcrun -sdk macosx11.1 --show-sdk-path)
             export MACOSX_DEPLOYMENT_TARGET=$(xcrun -sdk macosx11.1 --show-sdk-platform-version)
             cargo build --target aarch64-apple-darwin --release
 
-            gzip -c target/aarch64-apple-darwin/release/pact-protobuf-plugin > /tmp/artifacts/pact-protobuf-plugin-osx-aarch64.gz
-            openssl dgst -sha256 -r /tmp/artifacts/pact-protobuf-plugin-osx-aarch64.gz > /tmp/artifacts/pact-protobuf-plugin-osx-aarch64.gz.sha256
+            gzip -c target/aarch64-apple-darwin/release/pact-plugin-csv > /tmp/artifacts/pact-plugin-csv-osx-aarch64.gz
+            openssl dgst -sha256 -r /tmp/artifacts/pact-plugin-csv-osx-aarch64.gz > /tmp/artifacts/pact-plugin-csv-osx-aarch64.gz.sha256
             ;;
   *)        echo "$1 is not a recognised OS"
             exit 1
