@@ -2,7 +2,7 @@
   "manifestVersion": 1,
   "pluginInterfaceVersion": 1,
   "name": "csv",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "executableType": "exec",
   "entryPoint": "pact-plugin-csv"
 }

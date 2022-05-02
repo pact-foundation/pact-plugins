@@ -9,13 +9,13 @@ in the `target/release/` directory.
 
 ## Installing the plugin
 
-The plugin binary and [manifest file pact-plugin.json](pact-plugin.json) need to be copied into the `$HOME/.pact/plugins/csv-0.0.0` directory. You can download
+The plugin binary and [manifest file pact-plugin.json](pact-plugin.json) need to be copied into the `$HOME/.pact/plugins/csv-0.0.1` directory. You can download
 those from the release for the plugin.
 
 ## Running with a development version of the plugin
 
 If you build the plugin without the `--release`, this will create a debug version in the `target/debug` directory.
-Copy the [manifest file pact-plugin.json](pact-plugin.json) into the `$HOME/.pact/plugins/csv-0.0.0` directory. If you
+Copy the [manifest file pact-plugin.json](pact-plugin.json) into the `$HOME/.pact/plugins/csv-0.0.1` directory. If you
 then edit that file, and set the `entryPoint` to the absolute path of the `pact-plugin-csv` binary in `target/debug`,
 you can then make changes to the plugin, build it, and then all test projects will use that version.
 
