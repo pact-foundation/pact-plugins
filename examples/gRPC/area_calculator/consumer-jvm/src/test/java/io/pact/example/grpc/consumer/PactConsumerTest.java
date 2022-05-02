@@ -88,7 +88,7 @@ public class PactConsumerTest {
     AreaCalculator.AreaResponse response = stub.calculate(shapeMessage);
     assertThat(response.getValue(), equalTo(12.0F));
 
-    // Incorrect request, missing the length field
+    // Incorrect request, missing the length field. Uncommenting this will cause the test to fail.
     //AreaCalculator.ShapeMessage.Builder builder = AreaCalculator.ShapeMessage.newBuilder();
     //AreaCalculator.Rectangle rectangle = builder.getRectangleBuilder().setWidth(22).build();
     //shapeMessage = builder.setRectangle(rectangle).build();
