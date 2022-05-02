@@ -7,7 +7,7 @@ This example project has a server implementation in Kotlin for the area calculat
 ```
 
 The Gradle Protobuf plugin is used to generate the gRPC classes for the calculate service call and the [Kotlin Server
-class](src/main/kotlin/io/pact/example/grpc/provider/Server.kt) implements the calculate method.
+class](server/src/main/kotlin/io/pact/example/grpc/provider/Server.kt) implements the calculate method.
 
 ## gRPC plugin
 
@@ -15,7 +15,7 @@ To run the test in this project, it requires the gRPC plugin to be installed. Se
 
 ## Pact verification test
 
-There is a [Pact verification test](src/test/java/io/pact/example/grpc/provider/PactVerificationTest.java) written in Java and JUint 5 that can verify the Kotlin server using a Pact file from
+There is a [Pact verification test](server/src/test/java/io/pact/example/grpc/provider/PactVerificationTest.java) written in Java and JUint 5 that can verify the Kotlin server using a Pact file from
 one of the consumer projects.
 
 ## Verifying the gRPC server using Verifier CLI
@@ -25,7 +25,7 @@ The server can also be verified by using the [Pact Verifier CLI](https://github.
 For this to work, the server first needs to be started. Then the `pact_verifier_cli` can be used with one of the Pact files
 from the consumer projects to verify the server.
 
-### First start the server
+### First, start the server
 
 We can use the Gradle run task for that:
 
