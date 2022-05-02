@@ -26,6 +26,7 @@ jobs:
         if: runner.os == 'Windows'
       - if: startsWith(github.ref, 'refs/tags/csv-plugin')
         run: ./release.sh ${{ runner.os }}
+        shell: bash
         working-directory: plugins/csv
       - name: Upload Release Assets
         id: upload-release-asset
