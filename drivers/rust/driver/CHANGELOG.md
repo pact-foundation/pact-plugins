@@ -1,5 +1,12 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.6 - replace logging with tracing crate
+
+* 1dbb311 - chore: lock the version of the tracing core crate (Ronald Holshausen, Mon May 9 16:39:13 2022 +1000)
+* e194ab9 - chore: replace logging with tracing crate (Ronald Holshausen, Mon May 9 16:27:31 2022 +1000)
+* f2e4c3f - chore: Update dependencies (Ronald Holshausen, Mon May 9 14:59:12 2022 +1000)
+* 75bf662 - bump version to 0.1.6 (Ronald Holshausen, Tue Apr 26 13:51:05 2022 +1000)
+
 # 0.1.5 - Maintenance Release
 
 * aa04485 - chore: move pact tests into a seperate crate (Ronald Holshausen, Tue Apr 26 13:25:20 2022 +1000)
