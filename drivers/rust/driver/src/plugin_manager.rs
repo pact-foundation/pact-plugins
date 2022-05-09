@@ -15,7 +15,6 @@ use anyhow::anyhow;
 use bytes::Bytes;
 use itertools::Either;
 use lazy_static::lazy_static;
-use log::max_level;
 use os_info::Type;
 use pact_models::bodies::OptionalBody;
 use pact_models::PactSpecification;
@@ -26,6 +25,7 @@ use serde_json::Value;
 use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
 use tokio::process::Command;
 use tracing::{debug, trace, warn};
+use tracing_core::LevelFilter;
 
 use crate::catalogue_manager::{CatalogueEntry, register_plugin_entries, remove_plugin_entries};
 use crate::child_process::ChildPluginProcess;
@@ -221,10 +221,10 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
   }
   debug!("Starting plugin using {:?}", path);
 
-  let log_level = max_level();
+  let log_level = LevelFilter::current();
   let child = Command::new(path)
-    .env("LOG_LEVEL", log_level.as_str())
-    .env("RUST_LOG", log_level.as_str())
+    .env("LOG_LEVEL", log_level.to_string())
+    .env("RUST_LOG", log_level.to_string())
     .current_dir(manifest.plugin_dir.clone())
     .stdout(Stdio::piped())
     .stderr(Stdio::piped())

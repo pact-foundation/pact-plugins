@@ -191,16 +191,6 @@ dependencies = [
 
 [[package]]
 name = "chrono-tz"
-version = "0.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2554a3155fec064362507487171dcc4edc3df60cb10f3a1fb10ed8094822b120"
-dependencies = [
- "chrono",
- "parse-zoneinfo",
-]
-
-[[package]]
-name = "chrono-tz"
 version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "58549f1842da3080ce63002102d5bc954c7bc843d4f47818e642abdc36253552"
@@ -1154,7 +1144,6 @@ dependencies = [
  "home",
  "itertools",
  "lazy_static",
- "log",
  "maplit",
  "md5",
  "os_info",
@@ -1171,6 +1160,7 @@ dependencies = [
  "tonic",
  "tonic-build",
  "tracing",
+ "tracing-core",
  "uuid",
 ]
 
@@ -1226,7 +1216,7 @@ dependencies = [
  "anyhow",
  "bytes",
  "chrono",
- "chrono-tz 0.6.1",
+ "chrono-tz",
  "clap",
  "either",
  "env_logger",
@@ -1325,23 +1315,22 @@ dependencies = [
 
 [[package]]
 name = "pact_models"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8868e400313623bec4928cf1e917286a1f75a31f3c368839bae60252129402ec"
+checksum = "b427d9eae4900935a272e622963304e503569bc65355e6e444072774c3af3120"
 dependencies = [
  "anyhow",
  "ariadne",
  "base64",
  "bytes",
  "chrono",
- "chrono-tz 0.5.3",
+ "chrono-tz",
  "fs2",
  "hex",
  "indextree",
  "itertools",
  "lazy_static",
  "lenient_semver",
- "log",
  "logos",
  "logos-iter",
  "maplit",
@@ -1358,6 +1347,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sxd-document",
+ "tracing",
  "uuid",
 ]
 
@@ -2329,6 +2319,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f54c8ca710e81886d498c2fd3331b56c93aa248d49de2222ad2742247c60072f"
 dependencies = [
  "lazy_static",
+ "valuable",
 ]
 
 [[package]]
@@ -2465,6 +2456,12 @@ checksum = "bc5cf98d8186244414c848017f0e2676b3fcb46807f6668a97dfe67359a3c4b7"
 dependencies = [
  "getrandom",
 ]
+
+[[package]]
+name = "valuable"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "830b7e5d4d90034032940e4ace0d9a9a057e7a45cd94e6c007832e39edb82f6d"
 
 [[package]]
 name = "vec_map"
