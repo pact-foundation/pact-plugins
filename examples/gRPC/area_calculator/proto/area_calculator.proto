@@ -3,6 +3,7 @@ syntax = "proto3";
 package area_calculator;
 
 option php_generic_services = true;
+option go_package = "io.pact/area_calculator";
 
 service Calculator {
   rpc calculate (ShapeMessage) returns (AreaResponse) {}
