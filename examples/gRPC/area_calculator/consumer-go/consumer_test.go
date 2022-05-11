@@ -25,7 +25,7 @@ func TestCalculateClient(t *testing.T) {
 	//	WithBodyMatch(&User{})
 
 	// Act: test our API client behaves correctly
-	err = mockProvider.ExecuteTest(func(config MockServerConfig) error {
+	err = mockProvider.ExecuteTest(t, func(config MockServerConfig) error {
 		// Execute the gRPC client against the mock server
 		area, err := GetSquareArea(fmt.Sprintf("%s:%d", config.Host, config.Port))
 
