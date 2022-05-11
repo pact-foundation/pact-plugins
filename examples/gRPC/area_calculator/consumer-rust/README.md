@@ -15,7 +15,7 @@ To run the test in this project, it requires the gRPC plugin to be installed. Se
 
 The gRPC structs are automatically generated using Prost in the build script.
 
-## Test class
+## Test method
 
 The test method [test_proto_client](src/lib.rs) first sets up the interaction using the Pact DSL, then sets up a 
 gRPC mock server to use. The generated stub structs are then used to send the `ShapeMessage` to the mock server, 

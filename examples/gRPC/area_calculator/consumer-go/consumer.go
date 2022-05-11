@@ -15,12 +15,12 @@ var (
 	addr = flag.String("addr", "localhost:8080", "the address to connect to")
 )
 
-func main() {
-	flag.Parse()
+func GetSquareArea(address string) (float32, error) {
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(*addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial(address, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
+		return 0, err
 	}
 	defer conn.Close()
 
@@ -31,7 +31,17 @@ func main() {
 	defer cancel()
 	r, err := c.Calculate(ctx, &ac.ShapeMessage{ Shape: &ac.ShapeMessage_Square{ Square: &ac.Square { EdgeLength: 3 } } })
 	if err != nil {
-		log.Fatalf("could not calculate length: %v", err)
+		return 0, err
 	}
-	fmt.Printf("Area: %f", r.GetValue())
+	return r.GetValue(), nil
+}
+
+func main() {
+	flag.Parse()
+	area, err := GetSquareArea(*addr)
+	if err != nil {
+		log.Fatalf("could not calculate length: %v", err)
+	} else {
+		fmt.Printf("Area: %f", area)
+	}
 }
