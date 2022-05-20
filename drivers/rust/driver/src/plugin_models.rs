@@ -133,6 +133,9 @@ pub trait PactPluginRpc {
   /// Shutdown a running mock server
   async fn shutdown_mock_server(&self, request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse>;
 
+  /// Get the matching results from a running mock server
+  async fn get_mock_server_results(&self, request: MockServerRequest) -> anyhow::Result<MockServerResults>;
+
   /// Prepare an interaction for verification. This should return any data required to construct any request
   /// so that it can be amended before the verification is run.
   async fn prepare_interaction_for_verification(&self, request: VerificationPreparationRequest) -> anyhow::Result<VerificationPreparationResponse>;
@@ -229,6 +232,18 @@ impl PactPluginRpc for PactPlugin {
       Ok(req)
     });
     let response = client.shutdown_mock_server(tonic::Request::new(request)).await?;
+    Ok(response.get_ref().clone())
+  }
+
+  async fn get_mock_server_results(&self, request: MockServerRequest) -> anyhow::Result<MockServerResults> {
+    let channel = self.connect_channel().await?;
+    let auth_str = self.child.plugin_info.server_key.as_str();
+    let token = MetadataValue::from_str(auth_str)?;
+    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
+      req.metadata_mut().insert("authorization", token.clone());
+      Ok(req)
+    });
+    let response = client.get_mock_server_results(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 

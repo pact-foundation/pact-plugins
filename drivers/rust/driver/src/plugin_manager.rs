@@ -384,6 +384,50 @@ pub async fn shutdown_mock_server(mock_server: &MockServerDetails) -> anyhow::Re
   }
 }
 
+/// Gets the results from a running mock server.
+pub async fn get_mock_server_results(mock_server: &MockServerDetails) -> anyhow::Result<Vec<MockServerResults>> {
+  let request = MockServerRequest {
+    server_key: mock_server.key.to_string()
+  };
+
+  debug!(
+    plugin_name = mock_server.plugin.manifest.name.as_str(),
+    plugin_version = mock_server.plugin.manifest.version.as_str(),
+    server_key = mock_server.key.as_str(),
+    "Sending getMockServerResults request to plugin"
+  );
+  let response = mock_server.plugin.get_mock_server_results(request).await?;
+  debug!("Got response: {response:?}");
+
+  if response.ok {
+    Ok(vec![])
+  } else {
+    Ok(response.results.iter().map(|result| {
+      MockServerResults {
+        path: result.path.clone(),
+        error: result.error.clone(),
+        mismatches: result.mismatches.iter().map(|mismatch| {
+          ContentMismatch {
+            expected: mismatch.expected.as_ref()
+              .map(|e| from_utf8(&e).unwrap_or_default().to_string())
+              .unwrap_or_default(),
+            actual: mismatch.actual.as_ref()
+              .map(|a| from_utf8(&a).unwrap_or_default().to_string())
+              .unwrap_or_default(),
+            mismatch: mismatch.mismatch.clone(),
+            path: mismatch.path.clone(),
+            diff: if mismatch.diff.is_empty() {
+              None
+            } else {
+              Some(mismatch.diff.clone())
+            }
+          }
+        }).collect()
+      }
+    }).collect())
+  }
+}
+
 /// Sets up a transport request to be made. This is the first phase when verifying, and it allows the
 /// users to add additional values to any requests that are made.
 pub async fn prepare_validation_for_interaction(
