@@ -297,6 +297,11 @@ interface PluginManager {
   fun shutdownMockServer(mockServer: MockServerDetails): List<MockServerResults>?
 
   /**
+   * Gets the results from a running mock server.
+   */
+  fun getMockServerResults(mockServer: MockServerDetails): List<MockServerResults>?
+
+  /**
    * Sets up a transport request to be made. This is the first phase when verifying, and it allows the
    * users to add additional values to any requests that are made.
    */
@@ -590,6 +595,23 @@ object DefaultPluginManager: KLogging(), PluginManager {
       MockServerResults(result.path, result.error, result.mismatchesList.map {
         MockServerMismatch(
           it.expected, it.actual, it.mismatch, it.path, it.diff
+        )
+      })
+    }
+  }
+
+  override fun getMockServerResults(mockServer: MockServerDetails): List<MockServerResults>? {
+    val request = Plugin.MockServerRequest.newBuilder()
+            .setServerKey(mockServer.key)
+
+    logger.debug { "Sending getMockServerResults request to plugin ${mockServer.plugin.manifest}" }
+    val response = mockServer.plugin.withGrpcStub { stub -> stub.getMockServerResults(request.build()) }
+    logger.debug { "Got response: $response" }
+
+    return if (response.ok) null else response.resultsList.map { result ->
+      MockServerResults(result.path, result.error, result.mismatchesList.map {
+        MockServerMismatch(
+                it.expected, it.actual, it.mismatch, it.path, it.diff
         )
       })
     }
