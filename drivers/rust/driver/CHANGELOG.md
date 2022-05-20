@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.7 - return mock server results from a running server
+
+* 647cf93 - feat: add method to return mock server results from a running server (Ronald Holshausen, Fri May 20 14:22:50 2022 +1000)
+* 105abe1 - feat: added example gRPC consumer example (Ronald Holshausen, Tue May 10 16:57:03 2022 +1000)
+* 7a3881f - bump version to 0.1.7 (Ronald Holshausen, Mon May 9 17:18:07 2022 +1000)
+
 # 0.1.6 - replace logging with tracing crate
 
 * 1dbb311 - chore: lock the version of the tracing core crate (Ronald Holshausen, Mon May 9 16:39:13 2022 +1000)
