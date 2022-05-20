@@ -249,7 +249,14 @@ message MockServerDetails {
 }
 
 // Request to shut down a running mock server
+// TODO: replace this with MockServerRequest in the next major version
 message ShutdownMockServerRequest {
+  // The server ID to shutdown
+  string serverKey = 1;
+}
+
+// Request for a running mock server by ID
+message MockServerRequest {
   // The server ID to shutdown
   string serverKey = 1;
 }
@@ -265,7 +272,16 @@ message MockServerResult {
 }
 
 // Response to the shut down mock server request
+// TODO: replace this with MockServerResults in the next major version
 message ShutdownMockServerResponse {
+  // If the mock status is all ok
+  bool ok = 1;
+  // The results of the test run, will contain an entry for each request received by the mock server
+  repeated MockServerResult results = 2;
+}
+
+// Matching results of the mock server.
+message MockServerResults {
   // If the mock status is all ok
   bool ok = 1;
   // The results of the test run, will contain an entry for each request received by the mock server
@@ -365,7 +381,10 @@ service PactPlugin {
   // Start a mock server
   rpc StartMockServer(StartMockServerRequest) returns (StartMockServerResponse);
   // Shutdown a running mock server
+  // TODO: Replace the message types with MockServerRequest and MockServerResults in the next major version
   rpc ShutdownMockServer(ShutdownMockServerRequest) returns (ShutdownMockServerResponse);
+  // Get the matching results from a running mock server
+  rpc GetMockServerResults(MockServerRequest) returns (MockServerResults);
 
   // Prepare an interaction for verification. This should return any data required to construct any request
   // so that it can be amended before the verification is run

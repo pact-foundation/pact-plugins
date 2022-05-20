@@ -46,6 +46,10 @@ impl PactPluginRpc for MockPlugin {
     unimplemented!()
   }
 
+  async fn get_mock_server_results(&self, request: MockServerRequest) -> anyhow::Result<MockServerResults> {
+    unimplemented!()
+  }
+
   async fn prepare_interaction_for_verification(&self, _request: VerificationPreparationRequest) -> anyhow::Result<VerificationPreparationResponse> {
     unimplemented!()
   }
