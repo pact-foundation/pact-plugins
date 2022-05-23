@@ -647,9 +647,9 @@ dependencies = [
 
 [[package]]
 name = "http-body"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1ff4f84919677303da5f147645dbea6b1881f368d03ac84e1dc09031ebd7b2c6"
+checksum = "d5f38f16d184e36f2408a55281cd658ecbd3ca05cce6d6510a176eca393e26d1"
 dependencies = [
  "bytes",
  "http",
@@ -744,9 +744,9 @@ dependencies = [
 
 [[package]]
 name = "indexmap"
-version = "1.8.1"
+version = "1.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f647032dfaa1f8b6dc29bd3edb7bbef4861b8b8007ebb118d6db284fd59f6ee"
+checksum = "bc633605454125dec4b66843673f01c7df2b89479b32e0ed634e43a91cff62a5"
 dependencies = [
  "autocfg",
  "hashbrown",
@@ -1080,9 +1080,9 @@ checksum = "ff011a302c396a5197692431fc1948019154afc178baf7d8e37367442a4601cf"
 
 [[package]]
 name = "os_info"
-version = "3.3.0"
+version = "3.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04304d855bb5385d4b595edf0147b8e281871766b75dd4c87b2bdf3c9e5c2d19"
+checksum = "0eca3ecae1481e12c3d9379ec541b238a16f0b75c9a409942daa8ec20dbfdb62"
 dependencies = [
  "log",
  "serde",
@@ -1091,9 +1091,9 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.1.6"
+version = "0.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af0da9e0baef723fd8da57afa99dcc6a54639332467e90f8ce8d74538a5a4657"
+checksum = "21dd6ea7db3fe3acf2754b60dba05b9e114be4732a008495b620fd1a754313b0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1170,9 +1170,9 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "0.9.3"
+version = "0.9.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a91f56f0f46083bc2352369f9af5c12bd2dee06cd18242c0ec1e999b9bca44f8"
+checksum = "37cbd2c0db8015ffa6f8251ddc5b4d85e6cedf37098d0b41c3d2dde9e30a02d2"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1181,9 +1181,9 @@ dependencies = [
  "itertools",
  "lazy_static",
  "maplit",
- "pact-plugin-driver 0.1.6",
+ "pact-plugin-driver 0.1.7",
  "pact_matching",
- "pact_mock_server",
+ "pact_mock_server 0.9.0",
  "pact_models",
  "regex",
  "serde_json",
@@ -1217,9 +1217,9 @@ dependencies = [
  "multipart",
  "onig",
  "os_info",
- "pact-plugin-driver 0.1.6",
+ "pact-plugin-driver 0.1.7",
  "pact_matching",
- "pact_mock_server",
+ "pact_mock_server 0.8.11",
  "pact_models",
  "pact_verifier",
  "rand",
@@ -1259,7 +1259,7 @@ dependencies = [
  "multipart",
  "nom",
  "onig",
- "pact-plugin-driver 0.1.6",
+ "pact-plugin-driver 0.1.7",
  "pact_models",
  "rand",
  "reqwest",
@@ -1288,7 +1288,7 @@ dependencies = [
  "itertools",
  "lazy_static",
  "maplit",
- "pact-plugin-driver 0.1.6",
+ "pact-plugin-driver 0.1.7",
  "pact_matching",
  "pact_models",
  "rustls",
@@ -1300,6 +1300,36 @@ dependencies = [
  "tokio-rustls",
  "tracing",
  "tracing-core",
+ "uuid",
+]
+
+[[package]]
+name = "pact_mock_server"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d37e168de201b5fe7e00d3165100af0ecad3753ca954919d47c2fdb4b90355d"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "futures",
+ "hyper",
+ "hyper-rustls",
+ "itertools",
+ "lazy_static",
+ "maplit",
+ "pact-plugin-driver 0.1.7",
+ "pact_matching",
+ "pact_models",
+ "rustls",
+ "rustls-pemfile 1.0.0",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-rustls",
+ "tracing",
+ "tracing-core",
+ "url",
  "uuid",
 ]
 
@@ -1360,7 +1390,7 @@ dependencies = [
  "libc",
  "maplit",
  "mime",
- "pact-plugin-driver 0.1.6",
+ "pact-plugin-driver 0.1.7",
  "pact_matching",
  "pact_models",
  "regex",
@@ -1421,9 +1451,9 @@ checksum = "f658886ed52e196e850cfbbfddab9eaa7f6d90dd0929e264c31e5cec07e09e57"
 
 [[package]]
 name = "petgraph"
-version = "0.6.0"
+version = "0.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4a13a2fa9d0b63e5f22328828741e523766fff0ee9e779316902290dff3f824f"
+checksum = "51b305cc4569dd4e8765bab46261f67ef5d4d11a4b6e745100ee5dad8948b46c"
 dependencies = [
  "fixedbitset",
  "indexmap",
@@ -1664,9 +1694,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.5.5"
+version = "1.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1a11647b6b25ff05a515cb92c365cec08801e83423a235b51e231e1808747286"
+checksum = "d83f127d94bdbcda4c8cc2e50f6f84f4b611f69c902699ca385a39c3a75f9ff1"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -1681,9 +1711,9 @@ checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
 
 [[package]]
 name = "regex-syntax"
-version = "0.6.25"
+version = "0.6.26"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f497285884f3fcff424ffc933e56d7cbca511def0c9831a7f9b5f6153e3cc89b"
+checksum = "49b3de9ec5dc0a3417da371aab17d729997c15010e7fd24ff707773a33bddb64"
 
 [[package]]
 name = "remove_dir_all"
