@@ -19,7 +19,7 @@ jobs:
         with:
           java-version: 11
       - name: Install Protobuf plugin
-        run: scripts/install-protobuf-plugin.sh
+        run: scripts/ci-install-protobuf-plugin.sh
         shell: bash
       - name: Build and install csv plugin
         run: |
