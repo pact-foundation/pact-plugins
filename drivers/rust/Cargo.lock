@@ -422,15 +422,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "fern"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bdd7b0849075e79ee9a1836df22c717d1eba30451796fdc631b04565dd11e2a"
-dependencies = [
- "log",
-]
-
-[[package]]
 name = "fixedbitset"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -856,9 +847,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.14"
+version = "0.4.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51b9bbe6c47d51fc3e1a9b945965946b4c44142ab8792c50835a980d362c2710"
+checksum = "abb12e687cfb44aa40f41fc3978ef76448f9b6038cad6aef4259d3c095a2382e"
 dependencies = [
  "cfg-if",
 ]
@@ -901,6 +892,15 @@ name = "maplit"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3e2e65a1a2e43cfcb47a895c4c8b10d1f4a61097f9f254f183aee60cad9c651d"
+
+[[package]]
+name = "matchers"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8263075bb86c5a1b1427b5ae862e8889656f126e9f77c484496e8b47cf5c5558"
+dependencies = [
+ "regex-automata",
+]
 
 [[package]]
 name = "matches"
@@ -1046,9 +1046,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.11.0"
+version = "1.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b10983b38c53aebdf33f542c6275b0f58a238129d00c4ae0e6fb59738d783ca"
+checksum = "7709cef83f0c1f58f666e746a08b21e0085f7440fa6a29cc194d68aac97a4225"
 
 [[package]]
 name = "onig"
@@ -1166,6 +1166,9 @@ dependencies = [
  "prost-types",
  "reqwest",
  "serde_json",
+ "test-log",
+ "tokio",
+ "tonic",
 ]
 
 [[package]]
@@ -1183,7 +1186,7 @@ dependencies = [
  "maplit",
  "pact-plugin-driver 0.1.7",
  "pact_matching",
- "pact_mock_server 0.9.0",
+ "pact_mock_server",
  "pact_models",
  "regex",
  "serde_json",
@@ -1196,9 +1199,9 @@ dependencies = [
 
 [[package]]
 name = "pact_ffi"
-version = "0.2.6"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd76764dff1574685c5063164f0dade435bc410022cc24b9ce85719acb34ec95"
+checksum = "9882aa2f9bc1be2878c9f3ebc1449d039dac3e90cd11ac3b95268aaf1897d008"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -1208,7 +1211,6 @@ dependencies = [
  "clap",
  "either",
  "env_logger",
- "fern",
  "itertools",
  "lazy_static",
  "libc",
@@ -1219,7 +1221,7 @@ dependencies = [
  "os_info",
  "pact-plugin-driver 0.1.7",
  "pact_matching",
- "pact_mock_server 0.8.11",
+ "pact_mock_server",
  "pact_models",
  "pact_verifier",
  "rand",
@@ -1228,10 +1230,14 @@ dependencies = [
  "regex-syntax",
  "serde",
  "serde_json",
- "simplelog",
  "sxd-document",
  "thiserror",
  "tokio",
+ "tokio-rustls",
+ "tracing",
+ "tracing-core",
+ "tracing-log",
+ "tracing-subscriber",
  "uuid",
  "zeroize",
 ]
@@ -1271,35 +1277,6 @@ dependencies = [
  "tracing",
  "tracing-core",
  "tree_magic_mini",
- "uuid",
-]
-
-[[package]]
-name = "pact_mock_server"
-version = "0.8.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fdb79a102f918b153f73e3239a4df1f5e8637632be552127b34ece6f1b345718"
-dependencies = [
- "anyhow",
- "bytes",
- "futures",
- "hyper",
- "hyper-rustls",
- "itertools",
- "lazy_static",
- "maplit",
- "pact-plugin-driver 0.1.7",
- "pact_matching",
- "pact_models",
- "rustls",
- "rustls-pemfile 1.0.0",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tokio-rustls",
- "tracing",
- "tracing-core",
  "uuid",
 ]
 
@@ -1708,6 +1685,9 @@ name = "regex-automata"
 version = "0.1.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6c230d73fb8d8c1b9c0b3135c5142a8acee3a0558fb8db5cf1cb65f8d7862132"
+dependencies = [
+ "regex-syntax",
+]
 
 [[package]]
 name = "regex-syntax"
@@ -1963,23 +1943,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sharded-slab"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "900fba806f70c630b0a382d0d825e17a0f19fcd059a2ade1ff237bcddf446b31"
+dependencies = [
+ "lazy_static",
+]
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e51e73328dc4ac0c7ccbda3a494dfa03df1de2f46018127f60c693f2648455b0"
 dependencies = [
  "libc",
-]
-
-[[package]]
-name = "simplelog"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4bc0ffd69814a9b251d43afcabf96dad1b29f5028378056257be9e3fecc9f720"
-dependencies = [
- "chrono",
- "log",
- "termcolor",
 ]
 
 [[package]]
@@ -2088,6 +2066,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "test-log"
+version = "0.2.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4235dbf7ea878b3ef12dea20a59c134b405a66aafc4fc2c7b9935916e289e735"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "textwrap"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2114,6 +2103,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "thread_local"
+version = "1.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5516c27b78311c50bf42c071425c560ac799b11c30b31f87e3081965fe5e0180"
+dependencies = [
+ "once_cell",
 ]
 
 [[package]]
@@ -2350,6 +2348,35 @@ checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
 dependencies = [
  "pin-project",
  "tracing",
+]
+
+[[package]]
+name = "tracing-log"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "78ddad33d2d10b1ed7eb9d1f518a5674713876e97e5bb9b7345a7984fbb4f922"
+dependencies = [
+ "lazy_static",
+ "log",
+ "tracing-core",
+]
+
+[[package]]
+name = "tracing-subscriber"
+version = "0.3.11"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4bc28f93baff38037f64e6f43d34cfa1605f27a49c34e8a04c5e78b0babf2596"
+dependencies = [
+ "ansi_term",
+ "lazy_static",
+ "matchers",
+ "regex",
+ "sharded-slab",
+ "smallvec",
+ "thread_local",
+ "tracing",
+ "tracing-core",
+ "tracing-log",
 ]
 
 [[package]]

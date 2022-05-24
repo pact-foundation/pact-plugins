@@ -11,6 +11,7 @@ mod tests {
   use pact_ffi::mock_server::{
     pactffi_cleanup_mock_server,
     pactffi_create_mock_server_for_pact,
+    pactffi_create_mock_server_for_transport,
     pactffi_mock_server_mismatches,
     pactffi_write_pact_file
   };
@@ -29,11 +30,10 @@ mod tests {
   use serde_json::json;
 
   use pact_plugin_driver::proto::{InitPluginRequest, InitPluginResponse};
-
-  #[test]
+  use pact_plugin_driver::proto::pact_plugin_client::PactPluginClient;
+  
+  #[test_log::test]
   fn test_csv_client() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let consumer_name = CString::new("csv-consumer").unwrap();
     let provider_name = CString::new("csv-provider").unwrap();
     let plugin_name = CString::new("csv").unwrap();
@@ -92,10 +92,8 @@ mod tests {
     let _ = remove_dir_all(path);
   }
 
-  #[test]
+  #[test_log::test]
   fn test_message_client() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let consumer_name = CString::new("protobuf-consumer").unwrap();
     let provider_name = CString::new("protobuf-provider").unwrap();
     let plugin_name = CString::new("protobuf").unwrap();
@@ -153,10 +151,8 @@ mod tests {
     expect!(result).to(be_ok());
   }
 
-  #[test]
+  #[test_log::test]
   fn test_proto_service() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let consumer_name = CString::new("protobuf-consumer").unwrap();
     let provider_name = CString::new("protobuf-provider").unwrap();
     let plugin_name = CString::new("protobuf").unwrap();
@@ -225,6 +221,85 @@ mod tests {
       }
 
       pactffi_pact_sync_message_iter_delete(messages);
+    });
+
+    pactffi_cleanup_plugins(pact_handle);
+    pactffi_free_pact_handle(pact_handle);
+
+    let _ = remove_dir_all(dir.clone());
+
+    expect!(result).to(be_ok());
+  }
+
+  #[test_log::test]
+  fn test_grpc_service() {
+    let consumer_name = CString::new("grpc-consumer").unwrap();
+    let provider_name = CString::new("grpc-provider").unwrap();
+    let plugin_name = CString::new("protobuf").unwrap();
+    let pact_handle = pactffi_new_pact(consumer_name.as_ptr(), provider_name.as_ptr());
+
+    let mut dir = env::temp_dir();
+    dir = dir.join("test_grpc_service");
+    create_dir_all(dir.clone()).unwrap();
+    let file_path = dir.join("plugin.proto");
+    let proto_file = include_str!("../../driver/plugin.proto");
+    write(file_path.as_path(), proto_file).unwrap();
+
+    expect!(pactffi_using_plugin(pact_handle, plugin_name.as_ptr(), null())).to(be_equal_to(0));
+
+    let result = catch_unwind(|| {
+      let description = CString::new("init plugin request").unwrap();
+      let interaction = pactffi_new_sync_message_interaction(pact_handle, description.as_ptr());
+      let test_name = CString::new("test_grpc_service").unwrap();
+      expect!(pactffi_interaction_test_name(interaction, test_name.as_ptr())).to(be_equal_to(0));
+
+      let content_type = CString::new("application/protobuf").unwrap();
+      let contents = CString::new(json!({
+        "pact:proto": file_path.to_str().unwrap(),
+        "pact:proto-service": "PactPlugin/InitPlugin",
+        "pact:content-type": "application/protobuf",
+        "request": {
+          "implementation": "notEmpty('plugin-driver-rust')",
+          "version": "matching(semver, '0.0.0')"
+        },
+        "response": {
+          "catalogue": {
+            "pact:match" : "eachValue(matching($'CatalogueEntry'))",
+            "CatalogueEntry": {
+              "type": "matching(regex, 'CONTENT_MATCHER|CONTENT_GENERATOR', 'CONTENT_MATCHER')",
+              "key": "notEmpty('test key')"
+            }
+          }
+        }
+      }).to_string()).unwrap();
+
+      expect!(pactffi_interaction_contents(interaction, InteractionPart::Request, content_type.as_ptr(), contents.as_ptr())).to(be_equal_to(0));
+
+      let addr = CString::new("127.0.0.1").unwrap();
+      let transport = CString::new("grpc").unwrap();
+      let port = pactffi_create_mock_server_for_transport(pact_handle, addr.as_ptr(), 0,
+        transport.as_ptr(), null());
+      expect!(port).to(be_greater_than(1024));
+
+      let runtime = tokio::runtime::Builder::new_multi_thread()
+          .enable_all()
+          .build()
+          .expect("Could not start a Tokio runtime for running async tasks");
+      let response = runtime.block_on(async {
+        let mut client = PactPluginClient::connect(format!("http://127.0.0.1:{}", port)).await.unwrap();
+
+        let request = InitPluginRequest {
+          implementation: "ffi-test".to_string(),
+          version: "1.2.3".to_string()
+        };
+        let response = client.init_plugin(tonic::Request::new(request)).await.unwrap();
+        response.get_ref().clone()
+      });
+
+      expect!(pactffi_cleanup_mock_server(port)).to(be_true());
+
+      expect!(response.catalogue.len()).to(be_equal_to(1));
+      expect!(&response.catalogue.first().unwrap().key).to(be_equal_to("test key"));
     });
 
     pactffi_cleanup_plugins(pact_handle);
