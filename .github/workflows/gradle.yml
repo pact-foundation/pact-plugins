@@ -25,9 +25,9 @@ jobs:
     - name: Build plugin driver
       run: ./gradlew -s --no-daemon -i publishToMavenLocal
       working-directory: drivers/jvm
-    - name: Build and install Protobuf plugin
-      run: ./gradlew -s --no-daemon -i installLocal
-      working-directory: plugins/protobuf
+    - name: Install Protobuf plugin
+      run: scripts/ci-install-protobuf-plugin.sh
+      shell: bash
     - name: Run plugin driver tests
       run: ./gradlew -s --no-daemon -i check
       working-directory: drivers/jvm
@@ -56,9 +56,9 @@ jobs:
       - name: Build plugin driver
         run: ./gradlew -s --no-daemon -i publishToMavenLocal
         working-directory: drivers/jvm
-      - name: Build and install Protobuf plugin
-        run: ./gradlew -s --no-daemon -i installLocal
-        working-directory: plugins/protobuf
+      - name: Install Protobuf plugin
+        run: scripts/ci-install-protobuf-plugin.sh
+        shell: bash
       - name: Run plugin driver tests
         run: ./gradlew -s --no-daemon -i check
         working-directory: drivers/jvm

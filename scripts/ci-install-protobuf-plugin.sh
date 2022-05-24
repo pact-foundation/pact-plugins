@@ -14,7 +14,7 @@ case "$(uname -s)" in
      ;;
 esac
 
-wget https://github.com/pactflow/pact-protobuf-plugin/releases/download/"${LATEST_RELEASE}"/install-plugin.sh -O /tmp/install-plugin.sh
-chmod +x /tmp/install-plugin.sh
-
-/tmp/install-plugin.sh
+mkdir -p ~/.pact/plugins
+wget https://github.com/pactflow/pact-protobuf-plugin/releases/download/"${LATEST_RELEASE}"/install-plugin.sh -O ~/.pact/plugins/install-plugin.sh
+chmod +x ~/.pact/plugins/install-plugin.sh
+~/.pact/plugins/install-plugin.sh
