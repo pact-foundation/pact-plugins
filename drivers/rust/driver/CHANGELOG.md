@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.8 - Bugfix Release
+
+* 0ecb1cc - fix: log level was not being set correctly (Ronald Holshausen, Thu May 26 12:50:32 2022 +1000)
+* 7515dfb - bump version to 0.1.8 (Ronald Holshausen, Fri May 20 15:23:04 2022 +1000)
+
 # 0.1.7 - return mock server results from a running server
 
 * 647cf93 - feat: add method to return mock server results from a running server (Ronald Holshausen, Fri May 20 14:22:50 2022 +1000)
