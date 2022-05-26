@@ -12,6 +12,7 @@ mod tests {
     pactffi_cleanup_mock_server,
     pactffi_create_mock_server_for_pact,
     pactffi_create_mock_server_for_transport,
+    pactffi_mock_server_matched,
     pactffi_mock_server_mismatches,
     pactffi_write_pact_file
   };
@@ -296,10 +297,14 @@ mod tests {
         response.get_ref().clone()
       });
 
+      let all_matched = pactffi_mock_server_matched(port);
+
       expect!(pactffi_cleanup_mock_server(port)).to(be_true());
 
       expect!(response.catalogue.len()).to(be_equal_to(1));
       expect!(&response.catalogue.first().unwrap().key).to(be_equal_to("test key"));
+
+      expect!(all_matched).to(be_true());
     });
 
     pactffi_cleanup_plugins(pact_handle);
