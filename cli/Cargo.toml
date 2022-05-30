@@ -1,0 +1,18 @@
+[package]
+name = "pact-plugin-cli"
+version = "0.0.0"
+edition = "2021"
+authors = ["Ronald Holshausen <ronald.holshausen@smartbear.com>"]
+description = "CLI utility for Pact plugins"
+homepage = "http://www.pact.io"
+repository = "https://github.com/pact-foundation/pact-plugins"
+readme = "README.md"
+keywords = ["pact"]
+license = "MIT"
+exclude = [
+    "*.iml"
+]
+
+[dependencies]
+pact-plugin-driver = "0.1.8"
+clap = { version = "3.1.18", features = [ "derive" ] }
