@@ -1197,9 +1197,9 @@ dependencies = [
 
 [[package]]
 name = "pact_ffi"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9882aa2f9bc1be2878c9f3ebc1449d039dac3e90cd11ac3b95268aaf1897d008"
+checksum = "d4ea8b401114b85578ed39f4e5d2e5cef7b5cdc80f4c4a77ed92248bb20948db"
 dependencies = [
  "ansi_term",
  "anyhow",
