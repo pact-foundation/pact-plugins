@@ -34,10 +34,22 @@ enum Commands {
   Remove,
 
   /// Enable a plugin version
-  Enable,
+  Enable {
+    /// Plugin name
+    name: String,
+
+    /// Plugin version. Not required if there is only one plugin version.
+    version: Option<String>
+  },
 
   /// Disable a plugin version
-  Disable
+  Disable {
+    /// Plugin name
+    name: String,
+
+    /// Plugin version. Not required if there is only one plugin version.
+    version: Option<String>
+  }
 }
 
 fn main() -> anyhow::Result<()> {
@@ -48,12 +60,93 @@ fn main() -> anyhow::Result<()> {
     Commands::Env => print_env(),
     Commands::Install => Ok(()),
     Commands::Remove => Ok(()),
-    Commands::Enable => Ok(()),
-    Commands::Disable => Ok(())
+    Commands::Enable { name, version } => enable_plugin(name, version),
+    Commands::Disable { name, version } => disable_plugin(name, version)
+  }
+}
+
+fn disable_plugin(name: &String, version: &Option<String>) -> anyhow::Result<()> {
+  let vec = plugin_list()?;
+  let matches = vec.iter().filter(|(manifest, _, _)| {
+    if let Some(version) = version {
+      manifest.name == *name && manifest.version == *version
+    } else {
+      manifest.name == *name
+    }
+  }).collect_vec();
+  if matches.len() == 1 {
+    if let Some((manifest, file, status)) = matches.first() {
+      if !*status {
+        println!("Plugin '{}' with version '{}' is already disabled.", manifest.name, manifest.version);
+      } else {
+        fs::rename(file, file.with_file_name("pact-plugin.json.disabled"))?;
+        println!("Plugin '{}' with version '{}' is now disabled.", manifest.name, manifest.version);
+      }
+      Ok(())
+    } else {
+      Err(anyhow!("Internal error, matches.len() == 1 but first() == None"))
+    }
+  } else if matches.len() > 1 {
+    Err(anyhow!("There is more than one plugin version for '{}', please also provide the version", name))
+  } else if let Some(version) = version {
+    Err(anyhow!("Did not find a plugin with name '{}' and version '{}'", name, version))
+  } else {
+    Err(anyhow!("Did not find a plugin with name '{}'", name))
+  }
+}
+
+fn enable_plugin(name: &String, version: &Option<String>) -> anyhow::Result<()> {
+  let vec = plugin_list()?;
+  let matches = vec.iter().filter(|(manifest, _, _)| {
+    if let Some(version) = version {
+      manifest.name == *name && manifest.version == *version
+    } else {
+      manifest.name == *name
+    }
+  }).collect_vec();
+  if matches.len() == 1 {
+    if let Some((manifest, file, status)) = matches.first() {
+      if *status {
+        println!("Plugin '{}' with version '{}' is already enabled.", manifest.name, manifest.version);
+      } else {
+        fs::rename(file, file.with_file_name("pact-plugin.json"))?;
+        println!("Plugin '{}' with version '{}' is now enabled.", manifest.name, manifest.version);
+      }
+      Ok(())
+    } else {
+      Err(anyhow!("Internal error, matches.len() == 1 but first() == None"))
+    }
+  } else if matches.len() > 1 {
+    Err(anyhow!("There is more than one plugin version for '{}', please also provide the version", name))
+  } else if let Some(version) = version {
+    Err(anyhow!("Did not find a plugin with name '{}' and version '{}'", name, version))
+  } else {
+    Err(anyhow!("Did not find a plugin with name '{}'", name))
   }
 }
 
 fn list_plugins() -> anyhow::Result<()> {
+  let mut table = Table::new();
+  table
+    .load_preset(UTF8_FULL)
+    .set_header(vec!["Name", "Version", "Interface Version", "Directory", "Status"]);
+
+  for (manifest, _, status) in plugin_list()?.iter().sorted_by(manifest_sort_fn) {
+    table.add_row(vec![
+      manifest.name.as_str(),
+      manifest.version.as_str(),
+      manifest.plugin_interface_version.to_string().as_str(),
+      manifest.plugin_dir.to_string().as_str(),
+      if *status { "enabled" } else { "disabled" }
+    ]);
+  }
+
+  println!("{table}");
+
+  Ok(())
+}
+
+fn plugin_list() -> anyhow::Result<Vec<(PactPluginManifest, PathBuf, bool)>> {
   let (_, plugin_dir) = resolve_plugin_dir();
   let dir = PathBuf::from(plugin_dir);
   if dir.exists() {
@@ -63,52 +156,34 @@ fn list_plugins() -> anyhow::Result<()> {
       if path.is_dir() {
         let manifest_file = path.join("pact-plugin.json");
         if manifest_file.exists() && manifest_file.is_file() {
-          let file = File::open(manifest_file)?;
+          let file = File::open(manifest_file.clone())?;
           let reader = BufReader::new(file);
           let manifest: PactPluginManifest = serde_json::from_reader(reader)?;
           plugins.push((PactPluginManifest {
             plugin_dir: path.display().to_string(),
-            .. manifest
-          }, "enabled"));
+            ..manifest
+          }, manifest_file.clone(), true));
         } else {
           let manifest_file = path.join("pact-plugin.json.disabled");
           if manifest_file.exists() && manifest_file.is_file() {
-            let file = File::open(manifest_file)?;
+            let file = File::open(manifest_file.clone())?;
             let reader = BufReader::new(file);
             let manifest: PactPluginManifest = serde_json::from_reader(reader)?;
             plugins.push((PactPluginManifest {
               plugin_dir: path.display().to_string(),
-              .. manifest
-            }, "disabled"));
+              ..manifest
+            }, manifest_file.clone(), false));
           }
         }
       }
     }
-
-    let mut table = Table::new();
-    table
-      .load_preset(UTF8_FULL)
-      .set_header(vec!["Name", "Version", "Interface Version", "Directory", "Status"]);
-
-    for (manifest, status) in plugins.iter().sorted_by(manifest_sort_fn) {
-      table.add_row(vec![
-        manifest.name.as_str(),
-        manifest.version.as_str(),
-        manifest.plugin_interface_version.to_string().as_str(),
-        manifest.plugin_dir.to_string().as_str(),
-        status
-      ]);
-    }
-
-    println!("{table}");
-
-    Ok(())
+    Ok(plugins)
   } else {
     Err(anyhow!("Plugin directory '{}' does not exist!", dir.display()))
   }
 }
 
-fn manifest_sort_fn(a: &&(PactPluginManifest, &str), b: &&(PactPluginManifest, &str)) -> Ordering {
+fn manifest_sort_fn(a: &&(PactPluginManifest, PathBuf, bool), b: &&(PactPluginManifest, PathBuf, bool)) -> Ordering {
   if a.0.name == b.0.name {
     a.0.version.cmp(&b.0.version)
   } else {
