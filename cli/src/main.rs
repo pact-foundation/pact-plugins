@@ -16,6 +16,10 @@ use requestty::OnEsc;
 #[clap(version, about)]
 #[clap(propagate_version = true)]
 struct Cli {
+  #[clap(short, long)]
+  /// Automatically answer Yes for all prompts
+  yes: bool,
+
   #[clap(subcommand)]
   command: Commands
 }
@@ -66,32 +70,19 @@ fn main() -> anyhow::Result<()> {
     Commands::List => list_plugins(),
     Commands::Env => print_env(),
     Commands::Install => Ok(()),
-    Commands::Remove { name, version } => remove_plugin(name, version),
+    Commands::Remove { name, version } => remove_plugin(name, version, cli.yes),
     Commands::Enable { name, version } => enable_plugin(name, version),
     Commands::Disable { name, version } => disable_plugin(name, version)
   }
 }
 
-fn remove_plugin(name: &String, version: &Option<String>) -> anyhow::Result<()> {
+fn remove_plugin(name: &String, version: &Option<String>, override_prompt: bool) -> anyhow::Result<()> {
   let matches = find_plugin(name, version)?;
   if matches.len() == 1 {
     if let Some((manifest, _, _)) = matches.first() {
-      let question = requestty::Question::confirm("delete_plugin")
-        .message(format!("Are you sure you want to delete plugin with name '{}' and version '{}'?", manifest.name, manifest.version))
-        .default(false)
-        .on_esc(OnEsc::Terminate)
-        .build();
-      if let Ok(result) = requestty::prompt_one(question) {
-        if let Some(result) = result.as_bool() {
-          if result {
-            fs::remove_dir_all(manifest.plugin_dir.clone())?;
-            println!("Removed plugin with name '{}' and version '{}'?", manifest.name, manifest.version);
-          } else {
-            println!("Aborting deletion of plugin.");
-          }
-        } else {
-          println!("Aborting deletion of plugin.");
-        }
+      if override_prompt || prompt_delete(manifest) {
+        fs::remove_dir_all(manifest.plugin_dir.clone())?;
+        println!("Removed plugin with name '{}' and version '{}'", manifest.name, manifest.version);
       } else {
         println!("Aborting deletion of plugin.");
       }
@@ -105,6 +96,23 @@ fn remove_plugin(name: &String, version: &Option<String>) -> anyhow::Result<()> 
     Err(anyhow!("Did not find a plugin with name '{}' and version '{}'", name, version))
   } else {
     Err(anyhow!("Did not find a plugin with name '{}'", name))
+  }
+}
+
+fn prompt_delete(manifest: &PactPluginManifest) -> bool {
+  let question = requestty::Question::confirm("delete_plugin")
+    .message(format!("Are you sure you want to delete plugin with name '{}' and version '{}'?", manifest.name, manifest.version))
+    .default(false)
+    .on_esc(OnEsc::Terminate)
+    .build();
+  if let Ok(result) = requestty::prompt_one(question) {
+    if let Some(result) = result.as_bool() {
+      result
+    } else {
+      false
+    }
+  } else {
+    false
   }
 }
 
