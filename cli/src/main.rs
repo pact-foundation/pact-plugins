@@ -10,6 +10,7 @@ use comfy_table::presets::UTF8_FULL;
 use comfy_table::Table;
 use itertools::Itertools;
 use pact_plugin_driver::plugin_models::PactPluginManifest;
+use requestty::OnEsc;
 
 #[derive(Parser, Debug)]
 #[clap(version, about)]
@@ -31,7 +32,13 @@ enum Commands {
   Install,
 
   /// Remove a plugin
-  Remove,
+  Remove {
+    /// Plugin name
+    name: String,
+
+    /// Plugin version. Not required if there is only one plugin version.
+    version: Option<String>
+  },
 
   /// Enable a plugin version
   Enable {
@@ -59,21 +66,50 @@ fn main() -> anyhow::Result<()> {
     Commands::List => list_plugins(),
     Commands::Env => print_env(),
     Commands::Install => Ok(()),
-    Commands::Remove => Ok(()),
+    Commands::Remove { name, version } => remove_plugin(name, version),
     Commands::Enable { name, version } => enable_plugin(name, version),
     Commands::Disable { name, version } => disable_plugin(name, version)
   }
 }
 
-fn disable_plugin(name: &String, version: &Option<String>) -> anyhow::Result<()> {
-  let vec = plugin_list()?;
-  let matches = vec.iter().filter(|(manifest, _, _)| {
-    if let Some(version) = version {
-      manifest.name == *name && manifest.version == *version
+fn remove_plugin(name: &String, version: &Option<String>) -> anyhow::Result<()> {
+  let matches = find_plugin(name, version)?;
+  if matches.len() == 1 {
+    if let Some((manifest, _, _)) = matches.first() {
+      let question = requestty::Question::confirm("delete_plugin")
+        .message(format!("Are you sure you want to delete plugin with name '{}' and version '{}'?", manifest.name, manifest.version))
+        .default(false)
+        .on_esc(OnEsc::Terminate)
+        .build();
+      if let Ok(result) = requestty::prompt_one(question) {
+        if let Some(result) = result.as_bool() {
+          if result {
+            fs::remove_dir_all(manifest.plugin_dir.clone())?;
+            println!("Removed plugin with name '{}' and version '{}'?", manifest.name, manifest.version);
+          } else {
+            println!("Aborting deletion of plugin.");
+          }
+        } else {
+          println!("Aborting deletion of plugin.");
+        }
+      } else {
+        println!("Aborting deletion of plugin.");
+      }
+      Ok(())
     } else {
-      manifest.name == *name
+      Err(anyhow!("Internal error, matches.len() == 1 but first() == None"))
     }
-  }).collect_vec();
+  } else if matches.len() > 1 {
+    Err(anyhow!("There is more than one plugin version for '{}', please also provide the version", name))
+  } else if let Some(version) = version {
+    Err(anyhow!("Did not find a plugin with name '{}' and version '{}'", name, version))
+  } else {
+    Err(anyhow!("Did not find a plugin with name '{}'", name))
+  }
+}
+
+fn disable_plugin(name: &String, version: &Option<String>) -> anyhow::Result<()> {
+  let matches = find_plugin(name, version)?;
   if matches.len() == 1 {
     if let Some((manifest, file, status)) = matches.first() {
       if !*status {
@@ -95,15 +131,24 @@ fn disable_plugin(name: &String, version: &Option<String>) -> anyhow::Result<()>
   }
 }
 
-fn enable_plugin(name: &String, version: &Option<String>) -> anyhow::Result<()> {
+fn find_plugin(name: &String, version: &Option<String>) -> anyhow::Result<Vec<(PactPluginManifest, PathBuf, bool)>> {
   let vec = plugin_list()?;
-  let matches = vec.iter().filter(|(manifest, _, _)| {
-    if let Some(version) = version {
-      manifest.name == *name && manifest.version == *version
-    } else {
-      manifest.name == *name
-    }
-  }).collect_vec();
+  Ok(vec.iter()
+    .filter(|(manifest, _, _)| {
+      if let Some(version) = version {
+        manifest.name == *name && manifest.version == *version
+      } else {
+        manifest.name == *name
+      }
+    })
+    .map(|(m, p, s)| {
+      (m.clone(), p.clone(), *s)
+    })
+    .collect_vec())
+}
+
+fn enable_plugin(name: &String, version: &Option<String>) -> anyhow::Result<()> {
+  let matches = find_plugin(name, version)?;
   if matches.len() == 1 {
     if let Some((manifest, file, status)) = matches.first() {
       if *status {
