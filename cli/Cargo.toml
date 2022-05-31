@@ -16,3 +16,5 @@ exclude = [
 [dependencies]
 pact-plugin-driver = "0.1.8"
 clap = { version = "3.1.18", features = [ "derive" ] }
+comfy-table = "5.0.1"
+home = "0.5.3"
