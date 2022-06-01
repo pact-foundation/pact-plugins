@@ -3,14 +3,19 @@ use std::cmp::Ordering;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use anyhow::anyhow;
-use clap::{Parser, Subcommand};
+use clap::{ArgEnum, Parser, Subcommand};
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::Table;
 use itertools::Itertools;
 use pact_plugin_driver::plugin_models::PactPluginManifest;
 use requestty::OnEsc;
+use tracing::Level;
+use tracing_subscriber::FmtSubscriber;
+
+mod install;
 
 #[derive(Parser, Debug)]
 #[clap(version, about)]
@@ -19,6 +24,10 @@ struct Cli {
   #[clap(short, long)]
   /// Automatically answer Yes for all prompts
   yes: bool,
+
+  #[clap(short, long)]
+  /// Enable debug level logs
+  debug: bool,
 
   #[clap(subcommand)]
   command: Commands
@@ -33,7 +42,16 @@ enum Commands {
   Env,
 
   /// Install a plugin
-  Install,
+  Install {
+    /// The type of source to fetch the plugin files from. Will default to Github releases.
+    ///
+    /// Valid values: github
+    #[clap(short = 't', long)]
+    source_type: Option<InstallationSource>,
+
+    /// Where to fetch the plugin files from. This should be a URL.
+    source: String
+  },
 
   /// Remove a plugin
   Remove {
@@ -63,13 +81,44 @@ enum Commands {
   }
 }
 
+/// Installation source to fetch plugins files from
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Debug)]
+pub enum InstallationSource {
+  /// Install the plugin from a Github release page.
+  Github,
+}
+
+impl FromStr for InstallationSource {
+  type Err = anyhow::Error;
+  fn from_str(s: &str) -> Result<Self, Self::Err> {
+    if s.to_lowercase() == "github" {
+      Ok(InstallationSource::Github)
+    } else {
+      Err(anyhow!("'{}' is not a valid installation source", s))
+    }
+  }
+}
+
 fn main() -> anyhow::Result<()> {
   let cli = Cli::parse();
+
+  let log_level = if cli.debug {
+    Level::DEBUG
+  } else {
+    Level::WARN
+  };
+  let subscriber = FmtSubscriber::builder()
+    .with_max_level(log_level)
+    .finish();
+
+  if let Err(err) = tracing::subscriber::set_global_default(subscriber) {
+    eprintln!("WARN: Failed to initialise global tracing subscriber - {err}");
+  };
 
   match &cli.command {
     Commands::List => list_plugins(),
     Commands::Env => print_env(),
-    Commands::Install => Ok(()),
+    Commands::Install { source, source_type } => install::install_plugin(source, source_type, cli.yes),
     Commands::Remove { name, version } => remove_plugin(name, version, cli.yes),
     Commands::Enable { name, version } => enable_plugin(name, version),
     Commands::Disable { name, version } => disable_plugin(name, version)
