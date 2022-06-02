@@ -1,5 +1,5 @@
 [package]
-name = "pact-plugin-csv"
+name = "pact-csv-plugin"
 version = "0.0.1"
 edition = "2018"
 

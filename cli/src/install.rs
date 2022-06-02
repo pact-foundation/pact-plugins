@@ -1,13 +1,24 @@
-use std::fs;
+use std::cmp::min;
+use std::{env, fs, io};
 use std::fs::File;
-use std::io::Write;
+use std::io::{Read, Write};
 use std::path::PathBuf;
-use anyhow::{bail, Error};
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
+
+use anyhow::{anyhow, bail, Context};
+use flate2::read::GzDecoder;
+use futures_util::StreamExt;
+use indicatif::{ProgressBar, ProgressStyle};
+use os_info::Type;
+use pact_plugin_driver::plugin_manager::load_plugin;
 use pact_plugin_driver::plugin_models::PactPluginManifest;
 use requestty::OnEsc;
 use reqwest::Client;
 use serde_json::Value;
+use sha2::{Sha256, Digest};
 use tracing::{debug, info};
+
 use crate::resolve_plugin_dir;
 
 use super::InstallationSource;
@@ -49,7 +60,16 @@ pub fn install_plugin(
 
         println!("Installing plugin {} version {}", manifest.name, manifest.version);
         let plugin_dir = create_plugin_dir(&manifest, override_prompt)?;
-        download_plugin_executable(&manifest, &plugin_dir, override_prompt)
+        download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag).await?;
+
+        env::set_var("pact_do_not_track", "true");
+        load_plugin(&manifest.as_dependency())
+          .await
+          .and_then(|plugin| {
+            println!("Installed plugin {} version {} OK", manifest.name, manifest.version);
+            plugin.kill();
+            Ok(())
+          })
       } else {
         bail!("GitHub release page does not have a valid tag_name attribute");
       }
@@ -59,9 +79,150 @@ pub fn install_plugin(
   })
 }
 
-fn download_plugin_executable(manifest: &PactPluginManifest, plugin_dir: &PathBuf, override_prompt: bool) -> anyhow::Result<()> {
-  // Check for a single exec .gz file
+async fn download_plugin_executable(
+  manifest: &PactPluginManifest,
+  plugin_dir: &PathBuf,
+  http_client: &Client,
+  base_url: &str,
+  tag: &String
+) -> anyhow::Result<PathBuf> {
+  let (os, arch) = os_and_arch()?;
 
+  // Check for a single exec .gz file
+  let gz_file = format!("pact-{}-plugin-{}-{}.gz", manifest.name, os, arch);
+  let sha_file = format!("pact-{}-plugin-{}-{}.gz.sha256", manifest.name, os, arch);
+  if github_file_exists(http_client, base_url, tag, gz_file.as_str()).await? {
+    debug!(file = %gz_file, "Found a GZipped file");
+    let file = download_file_from_github(http_client, base_url, tag, gz_file.as_str(), plugin_dir).await?;
+
+    if github_file_exists(http_client, base_url, tag, sha_file.as_str()).await? {
+      let sha_file = download_file_from_github(http_client, base_url, tag, sha_file.as_str(), plugin_dir).await?;
+      check_sha(&file, &sha_file)?;
+      fs::remove_file(sha_file)?;
+    }
+
+    let file = gunzip_file(&file, plugin_dir, manifest)?;
+    #[cfg(unix)]
+    {
+      let mut perms = fs::metadata(&file)?.permissions();
+      perms.set_mode(0o775);
+      fs::set_permissions(&file, perms)?;
+    }
+
+    Ok(file)
+  } else {
+    bail!("Did not find a matching file pattern on GitHub to install")
+  }
+}
+
+fn gunzip_file(gz_file: &PathBuf, plugin_dir: &PathBuf, manifest: &PactPluginManifest) -> anyhow::Result<PathBuf> {
+  let file = plugin_dir.join(&manifest.entry_point);
+  let mut f = File::create(file.clone())?;
+  let mut gz = GzDecoder::new(File::open(gz_file)?);
+
+  let bytes = io::copy(&mut gz, &mut f)?;
+  debug!(file = %file.display(), "Wrote {} bytes", bytes);
+  fs::remove_file(gz_file)?;
+
+  Ok(file)
+}
+
+fn check_sha(file: &PathBuf, sha_file: &PathBuf) -> anyhow::Result<()> {
+  debug!(file = %file.display(), sha_file = %sha_file.display(), "Checking SHA of downloaded file");
+  let sha = fs::read_to_string(sha_file).context("Could not read SHA file")?;
+  let sha = sha.split(' ').next().ok_or(anyhow!("SHA file is not correctly formatted"))?;
+  debug!("Downloaded SHA {}", sha);
+
+  let mut hasher = Sha256::new();
+  let mut f = File::open(file.clone())?;
+  let mut buffer = [0_u8; 256];
+  let mut done = false;
+
+  while !done {
+    let amount = f.read(&mut buffer)?;
+    if amount == 0 {
+      done = true;
+    } else if amount == 256 {
+      hasher.update(&buffer);
+    } else {
+      let b = &buffer[0..amount];
+      hasher.update(b);
+    }
+  }
+
+  let result = hasher.finalize();
+  let calculated = format!("{:x}", result);
+  debug!("Calculated SHA {}", calculated);
+  if calculated == sha {
+    Ok(())
+  } else {
+    Err(anyhow!("Downloaded file {} has a checksum mismatch: {} != {}",
+      file.display(), sha, calculated))
+  }
+}
+
+async fn download_file_from_github(
+  http_client: &Client,
+  base_url: &str,
+  tag: &String,
+  filename: &str,
+  plugin_dir: &PathBuf
+) -> anyhow::Result<PathBuf> {
+  let url = format!("{}/download/{}/{}", base_url, tag, filename);
+  debug!("Downloading file from {}", url);
+
+  let res = http_client.get(url.as_str()).send().await?;
+  let total_size = res.content_length()
+    .ok_or(anyhow!("Failed to get content length from '{}'", url))?;
+
+  let pb = ProgressBar::new(total_size);
+  pb.set_style(ProgressStyle::default_bar()
+    .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
+    .progress_chars("#>-"));
+  pb.set_message(format!("Downloading {}", url));
+
+  let path = plugin_dir.join(filename);
+  let mut file = File::create(path.clone())?;
+  let mut downloaded: u64 = 0;
+  let mut stream = res.bytes_stream();
+
+  while let Some(item) = stream.next().await {
+    let chunk = item?;
+    file.write_all(&chunk)?;
+    let new = min(downloaded + (chunk.len() as u64), total_size);
+    downloaded = new;
+    pb.set_position(new);
+  }
+
+  pb.finish_with_message(format!("Downloaded {} to {}", url, path.display()));
+  Ok(path.clone())
+}
+
+async fn github_file_exists(http_client: &Client, base_url: &str, tag: &String, filename: &str) -> anyhow::Result<bool> {
+  let url = format!("{}/download/{}/{}", base_url, tag, filename);
+  debug!("Checking existence of file from {}", url);
+  Ok(http_client.head(url)
+    .send()
+    .await?
+    .status().is_success())
+}
+
+fn os_and_arch() -> anyhow::Result<(&'static str, &'static str)> {
+  let os_info = os_info::get();
+  debug!("Detected OS: {}", os_info);
+
+  let os = match os_info.os_type() {
+    Type::Alpine | Type::Amazon| Type::Android| Type::Arch| Type::CentOS| Type::Debian |
+    Type::EndeavourOS | Type::Fedora | Type::Gentoo | Type::Linux | Type::Manjaro | Type::Mariner |
+    Type::Mint | Type::NixOS | Type::openSUSE | Type::OracleLinux | Type::Redhat |
+    Type::RedHatEnterprise | Type::Pop | Type::Raspbian | Type::Solus | Type::SUSE |
+    Type::Ubuntu => "linux",
+    Type::Macos => "osx",
+    Type::Windows => "windows",
+    _ => bail!("{} is not a supported operating system", os_info)
+  };
+
+  Ok((os, std::env::consts::ARCH))
 }
 
 fn create_plugin_dir(manifest: &PactPluginManifest, override_prompt: bool) -> anyhow::Result<PathBuf> {
