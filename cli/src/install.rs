@@ -40,9 +40,9 @@ pub fn install_plugin(
     let response: Value = http_client.get(source)
       .header("accept", "application/json")
       .send()
-      .await?
+      .await.context("Fetching root document for source")?
       .json()
-      .await?;
+      .await.context("Parsing root JSON document for source")?;
 
     if let Some(map) = response.as_object() {
       if let Some(tag) = map.get("tag_name") {
