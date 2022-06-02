@@ -1,0 +1,25 @@
+name: Pact Plugin CLI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ${{ matrix.operating-system }}
+    strategy:
+      matrix:
+        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          components: clippy
+      - name: Build plugin CLI
+        run: cargo build
+        working-directory: cli
+      - name: Tests
+        run: cargo test
+        working-directory: cli
+      - name: Test installing plugin
+        run: ./target/debug/pact-plugin-cli -y install https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.1
+        working-directory: cli

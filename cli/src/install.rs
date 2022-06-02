@@ -54,12 +54,15 @@ pub fn install_plugin(
           let suffix = format!("/tag/{}", tag);
           source.strip_suffix(suffix.as_str()).unwrap_or(source)
         };
-        let manifest_json = download_json_from_github(&http_client, url, &tag, "pact-plugin.json").await?;
-        let manifest: PactPluginManifest = serde_json::from_value(manifest_json)?;
+        let manifest_json = download_json_from_github(&http_client, url, &tag, "pact-plugin.json")
+          .await.context("Downloading manifest file from GitHub")?;
+        let manifest: PactPluginManifest = serde_json::from_value(manifest_json)
+          .context("Parsing JSON manifest file from GitHub")?;
         debug!(?manifest, "Loaded manifest from GitHub");
 
         println!("Installing plugin {} version {}", manifest.name, manifest.version);
-        let plugin_dir = create_plugin_dir(&manifest, override_prompt)?;
+        let plugin_dir = create_plugin_dir(&manifest, override_prompt)
+          .context("Creating plugins directory")?;
         download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag).await?;
 
         env::set_var("pact_do_not_track", "true");
