@@ -128,7 +128,7 @@ fn gunzip_file(
   let file = if ext.is_empty() {
     plugin_dir.join(&manifest.entry_point)
   } else {
-    plugin_dir.join(&manifest.entry_point).with_extension(ext)
+    plugin_dir.join(&manifest.entry_point).with_extension(ext.drop_prefix('.'))
   };
   let mut f = File::create(file.clone())?;
   let mut gz = GzDecoder::new(File::open(gz_file)?);
