@@ -16,7 +16,6 @@ case "$1" in
   Linux)    echo "Building for Linux"
             gzip -c target/release/pact-plugin-cli > target/artifacts/pact-plugin-cli-linux-x86_64.gz
             openssl dgst -sha256 -r target/artifacts/pact-plugin-cli-linux-x86_64.gz > target/artifacts/pact-plugin-cli-linux-x86_64.gz.sha256
-            cp pact-plugin.json target/artifacts/
             ;;
   Windows)  echo  "Building for Windows"
             gzip -c target/release/pact-plugin-cli.exe > target/artifacts/pact-plugin-cli-windows-x86_64.exe.gz
