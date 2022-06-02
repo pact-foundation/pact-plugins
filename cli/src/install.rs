@@ -92,8 +92,9 @@ async fn download_plugin_executable(
   let (os, arch) = os_and_arch()?;
 
   // Check for a single exec .gz file
-  let gz_file = format!("pact-{}-plugin-{}-{}.gz", manifest.name, os, arch);
-  let sha_file = format!("pact-{}-plugin-{}-{}.gz.sha256", manifest.name, os, arch);
+  let ext = if os == "windows" { ".exe" } else { "" };
+  let gz_file = format!("pact-{}-plugin-{}-{}{}.gz", manifest.name, os, arch, ext);
+  let sha_file = format!("pact-{}-plugin-{}-{}{}.gz.sha256", manifest.name, os, arch, ext);
   if github_file_exists(http_client, base_url, tag, gz_file.as_str()).await? {
     debug!(file = %gz_file, "Found a GZipped file");
     let file = download_file_from_github(http_client, base_url, tag, gz_file.as_str(), plugin_dir).await?;
@@ -104,7 +105,7 @@ async fn download_plugin_executable(
       fs::remove_file(sha_file)?;
     }
 
-    let file = gunzip_file(&file, plugin_dir, manifest)?;
+    let file = gunzip_file(&file, plugin_dir, manifest, ext)?;
     #[cfg(unix)]
     {
       let mut perms = fs::metadata(&file)?.permissions();
@@ -118,8 +119,17 @@ async fn download_plugin_executable(
   bail!("Did not find a matching file pattern on GitHub to install")
 }
 
-fn gunzip_file(gz_file: &PathBuf, plugin_dir: &PathBuf, manifest: &PactPluginManifest) -> anyhow::Result<PathBuf> {
-  let file = plugin_dir.join(&manifest.entry_point);
+fn gunzip_file(
+  gz_file: &PathBuf,
+  plugin_dir: &PathBuf,
+  manifest: &PactPluginManifest,
+  ext: &str
+) -> anyhow::Result<PathBuf> {
+  let file = if ext.is_empty() {
+    plugin_dir.join(&manifest.entry_point)
+  } else {
+    plugin_dir.join(&manifest.entry_point).with_extension(ext)
+  };
   let mut f = File::create(file.clone())?;
   let mut gz = GzDecoder::new(File::open(gz_file)?);
 
