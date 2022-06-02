@@ -112,10 +112,10 @@ async fn download_plugin_executable(
       fs::set_permissions(&file, perms)?;
     }
 
-    Ok(file)
-  } else {
-    bail!("Did not find a matching file pattern on GitHub to install")
+    return Ok(file);
   }
+
+  bail!("Did not find a matching file pattern on GitHub to install")
 }
 
 fn gunzip_file(gz_file: &PathBuf, plugin_dir: &PathBuf, manifest: &PactPluginManifest) -> anyhow::Result<PathBuf> {
