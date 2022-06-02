@@ -21,7 +21,7 @@ jobs:
         run: |
           mkdir -p ~/.pact/plugins/csv-0.0.0
           cargo build
-          cp pact-plugin.json target/debug/pact-plugin-csv* ~/.pact/plugins/csv-0.0.0/
+          cp pact-plugin.json target/debug/pact-csv-plugin* ~/.pact/plugins/csv-0.0.0/
         working-directory: plugins/csv
         shell: bash
       - name: Tests
@@ -75,7 +75,7 @@ jobs:
            -w /workspace/plugins/csv -t  \
            -e 'RUST_LOG=debug' -e 'pact_do_not_track=true' \
            pactfoundation/rust-musl-build \
-           -c 'mkdir -p ~/.pact/plugins/csv-0.0.0 && cargo build && cp pact-plugin.json target/debug/pact-plugin-csv ~/.pact/plugins/csv-0.0.0/'
+           -c 'mkdir -p ~/.pact/plugins/csv-0.0.0 && cargo build && cp pact-plugin.json target/debug/pact-csv-plugin ~/.pact/plugins/csv-0.0.0/'
       - run: |
          docker run --rm -v $(pwd):/workspace -v $HOME/.pact:/root/.pact \
            -w /workspace/drivers/rust/driver -t  \
