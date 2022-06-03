@@ -11,7 +11,7 @@ use std::str::FromStr;
 use std::sync::Mutex;
 use std::thread;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, Context};
 use bytes::Bytes;
 use itertools::Either;
 use lazy_static::lazy_static;
