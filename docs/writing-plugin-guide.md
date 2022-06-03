@@ -78,6 +78,23 @@ drwxr-xr-x 2 ronald ronald 12288 Oct 13 12:23 lib
 drwxrwxr-x 2 ronald ronald  4096 Oct 18 13:33 tmp
 ```
 
+### Installing using the [pact-plugin-cli](https://github.com/pact-foundation/pact-plugins/tree/main/cli)
+
+The `pact-plugin-cli` command can be used to manage plugins. To be able to install your plugin, the CLI tool requires:
+
+* Plugin is released via GitHub releases with attached installation files.
+* The plugin manifest file must be attached to the release and have the correct name and version.
+* For single executable plugins, the executable attached to the release must be gzipped and named in the form `pact-${name}-plugin-${os}-${arch}(.exe?).gz`
+  * `name` is the name from the plugin manifest file
+  * `os` is the operating system (linux, windows, osx)
+  * `arch` is the system architecture (x86_64, aarch64 for Apple M1. See https://doc.rust-lang.org/stable/std/env/consts/constant.ARCH.html)
+  * Windows executables require `.exe` extension in the filename. Leave this out for Unix and OSX.
+* For bundled plugins (like with Node.js or Java), you can use a Zip file. The file must be named `pact-${name}-plugin.zip` or `pact-${name}-plugin-${os}-${arch}.zip` if you have OS/arch specific bundles.
+
+If you provide SHA256 files (with the same name but with `.sha256` appended), the installation command will check the downloaded
+artifact against the digest checksum in that file. For example, the Protobuf plugin executable for Linux is named 
+`pact-protobuf-plugin-linux-x86_64.gz` and the digest `pact-protobuf-plugin-linux-x86_64.gz.sha256`.
+
 ### If your plugin needs to use disk storage
 
 By default, the plugins should be stateless. They will receive all the required data from Pact framework running the test.
