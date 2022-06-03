@@ -49,12 +49,20 @@ enum Commands {
     #[clap(short = 't', long)]
     source_type: Option<InstallationSource>,
 
+    #[clap(short, long)]
+    /// Automatically answer Yes for all prompts
+    yes: bool,
+
     /// Where to fetch the plugin files from. This should be a URL.
     source: String
   },
 
   /// Remove a plugin
   Remove {
+    #[clap(short, long)]
+    /// Automatically answer Yes for all prompts
+    yes: bool,
+
     /// Plugin name
     name: String,
 
@@ -118,8 +126,8 @@ fn main() -> anyhow::Result<()> {
   match &cli.command {
     Commands::List => list_plugins(),
     Commands::Env => print_env(),
-    Commands::Install { source, source_type } => install::install_plugin(source, source_type, cli.yes),
-    Commands::Remove { name, version } => remove_plugin(name, version, cli.yes),
+    Commands::Install { yes, source, source_type } => install::install_plugin(source, source_type, *yes || cli.yes),
+    Commands::Remove { yes, name, version } => remove_plugin(name, version, *yes || cli.yes),
     Commands::Enable { name, version } => enable_plugin(name, version),
     Commands::Disable { name, version } => disable_plugin(name, version)
   }
