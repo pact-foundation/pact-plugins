@@ -116,7 +116,69 @@ async fn download_plugin_executable(
     return Ok(file);
   }
 
+  // Check for a arch specific Zip file
+  let zip_file = format!("pact-{}-plugin-{}-{}.zip", manifest.name, os, arch);
+  let zip_sha_file = format!("pact-{}-plugin-{}-{}.zip.sha256", manifest.name, os, arch);
+  if github_file_exists(http_client, base_url, tag, zip_file.as_str()).await? {
+    return download_zip_file(plugin_dir, http_client, base_url, tag, zip_file, zip_sha_file).await;
+  }
+
+  // Check for a Zip file
+  let zip_file = format!("pact-{}-plugin.zip", manifest.name);
+  let zip_sha_file = format!("pact-{}-plugin.zip.sha256", manifest.name);
+  if github_file_exists(http_client, base_url, tag, zip_file.as_str()).await? {
+    return download_zip_file(plugin_dir, http_client, base_url, tag, zip_file, zip_sha_file).await;
+  }
+
   bail!("Did not find a matching file pattern on GitHub to install")
+}
+
+async fn download_zip_file(plugin_dir: &PathBuf, http_client: &Client, base_url: &str, tag: &String, zip_file: String, zip_sha_file: String) -> anyhow::Result<PathBuf> {
+  debug!(file = %zip_file, "Found a Zip file");
+  let file = download_file_from_github(http_client, base_url, tag, zip_file.as_str(), plugin_dir).await?;
+
+  if github_file_exists(http_client, base_url, tag, zip_sha_file.as_str()).await? {
+    let sha_file = download_file_from_github(http_client, base_url, tag, zip_sha_file.as_str(), plugin_dir).await?;
+    check_sha(&file, &sha_file)?;
+    fs::remove_file(sha_file)?;
+  }
+
+  unzip_file(&file, plugin_dir)
+}
+
+fn unzip_file(zip_file: &PathBuf, plugin_dir: &PathBuf) -> anyhow::Result<PathBuf> {
+  let mut archive = zip::ZipArchive::new(File::open(zip_file)?)?;
+
+  for i in 0..archive.len() {
+    let mut file = archive.by_index(i).unwrap();
+    let outpath = match file.enclosed_name() {
+      Some(path) => plugin_dir.join(path),
+      None => continue
+    };
+
+    if (*file.name()).ends_with('/') {
+      debug!("Dir {} extracted to \"{}\"", i, outpath.display());
+      fs::create_dir_all(&outpath)?;
+    } else {
+      debug!("File {} extracted to \"{}\" ({} bytes)", i, outpath.display(), file.size());
+      if let Some(p) = outpath.parent() {
+        if !p.exists() {
+          fs::create_dir_all(&p)?;
+        }
+      }
+      let mut outfile = File::create(&outpath)?;
+      io::copy(&mut file, &mut outfile)?;
+    }
+
+    #[cfg(unix)]
+    {
+      if let Some(mode) = file.unix_mode() {
+        fs::set_permissions(&outpath, fs::Permissions::from_mode(mode))?;
+      }
+    }
+  }
+
+  Ok(plugin_dir.clone())
 }
 
 fn gunzip_file(

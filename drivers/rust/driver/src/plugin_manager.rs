@@ -228,7 +228,7 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
     .current_dir(manifest.plugin_dir.clone())
     .stdout(Stdio::piped())
     .stderr(Stdio::piped())
-    .spawn()?;
+    .spawn().context("Was not able to start plugin process")?;
   let child_pid = child.id().unwrap_or_default();
   debug!("Plugin {} started with PID {}", manifest.name, child_pid);
 
