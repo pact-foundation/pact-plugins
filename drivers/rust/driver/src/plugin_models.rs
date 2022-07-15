@@ -77,6 +77,9 @@ pub struct PactPluginManifest {
   #[serde(default)]
   pub entry_points: HashMap<String, String>,
 
+  /// Parameters to pass into the command line
+  pub args: Option<Vec<String>>,
+
   /// Dependencies required to invoke the plugin
   pub dependencies: Option<Vec<PluginDependency>>,
 
@@ -106,6 +109,7 @@ impl Default for PactPluginManifest {
       minimum_required_version: None,
       entry_point: "".to_string(),
       entry_points: Default::default(),
+      args: None,
       dependencies: None,
       plugin_config: Default::default()
     }

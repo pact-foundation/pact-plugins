@@ -222,10 +222,17 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
   debug!("Starting plugin using {:?}", path);
 
   let log_level = max_level();
-  let child = Command::new(path)
+  let mut child_command = Command::new(path);
+  let mut child_command = child_command
     .env("LOG_LEVEL", log_level.to_string())
     .env("RUST_LOG", log_level.to_string())
-    .current_dir(manifest.plugin_dir.clone())
+    .current_dir(manifest.plugin_dir.clone());
+
+  if let Some(args) = &manifest.args {
+    child_command = child_command.args(args);
+  }
+
+  let child = child_command
     .stdout(Stdio::piped())
     .stderr(Stdio::piped())
     .spawn().context("Was not able to start plugin process")?;
