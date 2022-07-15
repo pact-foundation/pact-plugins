@@ -55,6 +55,7 @@ import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import javax.json.Json
 import javax.json.JsonObject
+import javax.json.JsonArray
 
 /**
  * Type of plugin dependency
@@ -117,6 +118,11 @@ interface PactPluginManifest {
   val entryPoints: Map<String, String?>
 
   /**
+   * Parameters to pass into the command line
+   */
+  val args: List<String>
+
+  /**
    * List of system dependencies or plugins required to be able to execute this plugin
    */
   val dependencies: List<PluginDependency>
@@ -131,6 +137,7 @@ data class DefaultPactPluginManifest(
   override val minimumRequiredVersion: String?,
   override val entryPoint: String,
   override val entryPoints: Map<String, String?>,
+  override val args: List<String>,
   override val dependencies: List<PluginDependency>
 ): PactPluginManifest {
 
@@ -150,6 +157,10 @@ data class DefaultPactPluginManifest(
 
     if (entryPoints.isNotEmpty()) {
       map["entryPoints"] = entryPoints
+    }
+
+    if (args.isNotEmpty()) {
+      map["args"] = args
     }
 
     if (dependencies.isNotEmpty()) {
@@ -180,6 +191,18 @@ data class DefaultPactPluginManifest(
         emptyMap()
       }
 
+      val args = if (pluginJson.containsKey("args")) {
+        when (val aj = pluginJson["args"]) {
+          is JsonArray -> aj.map { toString(it)!! }
+          else -> {
+            logger.warn { "args field in plugin manifest is invalid" }
+            emptyList()
+          }
+        }
+      } else {
+        emptyList()
+      }
+
       return DefaultPactPluginManifest(
         pluginDir,
         toInteger(pluginJson["pluginInterfaceVersion"]) ?: 1,
@@ -189,6 +212,7 @@ data class DefaultPactPluginManifest(
         toString(pluginJson["minimumRequiredVersion"]),
         toString(pluginJson["entryPoint"])!!,
         entryPoints,
+        args,
         listOf()
       )
     }
@@ -792,6 +816,10 @@ object DefaultPluginManager: KLogging(), PluginManager {
     pb.environment()["LOG_LEVEL"] = logLevel
     pb.environment()["RUST_LOG"] = logLevel
     env.forEach { (k, v) -> pb.environment()[k] = v }
+
+    if (manifest.args.isNotEmpty()) {
+      pb.command().addAll(manifest.args)
+    }
 
     val cp = ChildProcess(pb, manifest)
     return try {

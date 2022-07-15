@@ -23,6 +23,7 @@ class DefaultPactPluginManifestSpec extends Specification {
       null,
       'exec',
       [:],
+      [],
       []
     )
 
@@ -48,6 +49,7 @@ class DefaultPactPluginManifestSpec extends Specification {
       '1.7.1',
       'exec.rb',
       [:],
+      [],
       []
     )
 
@@ -74,6 +76,7 @@ class DefaultPactPluginManifestSpec extends Specification {
       '1.7.1',
       'exec.rb',
       [:],
+      [],
       [
         new PluginDependency('dep1', '1.0', PluginDependencyType.Plugin),
         new PluginDependency('dep2', '2.0', PluginDependencyType.Library)
@@ -107,6 +110,7 @@ class DefaultPactPluginManifestSpec extends Specification {
       '1.7.1',
       'exec.rb',
       [windows: 'exec.bat'],
+      [],
       []
     )
 
@@ -141,6 +145,7 @@ class DefaultPactPluginManifestSpec extends Specification {
       null,
       'pact-plugins/plugins/csv/target/debug/pact-plugin-csv',
       [:],
+      [],
       []
     )
   }

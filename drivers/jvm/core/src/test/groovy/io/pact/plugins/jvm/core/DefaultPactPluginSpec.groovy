@@ -19,6 +19,7 @@ class DefaultPactPluginSpec extends Specification {
       null,
       'exec',
       [:],
+      [],
       []
     )
     def channel = Mock(ManagedChannel)
@@ -51,6 +52,7 @@ class DefaultPactPluginSpec extends Specification {
       null,
       'exec',
       [:],
+      [],
       []
     )
     def channel = Mock(ManagedChannel)
