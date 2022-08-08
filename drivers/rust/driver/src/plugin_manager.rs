@@ -22,7 +22,7 @@ use pact_models::prelude::{ContentType, Pact};
 use pact_models::prelude::v4::V4Pact;
 use pact_models::v4::interaction::V4Interaction;
 use serde_json::Value;
-use sysinfo::{Pid, ProcessExt, RefreshKind, Signal, System, SystemExt};
+use sysinfo::{Pid, PidExt, ProcessExt, Signal, System, SystemExt};
 use tokio::process::Command;
 use tracing::{debug, trace, warn};
 use tracing::log::max_level;
@@ -242,9 +242,10 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
   match ChildPluginProcess::new(child, manifest).await {
     Ok(child) => Ok(PactPlugin::new(manifest, child)),
     Err(err) => {
-      let s = System::new_with_specifics(RefreshKind::new().with_processes());
-      if let Some(process) = s.process(child_pid as Pid) {
-        process.kill(Signal::Term);
+      let mut s = System::new();
+      s.refresh_processes();
+      if let Some(process) = s.process(Pid::from_u32(child_pid)) {
+        process.kill_with(Signal::Term);
       } else {
         warn!("Child process with PID {} was not found", child_pid);
       }

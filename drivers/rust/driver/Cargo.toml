@@ -21,16 +21,16 @@ anyhow = "1.0.57"
 lazy_static = "1.4.0"
 maplit = "1.0.2"
 home = "0.5.3"
-tonic = "0.6.2"
-prost = "0.9.0"
-prost-types = "0.9.0"
+tonic = "0.8.0"
+prost = "0.11.0"
+prost-types = "0.11.1"
 tokio = { version = "1.18.1", features = ["full"] }
-sysinfo = "0.21.2"
+sysinfo = "0.25.1"
 itertools = "0.10.3"
 pact_models = "0.4.1"
 regex = "1.5.5"
 bytes = "1.1.0"
-uuid = { version = "0.8.2", features = ["v4"] }
+uuid = { version = "1.1.2", features = ["v4"] }
 async-trait = "0.1.53"
 os_info = "3.3.0"
 md5 = "0.7.0"
@@ -48,4 +48,4 @@ expectest = "0.12.0"
 env_logger = "0.9.0"
 
 [build-dependencies]
-tonic-build = "0.6.2"
+tonic-build = "0.8.0"
