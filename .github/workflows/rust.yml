@@ -17,14 +17,10 @@ jobs:
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
       - name: Install Protobuf plugin
-        run: scripts/ci-install-protobuf-plugin.sh
+        run: cargo install pact-plugin-cli && pact-plugin-cli install https://github.com/pactflow/pact-protobuf-plugin/releases/latest
         shell: bash
-      - name: Build and install csv plugin
-        run: |
-          mkdir -p ~/.pact/plugins/csv-0.0.0
-          cargo build
-          cp pact-plugin.json target/debug/pact-csv-plugin* ~/.pact/plugins/csv-0.0.0/
-        working-directory: plugins/csv
+      - name: Install csv plugin
+        run: cargo install pact-plugin-cli && pact-plugin-cli install https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.2
         shell: bash
       - name: Tests
         run: cargo test
@@ -68,19 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
-      - name: Install Protobuf plugin
-        run: scripts/ci-install-protobuf-plugin.sh
-        shell: bash
-      - name: Build and install csv plugin
-        run: |
-          docker run --rm -v $(pwd):/workspace -v $HOME/.pact:/root/.pact \
-           -w /workspace/plugins/csv -t  \
-           -e 'RUST_LOG=debug' -e 'pact_do_not_track=true' \
-           pactfoundation/rust-musl-build \
-           -c 'mkdir -p ~/.pact/plugins/csv-0.0.0 && cargo build && cp pact-plugin.json target/debug/pact-csv-plugin ~/.pact/plugins/csv-0.0.0/'
       - run: |
-         docker run --rm -v $(pwd):/workspace -v $HOME/.pact:/root/.pact \
-           -w /workspace/drivers/rust/driver -t  \
-           -e 'RUST_LOG=trace' -e 'pact_do_not_track=true' \
-           pactfoundation/rust-musl-build \
-           -c 'apk add protoc && cargo build && cargo test'
+         docker run --rm -v $(pwd):/workspace -w /workspace/drivers/rust/driver -t  \
+           -e 'RUST_LOG=trace' -e 'pact_do_not_track=true' pactfoundation/rust-musl-build \
+           -c ./musl-build.sh
