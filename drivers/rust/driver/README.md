@@ -14,3 +14,5 @@
 The Rust driver is built with Cargo. The build can be run with `cargo build`, but there is a test `DriverPactTest`
 that requires a Protobuf plugin to work. Either skip or disable that test, or install the prototype Protobuf plugin before
 running the build.
+
+The Protobuf compiler is required to be installed and available on the path.

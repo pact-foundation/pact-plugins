@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 use std::sync::Arc;
-use anyhow::anyhow;
 
+use anyhow::anyhow;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -167,7 +167,7 @@ impl PactPluginRpc for PactPlugin {
   async fn init_plugin(&self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
     let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::from_str(auth_str)?;
+    let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
       req.metadata_mut().insert("authorization", token.clone());
       Ok(req)
@@ -180,7 +180,7 @@ impl PactPluginRpc for PactPlugin {
   async fn compare_contents(&self, request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
     let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::from_str(auth_str)?;
+    let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
       req.metadata_mut().insert("authorization", token.clone());
       Ok(req)
@@ -193,7 +193,7 @@ impl PactPluginRpc for PactPlugin {
   async fn configure_interaction(&self, request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
     let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::from_str(auth_str)?;
+    let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
       req.metadata_mut().insert("authorization", token.clone());
       Ok(req)
@@ -206,7 +206,7 @@ impl PactPluginRpc for PactPlugin {
   async fn generate_content(&self, request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
     let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::from_str(auth_str)?;
+    let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
       req.metadata_mut().insert("authorization", token.clone());
       Ok(req)
@@ -218,7 +218,7 @@ impl PactPluginRpc for PactPlugin {
   async fn start_mock_server(&self, request: StartMockServerRequest) -> anyhow::Result<StartMockServerResponse> {
     let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::from_str(auth_str)?;
+    let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
       req.metadata_mut().insert("authorization", token.clone());
       Ok(req)
@@ -230,7 +230,7 @@ impl PactPluginRpc for PactPlugin {
   async fn shutdown_mock_server(&self, request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse> {
     let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::from_str(auth_str)?;
+    let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
       req.metadata_mut().insert("authorization", token.clone());
       Ok(req)
@@ -242,7 +242,7 @@ impl PactPluginRpc for PactPlugin {
   async fn get_mock_server_results(&self, request: MockServerRequest) -> anyhow::Result<MockServerResults> {
     let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::from_str(auth_str)?;
+    let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
       req.metadata_mut().insert("authorization", token.clone());
       Ok(req)
@@ -254,7 +254,7 @@ impl PactPluginRpc for PactPlugin {
   async fn prepare_interaction_for_verification(&self, request: VerificationPreparationRequest) -> anyhow::Result<VerificationPreparationResponse> {
     let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::from_str(auth_str)?;
+    let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
       req.metadata_mut().insert("authorization", token.clone());
       Ok(req)
@@ -266,7 +266,7 @@ impl PactPluginRpc for PactPlugin {
   async fn verify_interaction(&self, request: VerifyInteractionRequest) -> anyhow::Result<VerifyInteractionResponse> {
     let channel = self.connect_channel().await?;
     let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::from_str(auth_str)?;
+    let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
       req.metadata_mut().insert("authorization", token.clone());
       Ok(req)
