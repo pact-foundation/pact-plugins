@@ -1,5 +1,16 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.9 - Maintenance Release
+
+* 973aed9 - chore: Upgrade pact models to 0.4.2 (Ronald Holshausen, Wed Aug 10 09:47:20 2022 +1000)
+* f44348e - chore: Update musl build (Ronald Holshausen, Mon Aug 8 17:57:34 2022 +1000)
+* 77ea0f2 - chore: Update deprecated method after updating dependencies (Ronald Holshausen, Mon Aug 8 15:37:02 2022 +1000)
+* c2cbf48 - chore: Update dependent crates (prost, tonic, sysinfo, uuid) (Ronald Holshausen, Mon Aug 8 14:59:58 2022 +1000)
+* ab7899a - feat: add support for plugin command line args (Ronald Holshausen, Fri Jul 15 13:28:29 2022 -0400)
+* 2515001 - fix: was missing an import (Ronald Holshausen, Fri Jun 3 16:38:39 2022 +1000)
+* cdcda73 - feat: add support for installing plugins from Zip files (Ronald Holshausen, Fri Jun 3 16:20:31 2022 +1000)
+* 24b25a8 - bump version to 0.1.9 (Ronald Holshausen, Thu May 26 14:14:38 2022 +1000)
+
 # 0.1.8 - Bugfix Release
 
 * 0ecb1cc - fix: log level was not being set correctly (Ronald Holshausen, Thu May 26 12:50:32 2022 +1000)
