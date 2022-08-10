@@ -22,6 +22,8 @@ jobs:
 #        path: ~/.gradle/caches
 #        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
 #        restore-keys: ${{ runner.os }}-gradle
+    - name: Install Protoc
+      uses: arduino/setup-protoc@v1
     - name: Build plugin driver
       run: ./gradlew -s --no-daemon -i publishToMavenLocal
       working-directory: drivers/jvm
@@ -53,6 +55,8 @@ jobs:
 #          path: ~/.gradle/caches
 #          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle') }}
 #          restore-keys: ${{ runner.os }}-gradle
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
       - name: Build plugin driver
         run: ./gradlew -s --no-daemon -i publishToMavenLocal
         working-directory: drivers/jvm
