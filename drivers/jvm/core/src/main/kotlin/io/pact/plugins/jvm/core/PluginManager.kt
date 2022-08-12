@@ -740,23 +740,35 @@ object DefaultPluginManager: KLogging(), PluginManager {
         val plugin = result.value
         PLUGIN_REGISTER["${manifest.name}/${manifest.version}"] = plugin
         logger.debug { "Plugin process started OK (port = ${plugin.port}), sending init message" }
-        handleWith<PactPlugin> {
-          val channel = ManagedChannelBuilder.forTarget("[::1]:${plugin.port}")
-            .usePlaintext()
-            .build()
-          val stub = newBlockingStub(channel).withCallCredentials(BearerCredentials(plugin.serverKey))
-          plugin.stub = stub
-          plugin.channel = channel
 
-          initPlugin(plugin)
-
-          plugin
-        }.mapError { err ->
-          logger.error(err) { "Init call to plugin ${manifest.name} failed" }
-          "Init call to plugin ${manifest.name} failed: $err"
+        val initResult = tryInitPlugin(plugin, "[::1]:${plugin.port}")
+        when (initResult) {
+          is Ok -> initResult
+          is Err -> {
+            logger.debug { "Init call to plugin ${manifest.name} failed, will try an IP4 address" }
+            tryInitPlugin(plugin, "127.0.0.1:${plugin.port}").mapError { err ->
+              logger.error(err) { "Init call to plugin ${manifest.name} failed" }
+              "Init call to plugin ${manifest.name} failed: $err"
+            }
+          }
         }
       }
       is Err -> Err(result.error)
+    }
+  }
+
+  private fun tryInitPlugin(plugin: PactPlugin, address: String): Result<PactPlugin, Exception> {
+    return handleWith<PactPlugin> {
+      val channel = ManagedChannelBuilder.forTarget(address)
+        .usePlaintext()
+        .build()
+      val stub = newBlockingStub(channel).withCallCredentials(BearerCredentials(plugin.serverKey))
+      plugin.stub = stub
+      plugin.channel = channel
+
+      initPlugin(plugin)
+
+      plugin
     }
   }
 
