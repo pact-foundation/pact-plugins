@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.5 - Maintenance Release
+
+* 25818d4 - chore: Upgrade dependencies (protobuf, grpc, guava, kotlin-logging, kotlin-result, pact-jvm) (Ronald Holshausen, Fri Aug 12 16:22:31 2022 +1000)
+* d839f47 - chore: Upgrade Kotlin to 1.6.21 (Ronald Holshausen, Fri Aug 12 16:12:06 2022 +1000)
+* 9a17fea - bump version to 0.1.5 (Ronald Holshausen, Fri Aug 12 14:59:09 2022 +1000)
+
 # 0.1.4 - Bugfix Release
 
 * 7c2e50b - fix: If IP6 address fails, try connect to plugin using IP4 address (Ronald Holshausen, Fri Aug 12 13:43:22 2022 +1000)
