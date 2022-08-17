@@ -24,6 +24,8 @@ jobs:
 #        restore-keys: ${{ runner.os }}-gradle
     - name: Install Protoc
       uses: arduino/setup-protoc@v1
+      with:
+        repo-token: ${{ secrets.GITHUB_TOKEN }}
     - name: Build plugin driver
       run: ./gradlew -s --no-daemon -i publishToMavenLocal
       working-directory: drivers/jvm
@@ -57,6 +59,8 @@ jobs:
 #          restore-keys: ${{ runner.os }}-gradle
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build plugin driver
         run: ./gradlew -s --no-daemon -i publishToMavenLocal
         working-directory: drivers/jvm
