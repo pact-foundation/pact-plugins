@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.10 - Maintenance Release
+
+* 5e685c8 - chore: inline the generated protobuf code so the build no longer requires protoc installed (Ronald Holshausen, Thu Aug 18 13:56:10 2022 +1000)
+* be7cda2 - chore: Upgrade pact_models and tracing crates (Ronald Holshausen, Thu Aug 18 13:44:55 2022 +1000)
+* 95bfb08 - bump version to 0.1.10 (Ronald Holshausen, Wed Aug 10 09:58:06 2022 +1000)
+
 # 0.1.9 - Maintenance Release
 
 * 973aed9 - chore: Upgrade pact models to 0.4.2 (Ronald Holshausen, Wed Aug 10 09:47:20 2022 +1000)
