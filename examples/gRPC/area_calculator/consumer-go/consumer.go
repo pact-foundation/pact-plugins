@@ -1,14 +1,15 @@
 package main
 
 import (
+	ac "area_calculator/consumer/io.pact/area_calculator"
 	"context"
-	"fmt"
 	"flag"
+	"fmt"
 	"log"
+	"time"
+
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	ac "area_calculator/consumer/io.pact/area_calculator"
-	"time"
 )
 
 var (
@@ -26,10 +27,10 @@ func GetSquareArea(address string) (float32, error) {
 
 	c := ac.NewCalculatorClient(conn)
 
-	fmt.Println("Sending calculate square request")
+	log.Println("Sending calculate square request")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	r, err := c.Calculate(ctx, &ac.ShapeMessage{ Shape: &ac.ShapeMessage_Square{ Square: &ac.Square { EdgeLength: 3 } } })
+	r, err := c.Calculate(ctx, &ac.ShapeMessage{Shape: &ac.ShapeMessage_Rectangle{Rectangle: &ac.Rectangle{Length: 3, Width: 4}}})
 	if err != nil {
 		return 0, err
 	}

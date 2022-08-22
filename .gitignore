@@ -1,5 +1,6 @@
 # Ignore IDE files
 .idea/
+.vscode/
 
 # Ignore Gradle project-specific cache directory
 .gradle
@@ -7,3 +8,4 @@
 # Ignore build output directories
 build
 target
+

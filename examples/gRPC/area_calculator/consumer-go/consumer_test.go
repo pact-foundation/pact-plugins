@@ -2,38 +2,66 @@ package main
 
 import (
 	"fmt"
+	"log"
+	"os"
 	"testing"
 
-	. "github.com/pact-foundation/pact-go/v2/sugar"
+	pactlog "github.com/pact-foundation/pact-go/v2/log"
+	message "github.com/pact-foundation/pact-go/v2/message/v4"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCalculateClient(t *testing.T) {
-	mockProvider, err := NewV2Pact(MockHTTPProviderConfig{
+	mockProvider, err := message.NewSynchronousPact(message.Config{
 		Consumer: "grpc-consumer-go",
 		Provider: "area-calculator-provider",
 	})
 	assert.NoError(t, err)
 
-	// Arrange: Setup our expected interactions
-	//mockProvider.
-	//	AddInteraction().
-	//	Given("A user with ID 10 exists").
-	//	UponReceiving("A request for User 10").
-	//	WithRequest("GET", S("/user/10")).
-	//	WillRespondWith(200).
-	//	WithBodyMatch(&User{})
+	pactlog.SetLogLevel("TRACE")
 
-	// Act: test our API client behaves correctly
-	err = mockProvider.ExecuteTest(t, func(config MockServerConfig) error {
-		// Execute the gRPC client against the mock server
-		area, err := GetSquareArea(fmt.Sprintf("%s:%d", config.Host, config.Port))
+	dir, _ := os.Getwd()
+	path := fmt.Sprintf("%s/../proto/area_calculator.proto", dir)
 
-		// Assert: check the result
-		assert.NoError(t, err)
-		assert.Equal(t, 9, area)
+	grpcInteraction := `{
+		"pact:proto": "` + path + `",
+		"pact:proto-service": "Calculator/calculate",
+		"pact:content-type": "application/protobuf",
+		"request": {
+			"rectangle": {
+				"length": "matching(number, 3)",
+				"width": "matching(number, 4)"
+			}
+		},
+		"response": {
+			"value": "matching(number, 12)"
+		}
+	}`
 
-		return err
-	})
+	// Defined a new message interaction, and add the plugin config and the contents
+	err = mockProvider.
+		AddSynchronousMessage("calculate rectangle area request").
+		UsingPlugin(message.PluginConfig{
+			Plugin:  "protobuf",
+			Version: "0.1.10",
+		}).
+		WithContents(grpcInteraction, "application/grpc").
+		// Start the gRPC mock server
+		StartTransport("grpc", "127.0.0.1", nil).
+		// Execute the test
+		ExecuteTest(t, func(transport message.TransportConfig, m message.SynchronousMessage) error {
+			// Execute the gRPC client against the mock server
+			log.Println("Mock server is running on ", transport.Port)
+			area, err := GetSquareArea(fmt.Sprintf("localhost:%d", transport.Port))
+
+			// Assert: check the result
+			assert.NoError(t, err)
+			var f float32
+			f = 12
+			assert.Equal(t, f, area)
+
+			return err
+		})
+
 	assert.NoError(t, err)
 }
