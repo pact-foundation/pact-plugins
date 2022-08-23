@@ -1,6 +1,7 @@
 # Ignore IDE files
 .idea/
 .vscode/
+*.iml
 
 # Ignore Gradle project-specific cache directory
 .gradle

@@ -50,7 +50,7 @@ public class PactConsumerTest {
         // Configure the proto file, the content type and the service we expect to invoke
         "pact:proto", filePath("../proto/area_calculator.proto"),
         "pact:content-type", "application/grpc",
-        "pact:proto-service", "Calculator/calculate",
+        "pact:proto-service", "Calculator/calculateOne",
 
         // Details on the request message (ShapeMessage) we will send
         "request", Map.of(
@@ -85,13 +85,13 @@ public class PactConsumerTest {
 
     // Correct request
     AreaCalculator.ShapeMessage shapeMessage = AreaCalculator.ShapeMessage.parseFrom(interaction.getRequest().getContents().getValue());
-    AreaCalculator.AreaResponse response = stub.calculate(shapeMessage);
-    assertThat(response.getValue(), equalTo(12.0F));
+    AreaCalculator.AreaResponse response = stub.calculateOne(shapeMessage);
+    assertThat(response.getValue(0), equalTo(12.0F));
 
     // Incorrect request, missing the length field. Uncommenting this will cause the test to fail.
     //AreaCalculator.ShapeMessage.Builder builder = AreaCalculator.ShapeMessage.newBuilder();
     //AreaCalculator.Rectangle rectangle = builder.getRectangleBuilder().setWidth(22).build();
     //shapeMessage = builder.setRectangle(rectangle).build();
-    //stub.calculate(shapeMessage);
+    //stub.calculateOne(shapeMessage);
   }
 }
