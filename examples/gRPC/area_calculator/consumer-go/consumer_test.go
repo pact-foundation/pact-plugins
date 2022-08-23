@@ -25,16 +25,25 @@ func TestCalculateClient(t *testing.T) {
 
 	grpcInteraction := `{
 		"pact:proto": "` + path + `",
-		"pact:proto-service": "Calculator/calculate",
+		"pact:proto-service": "Calculator/calculateMulti",
 		"pact:content-type": "application/protobuf",
 		"request": {
-			"rectangle": {
-				"length": "matching(number, 3)",
-				"width": "matching(number, 4)"
-			}
+			"shapes": [
+				{
+					"rectangle": {
+						"length": "matching(number, 3)",
+						"width": "matching(number, 4)"
+					}
+				},
+				{
+					"square": {
+						"edge_length": "matching(number, 3)"
+					}
+				}
+			]
 		},
 		"response": {
-			"value": "matching(number, 12)"
+			"value": [ "matching(number, 12)", "matching(number, 9)" ]
 		}
 	}`
 
@@ -52,13 +61,12 @@ func TestCalculateClient(t *testing.T) {
 		ExecuteTest(t, func(transport message.TransportConfig, m message.SynchronousMessage) error {
 			// Execute the gRPC client against the mock server
 			log.Println("Mock server is running on ", transport.Port)
-			area, err := GetSquareArea(fmt.Sprintf("localhost:%d", transport.Port))
+			area, err := GetRectangleAndSquareArea(fmt.Sprintf("localhost:%d", transport.Port))
 
 			// Assert: check the result
 			assert.NoError(t, err)
-			var f float32
-			f = 12
-			assert.Equal(t, f, area)
+			assert.Equal(t, float32(12.0), area[0])
+			assert.Equal(t, float32(9.0), area[1])
 
 			return err
 		})

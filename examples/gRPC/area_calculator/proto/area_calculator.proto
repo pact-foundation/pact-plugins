@@ -6,7 +6,8 @@ option php_generic_services = true;
 option go_package = "io.pact/area_calculator";
 
 service Calculator {
-  rpc calculate (ShapeMessage) returns (AreaResponse) {}
+  rpc calculateOne (ShapeMessage) returns (AreaResponse) {}
+  rpc calculateMulti (AreaRequest) returns (AreaResponse) {}
 }
 
 message ShapeMessage {
@@ -43,6 +44,10 @@ message Parallelogram {
   float height = 2;
 }
 
+message AreaRequest {
+  repeated ShapeMessage shapes = 1;
+}
+
 message AreaResponse {
-  float value = 1;
+  repeated float value = 1;
 }

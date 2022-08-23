@@ -8,4 +8,5 @@
 # Ignore build output directories
 build
 target
+pacts
 

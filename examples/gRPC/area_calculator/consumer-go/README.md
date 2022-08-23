@@ -16,7 +16,7 @@ To run the test in this project, it requires the gRPC plugin to be installed. Se
 ## Generated gRPC stub
 
 To generate the Go code for the proto file, you need to install the Protobuf compiler (protoc), and install the Go
-protoc plugin, and then run `protoc --go_out=.  --proto_path ../proto  ../proto/area_calculator.proto`.
+protobuf and grpc protoc plugins, and then run `protoc --go_out=. --go-grpc_out=.  --proto_path ../proto  ../proto/area_calculator.proto`.
 
 ## Test method
 
