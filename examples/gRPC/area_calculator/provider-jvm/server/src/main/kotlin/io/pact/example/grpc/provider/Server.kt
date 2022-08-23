@@ -35,7 +35,7 @@ class Server {
 }
 
 class CalculatorService : CalculatorGrpcKt.CalculatorCoroutineImplBase() {
-    override suspend fun calculate(request: AreaCalculator.ShapeMessage): AreaCalculator.AreaResponse {
+    override suspend fun calculateOne(request: AreaCalculator.ShapeMessage): AreaCalculator.AreaResponse {
         val area = when (request.shapeCase) {
             AreaCalculator.ShapeMessage.ShapeCase.SQUARE -> {
                 logger.debug { "Got a SQUARE ${request.square}" }
@@ -61,7 +61,18 @@ class CalculatorService : CalculatorGrpcKt.CalculatorCoroutineImplBase() {
             else -> throw RuntimeException("Invalid request")
         }
         logger.debug { "Calculated area = $area" }
-        return AreaCalculator.AreaResponse.newBuilder().setValue(area).build()
+        return AreaCalculator.AreaResponse.newBuilder().addValue(area).build()
+    }
+
+    override suspend fun calculateMulti(request: AreaCalculator.AreaRequest): AreaCalculator.AreaResponse {
+        var builder = AreaCalculator.AreaResponse.newBuilder()
+        for (shape in request.shapesList) {
+            val area = calculateOne(shape)
+            builder = builder.addValue(area.getValue(0))
+        }
+        val response = builder.build()
+        logger.debug { "Response = $response" }
+        return response
     }
 
     companion object : KLogging()
