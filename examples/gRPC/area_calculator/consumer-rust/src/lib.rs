@@ -30,7 +30,7 @@ mod tests {
           // Configure the proto file, the content type and the service we expect to invoke
           "pact:proto": proto_file,
           "pact:content-type": "application/protobuf",
-          "pact:proto-service": "Calculator/calculate",
+          "pact:proto-service": "Calculator/calculateOne",
 
           // Details on the request message (ShapeMessage) we will send
           "request": {
@@ -63,9 +63,9 @@ mod tests {
         width: 4.0
       }))
     };
-    let response = client.calculate(tonic::Request::new(shape_message)).await;
+    let response = client.calculate_one(tonic::Request::new(shape_message)).await;
     let area_message = response.unwrap();
-    expect!(area_message.get_ref().value).to(be_equal_to(12.0));
+    expect!(area_message.get_ref().value.get(0).unwrap()).to(be_equal_to(&12.0));
 
     // Incorrect request, missing the length field. Uncommenting this will cause the test to fail.
     // let shape_message = ShapeMessage {
@@ -73,6 +73,6 @@ mod tests {
     //     width: 4.0, .. Rectangle::default()
     //   }))
     // };
-    // client.calculate(tonic::Request::new(shape_message)).await;
+    // client.calculate_one(tonic::Request::new(shape_message)).await;
   }
 }
