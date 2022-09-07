@@ -30,7 +30,7 @@ class CsvClientTest {
   V4Pact pact(PactBuilder builder) {
     return builder
       .usingPlugin("csv")
-      .expectsToReceive("request for a report", "core/interaction/http")
+      .expectsToReceive("request for a report", "")
       .with(Map.of(
         "request.path", "/reports/report001.csv",
         "response.status", "200",
@@ -49,7 +49,7 @@ class CsvClientTest {
   V4Pact csvWithHeaders(PactBuilder builder) {
     return builder
       .usingPlugin("csv")
-      .expectsToReceive("request for a report with headers", "core/interaction/http")
+      .expectsToReceive("request for a report with headers", "core/transport/http")
       .with(Map.of(
         "request.path", "/reports/report002.csv",
         "response.status", "200",
@@ -68,7 +68,7 @@ class CsvClientTest {
   V4Pact pact2(PactBuilder builder) {
     return builder
       .usingPlugin("csv")
-      .expectsToReceive("request for to store a report", "core/interaction/http")
+      .expectsToReceive("request for to store a report", "core/transport/http")
       .with(
         Map.of(
           "request.path", "/reports/report001.csv",
