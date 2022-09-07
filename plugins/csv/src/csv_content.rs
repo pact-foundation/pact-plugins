@@ -137,7 +137,7 @@ pub fn setup_csv_contents(
           generators,
           message_metadata: None,
           plugin_configuration: Some(proto::PluginConfiguration {
-            interaction_configuration: Some(to_proto_struct(hashmap!{
+            interaction_configuration: Some(to_proto_struct(&hashmap!{
             "csvHeaders".to_string() => json!(has_headers)
           })),
             pact_configuration: None
