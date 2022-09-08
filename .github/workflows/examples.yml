@@ -35,7 +35,7 @@ jobs:
       - name: Install Pact verifier
         run: scripts/install-verifier-cli.sh
         shell: bash
-      - name: Run CSV examples
+      - name: Run CSV examples (Non-Windows)
         run: |
           set -e
           cd csv-consumer-jvm
@@ -51,3 +51,18 @@ jobs:
           ~/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
         shell: bash
         working-directory: examples/csv
+        if: runner.os != 'Windows'
+      - name: Run CSV examples (Windows)
+        run: |
+          set -e
+          cd csv-consumer-jvm
+          ./gradlew check
+          cd ../csv-provider
+          cargo build
+          nohup ./target/debug/csv-provider &
+          PID=$!
+          trap "kill $PID" EXIT
+          ~/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
+        shell: bash
+        working-directory: examples/csv
+        if: runner.os == 'Windows'
