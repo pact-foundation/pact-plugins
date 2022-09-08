@@ -25,7 +25,7 @@ jobs:
         run: ~/bin/pact-plugin-cli -y install https://github.com/pactflow/pact-protobuf-plugin/releases/latest
         shell: bash
       - name: Install csv plugin
-        run: ~/bin/pact-plugin-cli -y install https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.2
+        run: ~/bin/pact-plugin-cli -y install https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.3
         shell: bash
       - name: Tests
         run: cargo test
