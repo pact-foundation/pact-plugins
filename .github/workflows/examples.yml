@@ -33,7 +33,7 @@ jobs:
         run: ~/bin/pact-plugin-cli -y install https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.2
         shell: bash
       - name: Install Pact verifier
-        run: cargo install pact_verifier_cli
+        run: scripts/install-verifier-cli.sh
         shell: bash
       - name: Run CSV examples
         run: |
@@ -47,7 +47,7 @@ jobs:
           nohup ./target/debug/csv-provider &
           PID=$!
           trap "kill $PID" EXIT
-          pact_verifier_cli -f ../csv-consumer-rust/target/pacts/CsvClient-CsvServer.json -p 8080
-          pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
+          ~/bin/pact_verifier_cli -f ../csv-consumer-rust/target/pacts/CsvClient-CsvServer.json -p 8080
+          ~/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
         shell: bash
         working-directory: examples/csv
