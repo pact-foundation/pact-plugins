@@ -27,7 +27,7 @@ jobs:
         run: scripts/ci-install-protobuf-plugin.sh
         shell: bash
       - name: Install csv plugin
-        run: pact-plugin-cli install https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.2
+        run: pact-plugin-cli -y install https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.2
         shell: bash
       - name: Run CSV examples
         run: |
