@@ -31,7 +31,6 @@ jobs:
     - name: Install plugin cli
       run: scripts/install-plugin-cli.sh
       shell: bash
-      working-directory: drivers/jvm
     - name: Install Protobuf plugin
       run: ~/bin/pact-plugin-cli -y install https://github.com/pactflow/pact-protobuf-plugin/releases/latest
       shell: bash
