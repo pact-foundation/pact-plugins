@@ -25,8 +25,8 @@ message CatalogueEntry {
     CONTENT_MATCHER = 0;
     // Generator for contents of messages, requests or response bodies
     CONTENT_GENERATOR = 1;
-    // Mock server for a network protocol
-    MOCK_SERVER = 2;
+    // Transport for a network protocol
+    TRANSPORT = 2;
     // Matching rule for content field/values
     MATCHER = 3;
     // Type of interaction
@@ -215,6 +215,157 @@ message GenerateContentResponse {
   Body contents = 1;
 }
 
+// Request to start a mock server
+message StartMockServerRequest {
+  // Interface to bind to. Will default to the loopback adapter
+  string hostInterface = 1;
+  // Port to bind to. Default (or a value of 0) get the OS to open a random port
+  uint32 port = 2;
+  // If TLS should be used (if supported by the mock server)
+  bool tls = 3;
+  // Pact as JSON to use for the mock server behaviour
+  string pact = 4;
+}
+
+// Response to the start mock server request
+message StartMockServerResponse {
+  oneof response {
+    // If an error occurred
+    string error = 1;
+
+    // Mock server details
+    MockServerDetails details = 2;
+  }
+}
+
+// Details on a running mock server
+message MockServerDetails {
+  // Mock server unique ID
+  string key = 1;
+  // Port the mock server is running on
+  uint32 port = 2;
+  // IP address the mock server is bound to. Probably an IP6 address, but may be IP4
+  string address = 3;
+}
+
+// Request to shut down a running mock server
+// TODO: replace this with MockServerRequest in the next major version
+message ShutdownMockServerRequest {
+  // The server ID to shutdown
+  string serverKey = 1;
+}
+
+// Request for a running mock server by ID
+message MockServerRequest {
+  // The server ID to shutdown
+  string serverKey = 1;
+}
+
+// Result of a request that the mock server received
+message MockServerResult {
+  // service + method that was requested
+  string path = 1;
+  // If an error occurred trying to handle the request
+  string error = 2;
+  // Any mismatches that occurred
+  repeated ContentMismatch mismatches = 3;
+}
+
+// Response to the shut down mock server request
+// TODO: replace this with MockServerResults in the next major version
+message ShutdownMockServerResponse {
+  // If the mock status is all ok
+  bool ok = 1;
+  // The results of the test run, will contain an entry for each request received by the mock server
+  repeated MockServerResult results = 2;
+}
+
+// Matching results of the mock server.
+message MockServerResults {
+  // If the mock status is all ok
+  bool ok = 1;
+  // The results of the test run, will contain an entry for each request received by the mock server
+  repeated MockServerResult results = 2;
+}
+
+// Request to prepare an interaction for verification
+message VerificationPreparationRequest {
+  // Pact as JSON to use for the verification
+  string pact = 1;
+  // Interaction key for the interaction from the Pact that is being verified
+  string interactionKey = 2;
+  // Any data supplied by the user to verify the interaction
+  google.protobuf.Struct config = 3;
+}
+
+// Request metadata value. Will either be a JSON-like value, or binary data
+message MetadataValue {
+  oneof value {
+    google.protobuf.Value nonBinaryValue = 1;
+    bytes binaryValue = 2;
+  }
+}
+
+// Interaction request data to be sent or received for verification
+message InteractionData {
+  // Request/Response body as bytes
+  Body body = 1;
+  // Metadata associated with the request/response
+  map<string, MetadataValue> metadata = 2;
+}
+
+// Response for the prepare an interaction for verification request
+message VerificationPreparationResponse {
+  oneof response {
+    // If an error occurred
+    string error = 1;
+
+    // Interaction data required to construct any request
+    InteractionData interactionData = 2;
+  }
+}
+
+// Request data to verify an interaction
+message VerifyInteractionRequest {
+  // Interaction data required to construct the request
+  InteractionData interactionData = 1;
+  // Any data supplied by the user to verify the interaction
+  google.protobuf.Struct config = 2;
+  // Pact as JSON to use for the verification
+  string pact = 3;
+  // Interaction key for the interaction from the Pact that is being verified
+  string interactionKey = 4;
+}
+
+message VerificationResultItem {
+  oneof result {
+    string error = 1;
+    ContentMismatch mismatch = 2;
+  }
+}
+
+// Result of running the verification
+message VerificationResult {
+  // Was the verification successful?
+  bool success = 1;
+  // Interaction data retrieved from the provider (optional)
+  InteractionData responseData = 2;
+  // Any mismatches that occurred
+  repeated VerificationResultItem mismatches = 3;
+  // Output for the verification to display to the user
+  repeated string output = 4;
+}
+
+// Result of running the verification
+message VerifyInteractionResponse {
+  oneof response {
+    // If an error occurred trying to run the verification
+    string error = 1;
+
+    VerificationResult result = 2;
+  }
+}
+
 service PactPlugin {
   // Check that the plugin loaded OK. Returns the catalogue entries describing what the plugin provides
   rpc InitPlugin(InitPluginRequest) returns (InitPluginResponse);
@@ -226,4 +377,18 @@ service PactPlugin {
   rpc ConfigureInteraction(ConfigureInteractionRequest) returns (ConfigureInteractionResponse);
   // Request to generate the content using any defined generators
   rpc GenerateContent(GenerateContentRequest) returns (GenerateContentResponse);
+
+  // Start a mock server
+//  rpc StartMockServer(StartMockServerRequest) returns (StartMockServerResponse);
+//  // Shutdown a running mock server
+//  // TODO: Replace the message types with MockServerRequest and MockServerResults in the next major version
+//  rpc ShutdownMockServer(ShutdownMockServerRequest) returns (ShutdownMockServerResponse);
+//  // Get the matching results from a running mock server
+//  rpc GetMockServerResults(MockServerRequest) returns (MockServerResults);
+//
+//  // Prepare an interaction for verification. This should return any data required to construct any request
+//  // so that it can be amended before the verification is run
+//  rpc PrepareInteractionForVerification(VerificationPreparationRequest) returns (VerificationPreparationResponse);
+//  // Execute the verification for the interaction.
+//  rpc VerifyInteraction(VerifyInteractionRequest) returns (VerifyInteractionResponse);
 }
