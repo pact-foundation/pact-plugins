@@ -29,3 +29,9 @@ jobs:
       - name: Install csv plugin
         run: pact-plugin-cli install https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.2
         shell: bash
+      - name: Run CSV examples
+          run: |
+            cd csv-consumer-jvm
+            ./gradlew check
+        shell: bash
+        working-directory: examples/csv
