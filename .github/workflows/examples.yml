@@ -43,6 +43,7 @@ jobs:
           cd ../csv-consumer-rust
           cargo test
           cd ../csv-provider
+          cargo build
           nohup ./target/debug/csv-provider &
           PID=$!
           trap "kill $PID" EXIT
