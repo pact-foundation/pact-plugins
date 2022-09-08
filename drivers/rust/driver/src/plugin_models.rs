@@ -146,6 +146,9 @@ pub trait PactPluginRpc {
 
   /// Execute the verification for the interaction.
   async fn verify_interaction(&self, request: VerifyInteractionRequest) -> anyhow::Result<VerifyInteractionResponse>;
+
+  /// Updates the catalogue. This will be sent when the core catalogue has been updated (probably by a plugin loading).
+  async fn update_catalogue(&self, request: Catalogue) -> anyhow::Result<()>;
 }
 
 /// Running plugin details
@@ -273,6 +276,18 @@ impl PactPluginRpc for PactPlugin {
     });
     let response = client.verify_interaction(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
+  }
+
+  async fn update_catalogue(&self, request: Catalogue) -> anyhow::Result<()> {
+    let channel = self.connect_channel().await?;
+    let auth_str = self.child.plugin_info.server_key.as_str();
+    let token = MetadataValue::try_from(auth_str)?;
+    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
+      req.metadata_mut().insert("authorization", token.clone());
+      Ok(req)
+    });
+    client.update_catalogue(tonic::Request::new(request)).await?;
+    Ok(())
   }
 }
 

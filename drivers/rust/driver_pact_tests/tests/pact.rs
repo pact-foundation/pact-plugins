@@ -57,6 +57,10 @@ impl PactPluginRpc for MockPlugin {
   async fn verify_interaction(&self, _request: VerifyInteractionRequest) -> anyhow::Result<VerifyInteractionResponse> {
     unimplemented!()
   }
+
+  async fn update_catalogue(&self, _request: Catalogue) -> anyhow::Result<()> {
+    unimplemented!()
+  }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 1)]

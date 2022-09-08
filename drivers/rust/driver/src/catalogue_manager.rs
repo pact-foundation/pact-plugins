@@ -37,6 +37,19 @@ pub enum CatalogueEntryType {
   INTERACTION
 }
 
+impl CatalogueEntryType {
+  /// Return the protobuf type for this entry type
+  pub fn to_proto_type(&self) -> EntryType {
+    match self {
+      CatalogueEntryType::CONTENT_MATCHER => EntryType::ContentMatcher,
+      CatalogueEntryType::CONTENT_GENERATOR => EntryType::ContentGenerator,
+      CatalogueEntryType::TRANSPORT => EntryType::Transport,
+      CatalogueEntryType::MATCHER => EntryType::Matcher,
+      CatalogueEntryType::INTERACTION => EntryType::Interaction
+    }
+  }
+}
+
 impl Display for CatalogueEntryType {
   fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
     match self {
@@ -227,4 +240,10 @@ pub fn find_content_generator(content_type: &ContentType) -> Option<ContentGener
       false
     }
   }).map(|entry| ContentGenerator { catalogue_entry: entry.clone() })
+}
+
+/// Returns a copy of all catalogue entries
+pub fn all_entries() -> Vec<CatalogueEntry> {
+  let guard = CATALOGUE_REGISTER.lock().unwrap();
+  guard.values().cloned().collect()
 }

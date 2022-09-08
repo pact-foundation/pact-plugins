@@ -27,7 +27,7 @@ use tokio::process::Command;
 use tracing::{debug, trace, warn};
 use tracing::log::max_level;
 
-use crate::catalogue_manager::{CatalogueEntry, register_plugin_entries, remove_plugin_entries};
+use crate::catalogue_manager::{all_entries, CatalogueEntry, register_plugin_entries, remove_plugin_entries};
 use crate::child_process::ChildPluginProcess;
 use crate::content::ContentMismatch;
 use crate::metrics::send_metrics;
@@ -191,7 +191,7 @@ async fn initialise_plugin(
 }
 
 /// Internal function: public for testing
-pub async fn init_handshake(manifest: &PactPluginManifest, plugin: &dyn PactPluginRpc) -> anyhow::Result<()> {
+pub async fn init_handshake(manifest: &PactPluginManifest, plugin: &(dyn PactPluginRpc + Send + Sync)) -> anyhow::Result<()> {
   let request = InitPluginRequest {
     implementation: "plugin-driver-rust".to_string(),
     version: option_env!("CARGO_PKG_VERSION").unwrap_or("0").to_string()
@@ -199,7 +199,7 @@ pub async fn init_handshake(manifest: &PactPluginManifest, plugin: &dyn PactPlug
   let response = plugin.init_plugin(request).await?;
   debug!("Got init response {:?} from plugin {}", response, manifest.name);
   register_plugin_entries(manifest, &response.catalogue);
-  tokio::task::spawn(async { publish_updated_catalogue() });
+  tokio::task::spawn(publish_updated_catalogue());
   Ok(())
 }
 
@@ -277,24 +277,53 @@ pub fn shutdown_plugin(plugin: &mut PactPlugin) {
   remove_plugin_entries(&plugin.manifest.name);
 }
 
-// TODO
-fn publish_updated_catalogue() {
-  // val requestBuilder = Plugin.Catalogue.newBuilder()
-  // CatalogueManager.entries().forEach { (_, entry) ->
-  //   requestBuilder.addCatalogue(Plugin.CatalogueEntry.newBuilder()
-  //     .setKey(entry.key)
-  //     .setType(entry.type.name)
-  //     .putAllValues(entry.values)
-  //     .build())
-  // }
-  // val request = requestBuilder.build()
-  //
-  // PLUGIN_REGISTER.forEach { (_, plugin) ->
-  //   plugin.stub?.updateCatalogue(request)
-  // }
+/// Publish the current catalogue to all plugins
+pub async fn publish_updated_catalogue() {
+  let thread_id = thread::current().id();
+
+  let request = Catalogue {
+    catalogue: all_entries().iter()
+      .map(|entry| crate::proto::CatalogueEntry {
+        r#type: entry.entry_type.to_proto_type() as i32,
+        key: entry.key.clone(),
+        values: entry.values.clone()
+      }).collect()
+  };
+
+  let plugins = {
+    trace!("publish_updated_catalogue {:?}: Waiting on PLUGIN_REGISTER lock", thread_id);
+    let inner = PLUGIN_REGISTER.lock().unwrap();
+    trace!("publish_updated_catalogue {:?}: Got PLUGIN_REGISTER lock", thread_id);
+    let plugins = inner.values().cloned().collect::<Vec<_>>();
+    trace!("publish_updated_catalogue {:?}: Releasing PLUGIN_REGISTER lock", thread_id);
+    plugins
+  };
+
+  for plugin in plugins {
+    if let Err(err) = plugin.update_catalogue(request.clone()).await {
+      warn!("Failed to send updated catalogue to plugin '{}' - {}", plugin.manifest.name, err);
+    }
+  }
+}
+
+/// Increment access to the plugin.
+#[tracing::instrument]
+pub fn increment_plugin_access(plugin: &PluginDependency) {
+  let thread_id = thread::current().id();
+
+  trace!("increment_plugin_access {:?}: Waiting on PLUGIN_REGISTER lock", thread_id);
+  let mut inner = PLUGIN_REGISTER.lock().unwrap();
+  trace!("increment_plugin_access {:?}: Got PLUGIN_REGISTER lock", thread_id);
+
+  if let Some(plugin) = lookup_plugin_inner(plugin, &mut inner) {
+    plugin.update_access();
+  }
+
+  trace!("increment_plugin_access {:?}: Releasing PLUGIN_REGISTER lock", thread_id);
 }
 
 /// Decrement access to the plugin. If the current access count is zero, shut down the plugin
+#[tracing::instrument]
 pub fn drop_plugin_access(plugin: &PluginDependency) {
   let thread_id = thread::current().id();
 

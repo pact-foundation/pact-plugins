@@ -27,7 +27,7 @@ prost-types = "0.11.1"
 tokio = { version = "1.18.1", features = ["full"] }
 sysinfo = "0.25.1"
 itertools = "0.10.3"
-pact_models = "0.4.4"
+pact_models = "0.4.5"
 regex = "1.5.5"
 bytes = "1.1.0"
 uuid = { version = "1.1.2", features = ["v4"] }
@@ -37,6 +37,7 @@ md5 = "0.7.0"
 semver = "1.0.9"
 tracing = "=0.1.36"  # This needs to be the same version across all the pact libs (i.e. pact ffi)
 tracing-core = "=0.1.29"  # This needs to be the same version across all the pact libs (i.e. pact ffi)
+backtrace = "0.3.66"
 
 [dependencies.reqwest]
 version = "0.11.10"
