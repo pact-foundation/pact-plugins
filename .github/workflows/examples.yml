@@ -31,7 +31,10 @@ jobs:
         shell: bash
       - name: Run CSV examples
         run: |
+          set -e
           cd csv-consumer-jvm
           ./gradlew check
+          cd ../csv-consumer-rust
+          cargo test
         shell: bash
         working-directory: examples/csv

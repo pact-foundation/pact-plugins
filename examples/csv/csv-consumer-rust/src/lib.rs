@@ -47,13 +47,11 @@ mod tests {
 
   use crate::CsvClient;
 
-  #[tokio::test]
+  #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 1))]
   async fn test_csv_client() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let csv_service = PactBuilder::new_v4("CsvClient", "CsvServer")
       .using_plugin("csv", None).await
-      .interaction("request for a report", "core/interaction/http", |mut i| async move {
+      .interaction("request for a report", "", |mut i| async move {
         i.request.path("/reports/report001.csv");
         i.response
           .ok()
@@ -63,10 +61,10 @@ mod tests {
             "column:2": "matching(number,100)",
             "column:3": "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
           })).await;
-        i.clone()
+        i
       })
       .await
-    .start_mock_server_async()
+    .start_mock_server_async(None)
     .await;
 
     let client = CsvClient::new(csv_service.url().clone());
@@ -80,16 +78,15 @@ mod tests {
     expect!(re.is_match(date)).to(be_true());
   }
 
-  #[tokio::test]
+  #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 1))]
   async fn test_post_csv() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let csv_service = PactBuilder::new_v4("CsvClient", "CsvServer")
       .using_plugin("csv", None).await
-      .interaction("request for to store a report", "core/interaction/http", |mut i| async move {
+      .interaction("request for to store a report", "", |mut i| async move {
         i.request
           .path("/reports/report001.csv")
           .method("POST")
+          .header("content-type", "text/csv")
           .contents(ContentType::from("text/csv"), json!({
             "csvHeaders": false,
             "column:1": "matching(type,'Name')",
@@ -99,10 +96,10 @@ mod tests {
 
         i.response.created();
 
-        i.clone()
+        i
       })
       .await
-      .start_mock_server_async()
+      .start_mock_server_async(None)
       .await;
 
     let client = CsvClient::new(csv_service.url().clone());
