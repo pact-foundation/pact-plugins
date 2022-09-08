@@ -13,7 +13,7 @@ case "$(uname -s)" in
      if [ "$(uname -m)" == "arm64" ]; then
         curl -L -o ~/bin/pact-plugin-cli.gz https://github.com/pact-foundation/pact-plugins/releases/download/pact-plugin-cli-v${VERSION}/pact-plugin-cli-osx-aarch64.gz
      else
-        curl -L -o ~/bin/pact-plugin-cli.gz curl https://github.com/pact-foundation/pact-plugins/releases/download/pact-plugin-cli-v${VERSION}/pact-plugin-cli-osx-x86_64.gz
+        curl -L -o ~/bin/pact-plugin-cli.gz https://github.com/pact-foundation/pact-plugins/releases/download/pact-plugin-cli-v${VERSION}/pact-plugin-cli-osx-x86_64.gz
      fi
      gunzip -N -f ~/bin/pact-plugin-cli.gz
      chmod +x ~/bin/pact-plugin-cli
