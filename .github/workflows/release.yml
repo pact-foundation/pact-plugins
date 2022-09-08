@@ -24,6 +24,10 @@ jobs:
       - name: Install LLVM
         run: choco install -y llvm
         if: runner.os == 'Windows'
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
       - if: startsWith(github.ref, 'refs/tags/csv-plugin')
         run: ./release.sh ${{ runner.os }}
         shell: bash
