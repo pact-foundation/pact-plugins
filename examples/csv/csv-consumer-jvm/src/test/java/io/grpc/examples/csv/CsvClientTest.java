@@ -51,7 +51,8 @@ class CsvClientTest {
       .usingPlugin("csv")
       .expectsToReceive("request for a report with headers", "core/transport/http")
       .with(Map.of(
-        "request.path", "/reports/report002.csv",
+        "request.path", "/reports/headers/report002.csv",
+        //"request.query", Map.of("headers", List.of("true")),
         "response.status", "200",
         "response.contents", Map.of(
           "pact:content-type", "text/csv",
@@ -101,7 +102,7 @@ class CsvClientTest {
   @PactTestFor(providerName = "CsvServer", pactMethod = "csvWithHeaders")
   void getCsvReportWithHeaders(MockServer mockServer) throws IOException {
     CsvClient client = new CsvClient(mockServer.getUrl());
-    List<CSVRecord> csvData = client.fetch("report002.csv", true);
+    List<CSVRecord> csvData = client.fetch("headers/report002.csv", true);
     assertThat(csvData.size(), is(1));
     CSVRecord row = csvData.get(0);
     assertThat(row.isConsistent(), is(true));
