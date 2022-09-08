@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.11 - Maintenance Release
+
+* 97d8bd4 - feat: Implement update_catalogue call and add function to increment plugin access count (Ronald Holshausen, Thu Sep 8 11:12:58 2022 +1000)
+* d638a27 - bump version to 0.1.11 (Ronald Holshausen, Thu Aug 18 14:05:18 2022 +1000)
+
 # 0.1.10 - Maintenance Release
 
 * 5e685c8 - chore: inline the generated protobuf code so the build no longer requires protoc installed (Ronald Holshausen, Thu Aug 18 13:56:10 2022 +1000)
