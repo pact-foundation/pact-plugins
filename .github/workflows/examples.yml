@@ -99,8 +99,8 @@ jobs:
           set -e
           cd protobuf-consumer-jvm
           ./gradlew check
-          #cd ../csv-consumer-rust
-          #cargo test
+          cd ../protobuf-consumer-rust
+          cargo test
           #cd ../csv-provider
           #cargo build
           #nohup ./target/debug/csv-provider &

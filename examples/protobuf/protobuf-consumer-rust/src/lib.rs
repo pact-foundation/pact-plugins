@@ -22,7 +22,7 @@ mod tests {
     let mut pact_builder = PactBuilder::new_v4("protobuf-consumer-rust", "protobuf-provider");
     let proto_service = pact_builder
       .using_plugin("protobuf", None).await
-      .message_interaction("init plugin message", "core/interaction/message", |mut i| async move {
+      .message_interaction("init plugin message", |mut i| async move {
         let proto_file = Path::new("../../../proto/plugin.proto")
           .canonicalize().unwrap().to_string_lossy().to_string();
         i.contents_from(json!({
@@ -51,7 +51,7 @@ mod tests {
     let mut pact_builder = PactBuilder::new_v4("protobuf-consumer-rust", "protobuf-provider");
     let proto_service = pact_builder
       .using_plugin("protobuf", None).await
-      .message_interaction("Configure Interaction Response", "core/interaction/message", |mut i| async move {
+      .message_interaction("Configure Interaction Response", |mut i| async move {
         let proto_file = Path::new("../../../proto/plugin.proto")
           .canonicalize().unwrap().to_string_lossy().to_string();
 
