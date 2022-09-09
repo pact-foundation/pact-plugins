@@ -180,4 +180,4 @@ jobs:
           #pact_do_not_track=true ~/bin/pact_verifier_cli -f ../protobuf-consumer-rust/target/pacts/protobuf-consumer-rust-protobuf-provider.json -p 8111
           #pact_do_not_track=true ~/bin/pact_verifier_cli -f ../protobuf-consumer-jvm/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
         shell: bash
-        working-directory: examples/gRPC
+        working-directory: examples/gRPC/area_calculator
