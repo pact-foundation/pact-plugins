@@ -181,9 +181,10 @@ jobs:
       - name: Install Pact Go (Windows)
         run: |
           go install github.com/pact-foundation/pact-go/v2@2.x.x
-          $HOME/go/bin/pact-go -l DEBUG install && true
-          ls -la /usr/local/lib/
+          $HOME/go/bin/pact-go -l DEBUG install
         shell: bash
+        env:
+          PACT_GO_LIB_DOWNLOAD_PATH: .pact
         if: runner.os == 'Windows'
       - name: Run Protobuf examples
         run: |
