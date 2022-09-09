@@ -168,7 +168,8 @@ jobs:
       - name: Install Pact Go
         run: |
           go install github.com/pact-foundation/pact-go/v2@2.x.x
-          pact-go -l DEBUG install
+          sudo pact-go -l DEBUG install
+          ls -la /usr/local/lib/
         shell: bash
       - name: Run Protobuf examples
         run: |
