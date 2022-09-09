@@ -5,7 +5,7 @@ on:
   - pull_request
 
 jobs:
-  examples:
+  csv-examples:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
@@ -66,3 +66,47 @@ jobs:
         shell: bash
         working-directory: examples/csv
         if: runner.os == 'Windows'
+
+  protobuf-examples:
+    runs-on: ${{ matrix.operating-system }}
+    strategy:
+      matrix:
+        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
+    steps:
+      - uses: actions/checkout@v2
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 11
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install plugin cli
+        run: scripts/install-plugin-cli.sh
+        shell: bash
+      - name: Install Protobuf plugin
+        run: ~/bin/pact-plugin-cli -y install https://github.com/pactflow/pact-protobuf-plugin/releases/latest
+        shell: bash
+      - name: Install Pact verifier
+        run: scripts/install-verifier-cli.sh
+        shell: bash
+      - name: Run Protobuf examples
+        run: |
+          set -e
+          cd protobuf-consumer-jvm
+          ./gradlew check
+          #cd ../csv-consumer-rust
+          #cargo test
+          #cd ../csv-provider
+          #cargo build
+          #nohup ./target/debug/csv-provider &
+          #PID=$!
+          #trap "kill $PID" EXIT
+          #~/bin/pact_verifier_cli -f ../csv-consumer-rust/target/pacts/CsvClient-CsvServer.json -p 8080
+          #~/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
+        shell: bash
+        working-directory: examples/protobuf
