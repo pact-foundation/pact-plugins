@@ -50,8 +50,8 @@ jobs:
           nohup ./target/debug/csv-provider &
           PID=$!
           trap "kill $PID" EXIT
-          ~/bin/pact_verifier_cli -f ../csv-consumer-rust/target/pacts/CsvClient-CsvServer.json -p 8080
-          ~/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
+          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../csv-consumer-rust/target/pacts/CsvClient-CsvServer.json -p 8080
+          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
         shell: bash
         working-directory: examples/csv
         if: runner.os != 'Windows'
@@ -65,7 +65,7 @@ jobs:
           nohup ./target/debug/csv-provider &
           PID=$!
           trap "kill $PID" EXIT
-          ~/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
+          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
         shell: bash
         working-directory: examples/csv
         if: runner.os == 'Windows'
@@ -104,6 +104,11 @@ jobs:
       - name: Install Pact verifier
         run: scripts/install-verifier-cli.sh
         shell: bash
+      - name: Install timeout on OSX
+        run: |
+          brew install coreutils
+        shell: bash
+        if: runner.os == 'macOS'
       - name: Run Protobuf examples
         run: |
           set -e
@@ -116,7 +121,7 @@ jobs:
           PID=$!
           trap "kill $PID" EXIT
           timeout --foreground -s TERM 30s bash -c 'while [[ "$(curl -s -o /dev/null -m 3 -L -w ''%{http_code}'' -XPOST -d'{}' http://127.0.0.1:8111)" != "200" ]]; do echo "Waiting for http://127.0.0.1:8111" && sleep 2; done'
-          ~/bin/pact_verifier_cli -f ../protobuf-consumer-rust/target/pacts/protobuf-consumer-rust-protobuf-provider.json -p 8111
-          ~/bin/pact_verifier_cli -f ../protobuf-consumer-jvm/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
+          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../protobuf-consumer-rust/target/pacts/protobuf-consumer-rust-protobuf-provider.json -p 8111
+          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../protobuf-consumer-jvm/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
         shell: bash
         working-directory: examples/protobuf
