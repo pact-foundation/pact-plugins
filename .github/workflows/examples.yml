@@ -165,12 +165,19 @@ jobs:
           brew install coreutils
         shell: bash
         if: runner.os == 'macOS'
-      - name: Install Pact Go
+      - name: Install Pact Go (Linux)
         run: |
           go install github.com/pact-foundation/pact-go/v2@2.x.x
           sudo $HOME/go/bin/pact-go -l DEBUG install
           ls -la /usr/local/lib/
         shell: bash
+        if: runner.os == 'Linux'
+      - name: Install Pact Go (Non-Linux)
+        run: |
+          go install github.com/pact-foundation/pact-go/v2@2.x.x
+          $HOME/go/bin/pact-go -l DEBUG install
+        shell: bash
+        if: runner.os != 'Linux'
       - name: Run Protobuf examples
         run: |
           set -e
