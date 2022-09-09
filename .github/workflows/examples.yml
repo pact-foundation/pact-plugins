@@ -12,6 +12,7 @@ jobs:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
       PACT_DO_NOT_TRACK: true
+      pact_do_not_track: true
       RUST_LOG: trace
     steps:
       - uses: actions/checkout@v2
@@ -44,7 +45,7 @@ jobs:
           cd csv-consumer-jvm
           ./gradlew check
           cd ../csv-consumer-rust
-          cargo test
+          cargo test -- --test-threads 1
           cd ../csv-provider
           cargo build
           nohup ./target/debug/csv-provider &
@@ -77,6 +78,7 @@ jobs:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
       PACT_DO_NOT_TRACK: true
+      pact_do_not_track: true
       RUST_LOG: trace
     steps:
       - uses: actions/checkout@v2
@@ -91,6 +93,10 @@ jobs:
         uses: arduino/setup-protoc@v1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Go
+        uses: actions/setup-go@v2
+        with:
+          go-version: 1.19.x
       - name: Install plugin cli
         run: scripts/install-plugin-cli.sh
         shell: bash
@@ -107,12 +113,11 @@ jobs:
           ./gradlew check
           cd ../protobuf-consumer-rust
           cargo test
-          #cd ../csv-provider
-          #cargo build
-          #nohup ./target/debug/csv-provider &
-          #PID=$!
-          #trap "kill $PID" EXIT
-          #~/bin/pact_verifier_cli -f ../csv-consumer-rust/target/pacts/CsvClient-CsvServer.json -p 8080
-          #~/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
+          cd ../protobuf-provider
+          nohup go run main.go &
+          PID=$!
+          trap "kill $PID" EXIT
+          ~/bin/pact_verifier_cli -f ../protobuf-consumer-rust/target/pacts/protobuf-consumer-rust-protobuf-provider.json -p 8111
+          ~/bin/pact_verifier_cli -f ../protobuf-consumer-jvm/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
         shell: bash
         working-directory: examples/protobuf
