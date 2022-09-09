@@ -10,6 +10,9 @@ jobs:
     strategy:
       matrix:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
+    env:
+      PACT_DO_NOT_TRACK: true
+      RUST_LOG: trace
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 11
@@ -72,6 +75,9 @@ jobs:
     strategy:
       matrix:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
+    env:
+      PACT_DO_NOT_TRACK: true
+      RUST_LOG: trace
     steps:
       - uses: actions/checkout@v2
       - name: Set up JDK 11
