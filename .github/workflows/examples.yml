@@ -194,16 +194,17 @@ jobs:
       - name: Run Protobuf examples
         run: |
           set -e
+          set -x
           cd consumer-jvm
           ./gradlew check
           cd ../consumer-rust
           pact_do_not_track=true cargo test
           cd ../consumer-go
           pact_do_not_track=true go test
-          cd ../provider-jvm/server
-          cp ../../consumer-jvm/build/pacts/* src/test/resources/pacts
-          cp ../../consumer-rust/target/pacts/* src/test/resources/pacts
-          cp ../../consumer-go/pacts/* src/test/resources/pacts
+          cd ../provider-jvm
+          cp ../consumer-jvm/build/pacts/* server/src/test/resources/pacts
+          cp ../consumer-rust/target/pacts/* server/src/test/resources/pacts
+          cp ../consumer-go/pacts/* server/src/test/resources/pacts
           ./gradlew check
           #cd ../protobuf-provider
           #nohup go run main.go &
