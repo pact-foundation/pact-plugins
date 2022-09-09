@@ -12,7 +12,6 @@ jobs:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
       PACT_DO_NOT_TRACK: true
-      pact_do_not_track: true
       RUST_LOG: trace
     steps:
       - uses: actions/checkout@v2
@@ -45,7 +44,7 @@ jobs:
           cd csv-consumer-jvm
           ./gradlew check
           cd ../csv-consumer-rust
-          cargo test -- --test-threads 1
+          pact_do_not_track=true cargo test -- --test-threads 1
           cd ../csv-provider
           cargo build
           nohup ./target/debug/csv-provider &
@@ -78,7 +77,6 @@ jobs:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
       PACT_DO_NOT_TRACK: true
-      pact_do_not_track: true
       RUST_LOG: trace
     steps:
       - uses: actions/checkout@v2
@@ -112,7 +110,7 @@ jobs:
           cd protobuf-consumer-jvm
           ./gradlew check
           cd ../protobuf-consumer-rust
-          cargo test
+          pact_do_not_track=true cargo test
           cd ../protobuf-provider
           nohup go run main.go &
           PID=$!
