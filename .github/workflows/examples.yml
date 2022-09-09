@@ -185,6 +185,8 @@ jobs:
           #$HOME/go/bin/pact-go -l DEBUG install
           curl -L -o ~/.pact/pact_ffi.dll.gz https://github.com/pact-foundation/pact-reference/releases/download/libpact_ffi-v0.3.11/pact_ffi-windows-x86_64.dll.gz
           gunzip -N -f ~/.pact/pact_ffi.dll.gz
+          cp ~/.pact/pact_ffi.dll examples/gRPC/area_calculator/consumer-go
+          cp ~/.pact/pact_ffi.dll examples/gRPC/area_calculator/provider-go
         shell: bash
         env:
           PACT_GO_LIB_DOWNLOAD_PATH: .pact
@@ -197,7 +199,6 @@ jobs:
           cd ../consumer-rust
           pact_do_not_track=true cargo test
           cd ../consumer-go
-          cp ~/.pact/pact_ffi.dll . | true
           pact_do_not_track=true go test
           cd ../provider-jvm/server
           cp ../consumer-jvm/build/pacts/* src/test/resources/pacts
