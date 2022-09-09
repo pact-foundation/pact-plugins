@@ -165,6 +165,11 @@ jobs:
           brew install coreutils
         shell: bash
         if: runner.os == 'macOS'
+      - name: Install Pact Go
+        run: |
+          go install github.com/pact-foundation/pact-go/v2@2.x.x
+          pact-go -l DEBUG install
+        shell: bash
       - name: Run Protobuf examples
         run: |
           set -e
@@ -172,6 +177,8 @@ jobs:
           ./gradlew check
           cd ../consumer-rust
           pact_do_not_track=true cargo test
+          cd ../consumer-go
+          pact_do_not_track=true go test 
           #cd ../protobuf-provider
           #nohup go run main.go &
           #PID=$!
