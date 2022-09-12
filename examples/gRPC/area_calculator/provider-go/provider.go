@@ -56,7 +56,7 @@ func (calc *calculatorServer) CalculateOne(ctx context.Context, req *ac.ShapeMes
 func (calc *calculatorServer) CalculateMulti(ctx context.Context, req *ac.AreaRequest) (*ac.AreaResponse, error) {
 	var areas []float32
 
-	log.Println("Calculting the area for multuple values", req)
+	log.Println("Calculating the area for multiple values", req)
 	for _, shape := range req.Shapes {
 		area, err := CalculateArea(shape)
 		if err != nil {

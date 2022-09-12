@@ -38,7 +38,7 @@ public class PactConsumerTest {
    * Configures the Pact interaction for the test. This will load the Protobuf plugin, which will provide all the
    * Protobuf and gRPC support to the Pact framework.
    */
-  @Pact(consumer = "protobuf-consumer")
+  @Pact(consumer = "grpc-consumer-jvm")
   V4Pact calculateRectangleArea(PactBuilder builder) {
     return builder
       // Tell Pact we need the Protobuf plugin
