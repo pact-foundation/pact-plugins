@@ -9,12 +9,12 @@ class CatalogueManagerSpec extends Specification {
     def matcherEntry = Plugin.CatalogueEntry.newBuilder()
       .setType(Plugin.CatalogueEntry.EntryType.CONTENT_MATCHER)
       .setKey('protobuf-test')
-      .putValues('content-types', 'application/protobuf;application/grpc')
+      .putValues('content-types', 'application/protobuf-test;application/grpc-test')
       .build()
     def generatorEntry = Plugin.CatalogueEntry.newBuilder()
       .setType(Plugin.CatalogueEntry.EntryType.CONTENT_GENERATOR)
       .setKey('protobuf-test')
-      .putValues('content-types', 'application/protobuf;application/grpc')
+      .putValues('content-types', 'application/protobuf-test;application/grpc-test')
       .build()
     def transportEntry = Plugin.CatalogueEntry.newBuilder()
       .setType(Plugin.CatalogueEntry.EntryType.TRANSPORT)
@@ -34,9 +34,9 @@ class CatalogueManagerSpec extends Specification {
 
     then:
     contentMatcher == new CatalogueEntry(CatalogueEntryType.CONTENT_MATCHER, CatalogueEntryProviderType.PLUGIN,
-      'CatalogueManagerSpec', 'protobuf-test', ['content-types': 'application/protobuf;application/grpc'])
+      'CatalogueManagerSpec', 'protobuf-test', ['content-types': 'application/protobuf-test;application/grpc-test'])
     contentGenerator == new CatalogueEntry(CatalogueEntryType.CONTENT_GENERATOR, CatalogueEntryProviderType.PLUGIN,
-      'CatalogueManagerSpec', 'protobuf-test', ['content-types': 'application/protobuf;application/grpc'])
+      'CatalogueManagerSpec', 'protobuf-test', ['content-types': 'application/protobuf-test;application/grpc-test'])
     transport == new CatalogueEntry(CatalogueEntryType.TRANSPORT, CatalogueEntryProviderType.PLUGIN,
       'CatalogueManagerSpec', 'grpc-test')
 
