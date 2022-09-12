@@ -2,24 +2,30 @@
 
 set -e
 
+echo '==== RUNNING consumer-jvm'
 cd consumer-jvm
 ./gradlew check
 
+echo '==== RUNNING consumer-rust'
 cd ../consumer-rust
 pact_do_not_track=true cargo test
 
+echo '==== RUNNING consumer-go'
 cd ../consumer-go
 go test -c
 ls -la
 pact_do_not_track=true ./consumer.test
 
+echo '==== RUNNING provider-jvm'
 cd ../provider-jvm
 cp ../consumer-jvm/build/pacts/* server/src/test/resources/pacts
 cp ../consumer-rust/target/pacts/* server/src/test/resources/pacts
 cp ../consumer-go/pacts/* server/src/test/resources/pacts
 ./gradlew check
 
+echo '==== RUNNING consumer-go'
 cd ../provider-go
+set -x
 go build provider.go
 nohup ./provider > provider.go.out 2>&1 &
 PID=$!
