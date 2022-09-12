@@ -20,7 +20,7 @@ mod tests {
     let mut pact_builder = PactBuilder::new_v4("grpc-consumer-rust", "area-calculator-provider");
     let mock_server = pact_builder
       // Tell Pact we need the Protobuf plugin
-      .using_plugin("protobuf", Some("0.1.0".to_string())).await
+      .using_plugin("protobuf", None).await
       // We will use a V4 synchronous message interaction for the test
       .synchronous_message_interaction("calculate rectangle area request", |mut i| async move {
         let proto_file = Path::new("../proto/area_calculator.proto")
