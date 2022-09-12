@@ -209,10 +209,11 @@ jobs:
           ./gradlew check
           cd ../provider-go
           go build provider.go
-          nohup ./provider > provider.go.out &
+          $(nohup ./provider > provider.go.out)&
           PID=$!
           trap "kill $PID" EXIT
-          PROVIDER_PORT=cat provider.go.out | cut -f4 -d:
+          ls -la
+          PROVIDER_PORT=$(cat provider.go.out | cut -f4 -d:)
           pact_do_not_track=true ~/bin/pact_verifier_cli -f ../consumer-jvm/build/pacts/grpc-consumer-jvm-area-calculator-provider.json\
             -f ../consumer-rust/target/pacts/grpc-consumer-rust-area-calculator-provider.json\
             -f ../consumer-go/pacts/grpc-consumer-go-area-calculator-provider.json\
