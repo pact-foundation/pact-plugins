@@ -187,7 +187,7 @@ mod tests {
           "catalogue": {
             "pact:match" : "eachValue(matching($'CatalogueEntry'))",
             "CatalogueEntry": {
-              "type": "matching(regex, 'CONTENT_MATCHER|CONTENT_GENERATOR', 'CONTENT_MATCHER')",
+              "type": "matching(regex, 'CONTENT_MATCHER|CONTENT_GENERATOR|TRANSPORT', 'CONTENT_MATCHER')",
               "key": "notEmpty('test')"
             }
           }
@@ -267,7 +267,7 @@ mod tests {
           "catalogue": {
             "pact:match" : "eachValue(matching($'CatalogueEntry'))",
             "CatalogueEntry": {
-              "type": "matching(regex, 'CONTENT_MATCHER|CONTENT_GENERATOR', 'CONTENT_MATCHER')",
+              "type": "matching(regex, 'CONTENT_MATCHER|CONTENT_GENERATOR|TRANSPORT', 'CONTENT_MATCHER')",
               "key": "notEmpty('test key')"
             }
           }

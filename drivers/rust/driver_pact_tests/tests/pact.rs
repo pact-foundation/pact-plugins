@@ -88,7 +88,7 @@ async fn test_proto_client() {
             "catalogue": {
               "pact:match" : "eachValue(matching($'CatalogueEntry'))",
               "CatalogueEntry": {
-                "type": "matching(regex, 'CONTENT_MATCHER|CONTENT_GENERATOR', 'CONTENT_MATCHER')",
+                "type": "matching(regex, 'CONTENT_MATCHER|CONTENT_GENERATOR|TRANSPORT', 'CONTENT_MATCHER')",
                 "key": "notEmpty('test')"
               }
             }
