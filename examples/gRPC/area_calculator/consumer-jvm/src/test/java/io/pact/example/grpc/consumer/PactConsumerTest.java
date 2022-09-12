@@ -42,7 +42,7 @@ public class PactConsumerTest {
   V4Pact calculateRectangleArea(PactBuilder builder) {
     return builder
       // Tell Pact we need the Protobuf plugin
-      .usingPlugin("protobuf", "0.1.0")
+      .usingPlugin("protobuf")
       // We will use a V4 synchronous message interaction for the test
       .expectsToReceive("calculate rectangle area request", "core/interaction/synchronous-message")
       // We need to pass all the details for the interaction over to the plugin

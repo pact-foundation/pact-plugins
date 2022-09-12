@@ -13,7 +13,6 @@ pact_do_not_track=true cargo test
 echo '==== RUNNING consumer-go'
 cd ../consumer-go
 go test -c
-ls -la
 pact_do_not_track=true ./consumer.test
 
 echo '==== RUNNING provider-jvm'
