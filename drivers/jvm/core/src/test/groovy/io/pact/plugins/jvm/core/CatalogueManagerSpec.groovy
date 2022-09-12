@@ -8,17 +8,17 @@ class CatalogueManagerSpec extends Specification {
     given:
     def matcherEntry = Plugin.CatalogueEntry.newBuilder()
       .setType(Plugin.CatalogueEntry.EntryType.CONTENT_MATCHER)
-      .setKey('protobuf')
+      .setKey('protobuf-test')
       .putValues('content-types', 'application/protobuf;application/grpc')
       .build()
     def generatorEntry = Plugin.CatalogueEntry.newBuilder()
       .setType(Plugin.CatalogueEntry.EntryType.CONTENT_GENERATOR)
-      .setKey('protobuf')
+      .setKey('protobuf-test')
       .putValues('content-types', 'application/protobuf;application/grpc')
       .build()
     def transportEntry = Plugin.CatalogueEntry.newBuilder()
       .setType(Plugin.CatalogueEntry.EntryType.TRANSPORT)
-      .setKey('grpc')
+      .setKey('grpc-test')
       .build()
     def entries = [
       matcherEntry,
@@ -28,17 +28,17 @@ class CatalogueManagerSpec extends Specification {
 
     when:
     CatalogueManager.INSTANCE.registerPluginEntries("CatalogueManagerSpec", entries)
-    def contentMatcher = CatalogueManager.INSTANCE.lookupEntry('content-matcher/protobuf')
-    def contentGenerator = CatalogueManager.INSTANCE.lookupEntry('content-generator/protobuf')
-    def transport = CatalogueManager.INSTANCE.lookupEntry('transport/grpc')
+    def contentMatcher = CatalogueManager.INSTANCE.lookupEntry('content-matcher/protobuf-test')
+    def contentGenerator = CatalogueManager.INSTANCE.lookupEntry('content-generator/protobuf-test')
+    def transport = CatalogueManager.INSTANCE.lookupEntry('transport/grpc-test')
 
     then:
     contentMatcher == new CatalogueEntry(CatalogueEntryType.CONTENT_MATCHER, CatalogueEntryProviderType.PLUGIN,
-      'CatalogueManagerSpec', 'protobuf', ['content-types': 'application/protobuf;application/grpc'])
+      'CatalogueManagerSpec', 'protobuf-test', ['content-types': 'application/protobuf;application/grpc'])
     contentGenerator == new CatalogueEntry(CatalogueEntryType.CONTENT_GENERATOR, CatalogueEntryProviderType.PLUGIN,
-      'CatalogueManagerSpec', 'protobuf', ['content-types': 'application/protobuf;application/grpc'])
+      'CatalogueManagerSpec', 'protobuf-test', ['content-types': 'application/protobuf;application/grpc'])
     transport == new CatalogueEntry(CatalogueEntryType.TRANSPORT, CatalogueEntryProviderType.PLUGIN,
-      'CatalogueManagerSpec', 'grpc')
+      'CatalogueManagerSpec', 'grpc-test')
 
     cleanup:
     CatalogueManager.INSTANCE.removePluginEntries('CatalogueManagerSpec')
