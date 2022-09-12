@@ -191,32 +191,6 @@ jobs:
           PACT_GO_LIB_DOWNLOAD_PATH: .pact
         if: runner.os == 'Windows'
       - name: Run gRPC examples
-        run: |
-          set -e
-          set -x
-          cd consumer-jvm
-          ./gradlew check
-          cd ../consumer-rust
-          pact_do_not_track=true cargo test
-          cd ../consumer-go
-          go test -c
-          ls -la
-          pact_do_not_track=true ./consumer.test
-          cd ../provider-jvm
-          cp ../consumer-jvm/build/pacts/* server/src/test/resources/pacts
-          cp ../consumer-rust/target/pacts/* server/src/test/resources/pacts
-          cp ../consumer-go/pacts/* server/src/test/resources/pacts
-          ./gradlew check
-          cd ../provider-go
-          go build provider.go
-          $(nohup ./provider > provider.go.out)&
-          PID=$!
-          trap "kill $PID" EXIT
-          ls -la
-          PROVIDER_PORT=$(cat provider.go.out | cut -f4 -d:)
-          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../consumer-jvm/build/pacts/grpc-consumer-jvm-area-calculator-provider.json\
-            -f ../consumer-rust/target/pacts/grpc-consumer-rust-area-calculator-provider.json\
-            -f ../consumer-go/pacts/grpc-consumer-go-area-calculator-provider.json\
-            -p $PROVIDER_PORT
+        run: scripts/run-grpc-examples.sh
         shell: bash
         working-directory: examples/gRPC/area_calculator
