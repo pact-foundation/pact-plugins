@@ -14,8 +14,8 @@ use tracing::{debug, error, trace};
 
 use crate::content::{ContentGenerator, ContentMatcher};
 use crate::plugin_models::PactPluginManifest;
-use crate::proto::CatalogueEntry as ProtoCatalogueEntry;
 use crate::proto::catalogue_entry::EntryType;
+use crate::proto::CatalogueEntry as ProtoCatalogueEntry;
 
 lazy_static! {
   static ref CATALOGUE_REGISTER: Mutex<HashMap<String, CatalogueEntry>> = Mutex::new(HashMap::new());
@@ -136,7 +136,7 @@ pub fn register_plugin_entries(plugin: &PactPluginManifest, catalogue_list: &Vec
       entry_type,
       provider_type: CatalogueEntryProviderType::PLUGIN,
       plugin: Some(plugin.clone()),
-      key: key.clone(),
+      key: entry.key.clone(),
       values: entry.values.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
     });
   }
@@ -246,4 +246,72 @@ pub fn find_content_generator(content_type: &ContentType) -> Option<ContentGener
 pub fn all_entries() -> Vec<CatalogueEntry> {
   let guard = CATALOGUE_REGISTER.lock().unwrap();
   guard.values().cloned().collect()
+}
+
+#[cfg(test)]
+mod tests {
+  use expectest::prelude::*;
+  use maplit::hashmap;
+
+  use crate::proto::catalogue_entry;
+
+  use super::*;
+
+  #[test]
+  fn sets_plugin_catalogue_entries_correctly() {
+    // Given
+    let manifest = PactPluginManifest {
+      name: "sets_plugin_catalogue_entries_correctly".to_string(),
+      .. PactPluginManifest::default()
+    };
+    let entries = vec![
+      ProtoCatalogueEntry {
+        r#type: catalogue_entry::EntryType::ContentMatcher as i32,
+        key: "protobuf".to_string(),
+        values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() }
+      },
+      ProtoCatalogueEntry {
+        r#type: catalogue_entry::EntryType::ContentGenerator as i32,
+        key: "protobuf".to_string(),
+        values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() }
+      },
+      ProtoCatalogueEntry {
+        r#type: catalogue_entry::EntryType::Transport as i32,
+        key: "grpc".to_string(),
+        values: hashmap!{}
+      }
+    ];
+
+    // When
+    register_plugin_entries(&manifest, &entries);
+
+    // Then
+    let matcher_entry = lookup_entry("content-matcher/protobuf");
+    let generator_entry = lookup_entry("content-generator/protobuf");
+    let transport_entry = lookup_entry("transport/grpc");
+
+    remove_plugin_entries("sets_plugin_catalogue_entries_correctly");
+
+    expect!(matcher_entry).to(be_some().value(CatalogueEntry {
+      entry_type: CatalogueEntryType::CONTENT_MATCHER,
+      provider_type: CatalogueEntryProviderType::PLUGIN,
+      plugin: Some(manifest.clone()),
+      key: "protobuf".to_string(),
+      values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() }
+    }));
+    expect!(generator_entry).to(be_some().value(CatalogueEntry {
+      entry_type: CatalogueEntryType::CONTENT_GENERATOR,
+      provider_type: CatalogueEntryProviderType::PLUGIN,
+      plugin: Some(manifest.clone()),
+      key: "protobuf".to_string(),
+      values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() }
+    }));
+    expect!(transport_entry).to(be_some().value(CatalogueEntry {
+      entry_type: CatalogueEntryType::TRANSPORT,
+      provider_type: CatalogueEntryProviderType::PLUGIN,
+      plugin: Some(manifest.clone()),
+      key: "grpc".to_string(),
+      values: hashmap!{}
+    }));
+  }
 }
