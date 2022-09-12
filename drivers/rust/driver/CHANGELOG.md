@@ -1,5 +1,12 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.12 - Bugfix Release
+
+* f059f54 - fix(Rust driver): register_plugin_entries was setting the entry keys incorrectly (Ronald Holshausen, Mon Sep 12 17:14:23 2022 +1000)
+* a54765f - chore: run build with latest CSV plugin (Ronald Holshausen, Thu Sep 8 15:11:14 2022 +1000)
+* c220ddb - chore: download the plugin cli instead of building it every time (Ronald Holshausen, Thu Sep 8 13:50:24 2022 +1000)
+* 96dca91 - bump version to 0.1.12 (Ronald Holshausen, Thu Sep 8 11:21:55 2022 +1000)
+
 # 0.1.11 - Maintenance Release
 
 * 97d8bd4 - feat: Implement update_catalogue call and add function to increment plugin access count (Ronald Holshausen, Thu Sep 8 11:12:58 2022 +1000)
