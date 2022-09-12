@@ -71,7 +71,7 @@ func GetRectangleAndSquareArea(address string) ([]float32, error) {
 
 	c := ac.NewCalculatorClient(conn)
 
-	log.Println("Sending calculate rectangle and sqaure request")
+	log.Println("Sending calculate rectangle and square request")
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 

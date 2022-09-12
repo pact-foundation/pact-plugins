@@ -51,8 +51,7 @@ func TestCalculateClient(t *testing.T) {
 	err = mockProvider.
 		AddSynchronousMessage("calculate rectangle area request").
 		UsingPlugin(message.PluginConfig{
-			Plugin:  "protobuf",
-			Version: "0.1.10",
+			Plugin: "protobuf",
 		}).
 		WithContents(grpcInteraction, "application/grpc").
 		// Start the gRPC mock server
