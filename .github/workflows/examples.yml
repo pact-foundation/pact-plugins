@@ -191,6 +191,6 @@ jobs:
           PACT_GO_LIB_DOWNLOAD_PATH: .pact
         if: runner.os == 'Windows'
       - name: Run gRPC examples
-        run: scripts/run-grpc-examples.sh
+        run: ../../../scripts/run-grpc-examples.sh
         shell: bash
         working-directory: examples/gRPC/area_calculator
