@@ -117,7 +117,8 @@ jobs:
           cd ../protobuf-consumer-rust
           pact_do_not_track=true cargo test
           cd ../protobuf-provider
-          nohup go run main.go &
+          go build main.go
+          nohup ./main &
           PID=$!
           trap "kill $PID" EXIT
           timeout --foreground -s TERM 30s bash -c 'while [[ "$(curl -s -o /dev/null -m 3 -L -w ''%{http_code}'' -XPOST -d'{}' http://127.0.0.1:8111)" != "200" ]]; do echo "Waiting for http://127.0.0.1:8111" && sleep 2; done'
