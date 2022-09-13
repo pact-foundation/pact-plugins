@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
+	"path/filepath"
 	"testing"
 
 	pactlog "github.com/pact-foundation/pact-go/v2/log"
@@ -20,11 +20,10 @@ func TestCalculateClient(t *testing.T) {
 
 	pactlog.SetLogLevel("TRACE")
 
-	dir, _ := os.Getwd()
-	path := fmt.Sprintf("%s/../proto/area_calculator.proto", dir)
+	dir, _ := filepath.Abs("../proto/area_calculator.proto")
 
 	grpcInteraction := `{
-		"pact:proto": "` + path + `",
+		"pact:proto": "` + filepath.ToSlash(dir) + `",
 		"pact:proto-service": "Calculator/calculateMulti",
 		"pact:content-type": "application/protobuf",
 		"request": {
