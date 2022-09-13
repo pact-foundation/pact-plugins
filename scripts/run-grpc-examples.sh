@@ -10,6 +10,12 @@ echo '==== RUNNING consumer-rust'
 cd ../consumer-rust
 pact_do_not_track=true cargo test
 
+case "$(uname -s)" in
+   CYGWIN*|MINGW32*|MSYS*|MINGW*)
+     export CGO_LDFLAGS="-g -O2 -L$USERPROFILE\\.pact"
+     ;;
+esac
+
 echo '==== RUNNING consumer-go'
 cd ../consumer-go
 go test -c
