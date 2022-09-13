@@ -19,7 +19,7 @@ esac
 echo '==== RUNNING consumer-go'
 cd ../consumer-go
 go test -c
-pact_do_not_track=true ./consumer.test
+pact_do_not_track=true LOG_LEVEL=trace ./consumer.test
 
 echo '==== RUNNING provider-jvm'
 cd ../provider-jvm
