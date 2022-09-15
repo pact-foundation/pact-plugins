@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package area_calculator;
 
+import "common.proto";
+
 option php_generic_services = true;
 option go_package = "io.pact/area_calculator";
 
@@ -17,6 +19,8 @@ message ShapeMessage {
     Circle circle = 3;
     Triangle triangle = 4;
     Parallelogram parallelogram = 5;
+    DeviceContext device_context = 6; // device data; populate as many fields as you can
+    ListenerContext listener_context = 7;
   }
 }
 
@@ -27,6 +31,23 @@ message Square {
 message Rectangle {
   float length = 1;
   float width = 2;
+}
+
+message DeviceContext {
+  int32 vendor_id = 1; // (required) vendor ID of the device on which the app is being used
+  int64 device_id = 2 [jstype = JS_STRING]; // (required) device ID of the device on which the app is being used
+  string carrier_name = 3; // (recommended) carrier name (e.g. "t-mobile") of the device on which the app is being used
+  string user_agent = 4; // (recommended) browser/app user agent associated with the request
+  string network_type = 5; // (recommended) network type (e.g. "wifi") the device is using to connect to the internet
+  string system_version = 6; // (recommended) system version of the device on which the app is being used
+  string app_version = 7; // (recommended) app version (e.g. 2022.01.1) of the app is being used
+  string vendor_name = 8; // (soft requirement) vendor short-name (e.g. "android") of the device on which the app is being used
+  string accessory_id = 9; // (recommended) device accessory ID of the device on which the app is being used
+  string device_category = 10; // (recommended) device CATEGORY property (e.g. "SMARTPHONES") of the device on which the app is being used
+  string device_type = 11; // (recommended) device TYPE property (e.g. "BLU_RAY") of the device on which the app is being used
+  string reporting_vendor = 12; // (recommended) device REPORTING_VENDOR property (e.g. "SAMSUNG") of the device on which the app is being used
+  string device_ad_category = 13; // (soft requirement) site device category (e.g. "android") for ads of the device on which the app is being used
+  string device_code = 14; // (required) unique device name (e.g. "greenfield-iphone") of the device on which the app is being used
 }
 
 message Circle {

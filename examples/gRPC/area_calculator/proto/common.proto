@@ -1,0 +1,40 @@
+syntax = "proto3";
+
+package area_calculator;
+
+option java_multiple_files = true;
+option go_package = "io.pact/area_calculator";
+
+message ListenerContext {
+  int64 listener_id = 1 [jstype = JS_STRING]; // (required) Pandora LID (e.g. 1234567890) of the account associated with the request
+  string username = 2; // (recommended) user account (e.g. "jane.doe@gmail.com") associated with the request
+  int64 listener_date_created = 3; // (recommended) account creation date of listener in milliseconds since epoch (e.g. 1615842902467)
+  bool filter_explicit_content = 4; // (soft requirement) whether listener account has explicit filter enabled
+  string zip_code = 5; // (soft requirement) listener's registered zip code (e.g. "28904")
+  string country_code = 6; // (recommended) country code associated with the listener's account (e.g. "US")
+  int32 birth_year = 7; // (soft requirement) listener's registered birth year (e.g. 1984)
+  string gender = 8; // (soft requirement) listener's registered gender from the Gender enum (e.g. "MALE")
+  int64 last_expiration = 9; // (recommended) most recent account expiration date in milliseconds since epoch (e.g. 1615842902467)
+  string sponsored_comp_name = 10; // (recommended) last complete sponsored trial name
+  bool used_trial = 11; // (recommended) did listener use their trial opportunity?
+  bool used_in_app_trial = 12; // (recommended) did listener use their in-app trial opportunity?
+  string listener_state = 13; // (recommended) listener's account state from the ListenerState enum (e.g. "REGISTERED")
+}
+
+message StationContext {
+  string station_seed_pandora_id = 1; // (soft requirement) Pandora (music) ID of station initial seed, if one exists (e.g. "AR:1234")
+  string station_pandora_id = 2; // (soft requirement) Pandora (music) ID of playback source (e.g. "ST:0:13455")
+  string station_type = 3; // (soft requirement) Pandora station type from the StationType enum (e.g. "QUICKMIX")
+  bool is_advertiser_station = 4; // (recommended) is station created by an advertiser?
+}
+
+message Status {
+  StatusCode status_code = 1; // status of the response
+  string error_message = 2; // additional info about the error, if an error occurred
+}
+
+enum StatusCode {
+  OK = 0; // the request was processed successfully
+  INVALID_REQUEST = 1; // the request failed because it was a bad request
+  ERROR = 2; // the server was unable to fulfill a valid request (or we dont know)
+}
