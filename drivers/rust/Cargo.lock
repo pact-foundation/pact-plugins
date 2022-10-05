@@ -446,7 +446,7 @@ dependencies = [
  "async-trait",
  "env_logger",
  "expectest",
- "pact-plugin-driver 0.1.13",
+ "pact-plugin-driver 0.1.14",
  "pact_consumer",
  "prost",
  "prost-types",
@@ -1243,7 +1243,7 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1282,7 +1282,7 @@ dependencies = [
  "csv",
  "env_logger",
  "expectest",
- "pact-plugin-driver 0.1.13",
+ "pact-plugin-driver 0.1.14",
  "pact_ffi",
  "prost",
  "prost-types",
