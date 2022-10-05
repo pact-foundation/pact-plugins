@@ -887,14 +887,24 @@ object DefaultPluginManager: KLogging(), PluginManager {
       }
 
       if (manifestList.isNotEmpty()) {
-        manifestList.sortByDescending { it.version }
-        val selectedManifest = manifestList.first()
+        val selectedManifest = maxVersion(manifestList)!!
         PLUGIN_MANIFEST_REGISTER["$name/${selectedManifest.version}"] = selectedManifest
         Ok(selectedManifest)
       } else {
         Err("No plugin with name '$name' and version '${version ?: "any"}' was found in the Pact plugin directory '$pluginDir'")
       }
     }
+  }
+
+  /**
+   * Return the max valid version of the found plugins
+   */
+  fun maxVersion(manifestList: List<PactPluginManifest>): PactPluginManifest? {
+    return manifestList.sortedWith { a, b ->
+      val versionA = Semver(a.version, Semver.SemverType.STRICT)
+      val versionB = Semver(b.version, Semver.SemverType.STRICT)
+      versionA.compareTo(versionB)
+    }.lastOrNull()
   }
 
   /**

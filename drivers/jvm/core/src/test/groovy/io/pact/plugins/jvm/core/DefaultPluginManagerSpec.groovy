@@ -165,4 +165,25 @@ class DefaultPluginManagerSpec extends Specification {
     cleanup:
     tempDir.deleteDir()
   }
+
+  @Unroll
+  def 'max version test'() {
+    expect:
+    DefaultPluginManager.INSTANCE.maxVersion(manifests(versions))?.version == expectedVersion
+
+    where:
+
+    versions                              | expectedVersion
+    []                                    | null
+    ['1.0.1']                             | '1.0.1'
+    ['1.0.1', '1.0.2']                    | '1.0.2'
+    ['1.0.3', '1.0.2']                    | '1.0.3'
+    ['1.0.1', '1.0.7', '1.1.14', '1.1.7'] | '1.1.14'
+  }
+
+  List<PactPluginManifest> manifests(List versions) {
+    versions.collect {
+      new DefaultPactPluginManifest('/tmp' as File, 1, it, it, '', '', '', [:], [], [])
+    }
+  }
 }
