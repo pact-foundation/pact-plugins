@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.13 - Bugfix Release
+
+* 8fbfac2 - fix: Updated load plugin manifest to return the max matching version, not the first one (Ronald Holshausen, Wed Oct 5 16:37:52 2022 +1100)
+* 2a26a25 - bump version to 0.1.13 (Ronald Holshausen, Mon Sep 12 17:40:54 2022 +1000)
+
 # 0.1.12 - Bugfix Release
 
 * f059f54 - fix(Rust driver): register_plugin_entries was setting the entry keys incorrectly (Ronald Holshausen, Mon Sep 12 17:14:23 2022 +1000)
