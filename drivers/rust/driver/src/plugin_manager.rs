@@ -21,6 +21,7 @@ use pact_models::PactSpecification;
 use pact_models::prelude::{ContentType, Pact};
 use pact_models::prelude::v4::V4Pact;
 use pact_models::v4::interaction::V4Interaction;
+use semver::Version;
 use serde_json::Value;
 use sysinfo::{Pid, PidExt, ProcessExt, Signal, System, SystemExt};
 use tokio::process::Command;
@@ -108,37 +109,53 @@ fn load_manifest_from_disk(plugin_dep: &PluginDependency) -> anyhow::Result<Pact
   debug!("Looking for plugin in {:?}", plugin_dir);
 
   if plugin_dir.exists() {
-    for entry in fs::read_dir(plugin_dir)? {
-      let path = entry?.path();
-      trace!("Found: {:?}", path);
+    load_manifest_from_dir(plugin_dep, &plugin_dir)
+  } else {
+    Err(anyhow!("Plugin directory {:?} does not exist", plugin_dir))
+  }
+}
 
-      if path.is_dir() {
-        let manifest_file = path.join("pact-plugin.json");
-        if manifest_file.exists() && manifest_file.is_file() {
-          debug!("Found plugin manifest: {:?}", manifest_file);
-          let file = File::open(manifest_file)?;
-          let reader = BufReader::new(file);
-          let manifest: PactPluginManifest = serde_json::from_reader(reader)?;
-          trace!("Parsed plugin manifest: {:?}", manifest);
-          let version = manifest.version.clone();
-          if manifest.name == plugin_dep.name && versions_compatible(version.as_str(), &plugin_dep.version) {
-            let manifest = PactPluginManifest {
-              plugin_dir: path.to_string_lossy().to_string(),
-              ..manifest
-            };
-            let key = format!("{}/{}", manifest.name, version);
-            {
-              let mut guard = PLUGIN_MANIFEST_REGISTER.lock().unwrap();
-              guard.insert(key.clone(), manifest.clone());
-            }
-            return Ok(manifest);
-          }
+fn load_manifest_from_dir(plugin_dep: &PluginDependency, plugin_dir: &PathBuf) -> anyhow::Result<PactPluginManifest> {
+  let mut manifests = vec![];
+  for entry in fs::read_dir(plugin_dir)? {
+    let path = entry?.path();
+    trace!("Found: {:?}", path);
+
+    if path.is_dir() {
+      let manifest_file = path.join("pact-plugin.json");
+      if manifest_file.exists() && manifest_file.is_file() {
+        debug!("Found plugin manifest: {:?}", manifest_file);
+        let file = File::open(manifest_file)?;
+        let reader = BufReader::new(file);
+        let manifest: PactPluginManifest = serde_json::from_reader(reader)?;
+        trace!("Parsed plugin manifest: {:?}", manifest);
+        let version = manifest.version.clone();
+        if manifest.name == plugin_dep.name && versions_compatible(version.as_str(), &plugin_dep.version) {
+          let manifest = PactPluginManifest {
+            plugin_dir: path.to_string_lossy().to_string(),
+            ..manifest
+          };
+          manifests.push(manifest);
         }
       }
     }
-    Err(anyhow!("Plugin {:?} was not found (in $HOME/.pact/plugins or $PACT_PLUGIN_DIR)", plugin_dep))
+  }
+
+  let manifest = manifests.iter()
+    .max_by(|a, b| {
+      let a = Version::parse(&a.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+      let b = Version::parse(&b.version).unwrap_or_else(|_| Version::new(0, 0, 0));
+      a.cmp(&b)
+    });
+  if let Some(manifest) = manifest {
+    let key = format!("{}/{}", manifest.name, manifest.version);
+    {
+      let mut guard = PLUGIN_MANIFEST_REGISTER.lock().unwrap();
+      guard.insert(key.clone(), manifest.clone());
+    }
+    Ok(manifest.clone())
   } else {
-    Err(anyhow!("Plugin directory {:?} does not exist", plugin_dir))
+    Err(anyhow!("Plugin {} was not found (in $HOME/.pact/plugins or $PACT_PLUGIN_DIR)", plugin_dep))
   }
 }
 
@@ -552,5 +569,81 @@ pub async fn verify_interaction(
   match &validation_response {
     verify_interaction_response::Response::Error(err) => Err(anyhow!("Failed to verify the request: {}", err)),
     verify_interaction_response::Response::Result(data) => Ok(data.into())
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::fs::{self, File};
+
+  use expectest::prelude::*;
+  use tempdir::TempDir;
+
+  use crate::plugin_models::PluginDependency;
+
+  use super::{load_manifest_from_dir, PactPluginManifest};
+
+  #[test]
+  fn load_manifest_from_dir_test() {
+    let tmp_dir = TempDir::new("load_manifest_from_dir").unwrap();
+
+    let manifest_1 = PactPluginManifest {
+      name: "test-plugin".to_string(),
+      version: "0.1.5".to_string(),
+      .. PactPluginManifest::default()
+    };
+    let path_1 = tmp_dir.path().join("1");
+    fs::create_dir_all(&path_1).unwrap();
+    let file_1 = File::create(path_1.join("pact-plugin.json")).unwrap();
+    serde_json::to_writer(file_1, &manifest_1).unwrap();
+
+    let manifest_2 = PactPluginManifest {
+      name: "test-plugin".to_string(),
+      version: "0.1.20".to_string(),
+      .. PactPluginManifest::default()
+    };
+    let path_2 = tmp_dir.path().join("2");
+    fs::create_dir_all(&path_2).unwrap();
+    let file_2 = File::create(path_2.join("pact-plugin.json")).unwrap();
+    serde_json::to_writer(file_2, &manifest_2).unwrap();
+
+    let manifest_3 = PactPluginManifest {
+      name: "test-plugin".to_string(),
+      version: "0.1.7".to_string(),
+      .. PactPluginManifest::default()
+    };
+    let path_3 = tmp_dir.path().join("3");
+    fs::create_dir_all(&path_3).unwrap();
+    let file_3 = File::create(path_3.join("pact-plugin.json")).unwrap();
+    serde_json::to_writer(file_3, &manifest_3).unwrap();
+
+    let manifest_4 = PactPluginManifest {
+      name: "test-plugin".to_string(),
+      version: "0.1.14".to_string(),
+      .. PactPluginManifest::default()
+    };
+    let path_4 = tmp_dir.path().join("4");
+    fs::create_dir_all(&path_4).unwrap();
+    let file_4 = File::create(path_4.join("pact-plugin.json")).unwrap();
+    serde_json::to_writer(file_4, &manifest_4).unwrap();
+
+    let manifest_5 = PactPluginManifest {
+      name: "test-plugin".to_string(),
+      version: "0.1.12".to_string(),
+      .. PactPluginManifest::default()
+    };
+    let path_5 = tmp_dir.path().join("5");
+    fs::create_dir_all(&path_5).unwrap();
+    let file_5 = File::create(path_5.join("pact-plugin.json")).unwrap();
+    serde_json::to_writer(file_5, &manifest_5).unwrap();
+
+    let dep = PluginDependency {
+      name: "test-plugin".to_string(),
+      version: None,
+      dependency_type: Default::default()
+    };
+
+    let result = load_manifest_from_dir(&dep, &tmp_dir.path().to_path_buf()).unwrap();
+    expect!(result.version).to(be_equal_to("0.1.20"));
   }
 }

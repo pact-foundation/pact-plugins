@@ -1,6 +1,7 @@
 //! Models for representing plugins
 
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
 use anyhow::anyhow;
@@ -45,6 +46,16 @@ pub struct PluginDependency {
   /// Type of dependency
   #[serde(default)]
   pub dependency_type: PluginDependencyType
+}
+
+impl Display for PluginDependency {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    if let Some(version) = &self.version {
+      write!(f, "{}:{}", self.name, version)
+    } else {
+      write!(f, "{}:*", self.name)
+    }
+  }
 }
 
 /// Manifest of a plugin
