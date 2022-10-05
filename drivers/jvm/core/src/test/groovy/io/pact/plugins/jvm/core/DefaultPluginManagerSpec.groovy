@@ -93,7 +93,7 @@ class DefaultPluginManagerSpec extends Specification {
     manifestDir.mkdirs()
     def manifestFile = new File(manifestDir, 'pact-plugin.json')
 
-    def version = new Random().nextInt(100)
+    def version = new Random().nextInt(100) + 2
     manifestFile.text = JsonOutput.toJson([
       name: 'test-plugin',
       version: "1.$version.99",
