@@ -20,6 +20,6 @@ protobuf and grpc protoc plugins, and then run `protoc --go_out=. --go-grpc_out=
 
 ## Test method
 
-The test method [test_proto_client](src/lib.rs) first sets up the interaction using the Pact DSL, then sets up a
+The test method [TestCalculateClient](consumer_test.go) first sets up the interaction using the Pact DSL, then sets up a
 gRPC mock server to use. The generated stub structs are then used to send the `ShapeMessage` to the mock server,
 and an `AreaResponse` message is received back. This is then validated.

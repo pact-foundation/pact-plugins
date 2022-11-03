@@ -20,6 +20,8 @@ protobuf and grpc protoc plugins, and then run `protoc --go_out=. --go-grpc_out=
 
 ## Verifying the provider
 
+**NOTE:** You need to first run the tests in `../consumer-go` to have the Pact file generated.
+
 You can verify the provider by using the Pact Verification CLI tool. For example, to verify the Pact file from the Go consumer example, start the provider and then run the verifier.
 
 ```shell
