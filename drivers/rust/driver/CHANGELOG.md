@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.14 - Maintenance Release
+
+* 80395c8 - chore: Upgrade pact_models to 0.4.6 (Ronald Holshausen, Fri Nov 4 15:56:26 2022 +1100)
+* f9fc661 - bump version to 0.1.14 (Ronald Holshausen, Wed Oct 5 17:23:25 2022 +1100)
+
 # 0.1.13 - Bugfix Release
 
 * 8fbfac2 - fix: Updated load plugin manifest to return the max matching version, not the first one (Ronald Holshausen, Wed Oct 5 16:37:52 2022 +1100)
