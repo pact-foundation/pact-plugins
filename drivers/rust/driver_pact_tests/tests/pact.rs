@@ -63,11 +63,9 @@ impl PactPluginRpc for MockPlugin {
   }
 }
 
-#[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+#[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 1))]
 async fn test_proto_client() {
-  let _ = env_logger::builder().is_test(true).try_init();
-
-  let mut pact_builder = PactBuilder::new_v4("pact-rust-driver", "plugin");
+  let mut pact_builder = PactBuilderAsync::new_v4("pact-rust-driver", "plugin");
   let proto_service = pact_builder
     .using_plugin("protobuf", None).await
     .synchronous_message_interaction("init plugin request", |mut i| async move {
