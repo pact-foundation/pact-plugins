@@ -19,7 +19,7 @@ mod tests {
   async fn test_proto_client() {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    let mut pact_builder = PactBuilder::new_v4("protobuf-consumer-rust", "protobuf-provider");
+    let mut pact_builder = PactBuilderAsync::new_v4("protobuf-consumer-rust", "protobuf-provider");
     let proto_service = pact_builder
       .using_plugin("protobuf", None).await
       .message_interaction("init plugin message", |mut i| async move {
@@ -48,7 +48,7 @@ mod tests {
   async fn proto_with_message_fields() {
     let _ = env_logger::builder().is_test(true).try_init();
 
-    let mut pact_builder = PactBuilder::new_v4("protobuf-consumer-rust", "protobuf-provider");
+    let mut pact_builder = PactBuilderAsync::new_v4("protobuf-consumer-rust", "protobuf-provider");
     let proto_service = pact_builder
       .using_plugin("protobuf", None).await
       .message_interaction("Configure Interaction Response", |mut i| async move {
