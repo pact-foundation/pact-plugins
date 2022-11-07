@@ -106,7 +106,7 @@ ask("Bump version to $nextVer?: [Y]") {
   executeOnShell "sed -i -e 's/documentation = \"https:\\/\\/docs\\.rs\\/pact-plugin-driver\\/${releaseVer}\\/pact-plugin-driver\\/\"/documentation = \"https:\\/\\/docs\\.rs\\/pact-plugin-driver\\/${nextVer}\\/pact-plugin-driver\\/\"/' Cargo.toml"
   executeOnShell("cargo update")
   executeOnShell("git add Cargo.toml")
-  executeOnShell("git add ../Cargo.lock")
+  executeOnShell("git add Cargo.lock")
   executeOnShell("git diff --cached")
   ask("Commit and push this change?: [Y]") {
     executeOnShell("git commit -m 'bump version to $nextVer'")
