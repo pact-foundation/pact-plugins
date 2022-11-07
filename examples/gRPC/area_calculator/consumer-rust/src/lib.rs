@@ -6,6 +6,7 @@ mod tests {
 
   use expectest::prelude::*;
   use pact_consumer::prelude::*;
+  use pact_consumer::mock_server::StartMockServerAsync;
   use serde_json::json;
 
   use super::*;
@@ -17,7 +18,7 @@ mod tests {
 
     // Configures the Pact interaction for the test. This will load the Protobuf plugin, which will provide all the
     // Protobuf and gRPC support to the Pact framework.
-    let mut pact_builder = PactBuilder::new_v4("grpc-consumer-rust", "area-calculator-provider");
+    let mut pact_builder = PactBuilderAsync::new_v4("grpc-consumer-rust", "area-calculator-provider");
     let mock_server = pact_builder
       // Tell Pact we need the Protobuf plugin
       .using_plugin("protobuf", None).await
