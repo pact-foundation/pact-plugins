@@ -40,6 +40,7 @@ mod tests {
   use expectest::prelude::*;
   use fakeit::{datetime, name};
   use pact_consumer::prelude::*;
+  use pact_consumer::mock_server::StartMockServerAsync;
   use pact_models::prelude::*;
   use rand::prelude::*;
   use regex::Regex;
