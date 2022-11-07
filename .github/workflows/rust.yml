@@ -48,12 +48,12 @@ jobs:
       - name: Build Components
         uses: marcopolo/cargo@master
         with:
-          working-directory: drivers/rust
+          working-directory: drivers/rust/driver
           command: build
       - name: Clippy
         uses: marcopolo/cargo@master
         with:
-          working-directory: drivers/rust
+          working-directory: drivers/rust/driver
           command: clippy
         if: runner.os == 'Linux'
       - name: Publish pact files
