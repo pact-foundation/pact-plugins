@@ -1,5 +1,29 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.7 - Bugfix Release
+
+* 2a4a963 - fix: Pass the mock server host and port though to the plugin #9 (Ronald Holshausen, Fri Nov 18 13:49:32 2022 +1100)
+* 5194bd4 - chore: Upgrade Gradle to 7.5.1 and update dependencies (Ronald Holshausen, Thu Nov 17 14:30:29 2022 +1100)
+* ef0289f - chore: Upgrade gRPC example dependencies (Ronald Holshausen, Mon Nov 7 16:19:52 2022 +1100)
+* 17fa7c0 - chore: fix Rust build (Ronald Holshausen, Mon Nov 7 16:16:11 2022 +1100)
+* 26741e0 - chore: Upgrade Protobuf example dependencies (Ronald Holshausen, Mon Nov 7 16:10:18 2022 +1100)
+* b8b778b - chore: Upgrade CSV example dependencies (Ronald Holshausen, Mon Nov 7 16:07:54 2022 +1100)
+* 5272fde - chore: Upgrade dependencies (Ronald Holshausen, Mon Nov 7 15:59:05 2022 +1100)
+* bf03fe0 - chore: Upgrade pact_consumer to 0.10.0 (Ronald Holshausen, Mon Nov 7 13:55:41 2022 +1100)
+* 55da8a9 - bump version to 0.1.16 (Ronald Holshausen, Mon Nov 7 11:06:12 2022 +1100)
+* e4ca2b9 - update changelog for release 0.1.15 (Ronald Holshausen, Mon Nov 7 11:03:58 2022 +1100)
+* 93d436c - fix: Upgrade pact models to 1.0 to fix dependency cycle issue (Ronald Holshausen, Mon Nov 7 10:48:52 2022 +1100)
+* 211cb85 - bump version to 0.1.15 (Ronald Holshausen, Fri Nov 4 16:09:31 2022 +1100)
+* 1e2c194 - update changelog for release 0.1.14 (Ronald Holshausen, Fri Nov 4 16:08:04 2022 +1100)
+* 80395c8 - chore: Upgrade pact_models to 0.4.6 (Ronald Holshausen, Fri Nov 4 15:56:26 2022 +1100)
+* d16fb18 - chore: fix example readmes #10 (Ronald Holshausen, Thu Nov 3 16:41:17 2022 +1100)
+* 1757890 - chore: mv workflow to .github folder (Yousaf Nabi, Tue Oct 18 19:26:36 2022 +0100)
+* 54811fd - ci(docs): add trigger on docs to docs.pact.io (Yousaf Nabi, Tue Oct 18 19:25:55 2022 +0100)
+* cf2c273 - fix: flaky test when rnd number < 2 (Ronald Holshausen, Thu Oct 6 09:01:27 2022 +1100)
+* f9fc661 - bump version to 0.1.14 (Ronald Holshausen, Wed Oct 5 17:23:25 2022 +1100)
+* 8bd39f4 - update changelog for release 0.1.13 (Ronald Holshausen, Wed Oct 5 17:22:31 2022 +1100)
+* bb46108 - bump version to 0.1.7 (Ronald Holshausen, Wed Oct 5 16:56:23 2022 +1100)
+
 # 0.1.6 - Bugfix Release
 
 * 8fbfac2 - fix: Updated load plugin manifest to return the max matching version, not the first one (Ronald Holshausen, Wed Oct 5 16:37:52 2022 +1100)
