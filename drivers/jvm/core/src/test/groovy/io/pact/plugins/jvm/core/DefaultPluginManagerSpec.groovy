@@ -1,13 +1,29 @@
 package io.pact.plugins.jvm.core
 
+import au.com.dius.pact.core.model.Consumer
+import au.com.dius.pact.core.model.Provider
+import au.com.dius.pact.core.model.V4Pact
 import com.github.michaelbull.result.Err
 import com.github.michaelbull.result.Ok
 import groovy.json.JsonOutput
+import io.grpc.CallOptions
+import io.grpc.Channel
+import io.grpc.stub.AbstractStub
+import io.pact.plugin.PactPluginGrpc
+import io.pact.plugin.Plugin
+import org.mockito.ArgumentCaptor
+import org.mockito.Mockito
 import spock.lang.Specification
 import spock.lang.Unroll
 import spock.util.environment.RestoreSystemProperties
 
+import static org.mockito.Mockito.doReturn
+
 class DefaultPluginManagerSpec extends Specification {
+  def cleanup() {
+    DefaultPluginManager.INSTANCE.PLUGIN_MANIFEST_REGISTER.remove('test/1.2.3')
+    DefaultPluginManager.INSTANCE.PLUGIN_MANIFEST_REGISTER.remove('test-plugin/1.2.3')
+  }
 
   @Unroll
   def 'plugin version compatibility check'() {
@@ -185,5 +201,42 @@ class DefaultPluginManagerSpec extends Specification {
     versions.collect {
       new DefaultPactPluginManifest('/tmp' as File, 1, it, it, '', '', '', [:], [], [])
     }
+  }
+
+  def 'startMockServer - passes the mock server config on to the plugin'() {
+    given:
+    def manifest = Mock(PactPluginManifest) {
+      getName() >> 'test-start-mockserver'
+      getVersion() >> '1.2.3'
+    }
+    def manager = DefaultPluginManager.INSTANCE
+    manager.PLUGIN_MANIFEST_REGISTER['test-start-mockserver/1.2.3'] = manifest
+    CatalogueEntry entry = new CatalogueEntry(CatalogueEntryType.TRANSPORT, CatalogueEntryProviderType.PLUGIN,
+      'test-start-mockserver', 'test')
+    MockServerConfig config = new MockServerConfig('10.0.1.2', 11223, false)
+    def pact = new V4Pact(new Consumer(), new Provider())
+    PactPlugin mockPlugin = Mock() {
+      getManifest() >> manifest
+    }
+    DefaultPluginManager.INSTANCE.PLUGIN_REGISTER['test-start-mockserver/1.2.3'] = mockPlugin
+    def response = Plugin.StartMockServerResponse.newBuilder()
+      .setDetails(Plugin.MockServerDetails.newBuilder().setKey('123abc').build())
+      .build()
+
+    def mockStub = Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
+    ArgumentCaptor<Plugin.StartMockServerRequest> argument = ArgumentCaptor.forClass(Plugin.StartMockServerRequest)
+    doReturn(response).when(mockStub).startMockServer(argument.capture())
+
+    when:
+    def result = manager.startMockServer(entry, config, pact)
+
+    then:
+    1 * mockPlugin.withGrpcStub(_) >> { args -> args[0].apply(mockStub) }
+    result.key == '123abc'
+    argument.value.hostInterface == '10.0.1.2'
+    argument.value.port == 11223
+
+    cleanup:
+    DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove('test-start-mockserver/1.2.3')
   }
 }

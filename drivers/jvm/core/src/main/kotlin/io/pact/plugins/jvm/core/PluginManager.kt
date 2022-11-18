@@ -596,6 +596,12 @@ object DefaultPluginManager: KLogging(), PluginManager {
     val request = Plugin.StartMockServerRequest.newBuilder()
       .setPact(writer.toString())
 
+    if (config.hostInterface.isNotEmpty()) {
+      request.hostInterface = config.hostInterface
+    }
+    request.port = config.port
+    request.tls = config.tls
+
     logger.debug { "Sending startMockServer request to plugin ${plugin.manifest}" }
     val response = plugin.withGrpcStub { stub -> stub.startMockServer(request.build()) }
     logger.debug { "Got response: $response" }
