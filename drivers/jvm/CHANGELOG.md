@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.8 - Bugfix Release
+
+* 8a553d6 - fix: Correct dependencies for Pact-JVM use (Ronald Holshausen, Mon Nov 21 12:41:07 2022 +1100)
+* dab1af6 - bump version to 0.1.8 (Ronald Holshausen, Fri Nov 18 14:10:26 2022 +1100)
+
 # 0.1.7 - Bugfix Release
 
 * 2a4a963 - fix: Pass the mock server host and port though to the plugin #9 (Ronald Holshausen, Fri Nov 18 13:49:32 2022 +1100)
