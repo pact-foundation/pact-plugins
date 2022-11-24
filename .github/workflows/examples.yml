@@ -114,6 +114,8 @@ jobs:
           set -e
           cd protobuf-consumer-jvm
           ./gradlew check
+          cd ../protobuf-consumer-maven
+          mvn verify
           cd ../protobuf-consumer-rust
           pact_do_not_track=true cargo test
           cd ../protobuf-provider

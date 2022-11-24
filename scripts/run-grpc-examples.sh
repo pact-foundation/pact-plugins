@@ -7,7 +7,7 @@ cd consumer-jvm
 ./gradlew check
 
 echo '==== RUNNING consumer-maven'
-cd consumer-maven
+cd ../consumer-maven
 mvn verify
 
 echo '==== RUNNING consumer-rust'
