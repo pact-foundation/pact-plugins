@@ -6,6 +6,10 @@ echo '==== RUNNING consumer-jvm'
 cd consumer-jvm
 ./gradlew check
 
+echo '==== RUNNING consumer-maven'
+cd consumer-maven
+mvn verify
+
 echo '==== RUNNING consumer-rust'
 cd ../consumer-rust
 pact_do_not_track=true cargo test
