@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.16 - Maintenance Release
+
+* c4c814e - chore: set pact models to use any 1.0+ version (Ronald Holshausen, Mon Nov 28 13:35:05 2022 +1100)
+* 55da8a9 - bump version to 0.1.16 (Ronald Holshausen, Mon Nov 7 11:06:12 2022 +1100)
+
 # 0.1.15 - Maintenance Release
 
 * 93d436c - fix: Upgrade pact models to 1.0 to fix dependency cycle issue (Ronald Holshausen, Mon Nov 7 10:48:52 2022 +1100)
