@@ -10,6 +10,24 @@ Main plugin driver responsibilities:
 * Provide a messaging bus to facilitate communication between the language implementation and the plugins.
 * Manage the plugin lifecycles.
 
+## Conceptual Overview
+
+![Conceptual Overview](conceptual-overview.png)
+
+
+1. Your code 😉
+2. The test framework executing tests e.g. Jest, JUnit
+3. The Pact Client library used in the test e.g. Pact JS, Pact JVM
+4. The Shared Core (Rust) or the Java Plugin Driver (for JVM projects) manages the lifecycle of a Pact test and provides key capabilities to client libraries. It oversees the use of plugins via the Plugin Driver
+
+5. Plugin driver is responsible for discovering, starting and orchestrating plugins.
+6. Plugin may communicate to/from the SUT e.g. in the case of a new transport it will serve as the mock server, and will also issue verification requests at the Provider API
+7. The pact file contains additional information
+   * Required plugins
+   * Transports
+   * Interaction type
+   * Markdown to display interactions
+
 ## Locating plugins
 
 Plugins must be stored on the system in a Pact plugins directory, defined either by the `PACT_PLUGIN_DIR` environment 

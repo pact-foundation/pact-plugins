@@ -9,7 +9,7 @@
 
 ## Plugin architecture
 
-The plugins are enabled via a message passing mechanism over GRPC. Each language implements a driver which provides the
+The plugins are enabled via a message passing mechanism over gRPC. Each language implements a driver which provides the
 mechanism to locate and load plugins, as well as a catalogue of features (like mock servers, matchers and provider
 verifiers) and a central message bus to enable communication between the language implementation and the plugins.
 
@@ -31,12 +31,12 @@ There are two implementations of plugin drivers: [JVM](drivers/jvm) and [Rust](d
 
 ### Plugins
 
-Plugins are required to start up a GRPC server when loaded, and respond to messages from the plugin driver. They provide
+Plugins are required to start up a gRPC server when loaded, and respond to messages from the plugin driver. They provide
 a manifest that describes the features they provide and the mechanism needed to load them.  
 
 Main responsibilities:
 * Have a plugin manifest that describes the plugin and how to load it.
-* Start a GRPC server on load and provide the port to the driver that loaded it.
+* Start a gRPC server on load and provide the port to the driver that loaded it.
 * Provide a catalogue of features the plugin provides when the driver requests it.
 * Respond to messages from the driver.
 
@@ -65,9 +65,7 @@ See [Pactflow Protobuf/gRPC plugin](https://github.com/pactflow/pact-protobuf-pl
 
 #### Plugins that provide matchers/generators (WIP)
 
-Plugins can also provide new matching rules and generators. 
-
-TODO, not implemented as part of the plugin MVC, and will be added in a later update.
+TODO 🚧
 
 ## Background
 
