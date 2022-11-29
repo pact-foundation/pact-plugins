@@ -15,11 +15,16 @@ The CSV plugin is written in Rust and the Protobuf one in Kotlin.
 
 ## Plugin Interface
 
-The first version of the plugin interface (version 1) supports adding matchers and generators for different types
-of content. Later versions will expand to add other things like protocol and transport implementations, but for now
-the plugins can only provide support for new types of content. This is for things like request/response bodies and
-message payloads and are based on specified MIME types. Refer to [Content Matchers and Generators](content-matcher-design.md) 
-for more details on the interface and gRPC methods that need to be implemented.
+The first version of the plugin interface (version 1) supports extending Pact with [Content](content-matcher-design.md) types, along with using Matchers and Generators to support flexible matching, and for adding new [Transport protocols](protocol-plugin-design.md).
+
+Content Matchers are for things like request/response bodies and message payloads and are based on specified MIME types, such as protobufs. 
+
+Transports allow you to communicate these new content types over a different wire protocol, such as gRPC or Websockets.
+
+Refer to for more details on the interface and gRPC methods that need to be implemented:
+
+- [Content Matchers and Generators](content-matcher-design.md)
+- [Transport protocols](protocol-plugin-design.md)
 
 You can find the [proto file](../proto/plugin.proto) that defines the plugin interface in the proto directory. Your 
 plugin will need to implement this interface.
