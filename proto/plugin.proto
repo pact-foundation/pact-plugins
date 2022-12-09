@@ -208,6 +208,8 @@ message GenerateContentRequest {
   map<string, Generator> generators = 2;
   // Additional data added to the Pact/Interaction by the plugin
   PluginConfiguration pluginConfiguration = 3;
+  // Context data provided by the test framework
+  google.protobuf.Struct testContext = 4;
 }
 
 // Generated body/message response
