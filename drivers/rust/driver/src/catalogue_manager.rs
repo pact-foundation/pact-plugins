@@ -195,8 +195,16 @@ pub fn remove_plugin_entries(name: &str) {
 }
 
 /// Find a content matcher in the global catalogue for the provided content type
-pub fn find_content_matcher(content_type: &ContentType) -> Option<ContentMatcher> {
-  debug!("Looking for a content matcher for {}", content_type);
+pub fn find_content_matcher<CT: Into<String>>(content_type: CT) -> Option<ContentMatcher> {
+  let content_type_str = content_type.into();
+  debug!("Looking for a content matcher for {}", content_type_str);
+  let content_type = match ContentType::parse(content_type_str.as_str()) {
+    Ok(ct) => ct,
+    Err(err) => {
+      error!("'{}' is not a valid content type", err);
+      return None;
+    }
+  };
   let guard = CATALOGUE_REGISTER.lock().unwrap();
   trace!("Catalogue has {} entries", guard.len());
   guard.values().find(|entry| {
@@ -204,7 +212,7 @@ pub fn find_content_matcher(content_type: &ContentType) -> Option<ContentMatcher
     if entry.entry_type == CatalogueEntryType::CONTENT_MATCHER {
       trace!("Catalogue entry is a content matcher for {:?}", entry.values.get("content-types"));
       if let Some(content_types) = entry.values.get("content-types") {
-        content_types.split(";").any(|ct| matches_pattern(ct.trim(), content_type))
+        content_types.split(";").any(|ct| matches_pattern(ct.trim(), &content_type))
       } else {
         false
       }

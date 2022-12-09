@@ -10,6 +10,7 @@ use pact_models::content_types::ContentTypeHint;
 use pact_models::matchingrules::{Category, MatchingRule, MatchingRuleCategory, RuleList};
 use pact_models::path_exp::DocPath;
 use pact_models::prelude::{ContentType, Generator, GeneratorCategory, Generators, RuleLogic};
+use pact_models::plugins::PluginData;
 use serde_json::Value;
 use tracing::{debug, error};
 
@@ -444,13 +445,25 @@ impl ContentGenerator {
   }
 
   /// Generate the content for the given content type and body
-  // TODO need to pass in any plugin configuration
   pub async fn generate_content(
     &self,
     content_type: &ContentType,
     generators: &HashMap<String, Generator>,
-    body: &OptionalBody
+    body: &OptionalBody,
+    plugin_data: &Vec<PluginData>,
+    interaction_data: &HashMap<String, HashMap<String, Value>>,
+    context: &HashMap<&str, Value>
   ) -> anyhow::Result<OptionalBody> {
+    let pact_plugin_manifest = self.catalogue_entry.plugin.clone().unwrap_or_default();
+    let plugin_data = plugin_data.iter().find_map(|pd| {
+      if pact_plugin_manifest.name == pd.name {
+        Some(pd.configuration.clone())
+      } else {
+        None
+      }
+    });
+    let interaction_data = interaction_data.get(&pact_plugin_manifest.name);
+
     let request = GenerateContentRequest {
       contents: Some(crate::proto::Body {
         content_type: content_type.to_string(),
@@ -464,7 +477,12 @@ impl ContentGenerator {
             .map(|(k, v)| (k.to_string(), v.clone())).collect())),
         })
       }).collect(),
-      plugin_configuration: None
+      plugin_configuration: Some(ProtoPluginConfiguration {
+        pact_configuration: plugin_data.as_ref().map(to_proto_struct),
+        interaction_configuration: interaction_data.map(to_proto_struct),
+        .. ProtoPluginConfiguration::default()
+      }),
+      test_context: Some(to_proto_struct(&context.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()))
     };
 
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()
