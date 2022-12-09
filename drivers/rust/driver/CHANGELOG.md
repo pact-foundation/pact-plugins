@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.2.0 - support GenerateContents RPC method
+
+* a61ab86 - feat: Update driver to support GenerateContents RPC method (Ronald Holshausen, Fri Dec 9 15:35:19 2022 +1100)
+* 79e5b15 - bump version to 0.1.17 (Ronald Holshausen, Mon Nov 28 13:51:36 2022 +1100)
+
 # 0.1.16 - Maintenance Release
 
 * c4c814e - chore: set pact models to use any 1.0+ version (Ronald Holshausen, Mon Nov 28 13:35:05 2022 +1100)
