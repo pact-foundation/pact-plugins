@@ -1,6 +1,6 @@
 [package]
 name = "pact-plugin-driver"
-version = "0.2.0"
+version = "0.2.1"
 description = "Pact support library that provides an interface for interacting with Pact plugins"
 edition = "2021"
 documentation = "https://docs.rs/pact-plugin-driver"
