@@ -132,7 +132,7 @@ jobs:
         run: |
           pact_do_not_track=true cargo test
         shell: bash
-        working-directory: protobuf/area_calculator_example/consumer
+        working-directory: examples/protobuf/area_calculator_example/consumer
 
   grpc-examples:
     runs-on: ${{ matrix.operating-system }}
