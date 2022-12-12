@@ -8,6 +8,12 @@ struct CalculatorImplementation {}
 impl calculator_server::Calculator for CalculatorImplementation {
   async fn calculate(&self, request: tonic::Request<ShapeMessage>) -> Result<tonic::Response<AreaResponse>, tonic::Status> {
     let shape_message = request.into_inner();
+
+    // Make sure the generators are working
+    if shape_message.created == "2000-01-01" {
+      return Err(tonic::Status::failed_precondition(format!("Invalid created date '{}'", shape_message.created)));
+    }
+
     let area = if let Some(shape) = shape_message.shape {
       match shape {
         shape_message::Shape::Square(s) => {
@@ -39,24 +45,25 @@ impl calculator_server::Calculator for CalculatorImplementation {
 mod tests {
   use std::path::Path;
 
+  use bytes::BytesMut;
   use expectest::prelude::*;
+  use maplit::hashmap;
   use pact_consumer::prelude::*;
+  use pact_models::generators::GeneratorTestMode;
+  use pact_matching::generators::apply_generators_to_sync_message;
   use prost::Message;
   use reqwest::Client;
   use serde_json::json;
-  use bytes::BytesMut;
 
   use crate::calculator_server::Calculator;
 
   use super::*;
 
-  #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
-  async fn test_area_calculator_client() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
-    let mut pact_builder = PactBuilder::new_v4("area_calculator-consumer", "area_calculator-provider");
+  #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 1))]
+  async fn test_area_calculator_client_with_message() {
+    let mut pact_builder = &mut PactBuilderAsync::new_v4("area_calculator-consumer", "area_calculator-provider");
+    pact_builder = pact_builder.using_plugin("protobuf", None).await;
     let proto_service = pact_builder
-      .using_plugin("protobuf", None).await
       .synchronous_message_interaction("request for calculate shape area", |mut i| async move {
         let project_dir = Path::new(option_env!("CARGO_MANIFEST_DIR").unwrap());
         let proto_file = project_dir.join("..").join("area_calculator.proto");
@@ -69,7 +76,8 @@ mod tests {
             "rectangle": {
               "length": "matching(number, 3)",
               "width": "matching(number, 4)"
-            }
+            },
+            "created": "matching(date, 'yyyy-MM-dd', '2000-01-01')"
           },
           "response": {
             "value" : "matching(number, 12)"
@@ -80,10 +88,18 @@ mod tests {
       })
       .await;
 
+    let pact = proto_service.build();
     for message in proto_service.synchronous_messages() {
-      let bytes = message.request.contents.value().unwrap();
+      let (request_contents, response_contents) = apply_generators_to_sync_message(
+        &message,
+        &GeneratorTestMode::Consumer,
+        &hashmap!{},
+        &pact.plugin_data(),
+        &message.plugin_config
+      ).await;
+      let bytes = request_contents.contents.value().unwrap();
       let request = ShapeMessage::decode(bytes).unwrap();
-      let bytes = message.response.first().unwrap().contents.value().unwrap();
+      let bytes = response_contents.first().unwrap().contents.value().unwrap();
       let response = AreaResponse::decode(bytes).unwrap();
       let calculator = CalculatorImplementation { };
 
@@ -94,10 +110,8 @@ mod tests {
     }
   }
 
-  #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+  #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 1))]
   async fn test_area_calculator_client_via_http() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let project_dir = Path::new(option_env!("CARGO_MANIFEST_DIR").unwrap());
     let proto_file = project_dir.join("..").join("area_calculator.proto");
 
@@ -107,6 +121,7 @@ mod tests {
         interaction
           .request
           .post()
+          .path("/calculate")
           .contents("application/protobuf".into(), json!({
             "pact:proto": proto_file.to_str().unwrap(),
             "pact:proto-service": "Calculator/calculate:request",
@@ -115,8 +130,7 @@ mod tests {
               "width": "matching(number, 4)"
             }
           }))
-          .await
-          .path("/calculate");
+          .await;
         interaction.response.contents("application/protobuf".into(), json!({
             "pact:proto": proto_file.to_str().unwrap(),
             "pact:proto-service": "Calculator/calculate:response",
@@ -131,7 +145,8 @@ mod tests {
     let mock_url = mock_service.url();
 
     let shape = ShapeMessage {
-      shape: Some(shape_message::Shape::Rectangle(Rectangle { length: 3.0, width: 4.0 }))
+      shape: Some(shape_message::Shape::Rectangle(Rectangle { length: 3.0, width: 4.0 })),
+      .. ShapeMessage::default()
     };
     let mut buffer = BytesMut::new();
     shape.encode(&mut buffer).unwrap();
@@ -145,7 +160,7 @@ mod tests {
       .bytes()
       .await
       .unwrap();
-    let area = AreaResponse::decode(dbg!(response)).unwrap();
+    let area = AreaResponse::decode(response).unwrap();
     expect!(area.value).to(be_equal_to(12.0));
   }
 }

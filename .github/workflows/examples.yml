@@ -128,6 +128,11 @@ jobs:
           pact_do_not_track=true ~/bin/pact_verifier_cli -f ../protobuf-consumer-jvm/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
         shell: bash
         working-directory: examples/protobuf
+      - name: Run area calculator Protobuf example
+        run: |
+          pact_do_not_track=true cargo test
+        shell: bash
+        working-directory: protobuf/area_calculator_example/consumer
 
   grpc-examples:
     runs-on: ${{ matrix.operating-system }}
