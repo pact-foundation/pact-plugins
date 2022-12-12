@@ -402,7 +402,7 @@ dependencies = [
  "async-trait",
  "env_logger",
  "expectest",
- "pact-plugin-driver 0.2.0",
+ "pact-plugin-driver 0.2.1",
  "pact_consumer",
  "prost",
  "prost-types",
@@ -857,9 +857,9 @@ dependencies = [
 
 [[package]]
 name = "ipnet"
-version = "2.6.0"
+version = "2.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec947b7a4ce12e3b87e353abae7ce124d025b6c7d6c5aea5cc0bcf92e9510ded"
+checksum = "11b0d96e660696543b251e58030cf9787df56da39dab19ad60eae7353040917e"
 
 [[package]]
 name = "is-terminal"
@@ -1217,9 +1217,9 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.1.16"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5ea5eacce40529ceb3ef7b51f9ec8c02685f091fd1410123accbe4814536c6ee"
+checksum = "6e73f6bd46855faf0e4934c295d1fe5004777bc35594a630808d51b23fe111c0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1250,7 +1250,7 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1281,9 +1281,9 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a0ac2f96096f2f3d8e613c9b6a54eb9b4b65c303ae2ffd6b73574a540d862a1a"
+checksum = "9908dd154216612c5f495b55a657a381feafae2c41043712b94d7a388d04d0d7"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1292,7 +1292,7 @@ dependencies = [
  "itertools",
  "lazy_static",
  "maplit",
- "pact-plugin-driver 0.1.16",
+ "pact-plugin-driver 0.2.0",
  "pact_matching",
  "pact_mock_server",
  "pact_models",
@@ -1307,9 +1307,9 @@ dependencies = [
 
 [[package]]
 name = "pact_matching"
-version = "0.12.15"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "16530a006129e19446064c11f31dcffae389232d9d073332b1bffc47953a91e9"
+checksum = "6bd4bebb44302d564dba84a29f65fa97750a0cfb4718606b5ec29fb737b27243"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -1328,7 +1328,7 @@ dependencies = [
  "multipart",
  "nom",
  "onig",
- "pact-plugin-driver 0.1.16",
+ "pact-plugin-driver 0.2.0",
  "pact_models",
  "rand",
  "reqwest",
@@ -1345,9 +1345,9 @@ dependencies = [
 
 [[package]]
 name = "pact_mock_server"
-version = "0.9.5"
+version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "49183223a1b8fe063a5dfa42d1080f4977368d32b36b76406f3d5e1e4c3c32bd"
+checksum = "89954113dbf12181fd554e026d0d704ba680d44944301f4a83df316e5a3495b9"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1357,7 +1357,7 @@ dependencies = [
  "itertools",
  "lazy_static",
  "maplit",
- "pact-plugin-driver 0.1.16",
+ "pact-plugin-driver 0.2.0",
  "pact_matching",
  "pact_models",
  "rustls",
@@ -1578,9 +1578,9 @@ dependencies = [
 
 [[package]]
 name = "prost-build"
-version = "0.11.3"
+version = "0.11.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e330bf1316db56b12c2bcfa399e8edddd4821965ea25ddb2c134b610b1c1c604"
+checksum = "276470f7f281b0ed53d2ae42dd52b4a8d08853a3c70e7fe95882acbb98a6ae94"
 dependencies = [
  "bytes",
  "heck",
@@ -1678,11 +1678,10 @@ dependencies = [
 
 [[package]]
 name = "rayon"
-version = "1.6.0"
+version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e060280438193c554f654141c9ea9417886713b7acd75974c85b18a69a88e0b"
+checksum = "6db3a213adf02b3bcfd2d3846bb41cb22857d131789e01df434fb7e7bc0759b7"
 dependencies = [
- "crossbeam-deque",
  "either",
  "rayon-core",
 ]
@@ -1925,18 +1924,18 @@ checksum = "e25dfac463d778e353db5be2449d1cce89bd6fd23c9f1ea21310ce6e5a1b29c4"
 
 [[package]]
 name = "serde"
-version = "1.0.149"
+version = "1.0.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "256b9932320c590e707b94576e3cc1f7c9024d0ee6612dfbcf1cb106cbe8e055"
+checksum = "e326c9ec8042f1b5da33252c8a37e9ffbd2c9bef0155215b6e6c80c790e05f91"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.149"
+version = "1.0.150"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4eae9b04cbffdfd550eb462ed33bc6a1b68c935127d008b27444d08380f94e4"
+checksum = "42a3df25b0713732468deadad63ab9da1f1fd75a48a15024b50363f128db627e"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2553,9 +2552,9 @@ dependencies = [
 
 [[package]]
 name = "webpki-roots"
-version = "0.22.5"
+version = "0.22.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "368bfe657969fb01238bb756d351dcade285e0f6fcbd36dcb23359a5169975be"
+checksum = "b6c71e40d7d2c34a5106301fb632274ca37242cd0c9d3e64dbece371a40a2d87"
 dependencies = [
  "webpki",
 ]
