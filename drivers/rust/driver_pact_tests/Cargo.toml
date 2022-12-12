@@ -14,6 +14,6 @@ prost-types = "0.11.1"
 pact-plugin-driver = { version = "0.2", path = "../driver" }
 expectest = "0.12.0"
 env_logger = "0.10.0"
-pact_consumer = "0.10.0"
+pact_consumer = "0.10.2"
 async-trait = "0.1.52"
 test-log = "0.2.11"

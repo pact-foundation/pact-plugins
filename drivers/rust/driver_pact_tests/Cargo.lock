@@ -1281,9 +1281,9 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "0.10.1"
+version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9908dd154216612c5f495b55a657a381feafae2c41043712b94d7a388d04d0d7"
+checksum = "4f266240a686b793f882b9f628534239a40dc4a54e42edeb284875ae6bf858ad"
 dependencies = [
  "anyhow",
  "async-trait",
