@@ -1,10 +1,8 @@
 package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.model.OptionalBody
-import au.com.dius.pact.core.model.generators.Generators
-import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
-import com.github.michaelbull.result.Result
+import au.com.dius.pact.core.support.Result
 import mu.KLogging
 
 data class ContentMismatch(

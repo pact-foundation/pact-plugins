@@ -1,8 +1,6 @@
 package io.pact.plugins.jvm.core
 
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.Result
+import au.com.dius.pact.core.support.Result
 import mu.KLogging
 import java.io.BufferedReader
 import java.io.IOException
@@ -16,18 +14,18 @@ object SystemExec: KLogging() {
       val errCode = proc.waitFor()
       if (errCode == 0) {
         BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
-          Ok(reader.readText())
+          Result.Ok(reader.readText())
         }
       } else {
         val errorOut = BufferedReader(InputStreamReader(proc.errorStream)).use { reader -> reader.readText() }
-        Err(errCode to errorOut)
+        Result.Err(errCode to errorOut)
       }
     } catch (ex: IOException) {
       logger.error(ex) { "Failed to execute $prog - ${ex.message}" }
-      Err(-1 to "Failed to execute $prog - ${ex.message}")
+      Result.Err(-1 to "Failed to execute $prog - ${ex.message}")
     } catch (ex: InterruptedException) {
       logger.error(ex) { "Failed to execute $prog - ${ex.message}" }
-      Err(-2 to "Failed to execute $prog - ${ex.message}")
+      Result.Err(-2 to "Failed to execute $prog - ${ex.message}")
     }
   }
 }

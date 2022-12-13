@@ -3,12 +3,8 @@ package io.pact.plugins.jvm.core
 import au.com.dius.pact.core.model.Consumer
 import au.com.dius.pact.core.model.Provider
 import au.com.dius.pact.core.model.V4Pact
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
+import au.com.dius.pact.core.support.Result
 import groovy.json.JsonOutput
-import io.grpc.CallOptions
-import io.grpc.Channel
-import io.grpc.stub.AbstractStub
 import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.Plugin
 import org.mockito.ArgumentCaptor
@@ -53,7 +49,7 @@ class DefaultPluginManagerSpec extends Specification {
     def result = manager.loadPluginManifest('test', '1.2.3')
 
     then:
-    result instanceof Ok
+    result instanceof Result.Ok
     result.value == manifest
   }
 
@@ -67,7 +63,7 @@ class DefaultPluginManagerSpec extends Specification {
     def result = manager.loadPluginManifest('test', '1.2.4')
 
     then:
-    result instanceof Err
+    result instanceof Result.Err
   }
 
   @RestoreSystemProperties
@@ -90,7 +86,7 @@ class DefaultPluginManagerSpec extends Specification {
     def result = manager.loadPluginManifest('test-plugin', '1.2.3')
 
     then:
-    result instanceof Ok
+    result instanceof Result.Ok
     result.value.name == 'test-plugin'
     result.value.version == '1.2.3'
     manager.PLUGIN_MANIFEST_REGISTER['test-plugin/1.2.3'] == result.value
@@ -121,7 +117,7 @@ class DefaultPluginManagerSpec extends Specification {
     def result = manager.loadPluginManifest('test-plugin', "1.2.$version")
 
     then:
-    result instanceof Ok
+    result instanceof Result.Ok
     result.value.name == 'test-plugin'
     result.value.version == "1.$version.99"
     manager.PLUGIN_MANIFEST_REGISTER["test-plugin/1.$version.99"] == result.value
@@ -173,7 +169,7 @@ class DefaultPluginManagerSpec extends Specification {
     def result = manager.loadPluginManifest('test-plugin', '1.0.0')
 
     then:
-    result instanceof Ok
+    result instanceof Result.Ok
     result.value.name == 'test-plugin'
     result.value.version == "1.$version.0"
     manager.PLUGIN_MANIFEST_REGISTER["test-plugin/1.$version.0"] == result.value

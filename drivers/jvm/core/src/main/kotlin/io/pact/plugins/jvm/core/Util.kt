@@ -2,9 +2,7 @@ package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.support.Utils.objectToJsonMap
 import au.com.dius.pact.core.support.json.JsonValue
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.Result
+import au.com.dius.pact.core.support.Result
 import com.google.protobuf.ListValue
 import com.google.protobuf.NullValue
 import com.google.protobuf.Struct
@@ -40,11 +38,11 @@ object Utils : KLogging() {
   fun <F> handleWith(f: () -> Any?): Result<F, Exception> {
     return try {
       val result = f()
-      if (result is Result<*, *>) result as Result<F, Exception> else Ok(result as F)
+      if (result is Result<*, *>) result as Result<F, Exception> else Result.Ok(result as F)
     } catch (ex: Exception) {
-      Err(ex)
+      Result.Err(ex)
     } catch (ex: Throwable) {
-      Err(RuntimeException(ex))
+      Result.Err(RuntimeException(ex))
     }
   }
 
@@ -184,17 +182,17 @@ object Utils : KLogging() {
       val errCode = proc.waitFor()
       if (errCode == 0) {
         BufferedReader(InputStreamReader(proc.inputStream)).use { reader ->
-          Ok(Paths.get(reader.readLine()))
+          Result.Ok(Paths.get(reader.readLine()))
         }
       } else {
-        Err("$desiredProgram not found in in PATH")
+        Result.Err("$desiredProgram not found in in PATH")
       }
     } catch (ex: IOException) {
       logger.error(ex) { "Something went wrong while searching for $desiredProgram - ${ex.message}" }
-      Err("Something went wrong while searching for $desiredProgram - ${ex.message}")
+      Result.Err("Something went wrong while searching for $desiredProgram - ${ex.message}")
     } catch (ex: InterruptedException) {
       logger.error(ex) { "Something went wrong while searching for $desiredProgram - ${ex.message}" }
-      Err("Something went wrong while searching for $desiredProgram - ${ex.message}")
+      Result.Err("Something went wrong while searching for $desiredProgram - ${ex.message}")
     }
   }
 }

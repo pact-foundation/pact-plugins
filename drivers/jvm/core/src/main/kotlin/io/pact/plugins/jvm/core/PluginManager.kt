@@ -20,10 +20,8 @@ import au.com.dius.pact.core.support.Json.toJson
 import au.com.dius.pact.core.support.Utils.lookupEnvironmentValue
 import au.com.dius.pact.core.support.isNotEmpty
 import au.com.dius.pact.core.support.json.JsonValue
-import com.github.michaelbull.result.Err
-import com.github.michaelbull.result.Ok
-import com.github.michaelbull.result.Result
-import com.github.michaelbull.result.mapError
+import au.com.dius.pact.core.support.Result
+import au.com.dius.pact.core.support.mapError
 import com.google.protobuf.ByteString
 import com.google.protobuf.BytesValue
 import com.google.protobuf.Struct
@@ -365,14 +363,14 @@ object DefaultPluginManager: KLogging(), PluginManager {
     synchronized(PLUGIN_REGISTER) {
       val plugin = lookupPlugin(name, version)
       return if (plugin != null) {
-        Ok(plugin)
+        Result.Ok(plugin)
       } else {
         when (val manifest = loadPluginManifest(name, version)) {
-          is Ok -> {
+          is Result.Ok -> {
             PluginMetrics.sendMetrics(manifest.value)
             initialisePlugin(manifest.value)
           }
-          is Err -> Err(manifest.error)
+          is Result.Err -> Result.Err(manifest.error)
         }
       }
     }
@@ -462,7 +460,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     logger.debug { "Got response: $response" }
 
     return if (response.error.isNotEmpty()) {
-      Err(response.error)
+      Result.Err(response.error)
     } else {
       val results = mutableListOf<InteractionContents>()
 
@@ -539,7 +537,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
         ))
       }
 
-      Ok(results)
+      Result.Ok(results)
     }
   }
 
@@ -672,7 +670,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
       throw PactPluginValidationForInteractionException(transportEntry.pluginName, response.error)
     }
 
-    return Ok(InteractionVerificationData(
+    return Result.Ok(InteractionVerificationData(
       OptionalBody.body(response.interactionData.body.content.value.toByteArray(), ContentType(response.interactionData.body.contentType)),
       response.interactionData.metadataMap.mapValues {
         when (it.value.valueCase) {
@@ -723,9 +721,9 @@ object DefaultPluginManager: KLogging(), PluginManager {
     logger.debug { "Got response: $response" }
 
     return if (response.hasError()) {
-      Err(response.error)
+      Result.Err(response.error)
     } else {
-      Ok(InteractionVerificationResult(response.result.success, response.result.mismatchesList.map {
+      Result.Ok(InteractionVerificationResult(response.result.success, response.result.mismatchesList.map {
         if (it.hasError()) {
           InteractionVerificationDetails.Error(it.error)
         } else {
@@ -739,18 +737,18 @@ object DefaultPluginManager: KLogging(), PluginManager {
   private fun initialisePlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
     val result = when (manifest.executableType) {
       "exec" -> startPluginProcess(manifest)
-      else -> Err("Plugin executable type of ${manifest.executableType} is not supported")
+      else -> Result.Err("Plugin executable type of ${manifest.executableType} is not supported")
     }
     return when (result) {
-      is Ok -> {
+      is Result.Ok -> {
         val plugin = result.value
         PLUGIN_REGISTER["${manifest.name}/${manifest.version}"] = plugin
         logger.debug { "Plugin process started OK (port = ${plugin.port}), sending init message" }
 
         val initResult = tryInitPlugin(plugin, "[::1]:${plugin.port}")
         when (initResult) {
-          is Ok -> initResult
-          is Err -> {
+          is Result.Ok -> initResult
+          is Result.Err -> {
             logger.debug { "Init call to plugin ${manifest.name} failed, will try an IP4 address" }
             tryInitPlugin(plugin, "127.0.0.1:${plugin.port}").mapError { err ->
               logger.error(err) { "Init call to plugin ${manifest.name} failed" }
@@ -759,7 +757,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
           }
         }
       }
-      is Err -> Err(result.error)
+      is Result.Err -> Result.Err(result.error)
     }
   }
 
@@ -847,15 +845,15 @@ object DefaultPluginManager: KLogging(), PluginManager {
       val timeout = System.getProperty("pact.plugin.loadTimeoutInMs")?.toLongOrNull() ?: 10000
       val startupInfo = cp.channel.poll(timeout, TimeUnit.MILLISECONDS)
       if (startupInfo is JsonObject) {
-        Ok(DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), toString(startupInfo["serverKey"])!!))
+        Result.Ok(DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), toString(startupInfo["serverKey"])!!))
       } else {
         cp.destroy()
-        Err("Plugin process did not output the correct startup message in $timeout ms - got $startupInfo")
+        Result.Err("Plugin process did not output the correct startup message in $timeout ms - got $startupInfo")
       }
     } catch (e: Exception) {
       logger.error(e) { "Plugin process did not start correctly" }
       cp.destroy()
-      Err("Plugin process did not start correctly - ${e.message}")
+      Result.Err("Plugin process did not start correctly - ${e.message}")
     }
   }
 
@@ -874,7 +872,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
   fun loadPluginManifest(name: String, version: String?): Result<PactPluginManifest, String> {
     val manifest = lookupPluginManifest(name, version)
     return if (manifest != null) {
-      Ok(manifest)
+      Result.Ok(manifest)
     } else {
       val manifestList = mutableListOf<PactPluginManifest>()
       val pluginDir = pluginInstallDirectory()
@@ -895,9 +893,9 @@ object DefaultPluginManager: KLogging(), PluginManager {
       if (manifestList.isNotEmpty()) {
         val selectedManifest = maxVersion(manifestList)!!
         PLUGIN_MANIFEST_REGISTER["$name/${selectedManifest.version}"] = selectedManifest
-        Ok(selectedManifest)
+        Result.Ok(selectedManifest)
       } else {
-        Err("No plugin with name '$name' and version '${version ?: "any"}' was found in the Pact plugin directory '$pluginDir'")
+        Result.Err("No plugin with name '$name' and version '${version ?: "any"}' was found in the Pact plugin directory '$pluginDir'")
       }
     }
   }
