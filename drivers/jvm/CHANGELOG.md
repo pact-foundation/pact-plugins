@@ -1,5 +1,30 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.2.0 - Bump minor version
+
+* b46198f - refactor: Use Result class from Pact-JVM support lib (Ronald Holshausen, Tue Dec 13 13:34:38 2022 +1100)
+* b6682bf - chore: Bump minor version (Ronald Holshausen, Tue Dec 13 13:34:10 2022 +1100)
+* 6694124 - chore: fix CI build (Ronald Holshausen, Mon Dec 12 16:13:44 2022 +1100)
+* 309e1b7 - chore: add Protobuf example test with a generator (Ronald Holshausen, Mon Dec 12 14:49:21 2022 +1100)
+* ea9a604 - chore: Upgrade Pact FFI and consumer crates (Ronald Holshausen, Mon Dec 12 14:38:04 2022 +1100)
+* 27fb978 - chore: Update dependencies for driver_pact_tests (Ronald Holshausen, Mon Dec 12 11:45:04 2022 +1100)
+* 256080d - bump version to 0.2.1 (Ronald Holshausen, Fri Dec 9 16:53:12 2022 +1100)
+* 8cf380c - update changelog for release 0.2.0 (Ronald Holshausen, Fri Dec 9 16:52:15 2022 +1100)
+* dfeb529 - chore: Update to 0.2.0 of the driver (Ronald Holshausen, Fri Dec 9 15:58:43 2022 +1100)
+* 19c846c - chore: Update to 0.2.0 of the driver (Ronald Holshausen, Fri Dec 9 15:53:05 2022 +1100)
+* 4174c86 - feat: Update driver to support GenerateContents RPC method (Ronald Holshausen, Fri Dec 9 15:44:45 2022 +1100)
+* a61ab86 - feat: Update driver to support GenerateContents RPC method (Ronald Holshausen, Fri Dec 9 15:35:19 2022 +1100)
+* ce83c3c - chore: add Maven gRPC provider example (Ronald Holshausen, Fri Dec 2 14:09:41 2022 +1100)
+* e741549 - chore: add conceptual overview and minor content changes (Matt Fellows, Tue Nov 29 21:48:28 2022 +1100)
+* 79e5b15 - bump version to 0.1.17 (Ronald Holshausen, Mon Nov 28 13:51:36 2022 +1100)
+* 10db62c - update changelog for release 0.1.16 (Ronald Holshausen, Mon Nov 28 13:49:31 2022 +1100)
+* c4c814e - chore: set pact models to use any 1.0+ version (Ronald Holshausen, Mon Nov 28 13:35:05 2022 +1100)
+* 90edd9e - chore: Add Maven Protobuf example (Ronald Holshausen, Thu Nov 24 12:11:39 2022 +1100)
+* a0b84df - chore: Add Maven gRPC example (Ronald Holshausen, Thu Nov 24 11:47:22 2022 +1100)
+* 90a89f6 - chore: Upgrade to latest Pact-JVM libs (Ronald Holshausen, Tue Nov 22 16:31:05 2022 +1100)
+* 5b0006b - chore: bump Pact-JVM to 4.4.1 (Ronald Holshausen, Mon Nov 21 17:42:06 2022 +1100)
+* b177328 - bump version to 0.1.9 (Ronald Holshausen, Mon Nov 21 12:42:22 2022 +1100)
+
 # 0.1.8 - Bugfix Release
 
 * 8a553d6 - fix: Correct dependencies for Pact-JVM use (Ronald Holshausen, Mon Nov 21 12:41:07 2022 +1100)
