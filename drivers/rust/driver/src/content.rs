@@ -482,7 +482,8 @@ impl ContentGenerator {
         interaction_configuration: interaction_data.map(to_proto_struct),
         .. ProtoPluginConfiguration::default()
       }),
-      test_context: Some(to_proto_struct(&context.iter().map(|(k, v)| (k.to_string(), v.clone())).collect()))
+      test_context: Some(to_proto_struct(&context.iter().map(|(k, v)| (k.to_string(), v.clone())).collect())),
+      .. GenerateContentRequest::default()
     };
 
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()

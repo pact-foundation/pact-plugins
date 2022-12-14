@@ -210,6 +210,23 @@ message GenerateContentRequest {
   PluginConfiguration pluginConfiguration = 3;
   // Context data provided by the test framework
   google.protobuf.Struct testContext = 4;
+
+  // The mode of the generation, if running from a consumer test or during provider verification
+  enum TestMode {
+    Unknown = 0;
+    // Running on the consumer side
+    Consumer = 1;
+    // Running on the provider side
+    Provider = 2;
+  }
+  TestMode testMode = 5;
+
+  // Which part the content is for
+  enum ContentFor {
+    Request = 0;
+    Response = 1;
+  }
+  ContentFor contentFor = 6;
 }
 
 // Generated body/message response

@@ -360,6 +360,75 @@ pub struct GenerateContentRequest {
   /// Context data provided by the test framework
   #[prost(message, optional, tag = "4")]
   pub test_context: ::core::option::Option<::prost_types::Struct>,
+  #[prost(enumeration = "generate_content_request::TestMode", tag = "5")]
+  pub test_mode: i32,
+  #[prost(enumeration = "generate_content_request::ContentFor", tag = "6")]
+  pub content_for: i32,
+}
+/// Nested message and enum types in `GenerateContentRequest`.
+pub mod generate_content_request {
+  /// The mode of the generation, if running from a consumer test or during provider verification
+  #[derive(
+  Clone,
+  Copy,
+  Debug,
+  PartialEq,
+  Eq,
+  Hash,
+  PartialOrd,
+  Ord,
+  ::prost::Enumeration
+  )]
+  #[repr(i32)]
+  pub enum TestMode {
+    Unknown = 0,
+    /// Running on the consumer side
+    Consumer = 1,
+    /// Running on the provider side
+    Provider = 2,
+  }
+  impl TestMode {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+      match self {
+        TestMode::Unknown => "Unknown",
+        TestMode::Consumer => "Consumer",
+        TestMode::Provider => "Provider",
+      }
+    }
+  }
+  /// Which part the content is for
+  #[derive(
+  Clone,
+  Copy,
+  Debug,
+  PartialEq,
+  Eq,
+  Hash,
+  PartialOrd,
+  Ord,
+  ::prost::Enumeration
+  )]
+  #[repr(i32)]
+  pub enum ContentFor {
+    Request = 0,
+    Response = 1,
+  }
+  impl ContentFor {
+    /// String value of the enum field names used in the ProtoBuf definition.
+    ///
+    /// The values are not transformed in any way and thus are considered stable
+    /// (if the ProtoBuf definition does not change) and safe for programmatic use.
+    pub fn as_str_name(&self) -> &'static str {
+      match self {
+        ContentFor::Request => "Request",
+        ContentFor::Response => "Response",
+      }
+    }
+  }
 }
 /// Generated body/message response
 #[derive(Clone, PartialEq, ::prost::Message)]

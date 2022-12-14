@@ -6,10 +6,12 @@ import au.com.dius.pact.core.model.DefaultPactWriter
 import au.com.dius.pact.core.model.OptionalBody
 import au.com.dius.pact.core.model.Pact
 import au.com.dius.pact.core.model.PactSpecVersion
+import au.com.dius.pact.core.model.PluginData
 import au.com.dius.pact.core.model.V4Interaction
 import au.com.dius.pact.core.model.V4Pact
 import au.com.dius.pact.core.model.generators.Category
 import au.com.dius.pact.core.model.generators.Generator
+import au.com.dius.pact.core.model.generators.GeneratorTestMode
 import au.com.dius.pact.core.model.generators.Generators
 import au.com.dius.pact.core.model.generators.createGenerator
 import au.com.dius.pact.core.model.matchingrules.MatchingRule
@@ -305,7 +307,12 @@ interface PluginManager {
     contentGenerator: CatalogueContentGenerator,
     contentType: ContentType,
     generators: Map<String, Generator>,
-    body: OptionalBody
+    body: OptionalBody,
+    testMode: GeneratorTestMode,
+    pluginData: List<PluginData>,
+    interactionData: Map<String, Map<String, JsonValue>>,
+    testContext: Map<String, JsonValue>,
+    forRequest: Boolean
   ): OptionalBody
 
   /**
@@ -553,14 +560,39 @@ object DefaultPluginManager: KLogging(), PluginManager {
     contentGenerator: CatalogueContentGenerator,
     contentType: ContentType,
     generators: Map<String, Generator>,
-    body: OptionalBody
+    body: OptionalBody,
+    testMode: GeneratorTestMode,
+    pluginData: List<PluginData>,
+    interactionData: Map<String, Map<String, JsonValue>>,
+    testContext: Map<String, JsonValue>,
+    forRequest: Boolean
   ): OptionalBody {
     val plugin = lookupPlugin(contentGenerator.catalogueEntry.pluginName, null) ?:
       throw PactPluginNotFoundException(contentGenerator.catalogueEntry.pluginName, null)
+
+    val pluginConfig = pluginData.find { it.name == plugin.manifest.name }?.configuration?.mapValues {
+      toJson(it.value)
+    }
+    val interactionConfig = interactionData[plugin.manifest.name]
+    val pluginConfigBuilder = Plugin.PluginConfiguration.newBuilder()
+    if (!pluginConfig.isNullOrEmpty()) {
+      pluginConfigBuilder.pactConfiguration = toProtoStruct(pluginConfig)
+    }
+    if (!interactionConfig.isNullOrEmpty()) {
+      pluginConfigBuilder.interactionConfiguration = toProtoStruct(interactionConfig)
+    }
+
     val request = Plugin.GenerateContentRequest.newBuilder()
       .setContents(Plugin.Body.newBuilder()
         .setContent(BytesValue.newBuilder().setValue(ByteString.copyFrom(body.orEmpty())))
         .setContentType(contentType.toString()))
+      .setPluginConfiguration(pluginConfigBuilder)
+      .setTestContext(mapToProtoStruct(testContext))
+      .setTestMode(if (testMode == GeneratorTestMode.Consumer)
+        Plugin.GenerateContentRequest.TestMode.Consumer
+        else Plugin.GenerateContentRequest.TestMode.Provider)
+      .setContentFor(if (forRequest) Plugin.GenerateContentRequest.ContentFor.Request
+        else Plugin.GenerateContentRequest.ContentFor.Response)
 
     generators.forEach { (key, generator) ->
       val builder = Struct.newBuilder()
