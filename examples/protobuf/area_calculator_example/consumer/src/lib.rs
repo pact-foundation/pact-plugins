@@ -66,7 +66,7 @@ mod tests {
     let proto_service = pact_builder
       .synchronous_message_interaction("request for calculate shape area", |mut i| async move {
         let project_dir = Path::new(option_env!("CARGO_MANIFEST_DIR").unwrap());
-        let proto_file = project_dir.join("..").join("area_calculator.proto");
+        let proto_file = project_dir.join("..").join("proto").join("area_calculator.proto");
 
         i.contents_from(json!({
           "pact:proto": proto_file.to_str().unwrap(),
@@ -113,7 +113,7 @@ mod tests {
   #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 1))]
   async fn test_area_calculator_client_via_http() {
     let project_dir = Path::new(option_env!("CARGO_MANIFEST_DIR").unwrap());
-    let proto_file = project_dir.join("..").join("area_calculator.proto");
+    let proto_file = project_dir.join("..").join("proto").join("area_calculator.proto");
 
     let mock_service = PactBuilder::new_v4("area_calculator-consumer", "area_calculator-provider")
       .using_plugin("protobuf", None).await

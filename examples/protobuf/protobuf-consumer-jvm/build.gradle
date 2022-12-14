@@ -9,7 +9,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'com.google.protobuf:protobuf-java:3.21.5'
+    implementation 'com.google.protobuf:protobuf-java:3.21.7'
     implementation 'io.grpc:grpc-protobuf:1.49.0'
     implementation 'io.grpc:grpc-stub:1.49.0'
     implementation 'io.grpc:grpc-netty:1.49.0'
@@ -20,7 +20,7 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.0'
     testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.0'
     testImplementation 'org.hamcrest:hamcrest:2.2'
-    testImplementation 'au.com.dius.pact.consumer:junit5:4.4.0-beta.5'
+    testImplementation 'au.com.dius.pact.consumer:junit5:4.4.2'
     testImplementation 'ch.qos.logback:logback-classic:1.2.11'
 }
 
