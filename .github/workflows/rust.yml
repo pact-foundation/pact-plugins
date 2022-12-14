@@ -8,6 +8,8 @@ jobs:
     strategy:
       matrix:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
+    env:
+      pact_do_not_track: true
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
