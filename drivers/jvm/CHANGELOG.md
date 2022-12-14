@@ -1,5 +1,13 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.2.1 - Implement support for GenerateContentRequest
+
+* 7fdc756 - bump version to 0.2.2 (Ronald Holshausen, Wed Dec 14 14:46:27 2022 +1100)
+* adad914 - update changelog for release 0.2.1 (Ronald Holshausen, Wed Dec 14 14:45:10 2022 +1100)
+* f17b134 - chore: Upgrade Kotlin to 1.7.22 (Ronald Holshausen, Wed Dec 14 14:38:10 2022 +1100)
+* 3cc6f04 - feat: add TestMode and ContentFor to GenerateContentRequest; Implement support in JVM driver (Ronald Holshausen, Wed Dec 14 14:26:22 2022 +1100)
+* da05e85 - bump version to 0.2.1 (Ronald Holshausen, Tue Dec 13 13:48:58 2022 +1100)
+
 # 0.2.0 - Bump minor version
 
 * b46198f - refactor: Use Result class from Pact-JVM support lib (Ronald Holshausen, Tue Dec 13 13:34:38 2022 +1100)
