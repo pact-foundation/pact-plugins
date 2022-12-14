@@ -13,7 +13,6 @@ import io.grpc.stub.AbstractBlockingStub
 import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.Plugin
 import org.jetbrains.annotations.Nullable
-import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.extension.ExtendWith
 import org.mockito.ArgumentCaptor
@@ -21,7 +20,7 @@ import org.mockito.Mockito
 
 import java.util.function.Function
 
-import static au.com.dius.pact.consumer.dsl.PactBuilder.filePath
+import static au.com.dius.pact.consumer.groovy.BuilderUtils.filePath
 import static org.mockito.Mockito.doReturn
 
 /**
@@ -29,7 +28,6 @@ import static org.mockito.Mockito.doReturn
  */
 @ExtendWith(PactConsumerTestExt.class)
 @PactTestFor(providerName = 'plugin', pactVersion = PactSpecVersion.V4, providerType = ProviderType.SYNCH_MESSAGE)
-@Disabled // TODO: re-enable this once Pact-JVM 4.5.0 is released
 class DriverPactTest {
 
   /*
