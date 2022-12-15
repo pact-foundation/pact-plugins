@@ -78,7 +78,7 @@ public class PactConsumerTest {
   @PactTestFor(pactMethod = "calculateRectangleArea")
   @MockServerConfig(implementation = MockServerImplementation.Plugin, registryEntry = "protobuf/transport/grpc")
   void calculateRectangleArea(MockServer mockServer, V4Interaction.SynchronousMessages interaction) throws InvalidProtocolBufferException {
-    ManagedChannel channel = ManagedChannelBuilder.forTarget("[::1]:" + mockServer.getPort())
+    ManagedChannel channel = ManagedChannelBuilder.forTarget("127.0.0.1:" + mockServer.getPort())
       .usePlaintext()
       .build();
     CalculatorGrpc.CalculatorBlockingStub stub = newBlockingStub(channel);
