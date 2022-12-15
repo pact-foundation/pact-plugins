@@ -15,10 +15,8 @@ mod tests {
 
   use super::*;
 
-  #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+  #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 2))]
   async fn test_proto_client() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let mut pact_builder = PactBuilderAsync::new_v4("protobuf-consumer-rust", "protobuf-provider");
     let proto_service = pact_builder
       .using_plugin("protobuf", None).await
@@ -44,10 +42,8 @@ mod tests {
     }
   }
 
-  #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
+  #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 2))]
   async fn proto_with_message_fields() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     let mut pact_builder = PactBuilderAsync::new_v4("protobuf-consumer-rust", "protobuf-provider");
     let proto_service = pact_builder
       .using_plugin("protobuf", None).await

@@ -117,7 +117,7 @@ jobs:
           cd ../protobuf-consumer-maven
           mvn verify
           cd ../protobuf-consumer-rust
-          pact_do_not_track=true cargo test
+          pact_do_not_track=true cargo test -- --test-threads 1
           cd ../protobuf-provider
           go build main.go
           nohup ./main &

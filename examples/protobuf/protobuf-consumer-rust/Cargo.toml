@@ -13,6 +13,7 @@ prost-types = "0.11.1"
 [dev-dependencies]
 expectest = "0.12.0"
 env_logger = "0.10.0"
+test-log = "0.2.11"
 pact_models = "1.0.0"
 pact_consumer = "0.10.0"
 pact-plugin-driver = { version = "0.2", path = "../../../drivers/rust/driver" }
