@@ -14,8 +14,5 @@ csv = "1.1.6"
 prost = "0.11.2"
 prost-types = "0.11.2"
 test-log = "0.2.11"
-tokio = { version = "1.21.2", features = ["full"] }
+tokio = { version = "1.23.0", features = ["full"] }
 tonic = "0.8.2"
-
-[patch.crates-io]
-thiserror = { git = "https://github.com/dtolnay/thiserror" }
