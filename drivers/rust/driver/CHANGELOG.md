@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.2.2 - Bugfix Release
+
+* 2de4518 - feat: Support passing a test context through to the start mock server call (Ronald Holshausen, Fri Dec 16 16:14:48 2022 +1100)
+* 6a4739b - chore: Upgrade tokio to latest (Ronald Holshausen, Fri Dec 16 11:01:40 2022 +1100)
+* 7fdc756 - bump version to 0.2.2 (Ronald Holshausen, Wed Dec 14 14:46:27 2022 +1100)
+
 # 0.2.1 - Maintenance Release
 
 * 3cc6f04 - feat: add TestMode and ContentFor to GenerateContentRequest; Implement support in JVM driver (Ronald Holshausen, Wed Dec 14 14:26:22 2022 +1100)
