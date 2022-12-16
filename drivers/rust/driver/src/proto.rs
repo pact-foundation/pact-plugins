@@ -6,6 +6,7 @@ use pact_models::content_types::ContentTypeHint;
 
 // ------------------ Generated --------------------------//
 /// Request to verify the plugin has loaded OK
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InitPluginRequest {
   /// Implementation calling the plugin
@@ -17,6 +18,7 @@ pub struct InitPluginRequest {
 }
 /// Entry to be added to the core catalogue. Each entry describes one of the features the plugin provides.
 /// Entries will be stored in the catalogue under the key "plugin/$name/$type/$key".
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CatalogueEntry {
   /// Entry type
@@ -76,6 +78,7 @@ pub mod catalogue_entry {
   }
 }
 /// Response to init plugin, providing the catalogue entries the plugin provides
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InitPluginResponse {
   /// List of entries the plugin supports
@@ -83,6 +86,7 @@ pub struct InitPluginResponse {
   pub catalogue: ::prost::alloc::vec::Vec<CatalogueEntry>,
 }
 /// Catalogue of Core Pact + Plugin features
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Catalogue {
   /// List of entries from the core catalogue
@@ -90,6 +94,7 @@ pub struct Catalogue {
   pub catalogue: ::prost::alloc::vec::Vec<CatalogueEntry>,
 }
 /// Message representing a request, response or message body
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Body {
   /// The content type of the body in MIME format (i.e. application/json)
@@ -141,6 +146,7 @@ pub mod body {
   }
 }
 /// Request to preform a comparison on an actual body given the expected one
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CompareContentsRequest {
   /// Expected body from the Pact interaction
@@ -164,6 +170,7 @@ pub struct CompareContentsRequest {
   pub plugin_configuration: ::core::option::Option<PluginConfiguration>,
 }
 /// Indicates that there was a mismatch with the content type
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ContentTypeMismatch {
   /// Expected content type (MIME format)
@@ -174,6 +181,7 @@ pub struct ContentTypeMismatch {
   pub actual: ::prost::alloc::string::String,
 }
 /// A mismatch for an particular item of content
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ContentMismatch {
   /// Expected data bytes
@@ -193,12 +201,14 @@ pub struct ContentMismatch {
   pub diff: ::prost::alloc::string::String,
 }
 /// List of content mismatches
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ContentMismatches {
   #[prost(message, repeated, tag = "1")]
   pub mismatches: ::prost::alloc::vec::Vec<ContentMismatch>,
 }
 /// Response to the CompareContentsRequest with the results of the comparison
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct CompareContentsResponse {
   /// Error message if an error occurred. If this field is set, the remaining fields will be ignored and the
@@ -216,6 +226,7 @@ pub struct CompareContentsResponse {
   >,
 }
 /// Request to configure/setup an interaction so that it can be verified later
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ConfigureInteractionRequest {
   /// Content type of the interaction (MIME format)
@@ -226,6 +237,7 @@ pub struct ConfigureInteractionRequest {
   pub contents_config: ::core::option::Option<::prost_types::Struct>,
 }
 /// Represents a matching rule
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MatchingRule {
   /// Type of the matching rule
@@ -236,12 +248,14 @@ pub struct MatchingRule {
   pub values: ::core::option::Option<::prost_types::Struct>,
 }
 /// List of matching rules
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MatchingRules {
   #[prost(message, repeated, tag = "1")]
   pub rule: ::prost::alloc::vec::Vec<MatchingRule>,
 }
 /// Example generator
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct Generator {
   /// Type of generator
@@ -252,6 +266,7 @@ pub struct Generator {
   pub values: ::core::option::Option<::prost_types::Struct>,
 }
 /// Plugin configuration added to the pact file by the ConfigureInteraction step
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct PluginConfiguration {
   /// Data to be persisted against the interaction
@@ -262,6 +277,7 @@ pub struct PluginConfiguration {
   pub pact_configuration: ::core::option::Option<::prost_types::Struct>,
 }
 /// Response to the configure/setup an interaction request
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InteractionResponse {
   /// Contents for the interaction
@@ -330,6 +346,7 @@ pub mod interaction_response {
   }
 }
 /// Response to the configure/setup an interaction request
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ConfigureInteractionResponse {
   /// If an error occurred. In this case, the other fields will be ignored/not set
@@ -343,6 +360,7 @@ pub struct ConfigureInteractionResponse {
   pub plugin_configuration: ::core::option::Option<PluginConfiguration>,
 }
 /// Request to generate the contents using any defined generators
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GenerateContentRequest {
   /// Original contents
@@ -431,12 +449,14 @@ pub mod generate_content_request {
   }
 }
 /// Generated body/message response
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct GenerateContentResponse {
   #[prost(message, optional, tag = "1")]
   pub contents: ::core::option::Option<Body>,
 }
 /// Request to start a mock server
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StartMockServerRequest {
   /// Interface to bind to. Will default to the loopback adapter
@@ -451,8 +471,12 @@ pub struct StartMockServerRequest {
   /// Pact as JSON to use for the mock server behaviour
   #[prost(string, tag = "4")]
   pub pact: ::prost::alloc::string::String,
+  /// Context data provided by the test framework
+  #[prost(message, optional, tag = "5")]
+  pub test_context: ::core::option::Option<::prost_types::Struct>,
 }
 /// Response to the start mock server request
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct StartMockServerResponse {
   #[prost(oneof = "start_mock_server_response::Response", tags = "1, 2")]
@@ -460,6 +484,7 @@ pub struct StartMockServerResponse {
 }
 /// Nested message and enum types in `StartMockServerResponse`.
 pub mod start_mock_server_response {
+  #[allow(clippy::derive_partial_eq_without_eq)]
   #[derive(Clone, PartialEq, ::prost::Oneof)]
   pub enum Response {
     /// If an error occurred
@@ -471,6 +496,7 @@ pub mod start_mock_server_response {
   }
 }
 /// Details on a running mock server
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MockServerDetails {
   /// Mock server unique ID
@@ -485,6 +511,7 @@ pub struct MockServerDetails {
 }
 /// Request to shut down a running mock server
 /// TODO: replace this with MockServerRequest in the next major version
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShutdownMockServerRequest {
   /// The server ID to shutdown
@@ -492,6 +519,7 @@ pub struct ShutdownMockServerRequest {
   pub server_key: ::prost::alloc::string::String,
 }
 /// Request for a running mock server by ID
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MockServerRequest {
   /// The server ID to shutdown
@@ -499,6 +527,7 @@ pub struct MockServerRequest {
   pub server_key: ::prost::alloc::string::String,
 }
 /// Result of a request that the mock server received
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MockServerResult {
   /// service + method that was requested
@@ -513,6 +542,7 @@ pub struct MockServerResult {
 }
 /// Response to the shut down mock server request
 /// TODO: replace this with MockServerResults in the next major version
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShutdownMockServerResponse {
   /// If the mock status is all ok
@@ -523,6 +553,7 @@ pub struct ShutdownMockServerResponse {
   pub results: ::prost::alloc::vec::Vec<MockServerResult>,
 }
 /// Matching results of the mock server.
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MockServerResults {
   /// If the mock status is all ok
@@ -533,6 +564,7 @@ pub struct MockServerResults {
   pub results: ::prost::alloc::vec::Vec<MockServerResult>,
 }
 /// Request to prepare an interaction for verification
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VerificationPreparationRequest {
   /// Pact as JSON to use for the verification
@@ -546,6 +578,7 @@ pub struct VerificationPreparationRequest {
   pub config: ::core::option::Option<::prost_types::Struct>,
 }
 /// Request metadata value. Will either be a JSON-like value, or binary data
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct MetadataValue {
   #[prost(oneof = "metadata_value::Value", tags = "1, 2")]
@@ -553,6 +586,7 @@ pub struct MetadataValue {
 }
 /// Nested message and enum types in `MetadataValue`.
 pub mod metadata_value {
+  #[allow(clippy::derive_partial_eq_without_eq)]
   #[derive(Clone, PartialEq, ::prost::Oneof)]
   pub enum Value {
     #[prost(message, tag = "1")]
@@ -562,6 +596,7 @@ pub mod metadata_value {
   }
 }
 /// Interaction request data to be sent or received for verification
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InteractionData {
   /// Request/Response body as bytes
@@ -575,6 +610,7 @@ pub struct InteractionData {
   >,
 }
 /// Response for the prepare an interaction for verification request
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VerificationPreparationResponse {
   #[prost(oneof = "verification_preparation_response::Response", tags = "1, 2")]
@@ -582,6 +618,7 @@ pub struct VerificationPreparationResponse {
 }
 /// Nested message and enum types in `VerificationPreparationResponse`.
 pub mod verification_preparation_response {
+  #[allow(clippy::derive_partial_eq_without_eq)]
   #[derive(Clone, PartialEq, ::prost::Oneof)]
   pub enum Response {
     /// If an error occurred
@@ -593,6 +630,7 @@ pub mod verification_preparation_response {
   }
 }
 /// Request data to verify an interaction
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VerifyInteractionRequest {
   /// Interaction data required to construct the request
@@ -608,6 +646,7 @@ pub struct VerifyInteractionRequest {
   #[prost(string, tag = "4")]
   pub interaction_key: ::prost::alloc::string::String,
 }
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VerificationResultItem {
   #[prost(oneof = "verification_result_item::Result", tags = "1, 2")]
@@ -615,6 +654,7 @@ pub struct VerificationResultItem {
 }
 /// Nested message and enum types in `VerificationResultItem`.
 pub mod verification_result_item {
+  #[allow(clippy::derive_partial_eq_without_eq)]
   #[derive(Clone, PartialEq, ::prost::Oneof)]
   pub enum Result {
     #[prost(string, tag = "1")]
@@ -624,6 +664,7 @@ pub mod verification_result_item {
   }
 }
 /// Result of running the verification
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VerificationResult {
   /// Was the verification successful?
@@ -640,6 +681,7 @@ pub struct VerificationResult {
   pub output: ::prost::alloc::vec::Vec<::prost::alloc::string::String>,
 }
 /// Result of running the verification
+#[allow(clippy::derive_partial_eq_without_eq)]
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VerifyInteractionResponse {
   #[prost(oneof = "verify_interaction_response::Response", tags = "1, 2")]
@@ -647,6 +689,7 @@ pub struct VerifyInteractionResponse {
 }
 /// Nested message and enum types in `VerifyInteractionResponse`.
 pub mod verify_interaction_response {
+  #[allow(clippy::derive_partial_eq_without_eq)]
   #[derive(Clone, PartialEq, ::prost::Oneof)]
   pub enum Response {
     /// If an error occurred trying to run the verification

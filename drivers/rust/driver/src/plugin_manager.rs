@@ -15,6 +15,7 @@ use anyhow::{anyhow, Context};
 use bytes::Bytes;
 use itertools::Either;
 use lazy_static::lazy_static;
+use maplit::hashmap;
 use os_info::Type;
 use pact_models::bodies::OptionalBody;
 use pact_models::PactSpecification;
@@ -360,10 +361,21 @@ pub fn drop_plugin_access(plugin: &PluginDependency) {
 }
 
 /// Starts a mock server given the catalog entry for it and a Pact
+#[deprecated(note = "Use start_mock_server_v2 which takes a test context map", since = "0.2.2")]
 pub async fn start_mock_server(
   catalogue_entry: &CatalogueEntry,
   pact: Box<dyn Pact + Send + Sync>,
   config: MockServerConfig
+) -> anyhow::Result<MockServerDetails> {
+  start_mock_server_v2(catalogue_entry, pact, config, hashmap!{}).await
+}
+
+/// Starts a mock server given the catalog entry for it and a Pact
+pub async fn start_mock_server_v2(
+  catalogue_entry: &CatalogueEntry,
+  pact: Box<dyn Pact + Send + Sync>,
+  config: MockServerConfig,
+  test_context: HashMap<String, Value>
 ) -> anyhow::Result<MockServerDetails> {
   let manifest = catalogue_entry.plugin.as_ref()
     .ok_or_else(|| anyhow!("Catalogue entry did not have an associated plugin manifest"))?;
@@ -376,7 +388,8 @@ pub async fn start_mock_server(
     host_interface: config.host_interface.unwrap_or_default(),
     port: config.port,
     tls: config.tls,
-    pact: pact.to_json(PactSpecification::V4)?.to_string()
+    pact: pact.to_json(PactSpecification::V4)?.to_string(),
+    test_context: Some(to_proto_struct(&test_context))
   };
   let response = plugin.start_mock_server(request).await?;
   debug!("Got response ${response:?}");

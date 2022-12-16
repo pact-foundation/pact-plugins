@@ -244,6 +244,8 @@ message StartMockServerRequest {
   bool tls = 3;
   // Pact as JSON to use for the mock server behaviour
   string pact = 4;
+  // Context data provided by the test framework
+  google.protobuf.Struct testContext = 5;
 }
 
 // Response to the start mock server request

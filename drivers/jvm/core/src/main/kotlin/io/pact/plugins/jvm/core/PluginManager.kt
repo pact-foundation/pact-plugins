@@ -318,7 +318,21 @@ interface PluginManager {
   /**
    * Starts a mock server given the catalog entry for it and a Pact
    */
-  fun startMockServer(catalogueEntry: CatalogueEntry, config: MockServerConfig, pact: Pact): MockServerDetails
+  fun startMockServer(
+    catalogueEntry: CatalogueEntry,
+    config: MockServerConfig,
+    pact: Pact
+  ): MockServerDetails
+
+  /**
+   * Starts a mock server given the catalog entry for it and a Pact
+   */
+  fun startMockServer(
+    catalogueEntry: CatalogueEntry,
+    config: MockServerConfig,
+    pact: Pact,
+    testContext: Map<String, JsonValue>,
+  ): MockServerDetails
 
   /**
    * Shutdowns a running mock server. Will return any errors from the mock server.
@@ -616,6 +630,13 @@ object DefaultPluginManager: KLogging(), PluginManager {
     catalogueEntry: CatalogueEntry,
     config: MockServerConfig,
     pact: Pact
+  ) = startMockServer(catalogueEntry, config, pact, emptyMap())
+
+  override fun startMockServer(
+    catalogueEntry: CatalogueEntry,
+    config: MockServerConfig,
+    pact: Pact,
+    testContext: Map<String, JsonValue>
   ): MockServerDetails {
     val plugin = lookupPlugin(catalogueEntry.pluginName, null) ?:
       throw PactPluginNotFoundException(catalogueEntry.pluginName, null)
@@ -625,6 +646,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
 
     val request = Plugin.StartMockServerRequest.newBuilder()
       .setPact(writer.toString())
+      .setTestContext(mapToProtoStruct(testContext))
 
     if (config.hostInterface.isNotEmpty()) {
       request.hostInterface = config.hostInterface
