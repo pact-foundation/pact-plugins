@@ -1,5 +1,25 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.2.2 - Bugfix Release
+
+* 2de4518 - feat: Support passing a test context through to the start mock server call (Ronald Holshausen, Fri Dec 16 16:14:48 2022 +1100)
+* 56b0bad - chore: Upgrade tokio to latest (Ronald Holshausen, Fri Dec 16 11:03:10 2022 +1100)
+* 6a4739b - chore: Upgrade tokio to latest (Ronald Holshausen, Fri Dec 16 11:01:40 2022 +1100)
+* a1c7ec0 - fix: consumer-jvm/src/test/java/io/pact/example/grpc/consumer/PactConsumerTest.java (Ronald Holshausen, Fri Dec 16 10:50:27 2022 +1100)
+* 7f8e508 - chore: fix gRPC/area_calculator/consumer-jvm (Ronald Holshausen, Fri Dec 16 09:16:20 2022 +1100)
+* 0d2a79e - chore: fix gRPC examples (Ronald Holshausen, Thu Dec 15 17:29:40 2022 +1100)
+* 785f15a - chore: diagnosing CI example failure (Ronald Holshausen, Thu Dec 15 11:21:42 2022 +1100)
+* 4e974df - chore: use 0.2.0 of the Protobuf plugin (Ronald Holshausen, Thu Dec 15 10:49:19 2022 +1100)
+* e600487 - chore: Update example CI build (Ronald Holshausen, Thu Dec 15 10:30:59 2022 +1100)
+* d109005 - chore: Update dependencies (Ronald Holshausen, Thu Dec 15 09:59:23 2022 +1100)
+* aaa0572 - fix: examples/protobuf/protobuf-consumer-jvm (Ronald Holshausen, Thu Dec 15 09:26:36 2022 +1100)
+* b711651 - chore: Upgrade Gradle to 6.9.3 to resolve Could not resolve au.com.dius.pact.consumer:junit5:4.4.2 error (Ronald Holshausen, Thu Dec 15 08:47:36 2022 +1100)
+* a568dab - chore: disable pact metrics (Ronald Holshausen, Thu Dec 15 08:36:23 2022 +1100)
+* 24d9825 - chore: Upgrade example JVM to v4.5.x (Ronald Holshausen, Wed Dec 14 18:09:19 2022 +1100)
+* ba6af82 - chore: re-enable driver Pact test (Ronald Holshausen, Wed Dec 14 16:08:12 2022 +1100)
+* 6e252b5 - feat: Add Protobuf JVM example which uses a generator (Ronald Holshausen, Wed Dec 14 16:00:10 2022 +1100)
+* 2f2059e - bump version to 0.2.2 (Ronald Holshausen, Wed Dec 14 15:04:05 2022 +1100)
+
 # 0.2.1 - Implement support for GenerateContentRequest
 
 * 7fdc756 - bump version to 0.2.2 (Ronald Holshausen, Wed Dec 14 14:46:27 2022 +1100)
