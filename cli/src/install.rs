@@ -252,8 +252,9 @@ async fn download_file_from_github(
     .ok_or(anyhow!("Failed to get content length from '{}'", url))?;
 
   let pb = ProgressBar::new(total_size);
-  pb.set_style(ProgressStyle::default_bar()
-    .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
+  pb.set_style(
+    ProgressStyle::with_template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
+    .unwrap()
     .progress_chars("#>-"));
   pb.set_message(format!("Downloading {}", url));
 
