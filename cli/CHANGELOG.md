@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.3 - Bugfix Release
+
+* 7e37d08 - fix(windows): force tokio runtime to shutdown as it causes the installation to hang on Windows (Ronald Holshausen, Tue Dec 20 14:51:10 2022 +1100)
+* 7e22803 - bump version to 0.0.3 (Ronald Holshausen, Tue Dec 20 12:38:11 2022 +1100)
+
 # 0.0.2 - Build CLI with musl
 
 * eebb4f4 - chore: Upgrade all dependencies (Ronald Holshausen, Tue Dec 20 12:05:47 2022 +1100)
