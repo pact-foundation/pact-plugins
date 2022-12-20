@@ -3,7 +3,7 @@
 set -e
 set -x
 
-VERSION="0.9.16"
+VERSION="0.9.20"
 
 mkdir -p ~/bin
 case "$(uname -s)" in
