@@ -29,6 +29,10 @@ struct Cli {
   /// Enable debug level logs
   debug: bool,
 
+  #[clap(short, long)]
+  /// Enable trace level logs
+  trace: bool,
+
   #[clap(subcommand)]
   command: Commands
 }
@@ -110,7 +114,9 @@ impl FromStr for InstallationSource {
 fn main() -> anyhow::Result<()> {
   let cli = Cli::parse();
 
-  let log_level = if cli.debug {
+  let log_level = if cli.trace {
+    Level::TRACE
+  } else if cli.debug {
     Level::DEBUG
   } else {
     Level::WARN

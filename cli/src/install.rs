@@ -17,7 +17,7 @@ use requestty::OnEsc;
 use reqwest::Client;
 use serde_json::Value;
 use sha2::{Sha256, Digest};
-use tracing::{debug, info};
+use tracing::{debug, info, trace};
 
 use crate::resolve_plugin_dir;
 
@@ -32,7 +32,7 @@ pub fn install_plugin(
     .enable_all()
     .build()?;
 
-  runtime.block_on(async {
+  let result = runtime.block_on(async {
     let http_client = reqwest::ClientBuilder::new()
       .build()?;
 
@@ -79,7 +79,10 @@ pub fn install_plugin(
     } else {
       bail!("Response from source is not a valid JSON from a GitHub release page")
     }
-  })
+  });
+  trace!("Result = {:?}", result);
+  runtime.shutdown_background();
+  result
 }
 
 async fn download_plugin_executable(
