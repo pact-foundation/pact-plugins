@@ -16,6 +16,12 @@ case "$1" in
             docker run --rm --user "$(id -u)":"$(id -g)" -v "$(pwd):/workspace" -w /workspace -t pactfoundation/rust-musl-build -c 'cargo build --release'
             gzip -c target/release/pact-plugin-cli > target/artifacts/pact-plugin-cli-linux-x86_64.gz
             openssl dgst -sha256 -r target/artifacts/pact-plugin-cli-linux-x86_64.gz > target/artifacts/pact-plugin-cli-linux-x86_64.gz.sha256
+
+            # Build aarch64
+            cargo install cross
+            cross build --target aarch64-unknown-linux-gnu --release
+            gzip -c target/aarch64-unknown-linux-gnu/release/pact-plugin-cli > target/artifacts/pact-plugin-cli-linux-aarch64.gz
+            openssl dgst -sha256 -r target/artifacts/pact-plugin-cli-linux-aarch64.gz > target/artifacts/pact-plugin-cli-linux-aarch64.gz.sha256
             ;;
   Windows)  echo  "Building for Windows"
             cargo build --release
