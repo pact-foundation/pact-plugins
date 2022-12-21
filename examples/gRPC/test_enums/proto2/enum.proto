@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package routeguide.other;
+
+option go_package = "io.pact/other";
+
+enum OtherFileEnum {
+  VALUE_ZERO = 0;
+  VALUE_ONE = 1;
+  VALUE_TWO = 2;
+}
