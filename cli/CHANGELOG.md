@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.0.4 - ARM 64 target
+
+* 5b5ddea - feat: Add ARM 64 target (Ronald Holshausen, Wed Dec 21 15:46:06 2022 +1100)
+* ab5d381 - bump version to 0.0.4 (Ronald Holshausen, Tue Dec 20 15:33:59 2022 +1100)
+
 # 0.0.3 - Bugfix Release
 
 * 7e37d08 - fix(windows): force tokio runtime to shutdown as it causes the installation to hang on Windows (Ronald Holshausen, Tue Dec 20 14:51:10 2022 +1100)
