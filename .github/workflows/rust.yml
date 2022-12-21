@@ -11,7 +11,7 @@ jobs:
     env:
       pact_do_not_track: true
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -70,7 +70,7 @@ jobs:
   musl-build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - run: |
          docker run --rm -v $(pwd):/workspace -w /workspace/drivers/rust/driver -t  \
            -e 'RUST_LOG=trace' -e 'pact_do_not_track=true' pactfoundation/rust-musl-build \
