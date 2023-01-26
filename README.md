@@ -61,7 +61,7 @@ See [Content matcher design docs](docs/content-matcher-design.md).
 There are two example prototype plugins that support matching different types of content: [Protobuf](plugins/protobuf) and 
 [CSV](plugins/csv).
 
-See [Pactflow Protobuf/gRPC plugin](https://github.com/pactflow/pact-protobuf-plugin) for a Pactflow supported plugin.
+See [PactFlow Protobuf/gRPC plugin](https://github.com/pactflow/pact-protobuf-plugin) for a PactFlow supported plugin.
 
 #### Plugins that provide matchers/generators (WIP)
 
