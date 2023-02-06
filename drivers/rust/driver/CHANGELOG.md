@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.3.0 - Support configuring matching rules and generators for message metadata
+
+* 66a0f01 - feat: Support configuring matching rules and generators for message metadata (Ronald Holshausen, Mon Feb 6 14:20:41 2023 +1100)
+* 17c66d9 - bump version to 0.2.3 (Ronald Holshausen, Fri Dec 16 16:25:26 2022 +1100)
+
 # 0.2.2 - Bugfix Release
 
 * 2de4518 - feat: Support passing a test context through to the start mock server call (Ronald Holshausen, Fri Dec 16 16:14:48 2022 +1100)
