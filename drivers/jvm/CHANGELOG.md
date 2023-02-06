@@ -1,5 +1,28 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.3.0 - Support configuring matching rules and generators for message metadata
+
+* 66a0f01 - feat: Support configuring matching rules and generators for message metadata (Ronald Holshausen, Mon Feb 6 14:20:41 2023 +1100)
+* 7ed5462 - Merge pull request #18 from pact-foundation/pactflow_camelcase (Yousaf Nabi, Fri Jan 27 12:26:41 2023 +0000)
+* 81092a6 - chore: /s/Pactflow/PactFlow (Yousaf Nabi, Thu Jan 26 16:12:14 2023 +0000)
+* b8f605d - chore: Update GH actions to use checkout v3 (Ronald Holshausen, Wed Dec 21 16:58:41 2022 +1100)
+* 543fec4 - bump version to 0.0.5 (Ronald Holshausen, Wed Dec 21 16:06:04 2022 +1100)
+* a2b7dd0 - update changelog for release 0.0.4 (Ronald Holshausen, Wed Dec 21 16:04:38 2022 +1100)
+* 5b5ddea - feat: Add ARM 64 target (Ronald Holshausen, Wed Dec 21 15:46:06 2022 +1100)
+* eba9151 - chore: add example with enum from different proto file (Ronald Holshausen, Wed Dec 21 14:46:32 2022 +1100)
+* 35f3f18 - chore: update CLIs used in example build (Ronald Holshausen, Tue Dec 20 16:21:58 2022 +1100)
+* ab5d381 - bump version to 0.0.4 (Ronald Holshausen, Tue Dec 20 15:33:59 2022 +1100)
+* 03ff042 - update changelog for release 0.0.3 (Ronald Holshausen, Tue Dec 20 15:31:51 2022 +1100)
+* 7e37d08 - fix(windows): force tokio runtime to shutdown as it causes the installation to hang on Windows (Ronald Holshausen, Tue Dec 20 14:51:10 2022 +1100)
+* 7e22803 - bump version to 0.0.3 (Ronald Holshausen, Tue Dec 20 12:38:11 2022 +1100)
+* a9e6529 - update changelog for release 0.0.2 (Ronald Holshausen, Tue Dec 20 12:36:58 2022 +1100)
+* eebb4f4 - chore: Upgrade all dependencies (Ronald Holshausen, Tue Dec 20 12:05:47 2022 +1100)
+* 6dc1382 - chore: Upgrade pact_ffi to 0.3.18 (Ronald Holshausen, Mon Dec 19 17:35:03 2022 +1100)
+* ae32194 - chore: Upgrade pact_consumer to 0.10.3 (Ronald Holshausen, Mon Dec 19 17:13:33 2022 +1100)
+* 17c66d9 - bump version to 0.2.3 (Ronald Holshausen, Fri Dec 16 16:25:26 2022 +1100)
+* 3ebd232 - update changelog for release 0.2.2 (Ronald Holshausen, Fri Dec 16 16:22:48 2022 +1100)
+* be8b7ba - bump version to 0.2.3 (Ronald Holshausen, Fri Dec 16 16:18:22 2022 +1100)
+
 # 0.2.2 - Bugfix Release
 
 * 2de4518 - feat: Support passing a test context through to the start mock server call (Ronald Holshausen, Fri Dec 16 16:14:48 2022 +1100)
