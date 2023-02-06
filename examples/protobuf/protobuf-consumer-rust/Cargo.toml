@@ -16,7 +16,7 @@ env_logger = "0.10.0"
 test-log = "0.2.11"
 pact_models = "1.0.0"
 pact_consumer = "0.10.0"
-pact-plugin-driver = { version = "0.2", path = "../../../drivers/rust/driver" }
+pact-plugin-driver = "0.3.0"
 serde_json = "1.0.66"
 regex = "1.4.6"
 fakeit = "1.1.1"
