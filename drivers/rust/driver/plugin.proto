@@ -188,6 +188,10 @@ message InteractionResponse {
   // Description of what part this interaction belongs to (in the case of there being more than one, for instance,
   // request/response messages)
   string partName = 8;
+  // All matching rules to apply to any message metadata
+  map<string, MatchingRules> metadata_rules = 9;
+  // Generators to apply to any message metadata
+  map<string, Generator> metadata_generators = 10;
 }
 
 // Response to the configure/setup an interaction request

@@ -78,6 +78,9 @@ pub struct InteractionContents {
   /// Message metadata
   pub metadata: Option<HashMap<String, Value>>,
 
+  /// Matching rules to apply to message metadata
+  pub metadata_rules: Option<MatchingRuleCategory>,
+
   /// Plugin configuration data to apply to the interaction
   pub plugin_config: PluginConfiguration,
 
@@ -96,6 +99,7 @@ impl Default for InteractionContents {
       rules: None,
       generators: None,
       metadata: None,
+      metadata_rules: None,
       plugin_config: Default::default(),
       interaction_markup: Default::default(),
       interaction_markup_type: Default::default()
@@ -188,7 +192,7 @@ impl ContentMatcher {
           if response.error.is_empty() {
             let mut results = vec![];
 
-            for response in response.interaction {
+            for response in &response.interaction {
               let body = match &response.contents {
                 Some(body) => {
                   let returned_content_type = ContentType::parse(body.content_type.as_str()).ok();
@@ -203,43 +207,38 @@ impl ContentMatcher {
                 None => OptionalBody::Missing
               };
 
-              let rules = if !response.rules.is_empty() {
-                Some(MatchingRuleCategory {
-                  name: Category::BODY,
-                  rules: response.rules.iter().map(|(k, rules)| {
-                    // TODO: This is unwrapping the DocPath
-                    (DocPath::new(k).unwrap(), RuleList {
-                      rules: rules.rule.iter().map(|rule| {
-                        // TODO: This is unwrapping the MatchingRule
-                        MatchingRule::create(rule.r#type.as_str(), &rule.values.as_ref().map(|rule| {
-                          proto_struct_to_json(rule)
-                        }).unwrap_or_default()).unwrap()
-                      }).collect(),
-                      rule_logic: RuleLogic::And,
-                      cascaded: false
-                    })
-                  }).collect()
-                })
-              } else {
-                None
-              };
+              let rules = Self::setup_matching_rules(&response.rules)?;
 
-              let generators = if !response.generators.is_empty() {
-                Some(Generators {
-                  categories: hashmap! {
-                    GeneratorCategory::BODY => response.generators.iter().map(|(k, gen)| {
-                      // TODO: This is unwrapping the DocPath
-                      // TODO: This is unwrapping the Generator
-                      (DocPath::new(k).unwrap(), Generator::create(gen.r#type.as_str(),
-                        &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default()).unwrap())
-                    }).collect()
+              let generators = if !response.generators.is_empty() || !response.metadata_generators.is_empty() {
+                let mut categories = hashmap!{};
+
+                if !response.generators.is_empty() {
+                  let mut generators = hashmap!{};
+                  for (k, gen) in &response.generators {
+                    generators.insert(DocPath::new(k)?,
+                      Generator::create(gen.r#type.as_str(),
+                        &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default())?);
                   }
-                })
+                  categories.insert(GeneratorCategory::BODY, generators);
+                }
+
+                if !response.metadata_generators.is_empty() {
+                  let mut generators = hashmap!{};
+                  for (k, gen) in &response.metadata_generators {
+                    generators.insert(DocPath::new(k)?,
+                      Generator::create(gen.r#type.as_str(),
+                        &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default())?);
+                  }
+                  categories.insert(GeneratorCategory::METADATA, generators);
+                }
+
+                Some(Generators { categories })
               } else {
                 None
               };
 
               let metadata = response.message_metadata.as_ref().map(|md| proto_struct_to_map(md));
+              let metadata_rules = Self::setup_matching_rules(&response.metadata_rules)?;
 
               let plugin_config = if let Some(plugin_configuration) = &response.plugin_configuration {
                 PluginConfiguration {
@@ -256,6 +255,7 @@ impl ContentMatcher {
               debug!("rules={:?}", rules);
               debug!("generators={:?}", generators);
               debug!("metadata={:?}", metadata);
+              debug!("metadata_rules={:?}", metadata_rules);
               debug!("pluginConfig={:?}", plugin_config);
 
               results.push(InteractionContents {
@@ -264,6 +264,7 @@ impl ContentMatcher {
                 rules,
                 generators,
                 metadata,
+                metadata_rules,
                 plugin_config,
                 interaction_markup: response.interaction_markup.clone(),
                 interaction_markup_type: match response.interaction_markup_type() {
@@ -287,6 +288,29 @@ impl ContentMatcher {
         error!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry);
         Err(anyhow!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry))
       }
+    }
+  }
+
+  fn setup_matching_rules(rules_map: &HashMap<String, crate::proto::MatchingRules>) -> anyhow::Result<Option<MatchingRuleCategory>> {
+    if !rules_map.is_empty() {
+      let mut rules = hashmap!{};
+      for (k, rule_list) in rules_map {
+        let mut vec = vec![];
+        for rule in &rule_list.rule {
+          let mr = MatchingRule::create(rule.r#type.as_str(), &rule.values.as_ref().map(|rule| {
+            proto_struct_to_json(rule)
+          }).unwrap_or_default())?;
+          vec.push(mr);
+        }
+        rules.insert(DocPath::new(k)?, RuleList {
+          rules: vec,
+          rule_logic: RuleLogic::And,
+          cascaded: false
+        });
+      }
+      Ok(Some(MatchingRuleCategory { name: Category::BODY, rules }))
+    } else {
+      Ok(None)
     }
   }
 

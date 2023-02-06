@@ -505,20 +505,41 @@ object DefaultPluginManager: KLogging(), PluginManager {
           interaction.contents.content.value.toByteArray(), returnedContentType,
           toContentTypeHint(interaction.contents.contentTypeHint)
         )
-        val rules = MatchingRuleCategory("body", interaction.rulesMap.entries.associate { (key, value) ->
-          key to MatchingRuleGroup(value.ruleList.map {
-            MatchingRule.create(it.type, structToJson(it.values))
-          }.toMutableList(), RuleLogic.AND, false)
-        }.toMutableMap())
-        val generators = Generators(mutableMapOf(Category.BODY to interaction.generatorsMap.mapValues {
-          createGenerator(it.value.type, structToJson(it.value.values))
-        }.toMutableMap()))
+
+        val rules = if (interaction.rulesCount > 0)
+          MatchingRuleCategory("body", interaction.rulesMap.entries.associate { (key, value) ->
+            key to MatchingRuleGroup(value.ruleList.map {
+              MatchingRule.create(it.type, structToJson(it.values))
+            }.toMutableList(), RuleLogic.AND, false)
+          }.toMutableMap())
+        else null
 
         val metadata = if (interaction.hasMessageMetadata()) {
           interaction.messageMetadata.fieldsMap.entries.associate { (key, value) -> key to valueToJson(value) }
         } else {
           emptyMap()
         }
+
+        val metadataRules = if (interaction.metadataRulesCount > 0)
+          MatchingRuleCategory("metadata", interaction.metadataRulesMap.entries.associate { (key, value) ->
+            key to MatchingRuleGroup(value.ruleList.map {
+              MatchingRule.create(it.type, structToJson(it.values))
+            }.toMutableList(), RuleLogic.AND, false)
+          }.toMutableMap())
+        else null
+
+        val categories = mutableMapOf<Category, MutableMap<String, Generator>>()
+        if (interaction.generatorsCount > 0) {
+          categories[Category.BODY] = interaction.generatorsMap.mapValues {
+            createGenerator(it.value.type, structToJson(it.value.values))
+          }.toMutableMap()
+        }
+        if (interaction.metadataGeneratorsCount > 0) {
+          categories[Category.METADATA] = interaction.metadataGeneratorsMap.mapValues {
+            createGenerator(it.value.type, structToJson(it.value.values))
+          }.toMutableMap()
+        }
+        val generators = Generators(categories)
 
         val pluginConfig = if (interaction.hasPluginConfiguration()) {
           val pluginConfiguration = globalPluginConfig.copy()
@@ -544,6 +565,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
         logger.debug { "rules=$rules" }
         logger.debug { "generators=$generators" }
         logger.debug { "metadata=$metadata" }
+        logger.debug { "metadataRules=$metadataRules" }
         logger.debug { "pluginConfig=$pluginConfig" }
 
         results.add(InteractionContents(
@@ -554,7 +576,8 @@ object DefaultPluginManager: KLogging(), PluginManager {
           metadata,
           pluginConfig,
           interaction.interactionMarkup,
-          interaction.interactionMarkupType.name
+          interaction.interactionMarkupType.name,
+          metadataRules
         ))
       }
 
@@ -1058,5 +1081,10 @@ data class InteractionContents @JvmOverloads constructor(
   /**
    * The type of the markup. Defaults to CommonMark.
    */
-  val interactionMarkupType: String = ""
+  val interactionMarkupType: String = "",
+
+  /**
+   * Matching rules to apply to any message metadata
+   */
+  val metadataRules: MatchingRuleCategory? = null
 )

@@ -75,6 +75,17 @@ pub mod catalogue_entry {
         EntryType::Interaction => "INTERACTION",
       }
     }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+      match value {
+        "CONTENT_MATCHER" => Some(Self::ContentMatcher),
+        "CONTENT_GENERATOR" => Some(Self::ContentGenerator),
+        "TRANSPORT" => Some(Self::Transport),
+        "MATCHER" => Some(Self::Matcher),
+        "INTERACTION" => Some(Self::Interaction),
+        _ => None,
+      }
+    }
   }
 }
 /// Response to init plugin, providing the catalogue entries the plugin provides
@@ -141,6 +152,15 @@ pub mod body {
         ContentTypeHint::Default => "DEFAULT",
         ContentTypeHint::Text => "TEXT",
         ContentTypeHint::Binary => "BINARY",
+      }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+      match value {
+        "DEFAULT" => Some(Self::Default),
+        "TEXT" => Some(Self::Text),
+        "BINARY" => Some(Self::Binary),
+        _ => None,
       }
     }
   }
@@ -310,6 +330,18 @@ pub struct InteractionResponse {
   /// request/response messages)
   #[prost(string, tag = "8")]
   pub part_name: ::prost::alloc::string::String,
+  /// All matching rules to apply to any message metadata
+  #[prost(map = "string, message", tag = "9")]
+  pub metadata_rules: ::std::collections::HashMap<
+    ::prost::alloc::string::String,
+    MatchingRules,
+  >,
+  /// Generators to apply to any message metadata
+  #[prost(map = "string, message", tag = "10")]
+  pub metadata_generators: ::std::collections::HashMap<
+    ::prost::alloc::string::String,
+    Generator,
+  >,
 }
 /// Nested message and enum types in `InteractionResponse`.
 pub mod interaction_response {
@@ -341,6 +373,14 @@ pub mod interaction_response {
       match self {
         MarkupType::CommonMark => "COMMON_MARK",
         MarkupType::Html => "HTML",
+      }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+      match value {
+        "COMMON_MARK" => Some(Self::CommonMark),
+        "HTML" => Some(Self::Html),
+        _ => None,
       }
     }
   }
@@ -417,6 +457,15 @@ pub mod generate_content_request {
         TestMode::Provider => "Provider",
       }
     }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+      match value {
+        "Unknown" => Some(Self::Unknown),
+        "Consumer" => Some(Self::Consumer),
+        "Provider" => Some(Self::Provider),
+        _ => None,
+      }
+    }
   }
   /// Which part the content is for
   #[derive(
@@ -444,6 +493,14 @@ pub mod generate_content_request {
       match self {
         ContentFor::Request => "Request",
         ContentFor::Response => "Response",
+      }
+    }
+    /// Creates an enum from field names used in the ProtoBuf definition.
+    pub fn from_str_name(value: &str) -> ::core::option::Option<Self> {
+      match value {
+        "Request" => Some(Self::Request),
+        "Response" => Some(Self::Response),
+        _ => None,
       }
     }
   }
