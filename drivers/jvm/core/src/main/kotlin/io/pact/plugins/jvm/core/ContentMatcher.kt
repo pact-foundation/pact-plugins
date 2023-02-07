@@ -10,8 +10,41 @@ data class ContentMismatch(
   val actual: ByteArray?,
   val mismatch: String,
   val path: String,
-  val diff : String? = null
-)
+  val diff : String? = null,
+  val type: String? = null
+) {
+  override fun equals(other: Any?): Boolean {
+    if (this === other) return true
+    if (javaClass != other?.javaClass) return false
+
+    other as ContentMismatch
+
+    if (expected != null) {
+      if (other.expected == null) return false
+      if (!expected.contentEquals(other.expected)) return false
+    } else if (other.expected != null) return false
+    if (actual != null) {
+      if (other.actual == null) return false
+      if (!actual.contentEquals(other.actual)) return false
+    } else if (other.actual != null) return false
+    if (mismatch != other.mismatch) return false
+    if (path != other.path) return false
+    if (diff != other.diff) return false
+    if (type != other.type) return false
+
+    return true
+  }
+
+  override fun hashCode(): Int {
+    var result = expected?.contentHashCode() ?: 0
+    result = 31 * result + (actual?.contentHashCode() ?: 0)
+    result = 31 * result + mismatch.hashCode()
+    result = 31 * result + path.hashCode()
+    result = 31 * result + (diff?.hashCode() ?: 0)
+    result = 31 * result + type.hashCode()
+    return result
+  }
+}
 
 interface ContentMatcher {
   val isCore: Boolean
@@ -66,7 +99,7 @@ data class CatalogueContentMatcher(
     } else {
       result.resultsMap.mapValues { entry ->
         entry.value.mismatchesList.map {
-          ContentMismatch(it.expected.toByteArray(), it.actual.toByteArray(), it.mismatch, it.path, it.diff)
+          ContentMismatch(it.expected.toByteArray(), it.actual.toByteArray(), it.mismatch, it.path, it.diff, it.mismatchType)
         }
       }
     }

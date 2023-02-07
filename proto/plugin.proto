@@ -108,6 +108,8 @@ message ContentMismatch {
   string path = 4;
   // Optional diff of the contents
   string diff = 5;
+  // Part of the interaction that the mismatch is for: body, headers, metadata, etc.
+  string mismatchType = 6;
 }
 
 // List of content mismatches

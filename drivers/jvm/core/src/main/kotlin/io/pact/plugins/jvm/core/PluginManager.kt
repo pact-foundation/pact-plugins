@@ -699,7 +699,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     return if (response.ok) null else response.resultsList.map { result ->
       MockServerResults(result.path, result.error, result.mismatchesList.map {
         MockServerMismatch(
-          it.expected, it.actual, it.mismatch, it.path, it.diff
+          it.expected, it.actual, it.mismatch, it.path, it.diff, it.mismatchType
         )
       })
     }
@@ -716,7 +716,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
     return if (response.ok) null else response.resultsList.map { result ->
       MockServerResults(result.path, result.error, result.mismatchesList.map {
         MockServerMismatch(
-                it.expected, it.actual, it.mismatch, it.path, it.diff
+          it.expected, it.actual, it.mismatch, it.path, it.diff, it.mismatchType
         )
       })
     }

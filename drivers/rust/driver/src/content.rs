@@ -56,7 +56,9 @@ pub struct ContentMismatch {
   /// Path to the mismatch
   pub path: String,
   /// Optional diff of the expected and actual values
-  pub diff: Option<String>
+  pub diff: Option<String>,
+  /// The type of item that the mismatch is for
+  pub mismatch_type: Option<String>
 }
 
 /// Interaction contents setup by the plugin
@@ -367,7 +369,8 @@ impl ContentMatcher {
                 actual: mismatch.actual.clone(),
                 mismatch: format!("Expected content type '{}' but got '{}'", mismatch.expected, mismatch.actual),
                 path: "".to_string(),
-                diff: None
+                diff: None,
+                mismatch_type: None
               }
             ]
           })
@@ -379,7 +382,8 @@ impl ContentMatcher {
                 actual: Default::default(),
                 mismatch: response.error.clone(),
                 path: "".to_string(),
-                diff: None
+                diff: None,
+                mismatch_type: None
               }
             ]
           })
@@ -399,7 +403,8 @@ impl ContentMatcher {
                   None
                 } else {
                   Some(mismatch.diff.clone())
-                }
+                },
+                mismatch_type: Some(mismatch.mismatch_type.clone())
               }
             }).collect())
           }).collect())
@@ -415,7 +420,8 @@ impl ContentMatcher {
                 actual: "".to_string(),
                 mismatch: format!("Call to plugin failed = {}", err),
                 path: "".to_string(),
-                diff: None
+                diff: None,
+                mismatch_type: None
               }
             ]
           })
@@ -430,7 +436,8 @@ impl ContentMatcher {
               actual: "".to_string(),
               mismatch: format!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry),
               path: "".to_string(),
-              diff: None
+              diff: None,
+              mismatch_type: None
             }
           ]
         })

@@ -71,5 +71,7 @@ data class MockServerMismatch(
   /** Path to the item that was matched. This is the value as per the documented Pact matching rule expressions. */
   val path: String,
   /** Optional diff of the contents */
-  val diff: String?
+  val diff: String?,
+  /** Type of object that the mismatch applies to: body, headers, metadata, etc. */
+  val mismatchType: String? = null
 )

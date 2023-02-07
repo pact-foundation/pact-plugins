@@ -99,6 +99,15 @@ pub fn versions_compatible(version: &str, required: &Option<String>) -> bool {
   }
 }
 
+pub fn optional_string<S: Into<String>>(string: S) -> Option<String> {
+  let string = string.into();
+  if string.is_empty() {
+    None
+  } else {
+    Some(string)
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use expectest::prelude::*;

@@ -36,7 +36,13 @@ use crate::metrics::send_metrics;
 use crate::mock_server::{MockServerConfig, MockServerDetails, MockServerResults};
 use crate::plugin_models::{PactPlugin, PactPluginManifest, PactPluginRpc, PluginDependency};
 use crate::proto::*;
-use crate::utils::{proto_value_to_json, to_proto_struct, to_proto_value, versions_compatible};
+use crate::utils::{
+  optional_string,
+  proto_value_to_json,
+  to_proto_struct,
+  to_proto_value,
+  versions_compatible
+};
 use crate::verification::{InteractionVerificationData, InteractionVerificationResult};
 
 lazy_static! {
@@ -439,11 +445,8 @@ pub async fn shutdown_mock_server(mock_server: &MockServerDetails) -> anyhow::Re
               .unwrap_or_default(),
             mismatch: mismatch.mismatch.clone(),
             path: mismatch.path.clone(),
-            diff: if mismatch.diff.is_empty() {
-              None
-            } else {
-              Some(mismatch.diff.clone())
-            }
+            diff: optional_string(&mismatch.diff),
+            mismatch_type: optional_string(&mismatch.mismatch_type)
           }
         }).collect()
       }
@@ -483,11 +486,8 @@ pub async fn get_mock_server_results(mock_server: &MockServerDetails) -> anyhow:
               .unwrap_or_default(),
             mismatch: mismatch.mismatch.clone(),
             path: mismatch.path.clone(),
-            diff: if mismatch.diff.is_empty() {
-              None
-            } else {
-              Some(mismatch.diff.clone())
-            }
+            diff: optional_string(&mismatch.diff),
+            mismatch_type: optional_string(&mismatch.mismatch_type)
           }
         }).collect()
       }

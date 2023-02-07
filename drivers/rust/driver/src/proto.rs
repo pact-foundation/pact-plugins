@@ -219,6 +219,9 @@ pub struct ContentMismatch {
   /// Optional diff of the contents
   #[prost(string, tag = "5")]
   pub diff: ::prost::alloc::string::String,
+  /// Part of the interaction that the mismatch is for: body, headers, metadata, etc.
+  #[prost(string, tag = "6")]
+  pub mismatch_type: ::prost::alloc::string::String,
 }
 /// List of content mismatches
 #[allow(clippy::derive_partial_eq_without_eq)]
