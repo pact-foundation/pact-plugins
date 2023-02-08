@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.3.1 - Bugfix Release
+
+* abdf9a7 - chore: Update dependencies (Ronald Holshausen, Wed Feb 8 13:19:02 2023 +1100)
+* 8d98e65 - feat: add field to mock server mismatches to indicate the type of mismatch (Ronald Holshausen, Tue Feb 7 15:49:21 2023 +1100)
+* 4a23448 - bump version to 0.3.1 (Ronald Holshausen, Mon Feb 6 14:47:37 2023 +1100)
+
 # 0.3.0 - Support configuring matching rules and generators for message metadata
 
 * 66a0f01 - feat: Support configuring matching rules and generators for message metadata (Ronald Holshausen, Mon Feb 6 14:20:41 2023 +1100)
