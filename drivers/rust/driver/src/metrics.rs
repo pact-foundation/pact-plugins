@@ -37,7 +37,8 @@ static CIS: &'static [&str] = &[
 ];
 
 pub(crate) fn send_metrics(manifest: &PactPluginManifest) {
-  let do_not_track = match var("PACT_DO_NOT_TRACK").or_else(|| var("pact_do_not_track")) {
+  let do_not_track = match var("PACT_DO_NOT_TRACK")
+    .or_else(|_| var("pact_do_not_track")) {
     Ok(val) => val == "true",
     Err(_) => false
   };
