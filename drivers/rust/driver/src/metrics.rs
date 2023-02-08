@@ -37,13 +37,13 @@ static CIS: &'static [&str] = &[
 ];
 
 pub(crate) fn send_metrics(manifest: &PactPluginManifest) {
-  let do_not_track = match var("pact_do_not_track") {
+  let do_not_track = match var("PACT_DO_NOT_TRACK").or_else(|| var("pact_do_not_track")) {
     Ok(val) => val == "true",
     Err(_) => false
   };
 
   if do_not_track {
-    debug!("'pact_do_not_track' environment variable is set, will not send metrics");
+    debug!("'PACT_DO_NOT_TRACK' environment variable is set, will not send metrics");
   } else {
     match tokio::runtime::Handle::try_current() {
       Ok(handle) => {
@@ -52,7 +52,7 @@ pub(crate) fn send_metrics(manifest: &PactPluginManifest) {
           warn!(
             "\n\nPlease note:\n\
             We are tracking this plugin load anonymously to gather important usage statistics.\n\
-            To disable tracking, set the 'pact_do_not_track' environment variable to 'true'.\n\n"
+            To disable tracking, set the 'PACT_DO_NOT_TRACK' environment variable to 'true'.\n\n"
           );
 
           let ci_context = if CIS.iter()

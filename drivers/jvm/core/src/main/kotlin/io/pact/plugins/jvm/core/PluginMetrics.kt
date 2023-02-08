@@ -18,8 +18,11 @@ object PluginMetrics: KLogging() {
   fun sendMetrics(manifest: PactPluginManifest) {
     Thread {
       val doNotTrack = lookupProperty("pact_do_not_track").ifNullOrEmpty {
+        System.getenv("PACT_DO_NOT_TRACK")
+      }.ifNullOrEmpty {
         System.getenv("pact_do_not_track")
       }
+
       if (doNotTrack != "true") {
         logger.warn {
           """
