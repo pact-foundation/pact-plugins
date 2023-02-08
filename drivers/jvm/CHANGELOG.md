@@ -1,5 +1,15 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.3.1 - Bugfix Release
+
+* 8d98e65 - feat: add field to mock server mismatches to indicate the type of mismatch (Ronald Holshausen, Tue Feb 7 15:49:21 2023 +1100)
+* 68ea7ee - chore: Correct driver_pact_tests build (Ronald Holshausen, Mon Feb 6 15:07:01 2023 +1100)
+* bf5472d - chore: correct example build (Ronald Holshausen, Mon Feb 6 15:00:18 2023 +1100)
+* 4a23448 - bump version to 0.3.1 (Ronald Holshausen, Mon Feb 6 14:47:37 2023 +1100)
+* c0e2d14 - update changelog for release 0.3.0 (Ronald Holshausen, Mon Feb 6 14:46:33 2023 +1100)
+* 9dda3e7 - chore: fix FFI build after bumping minor version (Ronald Holshausen, Mon Feb 6 14:41:25 2023 +1100)
+* b6e949a - bump version to 0.3.1 (Ronald Holshausen, Mon Feb 6 14:33:37 2023 +1100)
+
 # 0.3.0 - Support configuring matching rules and generators for message metadata
 
 * 66a0f01 - feat: Support configuring matching rules and generators for message metadata (Ronald Holshausen, Mon Feb 6 14:20:41 2023 +1100)
