@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+package metadatatest;
+option go_package = "io.pact/metadatatest";
+
+message ValidateTokenRequest {
+}
+
+message ValidateTokenResult {
+  bool ok = 1;
+}
+
+service Test {
+  rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResult) {}
+}
