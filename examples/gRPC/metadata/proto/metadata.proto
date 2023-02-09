@@ -11,5 +11,6 @@ message ValidateTokenResult {
 }
 
 service Test {
+  // This call requires the Auth header to be correctly set
   rpc ValidateToken(ValidateTokenRequest) returns (ValidateTokenResult) {}
 }

@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static au.com.dius.pact.consumer.dsl.PactBuilder.filePath;
 import static io.grpc.Metadata.ASCII_STRING_MARSHALLER;
@@ -58,17 +59,24 @@ public class PactConsumerTest {
 
   @Test
   @MockServerConfig(implementation = MockServerImplementation.Plugin, registryEntry = "protobuf/transport/grpc")
-  void testMetadata(MockServer mockServer, V4Interaction.SynchronousMessages interaction) throws InvalidProtocolBufferException {
+  void testMetadata(MockServer mockServer) {
+    io.grpc.Metadata.Key<String> authKey = io.grpc.Metadata.Key.of("Auth", ASCII_STRING_MARSHALLER);
+    io.grpc.Metadata.Key<String> codeKey = io.grpc.Metadata.Key.of("code", ASCII_STRING_MARSHALLER);
+
     io.grpc.Metadata metadata = new io.grpc.Metadata();
-    metadata.put(io.grpc.Metadata.Key.of("Auth", ASCII_STRING_MARSHALLER), "AB123");
+    metadata.put(authKey, "ABC123");
+    AtomicReference<io.grpc.Metadata> headers = new AtomicReference<>(null);
+    AtomicReference<io.grpc.Metadata> trailers = new AtomicReference<>(null);
     ManagedChannel channel = ManagedChannelBuilder.forTarget("127.0.0.1:" + mockServer.getPort())
       .usePlaintext()
       .intercept(MetadataUtils.newAttachHeadersInterceptor(metadata))
+      .intercept(MetadataUtils.newCaptureMetadataInterceptor(headers, trailers))
       .build();
     TestGrpc.TestBlockingStub stub = newBlockingStub(channel);
 
     Metadata.ValidateTokenRequest request = Metadata.ValidateTokenRequest.newBuilder().build();
     Metadata.ValidateTokenResult response = stub.validateToken(request);
     assertThat(response.getOk(), equalTo(true));
+    assertThat(headers.get().get(codeKey), equalTo("100"));
   }
 }
