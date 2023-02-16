@@ -13,11 +13,20 @@ use crate::proto::{VerificationResult, verification_result_item};
 #[derive(Clone, Debug, Default)]
 pub struct InteractionVerificationData {
   /// Data for the request of the interaction
-  pub(crate) request_data: OptionalBody,
+  pub request_data: OptionalBody,
   /// Metadata associated with the request
-  pub(crate) metadata: HashMap<String, Either<Value, Bytes>>
+  pub metadata: HashMap<String, Either<Value, Bytes>>
 }
 
+impl InteractionVerificationData {
+  /// Create a new InteractionVerificationData struct
+  pub fn new(request_data: OptionalBody, metadata: HashMap<String, Either<Value, Bytes>>) -> Self {
+    InteractionVerificationData {
+      request_data,
+      metadata,
+    }
+  }
+}
 
 /// Result of running an integration verification
 #[derive(Clone, Debug, Default)]
