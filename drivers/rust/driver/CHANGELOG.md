@@ -1,5 +1,12 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.3.2 - Bugfix Release
+
+* 1ffd3ad - fix: InteractionVerificationData fields were not public and there was no constructor function (Ronald Holshausen, Thu Feb 16 11:43:26 2023 +1100)
+* d30b769 - chore: fix failing build (Ronald Holshausen, Wed Feb 8 15:55:22 2023 +1100)
+* d06f7f8 - chore: check for PACT_DO_NOT_TRACK in both upper and lower case (Ronald Holshausen, Wed Feb 8 14:41:06 2023 +1100)
+* 1b7e6ee - bump version to 0.3.2 (Ronald Holshausen, Wed Feb 8 13:22:17 2023 +1100)
+
 # 0.3.1 - Bugfix Release
 
 * abdf9a7 - chore: Update dependencies (Ronald Holshausen, Wed Feb 8 13:19:02 2023 +1100)
