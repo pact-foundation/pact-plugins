@@ -90,7 +90,7 @@
           </execution>
         </executions>
         <configuration>
-          <protoSourceRoot>${project.basedir}/../../../proto</protoSourceRoot>
+          <protoSourceRoot>${project.basedir}/../../../interfaces/proto</protoSourceRoot>
           <protocArtifact>com.google.protobuf:protoc:${protobuf.version}:exe:${os.detected.classifier}</protocArtifact>
         </configuration>
       </plugin>
