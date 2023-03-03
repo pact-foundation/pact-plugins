@@ -2,7 +2,7 @@
 
 This example demonstrate using the prototype Protobuf plugin to support matching Protobuf messages.
 
-The [proto file](../../../proto/plugin.proto) for the plugin interface is used for these tests.
+The [proto file](../../../interfaces/proto/plugin.proto) for the plugin interface is used for these tests.
 
 The consumer has two tests, one for the simple InitPluginResponse message and one for the more complex
 InteractionResponse message.

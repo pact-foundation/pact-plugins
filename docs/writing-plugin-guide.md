@@ -26,7 +26,7 @@ Refer to for more details on the interface and gRPC methods that need to be impl
 - [Content Matchers and Generators](content-matcher-design.md)
 - [Transport protocols](protocol-plugin-design.md)
 
-You can find the [proto file](../proto/plugin.proto) that defines the plugin interface in the proto directory. Your 
+You can find the [proto file](../interfaces/proto/plugin.proto) that defines the plugin interface in the proto directory. Your 
 plugin will need to implement this interface.
 
 When the plugin starts up, it needs to write a small JSON message to standard output that contains the port the plugin

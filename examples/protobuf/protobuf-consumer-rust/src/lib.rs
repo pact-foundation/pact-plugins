@@ -21,7 +21,7 @@ mod tests {
     let proto_service = pact_builder
       .using_plugin("protobuf", None).await
       .message_interaction("init plugin message", |mut i| async move {
-        let proto_file = Path::new("../../../proto/plugin.proto")
+        let proto_file = Path::new("../../../interfaces/proto/plugin.proto")
           .canonicalize().unwrap().to_string_lossy().to_string();
         i.contents_from(json!({
           "pact:proto": proto_file,
@@ -48,7 +48,7 @@ mod tests {
     let proto_service = pact_builder
       .using_plugin("protobuf", None).await
       .message_interaction("Configure Interaction Response", |mut i| async move {
-        let proto_file = Path::new("../../../proto/plugin.proto")
+        let proto_file = Path::new("../../../interfaces/proto/plugin.proto")
           .canonicalize().unwrap().to_string_lossy().to_string();
 
         i.contents_from(json!({

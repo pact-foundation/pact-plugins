@@ -44,7 +44,7 @@ builder
   .expectsToReceive("init plugin message", "core/interaction/message")  // will use a message interaction 
   .with(Map.of(
     "message.contents", Map.of(
-      "pact:proto", filePath("../../../proto/plugin.proto"),            // Need to provide the proto file
+      "pact:proto", filePath("../../../interfaces/proto/plugin.proto"),            // Need to provide the proto file
       "pact:message-type", "InitPluginRequest",                         // The message in the proto file we will be testing with
       "pact:content-type", "application/protobuf",                      // Required content type for protobuf test
       "implementation", "notEmpty('pact-jvm-driver')",                  // Require the `implementation` to not be empty (must be present and not the empty string)
@@ -85,7 +85,7 @@ builder
     .expectsToReceive("Configure Interaction Response", "core/interaction/message")
     .with(Map.of(
         "message.contents", Map.of(
-          "pact:proto", filePath("../../../proto/plugin.proto"),
+          "pact:proto", filePath("../../../interfaces/proto/plugin.proto"),
           "pact:message-type", "InteractionResponse",
           "pact:content-type", "application/protobuf",
           "contents", Map.of(                                               // contents is a message, so use a map to confugure the matching

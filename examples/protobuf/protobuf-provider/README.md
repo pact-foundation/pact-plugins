@@ -3,7 +3,7 @@
 This provider starts a simple HTTP server that returns the Protobuf messages based on the request body. It expects a
 POST request with a JSON body, and depending on the `description` attribute will return a Protobuf message. 
 
-To generate the Go code for the proto file, run `protoc -I=../../../proto/ --go_out=. ../../../proto/plugin.proto`
+To generate the Go code for the proto file, run `protoc -I=../../../proto/ --go_out=. ../../../interfaces/proto/plugin.proto`
 
 Run the provider using `go run main.go`
 
