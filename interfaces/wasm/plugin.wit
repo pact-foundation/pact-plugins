@@ -1,0 +1,41 @@
+// WIT file for Pact plugin interface V2
+
+// Types dealing with initialising the plugin
+interface init {
+    // Type of entry
+    enum entry-type {
+        // Matcher for contents of messages, requests or response bodies
+        content-matcher,
+        // Generator for contents of messages, requests or response bodies
+        content-generator,
+        // Transport for a network protocol
+        transport,
+        // Matching rule for content field/values
+        matcher,
+        // Type of interaction
+        interaction
+    }
+
+    // Entry to be added to the core catalogue. Each entry describes one of the features the plugin provides.
+    // Entries will be stored in the catalogue under the key "plugin/$name/$type/$key".
+    record catalogue-entry {
+        entry-type: entry-type,
+        // Entry key
+        key: string,
+        // Associated data required for the entry as typles of key-values. For content-matcher and content-generator
+        // types, a "content-types" value (separated by semi-colons) is required for all the content types the
+        // plugin supports.
+        values: list<tuple<string, string>>
+     }
+}
+
+default world plugin-interface {
+    use self.init.{catalogue-entry}
+
+    // Check that the plugin loaded OK. Returns the catalogue entries describing what the plugin provides
+    // parameters:
+    //   implementation: Implementation calling the plugin
+    //   version: Version of the implementation
+    // returns: list of catalogue entries
+    export init-plugin: func(implementation: string, version: string) -> result<list<catalogue-entry>>
+}

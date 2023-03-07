@@ -1,0 +1,8 @@
+{
+  "manifestVersion": 1,
+  "pluginInterfaceVersion": 1,
+  "name": "csv-v2",
+  "version": "0.0.0",
+  "executableType": "wasm/wit",
+  "entryPoint": "pact-csv-v2-plugin.wasm"
+}

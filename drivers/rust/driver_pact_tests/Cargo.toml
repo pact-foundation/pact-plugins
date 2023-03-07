@@ -11,7 +11,7 @@ prost = "0.11.0"
 prost-types = "0.11.1"
 
 [dev-dependencies]
-pact-plugin-driver = { version = "0.3", path = "../driver" }
+pact-plugin-driver = { version = "0.4.0-beta.0", path = "../driver" }
 expectest = "0.12.0"
 env_logger = "0.10.0"
 pact_consumer = "0.10.3"

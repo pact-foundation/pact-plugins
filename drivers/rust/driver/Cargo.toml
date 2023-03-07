@@ -1,6 +1,6 @@
 [package]
 name = "pact-plugin-driver"
-version = "0.3.3"
+version = "0.4.0-beta.0"
 description = "Pact support library that provides an interface for interacting with Pact plugins"
 edition = "2021"
 documentation = "https://docs.rs/pact-plugin-driver"
@@ -38,6 +38,7 @@ semver = "1.0.14"
 tracing = "0.1.37"  # This needs to be the same version across all the pact libs (i.e. pact ffi)
 tracing-core = "0.1.30"  # This needs to be the same version across all the pact libs (i.e. pact ffi)
 backtrace = "0.3.66"
+wasmtime = "6.0.0"
 
 [dependencies.reqwest]
 version = "0.11.12"

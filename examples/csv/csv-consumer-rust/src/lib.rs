@@ -51,7 +51,7 @@ mod tests {
   #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 1))]
   async fn test_csv_client() {
     let csv_service = PactBuilder::new_v4("CsvClient", "CsvServer")
-      .using_plugin("csv", None).await
+      .using_plugin("csv-v2", None).await
       .interaction("request for a report", "", |mut i| async move {
         i.request.path("/reports/report001.csv");
         i.response

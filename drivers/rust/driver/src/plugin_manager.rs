@@ -11,7 +11,7 @@ use std::str::FromStr;
 use std::sync::Mutex;
 use std::thread;
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, Context, Error};
 use bytes::Bytes;
 use itertools::Either;
 use lazy_static::lazy_static;
@@ -44,6 +44,7 @@ use crate::utils::{
   versions_compatible
 };
 use crate::verification::{InteractionVerificationData, InteractionVerificationResult};
+use crate::wasm;
 
 lazy_static! {
   static ref PLUGIN_MANIFEST_REGISTER: Mutex<HashMap<String, PactPluginManifest>> = Mutex::new(HashMap::new());
@@ -196,22 +197,29 @@ async fn initialise_plugin(
   plugin_register: &mut HashMap<String, PactPlugin>
 ) -> anyhow::Result<PactPlugin> {
   match manifest.executable_type.as_str() {
-    "exec" => {
-      let plugin = start_plugin_process(manifest).await?;
-      debug!("Plugin process started OK (port = {}), sending init message", plugin.port());
-
-      init_handshake(manifest, &plugin).await.map_err(|err| {
-        plugin.kill();
-        anyhow!("Failed to send init request to the plugin - {}", err)
-      })?;
-
-      let key = format!("{}/{}", manifest.name, manifest.version);
-      plugin_register.insert(key, plugin.clone());
-
-      Ok(plugin)
-    }
+    "exec" => start_executable_plugin(manifest, plugin_register).await,
+    "wasm/wit" => wasm::start_plugin_component(manifest, plugin_register),
     _ => Err(anyhow!("Plugin executable type of {} is not supported", manifest.executable_type))
   }
+}
+
+async fn start_executable_plugin(
+  manifest: &PactPluginManifest,
+  plugin_register: &mut HashMap<String, PactPlugin>
+) -> Result<PactPlugin, Error> {
+  debug!("Starting an exectuable plugin");
+  let plugin = start_plugin_process(manifest).await?;
+  debug!("Plugin process started OK (port = {}), sending init message", plugin.port());
+
+  init_handshake(manifest, &plugin).await.map_err(|err| {
+    plugin.kill();
+    anyhow!("Failed to send init request to the plugin - {}", err)
+  })?;
+
+  let key = format!("{}/{}", manifest.name, manifest.version);
+  plugin_register.insert(key, plugin.clone());
+
+  Ok(plugin)
 }
 
 /// Internal function: public for testing
