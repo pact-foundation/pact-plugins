@@ -1,0 +1,24 @@
+pact-plugin-cli-install [CLIVERSION]
+Install a plugin
+
+USAGE:
+    pact-plugin-cli install [OPTIONS] <SOURCE>
+
+ARGS:
+    <SOURCE>
+            Where to fetch the plugin files from. This should be a URL
+
+OPTIONS:
+    -h, --help
+            Print help information
+
+    -t, --source-type <SOURCE_TYPE>
+            The type of source to fetch the plugin files from. Will default to Github releases.
+            
+            Valid values: github
+
+    -V, --version
+            Print version information
+
+    -y, --yes
+            Automatically answer Yes for all prompts
