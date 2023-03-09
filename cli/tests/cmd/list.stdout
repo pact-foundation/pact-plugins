@@ -1,9 +1,6 @@
-pact-plugin-cli-list [CLIVERSION]
 List installed plugins
 
-USAGE:
-    pact-plugin-cli list
+Usage: pact-plugin-cli list
 
-OPTIONS:
-    -h, --help       Print help information
-    -V, --version    Print version information
+Options:
+  -h, --help  Print help

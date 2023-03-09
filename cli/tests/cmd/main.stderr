@@ -1,21 +1,19 @@
-pact-plugin-cli [CLIVERSION]
 CLI utility for Pact plugins
 
-USAGE:
-    pact-plugin-cli [OPTIONS] <SUBCOMMAND>
+Usage: pact-plugin-cli [OPTIONS] <COMMAND>
 
-OPTIONS:
-    -d, --debug      Enable debug level logs
-    -h, --help       Print help information
-    -t, --trace      Enable trace level logs
-    -V, --version    Print version information
-    -y, --yes        Automatically answer Yes for all prompts
+Commands:
+  list     List installed plugins
+  env      Print out the Pact plugin environment config
+  install  Install a plugin
+  remove   Remove a plugin
+  enable   Enable a plugin version
+  disable  Disable a plugin version
+  help     Print this message or the help of the given subcommand(s)
 
-SUBCOMMANDS:
-    disable    Disable a plugin version
-    enable     Enable a plugin version
-    env        Print out the Pact plugin environment config
-    help       Print this message or the help of the given subcommand(s)
-    install    Install a plugin
-    list       List installed plugins
-    remove     Remove a plugin
+Options:
+  -y, --yes      Automatically answer Yes for all prompts
+  -d, --debug    Enable debug level logs
+  -t, --trace    Enable trace level logs
+  -v, --version  Print CLI version
+  -h, --help     Print help

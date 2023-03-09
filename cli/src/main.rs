@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use clap::{ArgEnum, Parser, Subcommand};
+use clap::{Parser, Subcommand};
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::Table;
 use itertools::Itertools;
@@ -18,8 +18,8 @@ use tracing_subscriber::FmtSubscriber;
 mod install;
 
 #[derive(Parser, Debug)]
-#[clap(version, about)]
-#[clap(propagate_version = true)]
+#[clap(about, version)]
+#[command(disable_version_flag(true))]
 struct Cli {
   #[clap(short, long)]
   /// Automatically answer Yes for all prompts
@@ -34,7 +34,11 @@ struct Cli {
   trace: bool,
 
   #[clap(subcommand)]
-  command: Commands
+  command: Commands,
+
+  #[clap(short = 'v', long = "version", action = clap::ArgAction::Version)]
+  /// Print CLI version
+  cli_version: bool
 }
 
 #[derive(Subcommand, Debug)]
@@ -94,10 +98,10 @@ enum Commands {
 }
 
 /// Installation source to fetch plugins files from
-#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, ArgEnum, Debug)]
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub enum InstallationSource {
   /// Install the plugin from a Github release page.
-  Github,
+  Github
 }
 
 impl FromStr for InstallationSource {

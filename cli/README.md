@@ -9,27 +9,25 @@ Running `pact-plugin-cli` without any options displays the standard help.
 ```console
 $ pact-plugin-cli 
 ? 2
-pact-plugin-cli 0.0.5
 CLI utility for Pact plugins
 
-USAGE:
-    pact-plugin-cli [OPTIONS] <SUBCOMMAND>
+Usage: pact-plugin-cli [OPTIONS] <COMMAND>
 
-OPTIONS:
-    -d, --debug      Enable debug level logs
-    -h, --help       Print help information
-    -t, --trace      Enable trace level logs
-    -V, --version    Print version information
-    -y, --yes        Automatically answer Yes for all prompts
+Commands:
+  list     List installed plugins
+  env      Print out the Pact plugin environment config
+  install  Install a plugin
+  remove   Remove a plugin
+  enable   Enable a plugin version
+  disable  Disable a plugin version
+  help     Print this message or the help of the given subcommand(s)
 
-SUBCOMMANDS:
-    disable    Disable a plugin version
-    enable     Enable a plugin version
-    env        Print out the Pact plugin environment config
-    help       Print this message or the help of the given subcommand(s)
-    install    Install a plugin
-    list       List installed plugins
-    remove     Remove a plugin
+Options:
+  -y, --yes      Automatically answer Yes for all prompts
+  -d, --debug    Enable debug level logs
+  -t, --trace    Enable trace level logs
+  -v, --version  Print CLI version
+  -h, --help     Print help
 
 ```
 
@@ -68,18 +66,16 @@ The `disable` command will disable a version of a plugin, while the `enable` com
 
 ```console
 $ pact-plugin-cli enable --help
-pact-plugin-cli-enable 0.0.5
 Enable a plugin version
 
-USAGE:
-    pact-plugin-cli enable <NAME> [VERSION]
+Usage: pact-plugin-cli enable <NAME> [VERSION]
 
-ARGS:
-    <NAME>       Plugin name
-    <VERSION>    Plugin version. Not required if there is only one plugin version
+Arguments:
+  <NAME>     Plugin name
+  [VERSION]  Plugin version. Not required if there is only one plugin version
 
-OPTIONS:
-    -h, --help    Print help information
+Options:
+  -h, --help  Print help
 
 ```
 
@@ -92,19 +88,17 @@ If there is only a single version, the version value can be omitted.
 
 ```console
 $ pact-plugin-cli remove --help
-pact-plugin-cli-remove 0.0.5
 Remove a plugin
 
-USAGE:
-    pact-plugin-cli remove [OPTIONS] <NAME> [VERSION]
+Usage: pact-plugin-cli remove [OPTIONS] <NAME> [VERSION]
 
-ARGS:
-    <NAME>       Plugin name
-    <VERSION>    Plugin version. Not required if there is only one plugin version
+Arguments:
+  <NAME>     Plugin name
+  [VERSION]  Plugin version. Not required if there is only one plugin version
 
-OPTIONS:
-    -h, --help    Print help information
-    -y, --yes     Automatically answer Yes for all prompts
+Options:
+  -y, --yes   Automatically answer Yes for all prompts
+  -h, --help  Print help
 
 ```
 
