@@ -338,3 +338,6 @@ fn resolve_plugin_dir() -> (String, String) {
     }
   }
 }
+
+#[cfg(test)]
+mod tests;
