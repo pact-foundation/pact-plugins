@@ -115,12 +115,41 @@ The `install` command can download and install a plugin from a GitHub release pa
 operating system and architecture required. If there are SHA256 digests of the download files, it will also check the digest
 against the downloaded one.
 
+```console
+$ pact-plugin-cli install --help
+Install a plugin
+
+Usage: pact-plugin-cli install [OPTIONS] <SOURCE>
+
+Arguments:
+  <SOURCE>
+          Where to fetch the plugin files from. This should be a URL
+
+Options:
+  -t, --source-type <SOURCE_TYPE>
+          The type of source to fetch the plugin files from. Will default to Github releases.
+          
+          Valid values: github
+
+  -y, --yes
+          Automatically answer Yes for all prompts
+
+  -s, --skip-if-installed
+          Skip installing the plugin if the same version is already installed
+
+  -h, --help
+          Print help (see a summary with '-h')
+
+```
+
 You can point it to a release version, of use the latest link to download the latest version. I.e., for the Protobuf plugin,
 https://github.com/pactflow/pact-protobuf-plugin/releases/tag/v-0.1.7 will install version 0.1.7, while
 https://github.com/pactflow/pact-protobuf-plugin/releases/latest will install the latest version.
 
 If the version of the plugin has already been installed, it will prompt to delete the existing one first. That can be
-overridden with the `-y,-yes` option.
+overridden with the `-y, -yes` option.
+
+To skip installing the plugin if the version is already installed, use the `-s, --skip-if-installed` option.
 
 Example of installing the CSV plugin:
 

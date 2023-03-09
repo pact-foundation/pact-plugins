@@ -19,14 +19,15 @@ use serde_json::Value;
 use sha2::{Sha256, Digest};
 use tracing::{debug, info, trace};
 
-use crate::resolve_plugin_dir;
+use crate::{find_plugin, resolve_plugin_dir};
 
 use super::InstallationSource;
 
 pub fn install_plugin(
   source: &String,
   _source_type: &Option<InstallationSource>,
-  override_prompt: bool
+  override_prompt: bool,
+  skip_if_installed: bool
 ) -> anyhow::Result<()> {
   let runtime = tokio::runtime::Builder::new_multi_thread()
     .enable_all()
@@ -60,19 +61,24 @@ pub fn install_plugin(
           .context("Parsing JSON manifest file from GitHub")?;
         debug!(?manifest, "Loaded manifest from GitHub");
 
-        println!("Installing plugin {} version {}", manifest.name, manifest.version);
-        let plugin_dir = create_plugin_dir(&manifest, override_prompt)
-          .context("Creating plugins directory")?;
-        download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag).await?;
+        if !skip_if_installed || !already_installed(&manifest) {
+          println!("Installing plugin {} version {}", manifest.name, manifest.version);
+          let plugin_dir = create_plugin_dir(&manifest, override_prompt)
+            .context("Creating plugins directory")?;
+          download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag).await?;
 
-        env::set_var("pact_do_not_track", "true");
-        load_plugin(&manifest.as_dependency())
-          .await
-          .and_then(|plugin| {
-            println!("Installed plugin {} version {} OK", manifest.name, manifest.version);
-            plugin.kill();
-            Ok(())
-          })
+          env::set_var("pact_do_not_track", "true");
+          load_plugin(&manifest.as_dependency())
+            .await
+            .and_then(|plugin| {
+              println!("Installed plugin {} version {} OK", manifest.name, manifest.version);
+              plugin.kill();
+              Ok(())
+            })
+        } else {
+          println!("Skipping installing plugin {} version {} as it is already installed", manifest.name, manifest.version);
+          Ok(())
+        }
       } else {
         bail!("GitHub release page does not have a valid tag_name attribute");
       }
@@ -83,6 +89,10 @@ pub fn install_plugin(
   trace!("Result = {:?}", result);
   runtime.shutdown_background();
   result
+}
+
+fn already_installed(manifest: &PactPluginManifest) -> bool {
+  find_plugin(&manifest.name, &Some(manifest.version.clone())).is_ok()
 }
 
 async fn download_plugin_executable(

@@ -61,6 +61,10 @@ enum Commands {
     /// Automatically answer Yes for all prompts
     yes: bool,
 
+    #[clap(short, long)]
+    /// Skip installing the plugin if the same version is already installed
+    skip_if_installed: bool,
+
     /// Where to fetch the plugin files from. This should be a URL.
     source: String
   },
@@ -136,7 +140,7 @@ fn main() -> anyhow::Result<()> {
   match &cli.command {
     Commands::List => list_plugins(),
     Commands::Env => print_env(),
-    Commands::Install { yes, source, source_type } => install::install_plugin(source, source_type, *yes || cli.yes),
+    Commands::Install { yes, skip_if_installed, source, source_type } => install::install_plugin(source, source_type, *yes || cli.yes, *skip_if_installed),
     Commands::Remove { yes, name, version } => remove_plugin(name, version, *yes || cli.yes),
     Commands::Enable { name, version } => enable_plugin(name, version),
     Commands::Disable { name, version } => disable_plugin(name, version)

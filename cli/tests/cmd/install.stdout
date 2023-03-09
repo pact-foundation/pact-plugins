@@ -15,5 +15,8 @@ Options:
   -y, --yes
           Automatically answer Yes for all prompts
 
+  -s, --skip-if-installed
+          Skip installing the plugin if the same version is already installed
+
   -h, --help
           Print help (see a summary with '-h')
