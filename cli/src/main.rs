@@ -38,7 +38,7 @@ struct Cli {
 
   #[clap(short = 'v', long = "version", action = clap::ArgAction::Version)]
   /// Print CLI version
-  cli_version: bool
+  cli_version: Option<bool>
 }
 
 #[derive(Subcommand, Debug)]
