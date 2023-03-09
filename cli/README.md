@@ -6,9 +6,8 @@ This project provides a command line interface to manage and install Pact plugin
 
 Running `pact-plugin-cli` without any options displays the standard help.
 
-```console
-$ pact-plugin-cli 
-? 2
+```console,ignore
+$ pact-plugin-cli
 CLI utility for Pact plugins
 
 Usage: pact-plugin-cli [OPTIONS] <COMMAND>
