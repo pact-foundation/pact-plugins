@@ -3,6 +3,7 @@ use std::cmp::Ordering;
 use std::fs::File;
 use std::io::BufReader;
 use std::path::PathBuf;
+use std::process::ExitCode;
 use std::str::FromStr;
 
 use anyhow::anyhow;
@@ -12,10 +13,11 @@ use comfy_table::Table;
 use itertools::Itertools;
 use pact_plugin_driver::plugin_models::PactPluginManifest;
 use requestty::OnEsc;
-use tracing::Level;
+use tracing::{error, Level};
 use tracing_subscriber::FmtSubscriber;
 
 mod install;
+mod repository;
 
 #[derive(Parser, Debug)]
 #[clap(about, version)]
@@ -98,7 +100,42 @@ enum Commands {
 
     /// Plugin version. Not required if there is only one plugin version.
     version: Option<String>
-  }
+  },
+
+  /// Sub-commands for dealing with a plugin repository
+  #[command(subcommand)]
+  Repository(RepositoryCommands)
+}
+
+#[derive(Subcommand, Debug)]
+enum RepositoryCommands {
+  /// Check the consistency of the repository index file
+  Validate,
+
+  /// Create a new blank repository index file
+  New {
+    /// Filename to use for the new file. By default will use repository.index
+    filename: Option<String>,
+
+    #[clap(short, long)]
+    /// Overwrite any existing file?
+    overwrite: bool
+  },
+
+  /// Add a plugin version to the index file (will update existing entry)
+  AddPluginVersion,
+
+  /// Add all versions of a plugin to the index file (will update existing entries)
+  AddAllPluginVersions,
+
+  /// Remove a plugin version from the index file
+  YankVersion,
+
+  /// List all plugins found in the index file
+  List,
+
+  /// List all plugin versions found in the index file
+  ListVersions
 }
 
 /// Installation source to fetch plugins files from
@@ -119,7 +156,7 @@ impl FromStr for InstallationSource {
   }
 }
 
-fn main() -> anyhow::Result<()> {
+fn main() -> Result<(), ExitCode> {
   let cli = Cli::parse();
 
   let log_level = if cli.trace {
@@ -137,14 +174,20 @@ fn main() -> anyhow::Result<()> {
     eprintln!("WARN: Failed to initialise global tracing subscriber - {err}");
   };
 
-  match &cli.command {
+  let result = match &cli.command {
     Commands::List => list_plugins(),
     Commands::Env => print_env(),
     Commands::Install { yes, skip_if_installed, source, source_type } => install::install_plugin(source, source_type, *yes || cli.yes, *skip_if_installed),
     Commands::Remove { yes, name, version } => remove_plugin(name, version, *yes || cli.yes),
     Commands::Enable { name, version } => enable_plugin(name, version),
-    Commands::Disable { name, version } => disable_plugin(name, version)
-  }
+    Commands::Disable { name, version } => disable_plugin(name, version),
+    Commands::Repository(command) => repository::handle_command(command)
+  };
+
+  result.map_err(|err| {
+    error!("error - {}", err);
+    ExitCode::FAILURE
+  })
 }
 
 fn remove_plugin(name: &String, version: &Option<String>, override_prompt: bool) -> anyhow::Result<()> {

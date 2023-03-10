@@ -3,13 +3,14 @@ CLI utility for Pact plugins
 Usage: pact-plugin-cli [OPTIONS] <COMMAND>
 
 Commands:
-  list     List installed plugins
-  env      Print out the Pact plugin environment config
-  install  Install a plugin
-  remove   Remove a plugin
-  enable   Enable a plugin version
-  disable  Disable a plugin version
-  help     Print this message or the help of the given subcommand(s)
+  list        List installed plugins
+  env         Print out the Pact plugin environment config
+  install     Install a plugin
+  remove      Remove a plugin
+  enable      Enable a plugin version
+  disable     Disable a plugin version
+  repository  Sub-commands for dealing with a plugin repository
+  help        Print this message or the help of the given subcommand(s)
 
 Options:
   -y, --yes      Automatically answer Yes for all prompts
