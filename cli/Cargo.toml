@@ -35,6 +35,7 @@ flate2 = "1.0"
 zip = "0.6.2"
 chrono = { version = "0.4.23", features = ["serde"]}
 toml = "0.7.2"
+semver = "1.0.14"
 
 [dev-dependencies]
 trycmd = "0.14.13"

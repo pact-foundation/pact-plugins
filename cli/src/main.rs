@@ -126,7 +126,8 @@ enum RepositoryCommands {
   },
 
   /// Add a plugin version to the index file (will update existing entry)
-  AddPluginVersion,
+  #[command(subcommand)]
+  AddPluginVersion(PluginVersionCommand),
 
   /// Add all versions of a plugin to the index file (will update existing entries)
   AddAllPluginVersions,
@@ -139,6 +140,12 @@ enum RepositoryCommands {
 
   /// List all plugin versions found in the index file
   ListVersions
+}
+
+#[derive(Subcommand, Debug)]
+enum PluginVersionCommand {
+  /// Add an entry for a local plugin manifest file to the repository file
+  File { repository_file: String, file: String }
 }
 
 /// Installation source to fetch plugins files from

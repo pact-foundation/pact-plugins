@@ -1462,6 +1462,7 @@ dependencies = [
  "pact-plugin-driver",
  "requestty",
  "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "sha2",
