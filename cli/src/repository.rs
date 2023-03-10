@@ -45,31 +45,62 @@ struct PluginRepositoryIndex {
 }
 
 /// Struct to store the plugin version entries
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct PluginEntry {
   /// Name of the plugin
   name: String,
   /// Latest version
   latest_version: String,
   /// All the plugin versions
-  versions: Vec<PactPluginManifest>
+  versions: Vec<PluginVersion>
+}
+
+/// Struct to store the plugin versions
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct PluginVersion {
+  /// Version of the plugin
+  version: String,
+  /// Source the manifest was loaded from
+  source: ManifestSource,
+  /// Manifest
+  manifest: Option<PactPluginManifest>
+}
+
+/// Struct to store the plugin versions
+#[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(tag = "type", content = "value")]
+enum ManifestSource {
+  /// Loaded from a file
+  File(String),
+
+  /// Loaded from a GitHub release
+  GitHubRelease(String)
 }
 
 impl PluginEntry {
-  fn new(manifest: &PactPluginManifest) -> PluginEntry {
+  fn new(manifest: &PactPluginManifest, source: &ManifestSource) -> PluginEntry {
     PluginEntry {
       name: manifest.name.clone(),
       latest_version: manifest.version.clone(),
-      versions: vec![manifest.clone()]
+      versions: vec![PluginVersion {
+        version: manifest.version.clone(),
+        source: source.clone(),
+        manifest: Some(manifest.clone())
+      }]
     }
   }
 
-  fn add_version(&mut self, manifest: &PactPluginManifest) {
+  fn add_version(&mut self, manifest: &PactPluginManifest, source: &ManifestSource) {
     if let Some(version) = self.versions.iter_mut()
       .find(|m| m.version == manifest.version) {
-      *version = manifest.clone()
+      version.source = source.clone();
+      version.manifest = Some(manifest.clone());
     } else {
-      self.versions.push(manifest.clone());
+      self.versions.push(PluginVersion {
+        version: manifest.version.clone(),
+        source: source.clone(),
+        manifest: Some(manifest.clone())
+      });
     }
     self.update_latest_version();
   }
@@ -186,14 +217,14 @@ fn handle_add_plugin_command(command: &PluginVersionCommand) -> anyhow::Result<(
     PluginVersionCommand::File { repository_file, file } => {
       let repository_file = validate_filename(repository_file, "Repository")?;
       let file = validate_filename(file, "Plugin manifest file")?;
-      let f = File::open(file)?;
+      let f = File::open(&file)?;
       let reader = BufReader::new(f);
       let manifest: PactPluginManifest = serde_json::from_reader(reader)?;
       let mut index = load_index_file(&repository_file)?;
       index.entries
         .entry(manifest.name.clone())
-        .and_modify(|entry| entry.add_version(&manifest))
-        .or_insert_with(|| PluginEntry::new(&manifest));
+        .and_modify(|entry| entry.add_version(&manifest, &ManifestSource::File(file.to_string_lossy().to_string())))
+        .or_insert_with(|| PluginEntry::new(&manifest, &ManifestSource::File(file.to_string_lossy().to_string())));
       index.index_version += 1;
       let toml = toml::to_string(&index)?;
       let mut f = File::create(&repository_file)?;
@@ -261,10 +292,9 @@ fn load_sha(repository_file: &PathBuf) -> anyhow::Result<String> {
 fn validate_filename(filename: &str, file_description: &str) -> anyhow::Result<PathBuf> {
   let path = PathBuf::from(filename);
   let abs_path = path.canonicalize().unwrap_or(path.clone());
-  if path.exists() {
-    Ok(path)
+  if abs_path.exists() {
+    Ok(abs_path)
   } else {
     Err(anyhow!("{} file '{}' does not exist", file_description, abs_path.to_string_lossy()))
   }
 }
-
