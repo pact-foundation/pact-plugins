@@ -5,7 +5,7 @@ use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
 use anyhow::anyhow;
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local, Utc};
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::Table;
 use serde::{Deserialize, Serialize};
@@ -106,12 +106,16 @@ fn validate_repository_file(filename: &String) -> anyhow::Result<()> {
     let mut table = Table::new();
     table
       .load_preset(UTF8_FULL)
-      .set_header(vec!["Key", "Value"]);
+      .set_header(vec!["Key", "Value", ""]);
 
-    table.add_row(vec![ "Format Version", index.format_version.to_string().as_str() ]);
-    table.add_row(vec![ "Index Version", index.index_version.to_string().as_str() ]);
-    table.add_row(vec![ "Last Modified", index.timestamp.to_string().as_str() ]);
-    table.add_row(vec![ "Entries", index.entries.len().to_string().as_str() ]);
+    table.add_row(vec![ "Format Version", index.format_version.to_string().as_str(), "" ]);
+    table.add_row(vec![ "Index Version", index.index_version.to_string().as_str(), "" ]);
+
+    let local_timestamp: DateTime<Local> = index.timestamp.into();
+    let additional = format!("Local: {}", local_timestamp);
+    table.add_row(vec![ "Last Modified", index.timestamp.to_string().as_str(), additional.as_str() ]);
+
+    table.add_row(vec![ "Entries", index.entries.len().to_string().as_str(), "" ]);
 
     println!("{table}");
 
