@@ -1,11 +1,13 @@
 use std::collections::HashMap;
 use std::fs;
 use std::fs::File;
-use std::io::Write;
+use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
 use anyhow::anyhow;
 use chrono::{DateTime, Utc};
+use comfy_table::presets::UTF8_FULL;
+use comfy_table::Table;
 use serde::{Deserialize, Serialize};
 use tracing::info;
 
@@ -13,9 +15,7 @@ use crate::RepositoryCommands;
 
 pub(crate) fn handle_command(repository_command: &RepositoryCommands) -> anyhow::Result<()> {
   match repository_command {
-    RepositoryCommands::Validate => {
-      todo!()
-    }
+    RepositoryCommands::Validate { filename } => validate_repository_file(filename),
     RepositoryCommands::New { filename, overwrite } => new_repository(filename, *overwrite),
     RepositoryCommands::AddPluginVersion => { todo!() }
     RepositoryCommands::AddAllPluginVersions => { todo!() }
@@ -83,5 +83,40 @@ fn new_repository(filename: &Option<String>, overwrite: bool) -> anyhow::Result<
     println!("Created new blank repository file '{}'", abs_path.to_string_lossy());
 
     Ok(())
+  }
+}
+
+fn validate_repository_file(filename: &String) -> anyhow::Result<()> {
+  let path = PathBuf::from(filename.as_str());
+  let abs_path = path.canonicalize().unwrap_or(path.clone());
+  if path.exists() {
+    let f = File::open(path.clone())?;
+    let mut reader = BufReader::new(f);
+    let mut buffer = String::new();
+    reader.read_to_string(&mut buffer)?;
+    let index: PluginRepositoryIndex = toml::from_str(buffer.as_str())?;
+
+    if index.format_version != 0 {
+      return Err(anyhow!("Error: format_version is not valid: {}", index.format_version));
+    }
+
+    println!("'{}' OK", abs_path.to_string_lossy());
+    println!();
+
+    let mut table = Table::new();
+    table
+      .load_preset(UTF8_FULL)
+      .set_header(vec!["Key", "Value"]);
+
+    table.add_row(vec![ "Format Version", index.format_version.to_string().as_str() ]);
+    table.add_row(vec![ "Index Version", index.index_version.to_string().as_str() ]);
+    table.add_row(vec![ "Last Modified", index.timestamp.to_string().as_str() ]);
+    table.add_row(vec![ "Entries", index.entries.len().to_string().as_str() ]);
+
+    println!("{table}");
+
+    Ok(())
+  } else {
+    Err(anyhow!("Repository file '{}' does not exist", abs_path.to_string_lossy()))
   }
 }

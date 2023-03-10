@@ -110,7 +110,10 @@ enum Commands {
 #[derive(Subcommand, Debug)]
 enum RepositoryCommands {
   /// Check the consistency of the repository index file
-  Validate,
+  Validate {
+    /// Filename to validate
+    filename: String
+  },
 
   /// Create a new blank repository index file
   New {
