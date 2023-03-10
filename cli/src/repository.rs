@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{BufReader, Read, Write};
 use std::path::PathBuf;
 
-use anyhow::anyhow;
+use anyhow::{anyhow, bail, Context};
 use chrono::{DateTime, Local, Utc};
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::Table;
@@ -13,9 +13,10 @@ use pact_plugin_driver::plugin_models::PactPluginManifest;
 use semver::Version;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use tracing::info;
+use tracing::{debug, info, trace};
 
 use crate::{PluginVersionCommand, RepositoryCommands};
+use crate::install::{download_json_from_github, fetch_json_from_url, json_to_string};
 
 pub(crate) fn handle_command(repository_command: &RepositoryCommands) -> anyhow::Result<()> {
   match repository_command {
@@ -238,21 +239,77 @@ fn handle_add_plugin_command(command: &PluginVersionCommand) -> anyhow::Result<(
       let reader = BufReader::new(f);
       let manifest: PactPluginManifest = serde_json::from_reader(reader)?;
       let mut index = load_index_file(&repository_file)?;
-      index.entries
-        .entry(manifest.name.clone())
-        .and_modify(|entry| entry.add_version(&manifest, &ManifestSource::File(file.to_string_lossy().to_string())))
-        .or_insert_with(|| PluginEntry::new(&manifest, &ManifestSource::File(file.to_string_lossy().to_string())));
-      index.index_version += 1;
-      let toml = toml::to_string(&index)?;
-      let mut f = File::create(&repository_file)?;
-      f.write_all(toml.as_bytes())?;
-      generate_sha_digest(&repository_file)?;
-
-      println!("Added plugin version {}/{} to repository file '{}'",
-        manifest.name, manifest.version, repository_file.to_string_lossy());
+      add_manifest_to_index(&repository_file, &manifest, &mut index, &ManifestSource::File(file.to_string_lossy().to_string()))?;
+      Ok(())
+    }
+    PluginVersionCommand::GitHub { repository_file, url } => {
+      let repository_file = validate_filename(repository_file, "Repository")?;
+      let mut index = load_index_file(&repository_file)?;
+      let manifest = download_manifest_from_github(url)
+        .context("Downloading manifest file from GitHub")?;
+      add_manifest_to_index(&repository_file, &manifest, &mut index, &ManifestSource::GitHubRelease(url.to_string()))?;
       Ok(())
     }
   }
+}
+
+fn add_manifest_to_index(
+  repository_file: &PathBuf,
+  manifest: &PactPluginManifest,
+  index: &mut PluginRepositoryIndex,
+  source: &ManifestSource
+) -> anyhow::Result<()> {
+  index.entries
+    .entry(manifest.name.clone())
+    .and_modify(|entry| entry.add_version(&manifest, source))
+    .or_insert_with(|| PluginEntry::new(&manifest, source));
+  index.index_version += 1;
+  let toml = toml::to_string(&index)?;
+  let mut f = File::create(&repository_file)?;
+  f.write_all(toml.as_bytes())?;
+  generate_sha_digest(&repository_file)?;
+
+  println!("Added plugin version {}/{} to repository file '{}'",
+           manifest.name, manifest.version, repository_file.to_string_lossy());
+  Ok(())
+}
+
+fn download_manifest_from_github(source: &String) -> anyhow::Result<PactPluginManifest> {
+  let runtime = tokio::runtime::Builder::new_multi_thread()
+    .enable_all()
+    .build()?;
+
+  let result = runtime.block_on(async {
+    let http_client = reqwest::ClientBuilder::new()
+      .build()?;
+
+    let response = fetch_json_from_url(source, &http_client).await?;
+    if let Some(map) = response.as_object() {
+      if let Some(tag) = map.get("tag_name") {
+        let tag = json_to_string(tag);
+        debug!(%tag, "Found tag");
+        let url = if source.ends_with("/latest") {
+          source.strip_suffix("/latest").unwrap_or(source)
+        } else {
+          let suffix = format!("/tag/{}", tag);
+          source.strip_suffix(suffix.as_str()).unwrap_or(source)
+        };
+        let manifest_json = download_json_from_github(&http_client, url, &tag, "pact-plugin.json")
+          .await.context("Downloading manifest file from GitHub")?;
+        let manifest: PactPluginManifest = serde_json::from_value(manifest_json)
+          .context("Parsing JSON manifest file from GitHub")?;
+        debug!(?manifest, "Loaded manifest from GitHub");
+        Ok(manifest)
+      } else {
+        bail!("GitHub release page does not have a valid tag_name attribute");
+      }
+    } else {
+      bail!("Response from source is not a valid JSON from a GitHub release page")
+    }
+  });
+  trace!("Result = {:?}", result);
+  runtime.shutdown_background();
+  result
 }
 
 fn generate_sha_digest(repository_file: &PathBuf) -> anyhow::Result<String> {

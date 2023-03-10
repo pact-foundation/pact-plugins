@@ -37,14 +37,7 @@ pub fn install_plugin(
     let http_client = reqwest::ClientBuilder::new()
       .build()?;
 
-    info!(%source, "Fetching root document for source");
-    let response: Value = http_client.get(source)
-      .header("accept", "application/json")
-      .send()
-      .await.context("Fetching root document for source")?
-      .json()
-      .await.context("Parsing root JSON document for source")?;
-
+    let response = fetch_json_from_url(source, &http_client).await?;
     if let Some(map) = response.as_object() {
       if let Some(tag) = map.get("tag_name") {
         let tag = json_to_string(tag);
@@ -89,6 +82,17 @@ pub fn install_plugin(
   trace!("Result = {:?}", result);
   runtime.shutdown_background();
   result
+}
+
+pub(crate) async fn fetch_json_from_url(source: &str, http_client: &Client) -> anyhow::Result<Value> {
+  info!(%source, "Fetching root document for source");
+  let response: Value = http_client.get(source)
+    .header("accept", "application/json")
+    .send()
+    .await.context("Fetching root document for source")?
+    .json()
+    .await.context("Parsing root JSON document for source")?;
+  Ok(response)
 }
 
 fn already_installed(manifest: &PactPluginManifest) -> bool {
@@ -364,14 +368,14 @@ fn prompt_continue(manifest: &PactPluginManifest) -> bool {
   }
 }
 
-fn json_to_string(value: &Value) -> String {
+pub(crate) fn json_to_string(value: &Value) -> String {
   match value {
     Value::String(s) => s.clone(),
     _ => value.to_string()
   }
 }
 
-async fn download_json_from_github(http_client: &Client, base_url: &str, tag: &String, filename: &str) -> anyhow::Result<Value> {
+pub(crate) async fn download_json_from_github(http_client: &Client, base_url: &str, tag: &String, filename: &str) -> anyhow::Result<Value> {
   let url = format!("{}/download/{}/{}", base_url, tag, filename);
   debug!("Downloading JSON file from {}", url);
   Ok(http_client.get(url)

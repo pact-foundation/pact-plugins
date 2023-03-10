@@ -154,7 +154,10 @@ enum RepositoryCommands {
 #[derive(Subcommand, Debug)]
 enum PluginVersionCommand {
   /// Add an entry for a local plugin manifest file to the repository file
-  File { repository_file: String, file: String }
+  File { repository_file: String, file: String },
+
+  /// Add an entry for a GitHub Release to the repository file
+  GitHub { repository_file: String, url: String }
 }
 
 /// Installation source to fetch plugins files from
