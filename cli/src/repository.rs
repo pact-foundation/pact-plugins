@@ -11,6 +11,7 @@ use comfy_table::Table;
 use pact_plugin_driver::plugin_models::PactPluginManifest;
 use semver::Version;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use tracing::info;
 
 use crate::{PluginVersionCommand, RepositoryCommands};
@@ -118,6 +119,7 @@ fn new_repository(filename: &Option<String>, overwrite: bool) -> anyhow::Result<
     let toml = toml::to_string(&repository)?;
     let mut f = File::create(path.clone())?;
     f.write_all(toml.as_bytes())?;
+    generate_sha_digest(&path)?;
 
     println!("Created new blank repository file '{}'", abs_path.to_string_lossy());
 
@@ -129,6 +131,12 @@ fn validate_repository_file(filename: &String) -> anyhow::Result<()> {
   let path = PathBuf::from(filename.as_str());
   let abs_path = path.canonicalize().unwrap_or(path.clone());
   if path.exists() {
+    let sha = calculate_sha(&path)?;
+    let expected_sha = load_sha(&path)?;
+    if sha != expected_sha {
+      return Err(anyhow!("Error: SHA256 digest does not match: expected {} but got {}", expected_sha, sha));
+    }
+
     let index = load_index_file(&path)?;
 
     if index.format_version != 0 {
@@ -150,7 +158,11 @@ fn validate_repository_file(filename: &String) -> anyhow::Result<()> {
     let additional = format!("Local: {}", local_timestamp);
     table.add_row(vec![ "Last Modified", index.timestamp.to_string().as_str(), additional.as_str() ]);
 
-    table.add_row(vec![ "Entries", index.entries.len().to_string().as_str(), "" ]);
+    table.add_row(vec![ "Plugin Entries", index.entries.len().to_string().as_str(), "" ]);
+    let versions = index.entries.iter()
+      .fold(0, |acc, (_, entry)| acc + entry.versions.len());
+    table.add_row(vec![ "Total Versions", versions.to_string().as_str(), "" ]);
+    table.add_row(vec![ "SHA", sha.as_str(), "" ]);
 
     println!("{table}");
 
@@ -182,15 +194,68 @@ fn handle_add_plugin_command(command: &PluginVersionCommand) -> anyhow::Result<(
         .entry(manifest.name.clone())
         .and_modify(|entry| entry.add_version(&manifest))
         .or_insert_with(|| PluginEntry::new(&manifest));
+      index.index_version += 1;
       let toml = toml::to_string(&index)?;
       let mut f = File::create(&repository_file)?;
       f.write_all(toml.as_bytes())?;
+      generate_sha_digest(&repository_file)?;
 
       println!("Added plugin version {}/{} to repository file '{}'",
         manifest.name, manifest.version, repository_file.to_string_lossy());
       Ok(())
     }
   }
+}
+
+fn generate_sha_digest(repository_file: &PathBuf) -> anyhow::Result<String> {
+  let file = get_sha_file_for_repository_file(repository_file)?;
+  let calculated = calculate_sha(repository_file)?;
+
+  let mut f = File::create(file)?;
+  f.write_all(calculated.as_bytes())?;
+  Ok(calculated)
+}
+
+fn get_sha_file_for_repository_file(repository_file: &PathBuf) -> anyhow::Result<PathBuf> {
+  let filename_base = repository_file.file_name()
+    .ok_or_else(|| anyhow!("Could not get the filename for repository file '{}'", repository_file.to_string_lossy()))?
+    .to_string_lossy();
+  let sha_file = format!("{}.sha256", filename_base);
+  let file = repository_file.parent()
+    .ok_or_else(|| anyhow!("Could not get the parent path for repository file '{}'", repository_file.to_string_lossy()))?
+    .join(sha_file.as_str());
+  Ok(file)
+}
+
+fn calculate_sha(repository_file: &PathBuf) -> anyhow::Result<String> {
+  let mut f = File::open(repository_file)?;
+  let mut hasher = Sha256::new();
+  let mut buffer = [0_u8; 256];
+  let mut done = false;
+
+  while !done {
+    let amount = f.read(&mut buffer)?;
+    if amount == 0 {
+      done = true;
+    } else if amount == 256 {
+      hasher.update(&buffer);
+    } else {
+      let b = &buffer[0..amount];
+      hasher.update(b);
+    }
+  }
+
+  let result = hasher.finalize();
+  let calculated = format!("{:x}", result);
+  Ok(calculated)
+}
+
+fn load_sha(repository_file: &PathBuf) -> anyhow::Result<String> {
+  let sha_file = get_sha_file_for_repository_file(repository_file)?;
+  let mut f = File::open(sha_file)?;
+  let mut buffer = String::new();
+  f.read_to_string(&mut buffer)?;
+  Ok(buffer)
 }
 
 fn validate_filename(filename: &str, file_description: &str) -> anyhow::Result<PathBuf> {
