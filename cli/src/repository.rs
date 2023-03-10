@@ -8,6 +8,7 @@ use anyhow::anyhow;
 use chrono::{DateTime, Local, Utc};
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::Table;
+use itertools::Itertools;
 use pact_plugin_driver::plugin_models::PactPluginManifest;
 use semver::Version;
 use serde::{Deserialize, Serialize};
@@ -23,8 +24,8 @@ pub(crate) fn handle_command(repository_command: &RepositoryCommands) -> anyhow:
     RepositoryCommands::AddPluginVersion(command) => handle_add_plugin_command(command),
     RepositoryCommands::AddAllPluginVersions => { todo!() }
     RepositoryCommands::YankVersion => { todo!() }
-    RepositoryCommands::List => { todo!() }
-    RepositoryCommands::ListVersions => { todo!() }
+    RepositoryCommands::List { filename } => list_entries(filename),
+    RepositoryCommands::ListVersions { filename, name } => list_versions(filename, name)
   }
 }
 
@@ -75,6 +76,22 @@ enum ManifestSource {
 
   /// Loaded from a GitHub release
   GitHubRelease(String)
+}
+
+impl ManifestSource {
+  fn name(&self) -> String {
+    match self {
+      ManifestSource::File(_) => "file".to_string(),
+      ManifestSource::GitHubRelease(_) => "GitHub release".to_string()
+    }
+  }
+
+  fn value(&self) -> String {
+    match self {
+      ManifestSource::File(v) => v.clone(),
+      ManifestSource::GitHubRelease(v) => v.clone()
+    }
+  }
 }
 
 impl PluginEntry {
@@ -297,4 +314,51 @@ fn validate_filename(filename: &str, file_description: &str) -> anyhow::Result<P
   } else {
     Err(anyhow!("{} file '{}' does not exist", file_description, abs_path.to_string_lossy()))
   }
+}
+
+fn list_versions(filename: &String, plugin_name: &String) -> anyhow::Result<()> {
+  let repository_file = validate_filename(filename, "Repository")?;
+  let index = load_index_file(&repository_file)?;
+  let mut table = Table::new();
+  table
+    .load_preset(UTF8_FULL)
+    .set_header(vec!["Name", "Version", "Source", "Value"]);
+
+  if let Some(entry) = index.entries.get(plugin_name.as_str()) {
+    for version in entry.versions.iter().sorted_by_key(|v| v.version.clone()) {
+      table.add_row(vec![
+        plugin_name.as_str(),
+        version.version.as_str(),
+        version.source.name().as_str(),
+        version.source.value().as_str()
+      ]);
+    }
+  }
+
+  println!("{table}");
+
+  Ok(())
+}
+
+fn list_entries(filename: &String) -> anyhow::Result<()> {
+  let repository_file = validate_filename(filename, "Repository")?;
+  let index = load_index_file(&repository_file)?;
+
+  let mut table = Table::new();
+  table
+    .load_preset(UTF8_FULL)
+    .set_header(vec!["Key", "Name", "Latest Version", "Versions"]);
+
+  for (key, entry) in index.entries.iter().sorted_by_key(|(k, _)| k.clone()) {
+    table.add_row(vec![
+      key.as_str(),
+      entry.name.as_str(),
+      entry.latest_version.as_str(),
+      entry.versions.len().to_string().as_str()
+    ]);
+  }
+
+  println!("{table}");
+
+  Ok(())
 }

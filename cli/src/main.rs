@@ -136,10 +136,19 @@ enum RepositoryCommands {
   YankVersion,
 
   /// List all plugins found in the index file
-  List,
+  List {
+    /// Filename to list entries from
+    filename: String
+  },
 
   /// List all plugin versions found in the index file
-  ListVersions
+  ListVersions{
+    /// Filename to list versions from
+    filename: String,
+
+    /// Plugin entry to list versions for
+    name: String
+  }
 }
 
 #[derive(Subcommand, Debug)]
