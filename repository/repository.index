@@ -1,0 +1,79 @@
+index_version = 4
+format_version = 0
+timestamp = "2023-03-10T05:36:45.725083896Z"
+
+[entries.csv]
+name = "csv"
+latest_version = "0.0.3"
+
+[[entries.csv.versions]]
+version = "0.0.0"
+
+[entries.csv.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.0"
+
+[entries.csv.versions.manifest]
+pluginInterfaceVersion = 1
+name = "csv"
+version = "0.0.0"
+executableType = "exec"
+entryPoint = "pact-plugin-csv"
+
+[entries.csv.versions.manifest.entryPoints]
+
+[entries.csv.versions.manifest.pluginConfig]
+
+[[entries.csv.versions]]
+version = "0.0.1"
+
+[entries.csv.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.1"
+
+[entries.csv.versions.manifest]
+pluginInterfaceVersion = 1
+name = "csv"
+version = "0.0.1"
+executableType = "exec"
+entryPoint = "pact-csv-plugin"
+
+[entries.csv.versions.manifest.entryPoints]
+
+[entries.csv.versions.manifest.pluginConfig]
+
+[[entries.csv.versions]]
+version = "0.0.2"
+
+[entries.csv.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.2"
+
+[entries.csv.versions.manifest]
+pluginInterfaceVersion = 1
+name = "csv"
+version = "0.0.2"
+executableType = "exec"
+entryPoint = "pact-csv-plugin"
+
+[entries.csv.versions.manifest.entryPoints]
+
+[entries.csv.versions.manifest.pluginConfig]
+
+[[entries.csv.versions]]
+version = "0.0.3"
+
+[entries.csv.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.3"
+
+[entries.csv.versions.manifest]
+pluginInterfaceVersion = 1
+name = "csv"
+version = "0.0.3"
+executableType = "exec"
+entryPoint = "pact-csv-plugin"
+
+[entries.csv.versions.manifest.entryPoints]
+
+[entries.csv.versions.manifest.pluginConfig]
