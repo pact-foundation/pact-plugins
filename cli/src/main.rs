@@ -130,7 +130,19 @@ enum RepositoryCommands {
   AddPluginVersion(PluginVersionCommand),
 
   /// Add all versions of a plugin to the index file (will update existing entries)
-  AddAllPluginVersions,
+  AddAllPluginVersions {
+    /// Repository index file to update
+    repository_file: String,
+
+    /// Repository owner to load versions from
+    owner: String,
+
+    /// Repository to load versions from
+    repository: String,
+
+    /// Base URL for GitHub APIs, will default to https://api.github.com/repos/
+    base_url: Option<String>
+  },
 
   /// Remove a plugin version from the index file
   YankVersion,

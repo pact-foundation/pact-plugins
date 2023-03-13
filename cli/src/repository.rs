@@ -12,18 +12,20 @@ use itertools::Itertools;
 use pact_plugin_driver::plugin_models::PactPluginManifest;
 use semver::Version;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use sha2::{Digest, Sha256};
 use tracing::{debug, info, trace};
 
 use crate::{PluginVersionCommand, RepositoryCommands};
 use crate::install::{download_json_from_github, fetch_json_from_url, json_to_string};
+use crate::repository::ManifestSource::GitHubRelease;
 
 pub(crate) fn handle_command(repository_command: &RepositoryCommands) -> anyhow::Result<()> {
   match repository_command {
     RepositoryCommands::Validate { filename } => validate_repository_file(filename),
     RepositoryCommands::New { filename, overwrite } => new_repository(filename, *overwrite),
     RepositoryCommands::AddPluginVersion(command) => handle_add_plugin_command(command),
-    RepositoryCommands::AddAllPluginVersions => { todo!() }
+    RepositoryCommands::AddAllPluginVersions { repository_file, base_url, owner, repository } => handle_add_all_versions(repository_file, base_url, owner, repository),
     RepositoryCommands::YankVersion => { todo!() }
     RepositoryCommands::List { filename } => list_entries(filename),
     RepositoryCommands::ListVersions { filename, name } => list_versions(filename, name)
@@ -418,4 +420,89 @@ fn list_entries(filename: &String) -> anyhow::Result<()> {
   println!("{table}");
 
   Ok(())
+}
+
+static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+
+fn handle_add_all_versions(
+  repository_file: &String,
+  base_url: &Option<String>,
+  owner: &String,
+  repository: &String
+) -> anyhow::Result<()> {
+  let runtime = tokio::runtime::Builder::new_multi_thread()
+    .enable_all()
+    .build()?;
+  let repository_file = validate_filename(repository_file, "Repository")?;
+  let mut index = load_index_file(&repository_file)?;
+  let source = format!("{}/{}/{}/releases", base_url.clone().unwrap_or("https://api.github.com/repos".to_string()),
+    owner, repository);
+
+  let result = runtime.block_on(async move {
+    let http_client = reqwest::ClientBuilder::new()
+      .user_agent(APP_USER_AGENT)
+      .build()?;
+
+    let response = fetch_json_from_url(source.as_str(), &http_client).await?;
+    match response {
+      Value::Array(values) => {
+        for value in values {
+          match value {
+            Value::Object(attributes) => if let Some(url) = attributes.get("html_url") {
+              let release_url = json_to_string(url);
+              let source = GitHubRelease(release_url);
+              if let Some(assets) = attributes.get("assets") {
+                if let Value::Array(assets) = assets {
+                  if let Some(manifest_url) = assets.iter().find_map(|item| {
+                    match item {
+                      Value::Object(attributes) => if let Some(name) = attributes.get("name") {
+                        let name = json_to_string(name);
+                        if name == "pact-plugin.json" {
+                          if let Some(url) = attributes.get("browser_download_url") {
+                            Some(json_to_string(url))
+                          } else {
+                            None
+                          }
+                        } else {
+                          None
+                        }
+                      } else {
+                        None
+                      }
+                      _ => None
+                    }
+                  }) {
+                    let manifest_json = http_client.get(manifest_url).send().await?
+                      .json().await?;
+                    let manifest: PactPluginManifest = serde_json::from_value(manifest_json)
+                      .context("Parsing JSON manifest file from GitHub")?;
+                    index.entries
+                      .entry(manifest.name.clone())
+                      .and_modify(|entry| entry.add_version(&manifest, &source))
+                      .or_insert_with(|| PluginEntry::new(&manifest, &source));
+                  }
+                }
+              }
+            }
+            _ => bail!("Was expecting a JSON Object, but got '{}'", value)
+          }
+        }
+
+        index.index_version += 1;
+        let toml = toml::to_string(&index)?;
+        let mut f = File::create(&repository_file)?;
+        f.write_all(toml.as_bytes())?;
+        generate_sha_digest(&repository_file)?;
+
+        println!("Added all plugin versions from {}/{} to repository file '{}'",
+                 owner, repository, repository_file.to_string_lossy());
+        Ok(())
+      }
+      _ => bail!("Was expecting a JSON Array, but got '{}'", response)
+    }
+  });
+
+  trace!("Result = {:?}", result);
+  runtime.shutdown_background();
+  result
 }

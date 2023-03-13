@@ -92,6 +92,7 @@ pub(crate) async fn fetch_json_from_url(source: &str, http_client: &Client) -> a
     .await.context("Fetching root document for source")?
     .json()
     .await.context("Parsing root JSON document for source")?;
+  debug!(?response, "Got response");
   Ok(response)
 }
 
