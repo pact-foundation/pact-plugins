@@ -15,6 +15,7 @@ use anyhow::{anyhow, Context};
 use bytes::Bytes;
 use itertools::Either;
 use lazy_static::lazy_static;
+use log::max_level;
 use maplit::hashmap;
 use os_info::Type;
 use pact_models::bodies::OptionalBody;
@@ -27,7 +28,6 @@ use serde_json::Value;
 use sysinfo::{Pid, PidExt, ProcessExt, Signal, System, SystemExt};
 use tokio::process::Command;
 use tracing::{debug, trace, warn};
-use tracing::log::max_level;
 
 use crate::catalogue_manager::{all_entries, CatalogueEntry, register_plugin_entries, remove_plugin_entries};
 use crate::child_process::ChildPluginProcess;

@@ -1105,6 +1105,7 @@ dependencies = [
  "home",
  "itertools",
  "lazy_static",
+ "log",
  "maplit",
  "md5",
  "os_info",
