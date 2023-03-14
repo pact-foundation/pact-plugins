@@ -1,5 +1,13 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.3.3 - Maintenance Release
+
+* 922c57c - chore: bump pact models to 1.0.6 (Ronald Holshausen, Tue Mar 14 16:54:32 2023 +1100)
+* 9954abb - chore: fix driver build on musl (Ronald Holshausen, Tue Mar 14 14:06:19 2023 +1100)
+* 0a73143 - chore: use log crate, as tracing::log::max_level is not available on Alpine (Ronald Holshausen, Tue Mar 14 13:48:30 2023 +1100)
+* 8ae7e7e - fix: require the log feature for tracing crate (Ronald Holshausen, Tue Mar 14 12:12:26 2023 +1100)
+* 8e335d5 - bump version to 0.3.3 (Ronald Holshausen, Thu Feb 16 12:00:23 2023 +1100)
+
 # 0.3.2 - Bugfix Release
 
 * 1ffd3ad - fix: InteractionVerificationData fields were not public and there was no constructor function (Ronald Holshausen, Thu Feb 16 11:43:26 2023 +1100)
