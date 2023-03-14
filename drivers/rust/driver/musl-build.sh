@@ -1,10 +1,12 @@
 #!/bin/bash
 
 set -e
+set -x
 
 apk add protobuf protobuf-dev
-cargo install pact-plugin-cli
-pact-plugin-cli -y install https://github.com/pactflow/pact-protobuf-plugin/releases/latest
-# pact-plugin-cli install https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.3
+wget https://github.com/pact-foundation/pact-plugins/releases/download/pact-plugin-cli-v0.0.4/pact-plugin-cli-linux-x86_64.gz
+gunzip pact-plugin-cli-linux-x86_64.gz
+chmod +x pact-plugin-cli-linux-x86_64
+./pact-plugin-cli-linux-x86_64 -y install https://github.com/pactflow/pact-protobuf-plugin/releases/latest
 cargo build
 cargo test
