@@ -33,7 +33,7 @@ pub(crate) fn handle_command(repository_command: &RepositoryCommands) -> anyhow:
 }
 
 /// Struct representing the plugin repository index file
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 struct PluginRepositoryIndex {
   /// Version of this index file
   index_version: usize,
@@ -151,6 +151,7 @@ impl Default for PluginRepositoryIndex {
 
 /// Create a new repository file
 fn new_repository(filename: &Option<String>, overwrite: bool) -> anyhow::Result<()> {
+  debug!(?filename, "Creating new repository file");
   let filename = filename.clone().unwrap_or("repository.index".to_string());
   let path = PathBuf::from(filename.as_str());
   let abs_path = path.canonicalize().unwrap_or(path.clone());
@@ -224,7 +225,8 @@ fn validate_repository_file(filename: &String) -> anyhow::Result<()> {
 }
 
 fn load_index_file(path: &PathBuf) -> anyhow::Result<PluginRepositoryIndex> {
-  let f = File::open(path.clone())?;
+  debug!(?path, "Loading index file");
+  let f = File::open(path.as_path())?;
   let mut reader = BufReader::new(f);
   let mut buffer = String::new();
   reader.read_to_string(&mut buffer)?;
@@ -261,18 +263,38 @@ fn add_manifest_to_index(
   index: &mut PluginRepositoryIndex,
   source: &ManifestSource
 ) -> anyhow::Result<()> {
+  debug!(?repository_file, "Adding plugin manifest to index");
   index.entries
     .entry(manifest.name.clone())
     .and_modify(|entry| entry.add_version(&manifest, source))
     .or_insert_with(|| PluginEntry::new(&manifest, source));
   index.index_version += 1;
-  let toml = toml::to_string(&index)?;
-  let mut f = File::create(&repository_file)?;
-  f.write_all(toml.as_bytes())?;
+  write_index_file(repository_file, index)?;
   generate_sha_digest(&repository_file)?;
 
   println!("Added plugin version {}/{} to repository file '{}'",
            manifest.name, manifest.version, repository_file.to_string_lossy());
+  Ok(())
+}
+
+fn write_index_file(
+  repository_file: &PathBuf,
+  index: &PluginRepositoryIndex
+) -> anyhow::Result<()> {
+  debug!(?repository_file, "Writing index file");
+  let toml = toml::to_string(index)?;
+  if repository_file.exists() {
+    let existing = load_index_file(repository_file).context("write_index_file")?;
+    if index.index_version <= existing.index_version {
+      return Err(anyhow!("Optimistic lock failed: Repository file has been updated by another process"));
+    } else {
+      let mut f = File::create(repository_file).context("Could not open repository file to write")?;
+      f.write_all(toml.as_bytes()).context("Failed to write to repository file")?;
+    }
+  } else {
+    let mut f = File::create(repository_file)?;
+    f.write_all(toml.as_bytes())?;
+  }
   Ok(())
 }
 
@@ -489,9 +511,7 @@ fn handle_add_all_versions(
         }
 
         index.index_version += 1;
-        let toml = toml::to_string(&index)?;
-        let mut f = File::create(&repository_file)?;
-        f.write_all(toml.as_bytes())?;
+        write_index_file(&repository_file, &index).context("Failed to write updated index file")?;
         generate_sha_digest(&repository_file)?;
 
         println!("Added all plugin versions from {}/{} to repository file '{}'",
@@ -505,4 +525,94 @@ fn handle_add_all_versions(
   trace!("Result = {:?}", result);
   runtime.shutdown_background();
   result
+}
+
+#[cfg(test)]
+mod tests {
+  use std::fs::File;
+  use std::io::Write;
+
+  use expectest::prelude::*;
+  use pact_plugin_driver::plugin_models::PactPluginManifest;
+  use tempfile::NamedTempFile;
+
+  use crate::repository::{add_manifest_to_index, load_index_file, ManifestSource, new_repository, PluginRepositoryIndex};
+
+  #[test_log::test]
+  fn add_manifest_to_index_test() {
+    let repository_file = NamedTempFile::new().unwrap();
+    let path = repository_file.path();
+    new_repository(&Some(path.to_string_lossy().to_string()), true).unwrap();
+    let mut index = load_index_file(&path.to_path_buf()).unwrap();
+
+    let manifest = PactPluginManifest {
+      plugin_dir: "".to_string(),
+      plugin_interface_version: 0,
+      name: "Test".to_string(),
+      version: "1.0.0".to_string(),
+      executable_type: "exec".to_string(),
+      minimum_required_version: None,
+      entry_point: "".to_string(),
+      entry_points: Default::default(),
+      args: None,
+      dependencies: None,
+      plugin_config: Default::default(),
+    };
+    let result = add_manifest_to_index(&path.to_path_buf(), &manifest,
+      &mut index, &ManifestSource::File("Test".to_string()));
+    expect!(result).to(be_ok());
+
+    index = load_index_file(&path.to_path_buf()).unwrap();
+    expect!(index.index_version).to(be_equal_to(1));
+    expect!(index.entries.len()).to(be_equal_to(1));
+  }
+
+  #[test]
+  fn add_manifest_to_index_when_index_does_not_exist() {
+    let repository_file = NamedTempFile::new().unwrap();
+    let mut path = repository_file.path().to_path_buf();
+    path.set_extension("index");
+    let mut index = PluginRepositoryIndex::default();
+
+    let manifest = PactPluginManifest {
+      name: "Test".to_string(),
+      version: "1.0.0".to_string(),
+      executable_type: "exec".to_string(),
+      .. PactPluginManifest::default()
+    };
+    let result = add_manifest_to_index(&path, &manifest,
+      &mut index, &ManifestSource::File("Test".to_string()));
+    expect!(result).to(be_ok());
+
+    index = load_index_file(&path).unwrap();
+    expect!(index.index_version).to(be_equal_to(1));
+    expect!(index.entries.len()).to(be_equal_to(1));
+  }
+
+  #[test]
+  fn add_manifest_to_index_with_optimistic_lock_failure() {
+    let repository_file = NamedTempFile::new().unwrap();
+    let path = repository_file.path();
+    new_repository(&Some(path.to_string_lossy().to_string()), true).unwrap();
+    let mut index = load_index_file(&path.to_path_buf()).unwrap();
+
+    let mut updated = index.clone();
+    updated.index_version += 1;
+    let toml = toml::to_string(&updated).unwrap();
+    let mut f = File::create(&path).unwrap();
+    f.write_all(toml.as_bytes()).unwrap();
+
+    let manifest = PactPluginManifest {
+      name: "Test".to_string(),
+      version: "1.0.0".to_string(),
+      executable_type: "exec".to_string(),
+      .. PactPluginManifest::default()
+    };
+    let result = add_manifest_to_index(&path.to_path_buf(), &manifest,
+      &mut index, &ManifestSource::File("Test".to_string()));
+    expect!(result.as_ref()).to(be_err());
+    expect!(result.unwrap_err().to_string())
+      .to(be_equal_to(
+        "Optimistic lock failed: Repository file has been updated by another process"));
+  }
 }

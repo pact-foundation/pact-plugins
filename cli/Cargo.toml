@@ -39,3 +39,7 @@ semver = "1.0.14"
 
 [dev-dependencies]
 trycmd = "0.14.13"
+tempfile = "3.4.0"
+expectest = "0.12.0"
+test-log = "0.2.11"
+env_logger = "0.10.0"
