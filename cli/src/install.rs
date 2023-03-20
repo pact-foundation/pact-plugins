@@ -1,25 +1,28 @@
-use std::cmp::min;
 use std::{env, fs, io};
+use std::cmp::min;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::path::PathBuf;
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
+use std::path::PathBuf;
 
 use anyhow::{anyhow, bail, Context};
 use flate2::read::GzDecoder;
 use futures_util::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
+use itertools::Itertools;
 use os_info::Type;
 use pact_plugin_driver::plugin_manager::load_plugin;
 use pact_plugin_driver::plugin_models::PactPluginManifest;
 use requestty::OnEsc;
 use reqwest::Client;
 use serde_json::Value;
-use sha2::{Sha256, Digest};
+use sha2::{Digest, Sha256};
 use tracing::{debug, info, trace};
+use url::Url;
 
 use crate::{find_plugin, resolve_plugin_dir};
+use crate::repository::{APP_USER_AGENT, fetch_repository_index};
 
 use super::InstallationSource;
 
@@ -33,56 +36,97 @@ pub fn install_plugin(
   let runtime = tokio::runtime::Builder::new_multi_thread()
     .enable_all()
     .build()?;
-
   let result = runtime.block_on(async {
     let http_client = reqwest::ClientBuilder::new()
+      .user_agent(APP_USER_AGENT)
       .build()?;
 
-    let response = fetch_json_from_url(source, &http_client).await?;
-    if let Some(map) = response.as_object() {
-      if let Some(tag) = map.get("tag_name") {
-        let tag = json_to_string(tag);
-        debug!(%tag, "Found tag");
-        let url = if source.ends_with("/latest") {
-          source.strip_suffix("/latest").unwrap_or(source)
-        } else {
-          let suffix = format!("/tag/{}", tag);
-          source.strip_suffix(suffix.as_str()).unwrap_or(source)
-        };
-        let manifest_json = download_json_from_github(&http_client, url, &tag, "pact-plugin.json")
-          .await.context("Downloading manifest file from GitHub")?;
-        let manifest: PactPluginManifest = serde_json::from_value(manifest_json)
-          .context("Parsing JSON manifest file from GitHub")?;
-        debug!(?manifest, "Loaded manifest from GitHub");
-
-        if !skip_if_installed || !already_installed(&manifest) {
-          println!("Installing plugin {} version {}", manifest.name, manifest.version);
-          let plugin_dir = create_plugin_dir(&manifest, override_prompt)
-            .context("Creating plugins directory")?;
-          download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag).await?;
-
-          env::set_var("pact_do_not_track", "true");
-          load_plugin(&manifest.as_dependency())
-            .await
-            .and_then(|plugin| {
-              println!("Installed plugin {} version {} OK", manifest.name, manifest.version);
-              plugin.kill();
-              Ok(())
-            })
-        } else {
-          println!("Skipping installing plugin {} version {} as it is already installed", manifest.name, manifest.version);
-          Ok(())
-        }
-      } else {
-        bail!("GitHub release page does not have a valid tag_name attribute");
-      }
+    let install_url = Url::parse(source.as_str());
+    if let Ok(install_url) = install_url {
+      install_plugin_from_url(&http_client, install_url.as_str(), override_prompt, skip_if_installed).await
     } else {
-      bail!("Response from source is not a valid JSON from a GitHub release page")
+      install_known_plugin(&http_client, source.as_str(), override_prompt, skip_if_installed, version).await
     }
   });
+
   trace!("Result = {:?}", result);
   runtime.shutdown_background();
   result
+}
+
+async fn install_known_plugin(
+  http_client: &Client,
+  name: &str,
+  override_prompt: bool,
+  skip_if_installed: bool,
+  version: &Option<String>
+) -> anyhow::Result<()> {
+  let index = fetch_repository_index().await?;
+  if let Some(entry) = index.entries.get(name) {
+    let version = if let Some(version) = version {
+      debug!("Installing plugin {}/{} from index", name, version);
+      version.as_str()
+    } else {
+      debug!("Installing plugin {}/latest from index", name);
+      entry.latest_version.as_str()
+    };
+    if let Some(version_entry) = entry.versions.iter().find(|v| v.version == version) {
+      install_plugin_from_url(&http_client, version_entry.source.value().as_str(), override_prompt, skip_if_installed).await
+    } else {
+      Err(anyhow!("'{}' is not a valid version for plugin '{}'", version, name))
+    }
+  } else {
+    Err(anyhow!("'{}' is not a known plugin. Known plugins are: {}", name, index.entries.keys().join(", ")))
+  }
+}
+
+async fn install_plugin_from_url(
+  http_client: &Client,
+  source_url: &str,
+  override_prompt: bool,
+  skip_if_installed: bool
+) -> anyhow::Result<()> {
+  let response = fetch_json_from_url(source_url, &http_client).await?;
+  if let Some(map) = response.as_object() {
+    if let Some(tag) = map.get("tag_name") {
+      let tag = json_to_string(tag);
+      debug!(%tag, "Found tag");
+      let url = if source_url.ends_with("/latest") {
+        source_url.strip_suffix("/latest").unwrap_or(source_url)
+      } else {
+        let suffix = format!("/tag/{}", tag);
+        source_url.strip_suffix(suffix.as_str()).unwrap_or(source_url)
+      };
+      let manifest_json = download_json_from_github(&http_client, url, &tag, "pact-plugin.json")
+        .await.context("Downloading manifest file from GitHub")?;
+      let manifest: PactPluginManifest = serde_json::from_value(manifest_json)
+        .context("Parsing JSON manifest file from GitHub")?;
+      debug!(?manifest, "Loaded manifest from GitHub");
+
+      if !skip_if_installed || !already_installed(&manifest) {
+        println!("Installing plugin {} version {}", manifest.name, manifest.version);
+        let plugin_dir = create_plugin_dir(&manifest, override_prompt)
+          .context("Creating plugins directory")?;
+        download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag).await?;
+
+        env::set_var("pact_do_not_track", "true");
+        load_plugin(&manifest.as_dependency())
+          .await
+          .and_then(|plugin| {
+            println!("Installed plugin {} version {} OK", manifest.name, manifest.version);
+            plugin.kill();
+            Ok(())
+          })
+      } else {
+        println!("Skipping installing plugin {} version {} as it is already installed", manifest.name, manifest.version);
+        Ok(())
+      }
+    } else {
+      bail!("GitHub release page does not have a valid tag_name attribute");
+    }
+  } else {
+    bail!("Response from source is not a valid JSON from a GitHub release page")
+  }
 }
 
 pub(crate) async fn fetch_json_from_url(source: &str, http_client: &Client) -> anyhow::Result<Value> {

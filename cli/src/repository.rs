@@ -446,7 +446,7 @@ fn list_entries(filename: &String) -> anyhow::Result<()> {
   Ok(())
 }
 
-static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
+pub static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 fn handle_add_all_versions(
   repository_file: &String,
@@ -529,8 +529,9 @@ fn handle_add_all_versions(
   result
 }
 
-pub fn fetch_repository_index() -> anyhow::Result<PluginRepositoryIndex> {
+pub async fn fetch_repository_index() -> anyhow::Result<PluginRepositoryIndex> {
   fetch_index_from_github()
+    .await
     .or_else(|err| {
       warn!("Was not able to load index from GitHub - {}", err);
       load_local_index()
@@ -561,47 +562,38 @@ fn load_local_index() -> anyhow::Result<PluginRepositoryIndex> {
   Ok(index)
 }
 
-fn fetch_index_from_github() -> anyhow::Result<PluginRepositoryIndex> {
-  let runtime = tokio::runtime::Builder::new_multi_thread()
-    .enable_all()
+async fn fetch_index_from_github() -> anyhow::Result<PluginRepositoryIndex> {
+  let http_client = reqwest::ClientBuilder::new()
+    .user_agent(APP_USER_AGENT)
     .build()?;
 
-  let result = runtime.block_on(async {
-    let http_client = reqwest::ClientBuilder::new()
-      .user_agent(APP_USER_AGENT)
-      .build()?;
+  info!("Fetching index from github");
+  let index_contents = http_client.get("https://raw.githubusercontent.com/pact-foundation/pact-plugins/main/repository/repository.index")
+    .send()
+    .await?
+    .text()
+    .await?;
 
-    info!("Fetching index from github");
-    let index_contents = http_client.get("https://raw.githubusercontent.com/pact-foundation/pact-plugins/main/repository/repository.index")
-      .send()
-      .await?
-      .text()
-      .await?;
+  let index_sha = http_client.get("https://raw.githubusercontent.com/pact-foundation/pact-plugins/main/repository/repository.index.sha256")
+    .send()
+    .await?
+    .text()
+    .await?;
+  let mut hasher = Sha256::new();
+  hasher.update(index_contents.as_bytes());
+  let result = hasher.finalize();
+  let calculated = format!("{:x}", result);
 
-    let index_sha = http_client.get("https://raw.githubusercontent.com/pact-foundation/pact-plugins/main/repository/repository.index.sha256")
-      .send()
-      .await?
-      .text()
-      .await?;
-    let mut hasher = Sha256::new();
-    hasher.update(index_contents.as_bytes());
-    let result = hasher.finalize();
-    let calculated = format!("{:x}", result);
+  if calculated != index_sha {
+    return Err(anyhow!("Error: SHA256 digest from GitHub does not match: expected {} but got {}", index_sha, calculated));
+  }
 
-    if calculated != index_sha {
-      return Err(anyhow!("Error: SHA256 digest from GitHub does not match: expected {} but got {}", index_sha, calculated));
-    }
+  if let Err(err) = cache_index(&index_contents, &index_sha) {
+    warn!("Could not cache index to local file - {}", err);
+  }
 
-    if let Err(err) = cache_index(&index_contents, &index_sha) {
-      warn!("Could not cache index to local file - {}", err);
-    }
-
-    let index: PluginRepositoryIndex = toml::from_str(index_contents.as_str())?;
-    Ok(index)
-  });
-  trace!("Result = {:?}", result);
-  runtime.shutdown_background();
-  result
+  let index: PluginRepositoryIndex = toml::from_str(index_contents.as_str())?;
+  Ok(index)
 }
 
 fn cache_index(index_contents: &String, sha: &String) -> anyhow::Result<()> {
