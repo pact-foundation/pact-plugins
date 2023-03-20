@@ -1,7 +1,4 @@
 use std::{env, fs};
-use std::cmp::Ordering;
-use std::fs::File;
-use std::io::BufReader;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::str::FromStr;
@@ -16,8 +13,11 @@ use requestty::OnEsc;
 use tracing::{error, Level};
 use tracing_subscriber::FmtSubscriber;
 
+use crate::list::{list_plugins, plugin_list};
+
 mod install;
 mod repository;
+mod list;
 
 #[derive(Parser, Debug)]
 #[clap(about, version)]
@@ -45,8 +45,9 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Commands {
-  /// List installed plugins
-  List,
+  /// List installed or available plugins
+  #[command(subcommand)]
+  List(ListCommands),
 
   /// Print out the Pact plugin environment config
   Env,
@@ -105,6 +106,19 @@ enum Commands {
   /// Sub-commands for dealing with a plugin repository
   #[command(subcommand)]
   Repository(RepositoryCommands)
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ListCommands {
+  /// List installed plugins
+  Installed,
+
+  /// List known plugins
+  Known {
+    /// Display all versions of the known plugins
+    #[clap(short, long)]
+    show_all_versions: bool
+  }
 }
 
 #[derive(Subcommand, Debug)]
@@ -209,7 +223,7 @@ fn main() -> Result<(), ExitCode> {
   };
 
   let result = match &cli.command {
-    Commands::List => list_plugins(),
+    Commands::List(command) => list_plugins(command),
     Commands::Env => print_env(),
     Commands::Install { yes, skip_if_installed, source, source_type } => install::install_plugin(source, source_type, *yes || cli.yes, *skip_if_installed),
     Commands::Remove { yes, name, version } => remove_plugin(name, version, *yes || cli.yes),
@@ -323,72 +337,6 @@ fn enable_plugin(name: &String, version: &Option<String>) -> anyhow::Result<()> 
     Err(anyhow!("Did not find a plugin with name '{}' and version '{}'", name, version))
   } else {
     Err(anyhow!("Did not find a plugin with name '{}'", name))
-  }
-}
-
-fn list_plugins() -> anyhow::Result<()> {
-  let mut table = Table::new();
-  table
-    .load_preset(UTF8_FULL)
-    .set_header(vec!["Name", "Version", "Interface Version", "Directory", "Status"]);
-
-  for (manifest, _, status) in plugin_list()?.iter().sorted_by(manifest_sort_fn) {
-    table.add_row(vec![
-      manifest.name.as_str(),
-      manifest.version.as_str(),
-      manifest.plugin_interface_version.to_string().as_str(),
-      manifest.plugin_dir.to_string().as_str(),
-      if *status { "enabled" } else { "disabled" }
-    ]);
-  }
-
-  println!("{table}");
-
-  Ok(())
-}
-
-fn plugin_list() -> anyhow::Result<Vec<(PactPluginManifest, PathBuf, bool)>> {
-  let (_, plugin_dir) = resolve_plugin_dir();
-  let dir = PathBuf::from(plugin_dir);
-  if dir.exists() {
-    let mut plugins = vec![];
-    for entry in fs::read_dir(dir)? {
-      let path = entry?.path();
-      if path.is_dir() {
-        let manifest_file = path.join("pact-plugin.json");
-        if manifest_file.exists() && manifest_file.is_file() {
-          let file = File::open(manifest_file.clone())?;
-          let reader = BufReader::new(file);
-          let manifest: PactPluginManifest = serde_json::from_reader(reader)?;
-          plugins.push((PactPluginManifest {
-            plugin_dir: path.display().to_string(),
-            ..manifest
-          }, manifest_file.clone(), true));
-        } else {
-          let manifest_file = path.join("pact-plugin.json.disabled");
-          if manifest_file.exists() && manifest_file.is_file() {
-            let file = File::open(manifest_file.clone())?;
-            let reader = BufReader::new(file);
-            let manifest: PactPluginManifest = serde_json::from_reader(reader)?;
-            plugins.push((PactPluginManifest {
-              plugin_dir: path.display().to_string(),
-              ..manifest
-            }, manifest_file.clone(), false));
-          }
-        }
-      }
-    }
-    Ok(plugins)
-  } else {
-    Err(anyhow!("Plugin directory '{}' does not exist!", dir.display()))
-  }
-}
-
-fn manifest_sort_fn(a: &&(PactPluginManifest, PathBuf, bool), b: &&(PactPluginManifest, PathBuf, bool)) -> Ordering {
-  if a.0.name == b.0.name {
-    a.0.version.cmp(&b.0.version)
-  } else {
-    a.0.name.cmp(&b.0.name)
   }
 }
 

@@ -14,11 +14,13 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use tracing::{debug, info, trace};
+use tracing::{debug, info, trace, warn};
 
-use crate::{PluginVersionCommand, RepositoryCommands};
+use crate::{PluginVersionCommand, RepositoryCommands, resolve_plugin_dir};
 use crate::install::{download_json_from_github, fetch_json_from_url, json_to_string};
 use crate::repository::ManifestSource::GitHubRelease;
+
+const DEFAULT_INDEX: &str = include_str!("../../repository/repository.index");
 
 pub(crate) fn handle_command(repository_command: &RepositoryCommands) -> anyhow::Result<()> {
   match repository_command {
@@ -34,7 +36,7 @@ pub(crate) fn handle_command(repository_command: &RepositoryCommands) -> anyhow:
 
 /// Struct representing the plugin repository index file
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct PluginRepositoryIndex {
+pub struct PluginRepositoryIndex {
   /// Version of this index file
   index_version: usize,
 
@@ -45,35 +47,35 @@ struct PluginRepositoryIndex {
   timestamp: DateTime<Utc>,
 
   /// Plugin entries
-  entries: HashMap<String, PluginEntry>
+  pub entries: HashMap<String, PluginEntry>
 }
 
 /// Struct to store the plugin version entries
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct PluginEntry {
+pub struct PluginEntry {
   /// Name of the plugin
-  name: String,
+  pub name: String,
   /// Latest version
-  latest_version: String,
+  pub latest_version: String,
   /// All the plugin versions
-  versions: Vec<PluginVersion>
+  pub versions: Vec<PluginVersion>
 }
 
 /// Struct to store the plugin versions
 #[derive(Serialize, Deserialize, Debug, Clone)]
-struct PluginVersion {
+pub struct PluginVersion {
   /// Version of the plugin
-  version: String,
+  pub version: String,
   /// Source the manifest was loaded from
-  source: ManifestSource,
+  pub source: ManifestSource,
   /// Manifest
-  manifest: Option<PactPluginManifest>
+  pub manifest: Option<PactPluginManifest>
 }
 
 /// Struct to store the plugin versions
 #[derive(Serialize, Deserialize, Debug, Clone)]
 #[serde(tag = "type", content = "value")]
-enum ManifestSource {
+pub enum ManifestSource {
   /// Loaded from a file
   File(String),
 
@@ -82,14 +84,14 @@ enum ManifestSource {
 }
 
 impl ManifestSource {
-  fn name(&self) -> String {
+  pub fn name(&self) -> String {
     match self {
       ManifestSource::File(_) => "file".to_string(),
       ManifestSource::GitHubRelease(_) => "GitHub release".to_string()
     }
   }
 
-  fn value(&self) -> String {
+  pub fn value(&self) -> String {
     match self {
       ManifestSource::File(v) => v.clone(),
       ManifestSource::GitHubRelease(v) => v.clone()
@@ -525,6 +527,96 @@ fn handle_add_all_versions(
   trace!("Result = {:?}", result);
   runtime.shutdown_background();
   result
+}
+
+pub fn fetch_repository_index() -> anyhow::Result<PluginRepositoryIndex> {
+  fetch_index_from_github()
+    .or_else(|err| {
+      warn!("Was not able to load index from GitHub - {}", err);
+      load_local_index()
+    })
+    .or_else(|err| {
+      warn!("Was not able to load local index - {}", err);
+      toml::from_str::<PluginRepositoryIndex>(DEFAULT_INDEX)
+        .map_err(|err| anyhow!(err))
+    })
+}
+
+fn load_local_index() -> anyhow::Result<PluginRepositoryIndex> {
+  let (_, plugin_dir) = resolve_plugin_dir();
+  let dir = PathBuf::from(plugin_dir);
+  if !dir.exists() {
+    return Err(anyhow!("Plugin directory does not exist"));
+  }
+
+  let repository_file = dir.join("repository.index");
+
+  let sha = calculate_sha(&repository_file)?;
+  let expected_sha = load_sha(&repository_file)?;
+  if sha != expected_sha {
+    return Err(anyhow!("Error: SHA256 digest does not match: expected {} but got {}", expected_sha, sha));
+  }
+
+  let index = load_index_file(&repository_file)?;
+  Ok(index)
+}
+
+fn fetch_index_from_github() -> anyhow::Result<PluginRepositoryIndex> {
+  let runtime = tokio::runtime::Builder::new_multi_thread()
+    .enable_all()
+    .build()?;
+
+  let result = runtime.block_on(async {
+    let http_client = reqwest::ClientBuilder::new()
+      .user_agent(APP_USER_AGENT)
+      .build()?;
+
+    info!("Fetching index from github");
+    let index_contents = http_client.get("https://raw.githubusercontent.com/pact-foundation/pact-plugins/main/repository/repository.index")
+      .send()
+      .await?
+      .text()
+      .await?;
+
+    let index_sha = http_client.get("https://raw.githubusercontent.com/pact-foundation/pact-plugins/main/repository/repository.index.sha256")
+      .send()
+      .await?
+      .text()
+      .await?;
+    let mut hasher = Sha256::new();
+    hasher.update(index_contents.as_bytes());
+    let result = hasher.finalize();
+    let calculated = format!("{:x}", result);
+
+    if calculated != index_sha {
+      return Err(anyhow!("Error: SHA256 digest from GitHub does not match: expected {} but got {}", index_sha, calculated));
+    }
+
+    if let Err(err) = cache_index(&index_contents, &index_sha) {
+      warn!("Could not cache index to local file - {}", err);
+    }
+
+    let index: PluginRepositoryIndex = toml::from_str(index_contents.as_str())?;
+    Ok(index)
+  });
+  trace!("Result = {:?}", result);
+  runtime.shutdown_background();
+  result
+}
+
+fn cache_index(index_contents: &String, sha: &String) -> anyhow::Result<()> {
+  let (_, plugin_dir) = resolve_plugin_dir();
+  let dir = PathBuf::from(plugin_dir);
+  if !dir.exists() {
+    fs::create_dir_all(&dir)?;
+  }
+  let repository_file = dir.join("repository.index");
+  let mut f = File::create(repository_file)?;
+  f.write_all(index_contents.as_bytes())?;
+  let sha_file = dir.join("repository.index.sha256");
+  let mut f2 = File::create(sha_file)?;
+  f2.write_all(sha.as_bytes())?;
+  Ok(())
 }
 
 #[cfg(test)]
