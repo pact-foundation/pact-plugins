@@ -1,6 +1,11 @@
-List installed plugins
+List installed or available plugins
 
-Usage: pact-plugin-cli list
+Usage: pact-plugin-cli list <COMMAND>
+
+Commands:
+  installed  List installed plugins
+  known      List known plugins
+  help       Print this message or the help of the given subcommand(s)
 
 Options:
   -h, --help  Print help

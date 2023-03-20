@@ -1,10 +1,12 @@
 Install a plugin
 
+A plugin can be either installed from a URL, or for a known plugin, by name (and optionally version).
+
 Usage: pact-plugin-cli install [OPTIONS] <SOURCE>
 
 Arguments:
   <SOURCE>
-          Where to fetch the plugin files from. This should be a URL
+          Where to fetch the plugin files from. This should be a URL or the name of a known plugin
 
 Options:
   -t, --source-type <SOURCE_TYPE>
@@ -17,6 +19,9 @@ Options:
 
   -s, --skip-if-installed
           Skip installing the plugin if the same version is already installed
+
+  -v, --version <VERSION>
+          The version to install. This is only used for known plugins
 
   -h, --help
           Print help (see a summary with '-h')

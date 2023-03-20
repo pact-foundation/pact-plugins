@@ -3,7 +3,7 @@ CLI utility for Pact plugins
 Usage: pact-plugin-cli [OPTIONS] <COMMAND>
 
 Commands:
-  list        List installed plugins
+  list        List installed or available plugins
   env         Print out the Pact plugin environment config
   install     Install a plugin
   remove      Remove a plugin
