@@ -20,7 +20,7 @@ use crate::{PluginVersionCommand, RepositoryCommands, resolve_plugin_dir};
 use crate::install::{download_json_from_github, fetch_json_from_url, json_to_string};
 use crate::repository::ManifestSource::GitHubRelease;
 
-const DEFAULT_INDEX: &str = include_str!("../repository/repository.index");
+const DEFAULT_INDEX: &str = include_str!("../repository.index");
 
 pub(crate) fn handle_command(repository_command: &RepositoryCommands) -> anyhow::Result<()> {
   match repository_command {

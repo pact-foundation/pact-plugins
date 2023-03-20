@@ -43,6 +43,14 @@ ask('Execute Build?: [Y]') {
   executeOnShell 'cargo test'
 }
 
+ask('Update repository index?: [Y]') {
+  executeOnShell 'cp ../repository/repository.index .'
+  executeOnShell 'git add repository.index'
+  executeOnShell "git commit -m 'chore: update repository.index'"
+  executeOnShell("git status")
+  executeOnShell("git diff HEAD^..HEAD")
+}
+
 def projectProps = new File('Cargo.toml').text
 def versionMatch = projectProps =~ /(?m)version\s*=\s*"(.*)"/
 def version = versionMatch[0][1]
