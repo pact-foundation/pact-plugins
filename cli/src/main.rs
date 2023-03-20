@@ -53,6 +53,9 @@ enum Commands {
   Env,
 
   /// Install a plugin
+  ///
+  /// A plugin can be either installed from a URL, or for a known plugin, by name (and optionally
+  /// version).
   Install {
     /// The type of source to fetch the plugin files from. Will default to Github releases.
     ///
@@ -68,8 +71,12 @@ enum Commands {
     /// Skip installing the plugin if the same version is already installed
     skip_if_installed: bool,
 
-    /// Where to fetch the plugin files from. This should be a URL.
-    source: String
+    /// Where to fetch the plugin files from. This should be a URL or the name of a known plugin.
+    source: String,
+
+    #[clap(short, long)]
+    /// The version to install. This is only used for known plugins.
+    version: Option<String>
   },
 
   /// Remove a plugin
@@ -225,7 +232,9 @@ fn main() -> Result<(), ExitCode> {
   let result = match &cli.command {
     Commands::List(command) => list_plugins(command),
     Commands::Env => print_env(),
-    Commands::Install { yes, skip_if_installed, source, source_type } => install::install_plugin(source, source_type, *yes || cli.yes, *skip_if_installed),
+    Commands::Install { yes, skip_if_installed, source, source_type, version } => {
+      install::install_plugin(source, source_type, *yes || cli.yes, *skip_if_installed, version)
+    },
     Commands::Remove { yes, name, version } => remove_plugin(name, version, *yes || cli.yes),
     Commands::Enable { name, version } => enable_plugin(name, version),
     Commands::Disable { name, version } => disable_plugin(name, version),

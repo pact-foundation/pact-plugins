@@ -27,7 +27,8 @@ pub fn install_plugin(
   source: &String,
   _source_type: &Option<InstallationSource>,
   override_prompt: bool,
-  skip_if_installed: bool
+  skip_if_installed: bool,
+  version: &Option<String>
 ) -> anyhow::Result<()> {
   let runtime = tokio::runtime::Builder::new_multi_thread()
     .enable_all()
