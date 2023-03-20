@@ -1,0 +1,46 @@
+plugins {
+    id 'org.jetbrains.kotlin.jvm' version '1.6.21'
+    id 'org.jetbrains.kotlin.plugin.spring' version '1.6.21'
+    id 'application'
+    id 'org.springframework.boot' version '2.7.3'
+}
+
+repositories {
+    mavenCentral()
+    mavenLocal()
+}
+
+dependencies {
+    implementation platform('org.jetbrains.kotlin:kotlin-bom')
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-jdk9:1.6.4'
+    implementation 'org.springframework.boot:spring-boot-starter-web:2.7.3'
+    implementation 'org.yaml:snakeyaml:1.33'
+    implementation 'com.github.javafaker:javafaker:1.0.2'
+
+    implementation('io.github.microutils:kotlin-logging:2.1.23') {
+        exclude group: 'org.jetbrains.kotlin'
+    }
+    implementation 'ch.qos.logback:logback-classic:1.2.6'
+    implementation 'org.apache.commons:commons-csv:1.9.0'
+
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
+    testImplementation 'au.com.dius.pact.provider:junit5spring:4.5.3'
+    testImplementation 'io.pact.plugin.driver:core:0.3.1'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test:2.7.3'
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+    kotlinOptions {
+        jvmTarget = "11"
+    }
+}
+
+test {
+    useJUnitPlatform()
+}
+
+application {
+    mainClass = 'io.pact.example.csv.provider.ServerKt'
+}

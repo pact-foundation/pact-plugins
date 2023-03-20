@@ -52,6 +52,10 @@ jobs:
           trap "kill $PID" EXIT
           pact_do_not_track=true ~/bin/pact_verifier_cli -f ../csv-consumer-rust/target/pacts/CsvClient-CsvServer.json -p 8080
           pact_do_not_track=true ~/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
+          cd ../csv-provider-jvm
+          mkdir -p server/src/test/resources/pacts
+          cp ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json server/src/test/resources/pacts
+          ./gradlew check
         shell: bash
         working-directory: examples/csv
         if: runner.os != 'Windows'

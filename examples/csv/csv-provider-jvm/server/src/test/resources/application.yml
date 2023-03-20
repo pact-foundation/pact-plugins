@@ -1,0 +1,11 @@
+logging:
+  level:
+    root: debug
+    org.springframework: info
+    org.apache.catalina: info
+    org.apache.tomcat: info
+    io.netty: info
+    au.com.dius.pact: debug
+    faker: info
+    jdk.event.security: info
+    org.apache.hc.client5: info

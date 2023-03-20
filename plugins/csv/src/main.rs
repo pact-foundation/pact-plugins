@@ -84,9 +84,10 @@ impl PactPlugin for CsvPactPlugin {
 
     match (request.expected.as_ref(), request.actual.as_ref()) {
       (Some(expected), Some(actual)) => {
-        let expected_csv_data = expected.content.as_ref().unwrap();
+        let expected_csv_data = std::str::from_utf8(expected.content.as_ref().unwrap())
+          .map_err(|err| tonic::Status::aborted(format!("Failed to compare CSV contents: {}", err)))?;
         let mut expected_rdr = ReaderBuilder::new().has_headers(has_headers)
-          .from_reader(expected_csv_data.as_slice());
+          .from_reader(expected_csv_data.as_bytes());
         let actual_csv_data = actual.content.as_ref().unwrap();
         let mut actual_rdr = ReaderBuilder::new().has_headers(has_headers)
           .from_reader(actual_csv_data.as_slice());
@@ -250,7 +251,7 @@ fn compare_contents<R: Read>(
   let expected_row = expected_records.next()
     .ok_or_else(|| anyhow!("Could not read the expected content"))??;
   let actual_row = actual_records.next()
-    .ok_or_else(|| anyhow!("Could not read the expected content"))??;
+    .ok_or_else(|| anyhow!("Could not read the actual content"))??;
 
   if !has_headers {
     if actual_row.len() < expected_row.len() {
