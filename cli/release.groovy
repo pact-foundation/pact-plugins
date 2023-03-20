@@ -46,7 +46,7 @@ ask('Execute Build?: [Y]') {
 ask('Update repository index?: [Y]') {
   executeOnShell 'cp ../repository/repository.index .'
   executeOnShell 'git add repository.index'
-  executeOnShell "git commit -m 'chore: update repository.index'"
+  executeOnShell "git commit -m 'chore: update repository.index' || true"
   executeOnShell("git status")
   executeOnShell("git diff HEAD^..HEAD")
 }
