@@ -30,10 +30,10 @@ jobs:
         run: scripts/install-plugin-cli.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/bin/pact-plugin-cli -y install https://github.com/pactflow/pact-protobuf-plugin/releases/latest
+        run: ~/bin/pact-plugin-cli -y install protobuf
         shell: bash
       - name: Install csv plugin
-        run: ~/bin/pact-plugin-cli -y install https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.3
+        run: ~/bin/pact-plugin-cli -y install csv
         shell: bash
       - name: Install Pact verifier
         run: scripts/install-verifier-cli.sh
@@ -103,7 +103,7 @@ jobs:
         run: scripts/install-plugin-cli.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/bin/pact-plugin-cli -y install https://github.com/pactflow/pact-protobuf-plugin/releases/latest
+        run: ~/bin/pact-plugin-cli -y install protobuf
         shell: bash
       - name: Install Pact verifier
         run: scripts/install-verifier-cli.sh
@@ -167,7 +167,7 @@ jobs:
         run: scripts/install-plugin-cli.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/bin/pact-plugin-cli -y install https://github.com/pactflow/pact-protobuf-plugin/releases/latest
+        run: ~/bin/pact-plugin-cli -y install protobuf
         shell: bash
       - name: Install Pact verifier
         run: scripts/install-verifier-cli.sh
