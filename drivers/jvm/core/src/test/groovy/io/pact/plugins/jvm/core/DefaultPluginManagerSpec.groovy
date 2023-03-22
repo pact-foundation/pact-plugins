@@ -1,6 +1,8 @@
 package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.model.Consumer
+import au.com.dius.pact.core.model.ContentType
+import au.com.dius.pact.core.model.OptionalBody
 import au.com.dius.pact.core.model.Provider
 import au.com.dius.pact.core.model.V4Pact
 import au.com.dius.pact.core.support.Result
@@ -234,5 +236,38 @@ class DefaultPluginManagerSpec extends Specification {
 
     cleanup:
     DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove('test-start-mockserver/1.2.3')
+  }
+
+  def 'invokeContentMatcher - must pass through the content type with the request'() {
+    given:
+    def manifest = Mock(PactPluginManifest) {
+      getName() >> 'test-invokeContentMatcher'
+      getVersion() >> '1.2.3'
+    }
+    def manager = DefaultPluginManager.INSTANCE
+    PactPlugin mockPlugin = Mock() {
+      getManifest() >> manifest
+    }
+    manager.PLUGIN_REGISTER['test-invokeContentMatcher/1.2.3'] = mockPlugin
+    ContentMatcher matcher = new CatalogueContentMatcher(new CatalogueEntry(
+      CatalogueEntryType.CONTENT_MATCHER, CatalogueEntryProviderType.PLUGIN, 'test-invokeContentMatcher', 'stuff'))
+    OptionalBody expected = OptionalBody.body('{}', ContentType.fromString('application/stuff'))
+    OptionalBody actual = OptionalBody.body('{}', ContentType.fromString('application/x-stuff'))
+
+    def response = Plugin.CompareContentsResponse.newBuilder().build()
+    def mockStub = Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
+    ArgumentCaptor<Plugin.CompareContentsRequest> argument = ArgumentCaptor.forClass(Plugin.CompareContentsRequest)
+    doReturn(response).when(mockStub).compareContents(argument.capture())
+
+    when:
+    manager.invokeContentMatcher(matcher, expected, actual, false, [:], [:])
+
+    then:
+    1 * mockPlugin.withGrpcStub(_) >> { args -> args[0].apply(mockStub) }
+    argument.value.actual.contentType == 'application/x-stuff'
+    argument.value.expected.contentType == 'application/stuff'
+
+    cleanup:
+    DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove('test-invokeContentMatcher/1.2.3')
   }
 }

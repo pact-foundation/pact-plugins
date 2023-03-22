@@ -431,11 +431,15 @@ object DefaultPluginManager: KLogging(), PluginManager {
           pluginConfigBuilder.pactConfiguration = toProtoStruct(pluginConfig.pactConfiguration)
         }
 
+        val expectedContent = Plugin.Body.newBuilder()
+          .setContent(BytesValue.newBuilder().setValue(ByteString.copyFrom(expected.orEmpty())))
+          .setContentType(expected.contentType.toString())
+        val actualContent = Plugin.Body.newBuilder()
+          .setContent(BytesValue.newBuilder().setValue(ByteString.copyFrom(actual.orEmpty())))
+          .setContentType(actual.contentType.toString())
         val request = Plugin.CompareContentsRequest.newBuilder()
-          .setExpected(Plugin.Body.newBuilder().setContent(
-            BytesValue.newBuilder().setValue(ByteString.copyFrom(expected.orEmpty()))))
-          .setActual(Plugin.Body.newBuilder().setContent(
-            BytesValue.newBuilder().setValue(ByteString.copyFrom(actual.orEmpty()))))
+          .setExpected(expectedContent)
+          .setActual(actualContent)
           .setAllowUnexpectedKeys(allowUnexpectedKeys)
           .putAllRules(rules.entries.associate { (key, rules) ->
             key to Plugin.MatchingRules.newBuilder().addAllRule(
