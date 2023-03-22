@@ -20,7 +20,6 @@ import org.mockito.Mockito
 
 import java.util.function.Function
 
-import static au.com.dius.pact.consumer.groovy.BuilderUtils.filePath
 import static org.mockito.Mockito.doReturn
 
 /**
@@ -118,7 +117,7 @@ class DriverPactTest {
       .usingPlugin('protobuf')
       .expectsToReceive('init plugin request', 'core/interaction/synchronous-message')
       .with([
-        'pact:proto': filePath("../../../proto/plugin.proto"),
+        'pact:proto': PactBuilder.filePath("../../../proto/plugin.proto"),
         'pact:content-type': 'application/protobuf',
         'pact:proto-service': 'PactPlugin/InitPlugin',
         'request': [

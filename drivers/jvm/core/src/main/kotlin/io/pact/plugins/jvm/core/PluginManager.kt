@@ -434,9 +434,11 @@ object DefaultPluginManager: KLogging(), PluginManager {
         val expectedContent = Plugin.Body.newBuilder()
           .setContent(BytesValue.newBuilder().setValue(ByteString.copyFrom(expected.orEmpty())))
           .setContentType(expected.contentType.toString())
+          .setContentTypeHint(toInterfaceType(expected.contentTypeHint))
         val actualContent = Plugin.Body.newBuilder()
           .setContent(BytesValue.newBuilder().setValue(ByteString.copyFrom(actual.orEmpty())))
           .setContentType(actual.contentType.toString())
+          .setContentTypeHint(toInterfaceType(actual.contentTypeHint))
         val request = Plugin.CompareContentsRequest.newBuilder()
           .setExpected(expectedContent)
           .setActual(actualContent)
@@ -461,6 +463,14 @@ object DefaultPluginManager: KLogging(), PluginManager {
         plugin.withGrpcStub { stub -> stub.compareContents(request) }
       }
       else -> throw RuntimeException("Mis-configured content type matcher $matcher")
+    }
+  }
+
+  private fun toInterfaceType(contentTypeHint: ContentTypeHint): Plugin.Body.ContentTypeHint {
+    return when (contentTypeHint) {
+      ContentTypeHint.BINARY -> Plugin.Body.ContentTypeHint.BINARY
+      ContentTypeHint.TEXT -> Plugin.Body.ContentTypeHint.TEXT
+      ContentTypeHint.DEFAULT -> Plugin.Body.ContentTypeHint.DEFAULT
     }
   }
 

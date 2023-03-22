@@ -2,6 +2,7 @@ package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.model.Consumer
 import au.com.dius.pact.core.model.ContentType
+import au.com.dius.pact.core.model.ContentTypeHint
 import au.com.dius.pact.core.model.OptionalBody
 import au.com.dius.pact.core.model.Provider
 import au.com.dius.pact.core.model.V4Pact
@@ -252,7 +253,8 @@ class DefaultPluginManagerSpec extends Specification {
     ContentMatcher matcher = new CatalogueContentMatcher(new CatalogueEntry(
       CatalogueEntryType.CONTENT_MATCHER, CatalogueEntryProviderType.PLUGIN, 'test-invokeContentMatcher', 'stuff'))
     OptionalBody expected = OptionalBody.body('{}', ContentType.fromString('application/stuff'))
-    OptionalBody actual = OptionalBody.body('{}', ContentType.fromString('application/x-stuff'))
+    OptionalBody actual = OptionalBody.body('{}'.bytes, ContentType.fromString('application/x-stuff'),
+      ContentTypeHint.BINARY)
 
     def response = Plugin.CompareContentsResponse.newBuilder().build()
     def mockStub = Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
@@ -265,7 +267,9 @@ class DefaultPluginManagerSpec extends Specification {
     then:
     1 * mockPlugin.withGrpcStub(_) >> { args -> args[0].apply(mockStub) }
     argument.value.actual.contentType == 'application/x-stuff'
+    argument.value.actual.contentTypeHint == Plugin.Body.ContentTypeHint.BINARY
     argument.value.expected.contentType == 'application/stuff'
+    argument.value.expected.contentTypeHint == Plugin.Body.ContentTypeHint.DEFAULT
 
     cleanup:
     DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove('test-invokeContentMatcher/1.2.3')

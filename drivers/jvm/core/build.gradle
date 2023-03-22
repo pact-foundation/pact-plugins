@@ -42,8 +42,8 @@ dependencies {
     testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
     testImplementation 'net.bytebuddy:byte-buddy:1.12.18'
     testImplementation 'org.objenesis:objenesis:3.2'
-    testImplementation 'au.com.dius.pact.consumer:junit5:4.5.0-beta.0'
-    testImplementation('au.com.dius.pact.consumer:groovy:4.5.0-beta.0') {
+    testImplementation 'au.com.dius.pact.consumer:junit5:4.4.5'
+    testImplementation('au.com.dius.pact.consumer:groovy:4.4.5') {
         transitive = false
     }
     testImplementation 'ch.qos.logback:logback-classic:1.4.4'
