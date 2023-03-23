@@ -1,10 +1,16 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 plugins {
   id 'java'
-  id 'org.jetbrains.kotlin.jvm' version '1.7.22'
-  id 'org.jetbrains.dokka' version '1.7.20'
-  id 'io.gitlab.arturbosch.detekt' version '1.21.0'
+  id 'org.jetbrains.kotlin.jvm' version '1.8.10'
+  id 'org.jetbrains.dokka' version '1.8.10'
+  id 'io.gitlab.arturbosch.detekt' version '1.22.0'
   id 'maven-publish'
   id 'signing'
+}
+
+repositories {
+  mavenCentral()
 }
 
 subprojects {
@@ -15,7 +21,6 @@ subprojects {
   apply plugin: 'org.jetbrains.dokka'
 
   repositories {
-    mavenLocal()
     mavenCentral()
   }
 
@@ -47,7 +52,7 @@ subprojects {
     from sourceSets.main.allSource
   }
 
-  tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
+  tasks.withType(KotlinCompile).configureEach {
     kotlinOptions {
       jvmTarget = "11"
     }
