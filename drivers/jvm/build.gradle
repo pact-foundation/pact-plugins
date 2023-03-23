@@ -1,124 +1,184 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
 
 plugins {
-  id 'java'
-  id 'org.jetbrains.kotlin.jvm' version '1.8.10'
-  id 'org.jetbrains.dokka' version '1.8.10'
-  id 'io.gitlab.arturbosch.detekt' version '1.22.0'
-  id 'maven-publish'
-  id 'signing'
+    id 'java-library'
+    id 'groovy'
+    id 'maven-publish'
+    id 'signing'
+    id 'au.com.dius.pact' version '4.5.4'
+    id 'com.google.protobuf' version '0.9.2'
+    id 'io.gitlab.arturbosch.detekt' version '1.22.0'
+    id 'org.jetbrains.kotlin.jvm' version '1.8.10'
+    id 'org.jetbrains.dokka' version '1.8.10'
+}
+
+ext {
+    description = "Pact Plugin Driver core implementation"
+    gitSha = System.getenv("GIT_SHA") ?: '0'
 }
 
 repositories {
-  mavenCentral()
+    mavenCentral()
 }
 
-subprojects {
-  apply plugin: 'java'
-  apply plugin: 'org.jetbrains.kotlin.jvm'
-  apply plugin: 'maven-publish'
-  apply plugin: 'signing'
-  apply plugin: 'org.jetbrains.dokka'
+version = '0.3.3'
+group = 'io.pact.plugin.driver'
 
-  repositories {
-    mavenCentral()
-  }
+targetCompatibility = '11'
+sourceCompatibility = '11'
 
-  version = '0.3.3'
+dependencies {
+    detektPlugins("io.gitlab.arturbosch.detekt:detekt-rules-libraries:1.22.0")
+//    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.22.0") // TODO: enable once formatting errors are fixed
 
-  targetCompatibility = '11'
-  sourceCompatibility = '11'
+    implementation "javax.annotation:javax.annotation-api:1.3.2"
+    implementation 'au.com.dius.pact.core:model:4.5.4'
+    implementation 'au.com.dius.pact.core:support:4.5.4'
+    implementation 'com.google.guava:guava:31.1-jre'
+    implementation 'com.vdurmont:semver4j:3.1.0'
+    implementation 'commons-codec:commons-codec:1.15'
+    implementation('io.github.microutils:kotlin-logging:3.0.5') {
+        exclude group: 'org.jetbrains.kotlin'
+    }
+    implementation 'io.grpc:grpc-netty:1.53.0'
+    implementation 'io.grpc:grpc-protobuf:1.53.0'
+    implementation 'io.grpc:grpc-stub:1.53.0'
+    implementation 'javax.json:javax.json-api:1.1.4'
+    implementation 'org.apache.commons:commons-lang3:3.12.0'
+    implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.2.1'
+    implementation 'org.apache.tika:tika-core:2.7.0'
+    implementation 'org.glassfish:javax.json:1.1.4'
+    implementation 'org.jetbrains.kotlin:kotlin-reflect:1.8.10'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.10'
 
-  jar {
+    protobuf files('../../proto/')
+
+    // These two needs to be before other test dependencies
+    testImplementation 'org.apache.groovy:groovy:4.0.10'
+    testImplementation 'org.apache.groovy:groovy-json:4.0.10'
+
+    testImplementation 'au.com.dius.pact.consumer:junit5:4.5.4'
+    testImplementation('au.com.dius.pact.consumer:groovy:4.5.4') {
+        transitive = false
+    }
+    testImplementation 'ch.qos.logback:logback-classic:1.4.6'
+    testImplementation 'net.bytebuddy:byte-buddy:1.14.2'
+    testImplementation 'org.hamcrest:hamcrest:2.2'
+    testImplementation 'org.json:json:20230227'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.2'
+    testImplementation 'org.mockito:mockito-core:5.2.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.2.0'
+    testImplementation 'org.objenesis:objenesis:3.3'
+    testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
+
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
+}
+
+jar {
     manifest {
-      attributes provider: 'gradle',
-        'Implementation-Title': project.name, 'Implementation-Version': archiveVersion,
-        'Implementation-Vendor': project.group, 'Implementation-Vendor-Id': project.group,
-        'Specification-Vendor': project.group,
-        'Specification-Title': project.name,
-        'Specification-Version': archiveVersion,
-        'Automatic-Module-Name': project.group + "." + project.name.replaceAll('-', '_')
+        attributes provider: 'gradle',
+                'Implementation-Title': project.name, 'Implementation-Version': archiveVersion,
+                'Implementation-Vendor': project.group, 'Implementation-Vendor-Id': project.group,
+                'Specification-Vendor': project.group,
+                'Specification-Title': project.name,
+                'Specification-Version': archiveVersion,
+                'Automatic-Module-Name': project.group + "." + project.name.replaceAll('-', '_')
     }
-  }
+}
 
-  task javadocJar(type: Jar, dependsOn: [javadoc, dokkaJavadoc]) {
+tasks.register('javadocJar', Jar) {
+    dependsOn dokkaJavadoc
+    from dokkaJavadoc.outputDirectory
     archiveClassifier = 'javadoc'
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    from javadoc.destinationDir, dokkaJavadoc.outputDirectory
-  }
+}
 
-  tasks.register('sourceJar', Jar) {
-    archiveClassifier = 'sources'
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-    from sourceSets.main.allSource
-  }
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
 
-  tasks.withType(KotlinCompile).configureEach {
-    kotlinOptions {
-      jvmTarget = "11"
-    }
-  }
-
-  test {
+test {
+    dependsOn jar
     useJUnitPlatform()
-  }
 
-  publishing {
-    publications {
-      mavenPublication(MavenPublication) {
-        from components.java
-        artifact sourceJar
-        artifact javadocJar
-        pom {
-          name = project.name
-          description = 'Pact Plugin Driver implementation'
-          url = 'https://github.com/pact-foundation/pact-plugins'
-          licenses {
-            license {
-              name = 'MIT'
-              url = 'https://github.com/pact-foundation/pact-plugins/blob/main/LICENSE'
-              distribution = 'repo'
-            }
-          }
-          scm {
-            url = 'https://github.com/pact-foundation/pact-plugins'
-            connection = 'git://github.com/pact-foundation/pact-plugins.git'
-          }
+    // Set the load plugin timeout to 30 seconds for Windows
+    systemProperty('pact.plugin.loadTimeoutInMs', '30000')
+}
 
-          developers {
-            developer {
-              id = 'mfellows'
-              name = 'Matt Fellows'
-              email = 'mfellows@dius.com.au'
-            }
-            developer {
-              id = 'rholshausen'
-              name = 'Ronald Holshausen'
-              email = 'rholshausen@dius.com.au'
-            }
-          }
+protobuf {
+    protoc { artifact = "com.google.protobuf:protoc:3.21.12" }
+    plugins {
+        grpc { artifact = "io.grpc:protoc-gen-grpc-java:1.53.0" }
+    }
+    generateProtoTasks {
+        all()*.plugins { grpc {} }
+    }
+}
+
+pact {
+    publish {
+        pactBrokerUrl = 'https://pact-foundation.pactflow.io'
+        consumerVersion = "${project.version}+${gitSha}"
+        if (project.hasProperty('pactBrokerToken')) {
+            pactBrokerToken = project.pactBrokerToken
         }
-      }
+    }
+}
+
+publishing {
+    publications {
+        mavenPublication(MavenPublication) {
+            from(components["java"])
+            pom {
+                name = project.name
+                description = 'Pact Plugin Driver implementation'
+                url = 'https://github.com/pact-foundation/pact-plugins'
+                licenses {
+                    license {
+                        name = 'MIT'
+                        url = 'https://github.com/pact-foundation/pact-plugins/blob/main/LICENSE'
+                        distribution = 'repo'
+                    }
+                }
+                scm {
+                    url = 'https://github.com/pact-foundation/pact-plugins'
+                    connection = 'git://github.com/pact-foundation/pact-plugins.git'
+                }
+
+                developers {
+                    developer {
+                        id = 'mfellows'
+                        name = 'Matt Fellows'
+                        email = 'mfellows@dius.com.au'
+                    }
+                    developer {
+                        id = 'rholshausen'
+                        name = 'Ronald Holshausen'
+                        email = 'rholshausen@dius.com.au'
+                    }
+                }
+            }
+        }
     }
     repositories {
-      maven {
-        url "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2"
-        if (project.hasProperty('sonatypeUsername')) {
-          credentials {
-            username sonatypeUsername
-            password sonatypePassword
-          }
+        maven {
+            url = 'https://s01.oss.sonatype.org/service/local/staging/deploy/maven2'
+            if (project.hasProperty('sonatypeUsername')) {
+                credentials {
+                    username sonatypeUsername
+                    password sonatypePassword
+                }
+            }
         }
-      }
     }
-  }
+}
 
-  signing {
+signing {
     required { project.hasProperty('isRelease') }
     sign publishing.publications.mavenPublication
-  }
-
-  detekt {
-    config = files(rootProject.file("config/detekt-config.yml"))
-  }
 }
+
+detekt {
+    config = files(rootProject.file("config/detekt-config.yml"))
+}
+

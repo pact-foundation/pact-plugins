@@ -55,7 +55,7 @@ ask('Execute Build?: [Y]') {
   executeOnShell './gradlew clean build'
 }
 
-def projectProps = './gradlew :core:properties'.execute().text.split('\n').inject([:]) { acc, v ->
+def projectProps = './gradlew :properties'.execute().text.split('\n').inject([:]) { acc, v ->
   if (v ==~ /\w+: .*/) {
     def kv = v.split(':')
     acc[kv[0].trim()] = kv[1].trim()
