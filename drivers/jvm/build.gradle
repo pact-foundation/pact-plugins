@@ -43,12 +43,13 @@ subprojects {
 
   task javadocJar(type: Jar, dependsOn: [javadoc, dokkaJavadoc]) {
     archiveClassifier = 'javadoc'
-    duplicatesStrategy = 'exclude'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from javadoc.destinationDir, dokkaJavadoc.outputDirectory
   }
 
-  task sourceJar(type: Jar) {
+  tasks.register('sourceJar', Jar) {
     archiveClassifier = 'sources'
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from sourceSets.main.allSource
   }
 
