@@ -1,5 +1,3 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
     id 'java-library'
     id 'groovy'
@@ -117,7 +115,7 @@ protobuf {
 
 pact {
     publish {
-        pactBrokerUrl = 'https://pact-foundation.pactflow.io'
+        pactBrokerUrl = project.pactBrokerUrl
         consumerVersion = "${project.version}+${gitSha}"
         if (project.hasProperty('pactBrokerToken')) {
             pactBrokerToken = project.pactBrokerToken
