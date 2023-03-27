@@ -4,6 +4,9 @@ on:
   - push
   - pull_request
 
+env:
+
+
 jobs:
   latest_jdk:
     runs-on: ${{ matrix.operating-system }}
@@ -35,10 +38,10 @@ jobs:
       - name: Publish driver Pact file
         run: |
           if [ "$PACT_BROKER_URL" != "" ]; then
-            echo "PACT_BROKER_URL $PACT_BROKER_URL" 
+            echo "PACT_BROKER_URL $PACT_BROKER_URL"
             ./gradlew --no-daemon pactPublish -PpactBrokerUrl=${{ PACT_BROKER_URL }}
           else
-            ./gradlew --no-daemon pactPublish -PpactBrokerUrl=https://pact-foundation.pactflow.io
+            ./gradlew --no-daemon pactPublish
           fi
         env:
           GIT_SHA: $GITHUB_SHA

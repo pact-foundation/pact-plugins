@@ -115,7 +115,7 @@ protobuf {
 
 pact {
     publish {
-        println "Set pactBrokerUrl: ${project.pactBrokerUrl}"
+        println "Setting pactBrokerUrl: ${project.pactBrokerUrl}"
         pactBrokerUrl = project.pactBrokerUrl
         consumerVersion = "${project.version}+${gitSha}"
         if (project.hasProperty('pactBrokerToken')) {
