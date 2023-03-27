@@ -36,7 +36,6 @@ jobs:
         run: ./gradlew --no-daemon pactPublish
         env:
           GIT_SHA: $GITHUB_SHA
-          ORG_GRADLE_PROJECT_pactBrokerUrl: ${{ secrets.PACT_BROKER_URL }}
           ORG_GRADLE_PROJECT_pactBrokerToken: ${{ secrets.PACTFLOW_TOKEN }}
         working-directory: drivers/jvm
         if: runner.os == 'Linux'
