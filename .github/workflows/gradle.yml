@@ -5,21 +5,24 @@ on:
   - pull_request
 
 jobs:
-  latest_jdk:
+  latest_lts_jdk:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     steps:
     - uses: actions/checkout@v3
-    - name: Set up JDK 16
+    - name: Set up JDK 17
       uses: actions/setup-java@v1
       with:
-        java-version: 16
+        java-version: 17
     - name: Install Protoc
       uses: arduino/setup-protoc@v1
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Run plugin driver tests
+      run: ./gradlew -s --no-daemon -i check
+      working-directory: drivers/jvm
     - name: Build plugin driver
       run: ./gradlew -s --no-daemon -i publishToMavenLocal
       working-directory: drivers/jvm
@@ -29,9 +32,6 @@ jobs:
     - name: Install Protobuf plugin
       run: ~/bin/pact-plugin-cli -y install protobuf
       shell: bash
-    - name: Run plugin driver tests
-      run: ./gradlew -s --no-daemon -i check
-      working-directory: drivers/jvm
     - name: Publish driver Pact file
       run: GIT_SHA=$GITHUB_SHA ./gradlew --no-daemon pactPublish -PpactBrokerToken=${{ secrets.PACTFLOW_TOKEN }}
       working-directory: drivers/jvm
@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        jdk: [ 11, 12, 13, 14, 15, 16 ]
+        jdk: [ 11, 17, 20 ]
     steps:
       - uses: actions/checkout@v3
       - name: Set up JDK
@@ -52,6 +52,9 @@ jobs:
         uses: arduino/setup-protoc@v1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Run plugin driver tests
+        run: ./gradlew -s --no-daemon -i check
+        working-directory: drivers/jvm
       - name: Build plugin driver
         run: ./gradlew -s --no-daemon -i publishToMavenLocal
         working-directory: drivers/jvm
@@ -61,6 +64,3 @@ jobs:
       - name: Install Protobuf plugin
         run: ~/bin/pact-plugin-cli -y install protobuf
         shell: bash
-      - name: Run plugin driver tests
-        run: ./gradlew -s --no-daemon -i check
-        working-directory: drivers/jvm
