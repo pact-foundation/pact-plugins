@@ -119,6 +119,7 @@ pact {
         pactBrokerUrl = project.pactBrokerUrl
         consumerVersion = "${project.version}+${gitSha}"
         if (project.hasProperty('pactBrokerToken')) {
+            println "Setting pactBrokerToken"
             pactBrokerToken = project.pactBrokerToken
         }
     }

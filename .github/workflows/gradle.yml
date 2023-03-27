@@ -11,31 +11,35 @@ jobs:
       matrix:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     steps:
-    - uses: actions/checkout@v3
-    - name: Set up JDK 17
-      uses: actions/setup-java@v1
-      with:
-        java-version: 17
-    - name: Install Protoc
-      uses: arduino/setup-protoc@v1
-      with:
-        repo-token: ${{ secrets.GITHUB_TOKEN }}
-    - name: Build plugin driver
-      run: ./gradlew -s --no-daemon -i publishToMavenLocal
-      working-directory: drivers/jvm
-    - name: Install plugin cli
-      run: scripts/install-plugin-cli.sh
-      shell: bash
-    - name: Install Protobuf plugin
-      run: ~/bin/pact-plugin-cli -y install protobuf
-      shell: bash
-    - name: Run plugin driver tests
-      run: ./gradlew -s --no-daemon -i check
-      working-directory: drivers/jvm
-    - name: Publish driver Pact file
-      run: GIT_SHA=$GITHUB_SHA ./gradlew --no-daemon pactPublish -PpactBrokerToken=${{ secrets.PACTFLOW_TOKEN }}
-      working-directory: drivers/jvm
-      if: runner.os == 'Linux'
+      - uses: actions/checkout@v3
+      - name: Set up JDK 17
+        uses: actions/setup-java@v1
+        with:
+          java-version: 17
+      - name: Install Protoc
+        uses: arduino/setup-protoc@v1
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build plugin driver
+        run: ./gradlew -s --no-daemon -i publishToMavenLocal
+        working-directory: drivers/jvm
+      - name: Install plugin cli
+        run: scripts/install-plugin-cli.sh
+        shell: bash
+      - name: Install Protobuf plugin
+        run: ~/bin/pact-plugin-cli -y install protobuf
+        shell: bash
+      - name: Run plugin driver tests
+        run: ./gradlew -s --no-daemon -i check
+        working-directory: drivers/jvm
+      - name: Publish driver Pact file
+        run: ./gradlew --no-daemon pactPublish
+        env:
+          GIT_SHA: $GITHUB_SHA
+          ORG_GRADLE_PROJECT_pactBrokerUrl: ${{ secrets.PACT_BROKER_URL }}
+          ORG_GRADLE_PROJECT_pactBrokerToken: ${{ secrets.PACTFLOW_TOKEN }}
+        working-directory: drivers/jvm
+        if: runner.os == 'Linux'
 
   supported_jdks:
     runs-on: ubuntu-latest
