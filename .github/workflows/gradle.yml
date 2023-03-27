@@ -35,6 +35,7 @@ jobs:
       - name: Publish driver Pact file
         run: |
           if [ "$PACT_BROKER_URL" != "" ]; then
+            echo "PACT_BROKER_URL $PACT_BROKER_URL" 
             ./gradlew --no-daemon pactPublish -PpactBrokerUrl=$PACT_BROKER_URL
           else
             ./gradlew --no-daemon pactPublish -PpactBrokerUrl=https://pact-foundation.pactflow.io
