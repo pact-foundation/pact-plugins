@@ -4,9 +4,6 @@ on:
   - push
   - pull_request
 
-env:
-
-
 jobs:
   latest_jdk:
     runs-on: ${{ matrix.operating-system }}
