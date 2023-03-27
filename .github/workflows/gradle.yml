@@ -5,7 +5,7 @@ on:
   - pull_request
 
 jobs:
-  latest_lts_jdk:
+  latest_jdk:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
@@ -20,9 +20,6 @@ jobs:
       uses: arduino/setup-protoc@v1
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
-    - name: Run plugin driver tests
-      run: ./gradlew -s --no-daemon -i check
-      working-directory: drivers/jvm
     - name: Build plugin driver
       run: ./gradlew -s --no-daemon -i publishToMavenLocal
       working-directory: drivers/jvm
@@ -32,6 +29,9 @@ jobs:
     - name: Install Protobuf plugin
       run: ~/bin/pact-plugin-cli -y install protobuf
       shell: bash
+    - name: Run plugin driver tests
+      run: ./gradlew -s --no-daemon -i check
+      working-directory: drivers/jvm
     - name: Publish driver Pact file
       run: GIT_SHA=$GITHUB_SHA ./gradlew --no-daemon pactPublish -PpactBrokerToken=${{ secrets.PACTFLOW_TOKEN }}
       working-directory: drivers/jvm
@@ -52,9 +52,6 @@ jobs:
         uses: arduino/setup-protoc@v1
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run plugin driver tests
-        run: ./gradlew -s --no-daemon -i check
-        working-directory: drivers/jvm
       - name: Build plugin driver
         run: ./gradlew -s --no-daemon -i publishToMavenLocal
         working-directory: drivers/jvm
@@ -64,3 +61,6 @@ jobs:
       - name: Install Protobuf plugin
         run: ~/bin/pact-plugin-cli -y install protobuf
         shell: bash
+      - name: Run plugin driver tests
+        run: ./gradlew -s --no-daemon -i check
+        working-directory: drivers/jvm
