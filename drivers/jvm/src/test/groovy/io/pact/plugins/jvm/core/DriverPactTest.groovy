@@ -117,7 +117,7 @@ class DriverPactTest {
       .usingPlugin('protobuf')
       .expectsToReceive('init plugin request', 'core/interaction/synchronous-message')
       .with([
-        'pact:proto': PactBuilder.filePath("../../../proto/plugin.proto"),
+        'pact:proto': PactBuilder.filePath("../../proto/plugin.proto"),
         'pact:content-type': 'application/protobuf',
         'pact:proto-service': 'PactPlugin/InitPlugin',
         'request': [

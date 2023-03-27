@@ -1,2 +1,1 @@
-rootProject.name = 'io.pact.plugin.driver'
-include('core')
+rootProject.name = 'core'
