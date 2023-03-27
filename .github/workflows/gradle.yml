@@ -33,10 +33,16 @@ jobs:
         run: ./gradlew -s --no-daemon -i check
         working-directory: drivers/jvm
       - name: Publish driver Pact file
-        run: ./gradlew --no-daemon pactPublish
+        run: |
+          if [ "$PACT_BROKER_URL" != "" ]; then
+            ./gradlew --no-daemon pactPublish -PpactBrokerUrl=$PACT_BROKER_URL
+          else
+            ./gradlew --no-daemon pactPublish -PpactBrokerUrl=https://pact-foundation.pactflow.io
+          fi
         env:
           GIT_SHA: $GITHUB_SHA
           ORG_GRADLE_PROJECT_pactBrokerToken: ${{ secrets.PACTFLOW_TOKEN }}
+          PACT_BROKER_URL: ${{ vars.PACT_BROKER_URL}}
         working-directory: drivers/jvm
         if: runner.os == 'Linux'
 
