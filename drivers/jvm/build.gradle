@@ -116,10 +116,10 @@ protobuf {
 pact {
     publish {
         if (project.hasProperty('pactBrokerToken')) {
-            println property('pactBrokerToken')
+            println "Set pactBrokerUrl: ${project.pactBrokerToken}"
             pactBrokerUrl = project.pactBrokerToken
         } else {
-            println "Using the default "
+            println "Using default pactBrokerUrl"
             pactBrokerUrl = 'https://pact-foundation.pactflow.io'
         }
         consumerVersion = "${project.version}+${gitSha}"
