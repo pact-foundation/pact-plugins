@@ -10,11 +10,14 @@ import org.apache.hc.core5.http.message.BasicNameValuePair
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
+private const val HTTP_CODE_MAX_OK = 299
+
 object PluginMetrics: KLogging() {
 
-  const val GA_ID = "UA-117778936-1"
-  const val GA_URL = "https://www.google-analytics.com/collect"
+  private const val GA_ID = "UA-117778936-1"
+  private const val GA_URL = "https://www.google-analytics.com/collect"
 
+  @Suppress("TooGenericExceptionThrown")
   fun sendMetrics(manifest: PactPluginManifest) {
     Thread {
       val doNotTrack = lookupProperty("pact_do_not_track").ifNullOrEmpty {
@@ -64,11 +67,11 @@ object PluginMetrics: KLogging() {
             .bodyForm(entity)
             .execute()
             .returnResponse()
-          if (response.code > 299) {
+          if (response.code > HTTP_CODE_MAX_OK) {
             logger.debug("Got response from metrics: ${response.code} ${response.reasonPhrase}")
           }
-        } catch (ex: Exception) {
-          logger.debug(ex) { "Failed to send plugin load metrics" }
+        } catch (ignore: Exception) {
+          logger.debug(ignore) { "Failed to send plugin load metrics" }
         }
       }
     }.start()

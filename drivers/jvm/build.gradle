@@ -22,9 +22,6 @@ repositories {
 version = '0.3.3'
 group = 'io.pact.plugin.driver'
 
-targetCompatibility = '11'
-sourceCompatibility = '11'
-
 dependencies {
     detektPlugins("io.gitlab.arturbosch.detekt:detekt-rules-libraries:1.22.0")
 //    detektPlugins("io.gitlab.arturbosch.detekt:detekt-formatting:1.22.0") // TODO: enable once formatting errors are fixed

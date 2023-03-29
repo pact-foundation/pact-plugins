@@ -13,6 +13,7 @@ data class ContentMismatch(
   val diff : String? = null,
   val type: String? = null
 ) {
+  @Suppress("CyclomaticComplexMethod")
   override fun equals(other: Any?): Boolean {
     if (this === other) return true
     if (javaClass != other?.javaClass) return false
@@ -99,7 +100,14 @@ data class CatalogueContentMatcher(
     } else {
       result.resultsMap.mapValues { entry ->
         entry.value.mismatchesList.map {
-          ContentMismatch(it.expected.toByteArray(), it.actual.toByteArray(), it.mismatch, it.path, it.diff, it.mismatchType)
+          ContentMismatch(
+            it.expected.toByteArray(),
+            it.actual.toByteArray(),
+            it.mismatch,
+            it.path,
+            it.diff,
+            it.mismatchType
+          )
         }
       }
     }

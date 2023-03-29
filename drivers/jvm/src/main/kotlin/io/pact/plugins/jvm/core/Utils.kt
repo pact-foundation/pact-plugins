@@ -16,6 +16,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.jar.JarInputStream
 
+@Suppress("TooManyFunctions")
 object Utils : KLogging() {
   fun lookupVersion(clazz: Class<*>): String {
     val url = clazz.protectionDomain?.codeSource?.location
@@ -35,14 +36,16 @@ object Utils : KLogging() {
     }
   }
 
+  @Suppress("TooGenericExceptionThrown")
   fun <F> handleWith(f: () -> Any?): Result<F, Exception> {
     return try {
       val result = f()
+      @Suppress("UNCHECKED_CAST")
       if (result is Result<*, *>) result as Result<F, Exception> else Result.Ok(result as F)
-    } catch (ex: Exception) {
-      Result.Err(ex)
-    } catch (ex: Throwable) {
-      Result.Err(RuntimeException(ex))
+    } catch (ignore: Exception) {
+      Result.Err(ignore)
+    } catch (ignore: Throwable) {
+      Result.Err(RuntimeException(ignore))
     }
   }
 
@@ -145,6 +148,7 @@ object Utils : KLogging() {
    */
   fun toProtoValue(value: Any?): Value {
     return if (value != null) {
+      @Suppress("UNCHECKED_CAST")
       when (value) {
         is Boolean -> Value.newBuilder().setBoolValue(value).build()
         is String -> Value.newBuilder().setStringValue(value).build()

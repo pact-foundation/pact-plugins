@@ -21,6 +21,7 @@ interface ContentGenerator {
   /**
    * Generate the contents for the body, using the provided generators
    */
+  @Suppress("LongParameterList")
   fun generateContent(
     contentType: ContentType,
     generators: Map<String, Generator>,
