@@ -197,10 +197,10 @@ async fn initialise_plugin(
 ) -> anyhow::Result<PactPlugin> {
   match manifest.executable_type.as_str() {
     "exec" => {
-      let plugin = start_plugin_process(manifest).await?;
+      let mut plugin = start_plugin_process(manifest).await?;
       debug!("Plugin process started OK (port = {}), sending init message", plugin.port());
 
-      init_handshake(manifest, &plugin).await.map_err(|err| {
+      init_handshake(manifest, &mut plugin).await.map_err(|err| {
         plugin.kill();
         anyhow!("Failed to send init request to the plugin - {}", err)
       })?;
@@ -215,7 +215,7 @@ async fn initialise_plugin(
 }
 
 /// Internal function: public for testing
-pub async fn init_handshake(manifest: &PactPluginManifest, plugin: &(dyn PactPluginRpc + Send + Sync)) -> anyhow::Result<()> {
+pub async fn init_handshake(manifest: &PactPluginManifest, plugin: &mut (dyn PactPluginRpc + Send + Sync)) -> anyhow::Result<()> {
   let request = InitPluginRequest {
     implementation: "plugin-driver-rust".to_string(),
     version: option_env!("CARGO_PKG_VERSION").unwrap_or("0").to_string()

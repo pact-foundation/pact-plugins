@@ -131,7 +131,7 @@ impl Default for PactPluginManifest {
 #[async_trait]
 pub trait PactPluginRpc {
   /// Send an init request to the plugin process
-  async fn init_plugin(&self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse>;
+  async fn init_plugin(&mut self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse>;
 
   /// Send a compare contents request to the plugin process
   async fn compare_contents(&self, request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse>;
@@ -172,14 +172,18 @@ pub struct PactPlugin {
   pub child: Arc<ChildPluginProcess>,
 
   /// Count of access to the plugin. If this is ever zero, the plugin process will be shutdown
-  access_count: usize
+  access_count: usize,
+
+  /// Channel connected to the plugin process
+  channel: Option<Channel>
 }
 
 #[async_trait]
 impl PactPluginRpc for PactPlugin {
   /// Send an init request to the plugin process
-  async fn init_plugin(&self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
+  async fn init_plugin(&mut self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
     let channel = self.connect_channel().await?;
+    self.channel = Some(channel.clone());
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -192,7 +196,10 @@ impl PactPluginRpc for PactPlugin {
 
   /// Send a compare contents request to the plugin process
   async fn compare_contents(&self, request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
-    let channel = self.connect_channel().await?;
+    let channel = self.channel
+      .as_ref()
+      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
+      .clone();
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -205,7 +212,10 @@ impl PactPluginRpc for PactPlugin {
 
   /// Send a configure contents request to the plugin process
   async fn configure_interaction(&self, request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
-    let channel = self.connect_channel().await?;
+    let channel = self.channel
+      .as_ref()
+      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
+      .clone();
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -218,7 +228,10 @@ impl PactPluginRpc for PactPlugin {
 
   /// Send a generate content request to the plugin
   async fn generate_content(&self, request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
-    let channel = self.connect_channel().await?;
+    let channel = self.channel
+      .as_ref()
+      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
+      .clone();
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -230,7 +243,10 @@ impl PactPluginRpc for PactPlugin {
   }
 
   async fn start_mock_server(&self, request: StartMockServerRequest) -> anyhow::Result<StartMockServerResponse> {
-    let channel = self.connect_channel().await?;
+    let channel = self.channel
+      .as_ref()
+      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
+      .clone();
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -242,7 +258,10 @@ impl PactPluginRpc for PactPlugin {
   }
 
   async fn shutdown_mock_server(&self, request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse> {
-    let channel = self.connect_channel().await?;
+    let channel = self.channel
+      .as_ref()
+      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
+      .clone();
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -254,7 +273,10 @@ impl PactPluginRpc for PactPlugin {
   }
 
   async fn get_mock_server_results(&self, request: MockServerRequest) -> anyhow::Result<MockServerResults> {
-    let channel = self.connect_channel().await?;
+    let channel = self.channel
+      .as_ref()
+      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
+      .clone();
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -266,7 +288,10 @@ impl PactPluginRpc for PactPlugin {
   }
 
   async fn prepare_interaction_for_verification(&self, request: VerificationPreparationRequest) -> anyhow::Result<VerificationPreparationResponse> {
-    let channel = self.connect_channel().await?;
+    let channel = self.channel
+      .as_ref()
+      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
+      .clone();
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -278,7 +303,10 @@ impl PactPluginRpc for PactPlugin {
   }
 
   async fn verify_interaction(&self, request: VerifyInteractionRequest) -> anyhow::Result<VerifyInteractionResponse> {
-    let channel = self.connect_channel().await?;
+    let channel = self.channel
+      .as_ref()
+      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
+      .clone();
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -290,7 +318,10 @@ impl PactPluginRpc for PactPlugin {
   }
 
   async fn update_catalogue(&self, request: Catalogue) -> anyhow::Result<()> {
-    let channel = self.connect_channel().await?;
+    let channel = self.channel
+      .as_ref()
+      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
+      .clone();
     let auth_str = self.child.plugin_info.server_key.as_str();
     let token = MetadataValue::try_from(auth_str)?;
     let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
@@ -305,7 +336,12 @@ impl PactPluginRpc for PactPlugin {
 impl PactPlugin {
   /// Create a new Plugin
   pub fn new(manifest: &PactPluginManifest, child: ChildPluginProcess) -> Self {
-    PactPlugin { manifest: manifest.clone(), child: Arc::new(child), access_count: 1 }
+    PactPlugin {
+      manifest: manifest.clone(),
+      child: Arc::new(child),
+      access_count: 1,
+      channel: None
+    }
   }
 
   /// Port the plugin is running on

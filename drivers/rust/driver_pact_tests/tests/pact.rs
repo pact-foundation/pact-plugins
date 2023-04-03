@@ -18,7 +18,7 @@ struct MockPlugin {
 
 #[async_trait]
 impl PactPluginRpc for MockPlugin {
-  async fn init_plugin(&self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
+  async fn init_plugin(&mut self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
     if self.request.implementation == request.implementation {
       Ok(self.response.clone())
     } else {
