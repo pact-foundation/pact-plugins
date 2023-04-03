@@ -26,14 +26,14 @@ Supported matching rules:
 | type        | Value must be the same type as the example                                                            |                    | `matching(type, 'Example value')`                                             |    
 | number      | Value must be a numeric value                                                                         |                    | `matching(number, 100.09)`                                                    |                  
 | integer     | Value must be an integer value (no decimals)                                                          |                    | `matching(integer, 100)`                                                      |         
-| decimal     | Value must be a decimal number (must have at least one significant figure after the decimal point)    |                    | `matching(decimnal, 100.01)`                                                  |         
+| decimal     | Value must be a decimal number (must have at least one significant figure after the decimal point)    |                    | `matching(decimal, 100.01)`                                                  |         
 | datetime    | Value must match a date-time format string                                                            | Format String      | `matching(datetime, 'yyyy-MM-dd HH:mm:ssZZZZZ', '2020-05-21 16:44:32+10:00')` |
 | date        | Value must match a date format string                                                                 | Format String      | `matching(date, 'yyyy-MM-dd', '22:04')`                                       |
 | time        | Value must match a time format string                                                                 | Format String      | `matching(time, 'HH:mm', '22:04')`                                            |
 | regex       | Value must match a regular expression                                                                 | Regular expression | `matching(regex, '\\w{3}\\d+', 'abc123')`                                     |
 | include     | Value must include the example value as a substring                                                   |                    | `matching(include, 'testing')`                                                |
 | boolean     | Value must be a boolean                                                                               |                    | `matching(boolean, true)`                                                     |
-| server      | Value must match the semver specification                                                             |                    | `matching(semver, '1.0.0')`                                                   |
+| semver      | Value must match the semver specification                                                             |                    | `matching(semver, '1.0.0')`                                                   |
 | contentType | Value must be of the provided content type. This will preform a magic test on the bytes of the value. | Content type       | `matching(contentType, 'application/xml', '<?xml?><test/>')`                  |
 
 The final form is a reference to another key. This is used to setup type matching using an example value, and is normally
