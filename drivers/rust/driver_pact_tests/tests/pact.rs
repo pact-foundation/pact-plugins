@@ -106,9 +106,9 @@ async fn test_proto_client() {
       name: "Test".to_string(),
       .. PactPluginManifest::default()
     };
-    let mock_plugin = MockPlugin { request, response };
+    let mut mock_plugin = MockPlugin { request, response };
 
-    let result = init_handshake(&manifest, &mock_plugin).await;
+    let result = init_handshake(&manifest, &mut mock_plugin).await;
 
     expect!(result).to(be_ok());
   }
