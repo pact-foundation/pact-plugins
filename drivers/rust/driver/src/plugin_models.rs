@@ -3,12 +3,17 @@
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tonic::metadata::MetadataValue;
+use tokio::sync::Mutex;
+use tonic::metadata::{Ascii, MetadataValue};
+use tonic::{Request, Status};
+use tonic::codegen::InterceptedService;
+use tonic::service::Interceptor;
 use tonic::transport::Channel;
 use tracing::{debug, trace};
 
@@ -172,162 +177,103 @@ pub struct PactPlugin {
   pub child: Arc<ChildPluginProcess>,
 
   /// Count of access to the plugin. If this is ever zero, the plugin process will be shutdown
-  access_count: usize,
+  access_count: Arc<AtomicUsize>,
 
   /// Channel connected to the plugin process
-  channel: Option<Channel>
+  channel: Option<Channel>,
+
+  /// Client to use to call the plugin process
+  client: Arc<Mutex<Option<PactPluginClient<InterceptedService<Channel, PactPluginInterceptor>>>>>
 }
 
 #[async_trait]
 impl PactPluginRpc for PactPlugin {
-  /// Send an init request to the plugin process
+  /// Send an init request to the plugin process. This function will setup the channel and client
+  /// to use to connect to the plugin process.
   async fn init_plugin(&mut self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
     let channel = self.connect_channel().await?;
     self.channel = Some(channel.clone());
-    let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::try_from(auth_str)?;
-    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
-      req.metadata_mut().insert("authorization", token.clone());
-      Ok(req)
-    });
-    let response = client.init_plugin(tonic::Request::new(request)).await?;
+    let interceptor = PactPluginInterceptor::new(self.child.plugin_info.server_key.as_str())?;
+    let mut client = PactPluginClient::with_interceptor(channel, interceptor);
+    {
+      let mut guard = self.client.lock().await;
+      let _ = guard.insert(client.clone());
+    }
+    let response = client.init_plugin(Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   /// Send a compare contents request to the plugin process
   async fn compare_contents(&self, request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
-    let channel = self.channel
-      .as_ref()
-      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
-      .clone();
-    let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::try_from(auth_str)?;
-    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
-      req.metadata_mut().insert("authorization", token.clone());
-      Ok(req)
-    });
-    let response = client.compare_contents(tonic::Request::new(request)).await?;
+    let mut guard = self.client.lock().await;
+    let client = guard.as_mut().ok_or_else(||
+      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
+    let response = client.compare_contents(Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   /// Send a configure contents request to the plugin process
   async fn configure_interaction(&self, request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
-    let channel = self.channel
-      .as_ref()
-      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
-      .clone();
-    let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::try_from(auth_str)?;
-    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
-      req.metadata_mut().insert("authorization", token.clone());
-      Ok(req)
-    });
+    let mut guard = self.client.lock().await;
+    let client = guard.as_mut().ok_or_else(||
+      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
     let response = client.configure_interaction(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   /// Send a generate content request to the plugin
   async fn generate_content(&self, request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
-    let channel = self.channel
-      .as_ref()
-      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
-      .clone();
-    let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::try_from(auth_str)?;
-    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
-      req.metadata_mut().insert("authorization", token.clone());
-      Ok(req)
-    });
+    let mut guard = self.client.lock().await;
+    let client = guard.as_mut().ok_or_else(||
+      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
     let response = client.generate_content(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   async fn start_mock_server(&self, request: StartMockServerRequest) -> anyhow::Result<StartMockServerResponse> {
-    let channel = self.channel
-      .as_ref()
-      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
-      .clone();
-    let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::try_from(auth_str)?;
-    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
-      req.metadata_mut().insert("authorization", token.clone());
-      Ok(req)
-    });
+    let mut guard = self.client.lock().await;
+    let client = guard.as_mut().ok_or_else(||
+      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
     let response = client.start_mock_server(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   async fn shutdown_mock_server(&self, request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse> {
-    let channel = self.channel
-      .as_ref()
-      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
-      .clone();
-    let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::try_from(auth_str)?;
-    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
-      req.metadata_mut().insert("authorization", token.clone());
-      Ok(req)
-    });
+    let mut guard = self.client.lock().await;
+    let client = guard.as_mut().ok_or_else(||
+      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
     let response = client.shutdown_mock_server(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   async fn get_mock_server_results(&self, request: MockServerRequest) -> anyhow::Result<MockServerResults> {
-    let channel = self.channel
-      .as_ref()
-      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
-      .clone();
-    let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::try_from(auth_str)?;
-    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
-      req.metadata_mut().insert("authorization", token.clone());
-      Ok(req)
-    });
+    let mut guard = self.client.lock().await;
+    let client = guard.as_mut().ok_or_else(||
+      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
     let response = client.get_mock_server_results(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   async fn prepare_interaction_for_verification(&self, request: VerificationPreparationRequest) -> anyhow::Result<VerificationPreparationResponse> {
-    let channel = self.channel
-      .as_ref()
-      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
-      .clone();
-    let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::try_from(auth_str)?;
-    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
-      req.metadata_mut().insert("authorization", token.clone());
-      Ok(req)
-    });
+    let mut guard = self.client.lock().await;
+    let client = guard.as_mut().ok_or_else(||
+      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
     let response = client.prepare_interaction_for_verification(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   async fn verify_interaction(&self, request: VerifyInteractionRequest) -> anyhow::Result<VerifyInteractionResponse> {
-    let channel = self.channel
-      .as_ref()
-      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
-      .clone();
-    let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::try_from(auth_str)?;
-    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
-      req.metadata_mut().insert("authorization", token.clone());
-      Ok(req)
-    });
+    let mut guard = self.client.lock().await;
+    let client = guard.as_mut().ok_or_else(||
+      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
     let response = client.verify_interaction(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   async fn update_catalogue(&self, request: Catalogue) -> anyhow::Result<()> {
-    let channel = self.channel
-      .as_ref()
-      .ok_or_else(|| anyhow!("Channel is not connected to plugin process"))?
-      .clone();
-    let auth_str = self.child.plugin_info.server_key.as_str();
-    let token = MetadataValue::try_from(auth_str)?;
-    let mut client = PactPluginClient::with_interceptor(channel, move |mut req: tonic::Request<_>| {
-      req.metadata_mut().insert("authorization", token.clone());
-      Ok(req)
-    });
+    let mut guard = self.client.lock().await;
+    let client = guard.as_mut().ok_or_else(||
+      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
     client.update_catalogue(tonic::Request::new(request)).await?;
     Ok(())
   }
@@ -339,8 +285,9 @@ impl PactPlugin {
     PactPlugin {
       manifest: manifest.clone(),
       child: Arc::new(child),
-      access_count: 1,
-      channel: None
+      access_count: Arc::new(AtomicUsize::new(1)),
+      channel: None,
+      client: Arc::default()
     }
   }
 
@@ -356,19 +303,29 @@ impl PactPlugin {
 
   /// Update the access of the plugin
   pub fn update_access(&mut self) {
-    self.access_count += 1;
-    trace!("update_access: Plugin {}/{} access is now {}", self.manifest.name, self.manifest.version,
-      self.access_count);
+    let count = self.access_count.fetch_add(1, Ordering::SeqCst);
+    trace!("update_access: Plugin {}/{} access is now {}", self.manifest.name,
+      self.manifest.version, count + 1);
   }
 
   /// Decrement and return the access count for the plugin
   pub fn drop_access(&mut self) -> usize {
-    if self.access_count > 0 {
-      self.access_count -= 1;
-    }
+    let check = self.access_count.fetch_update(Ordering::SeqCst,
+      Ordering::SeqCst, |count| {
+        if count > 0 {
+          Some(count - 1)
+        } else {
+          None
+        }
+      });
+    let count = if let Ok(v) = check {
+      if v > 0 { v - 1 } else { v }
+    } else {
+      0
+    };
     trace!("drop_access: Plugin {}/{} access is now {}", self.manifest.name, self.manifest.version,
-      self.access_count);
-    self.access_count
+      count);
+    count
   }
 
   async fn connect_channel(&self) -> anyhow::Result<Channel> {
@@ -381,6 +338,29 @@ impl PactPlugin {
           .map_err(|err| anyhow!(err))
       }
     }
+  }
+}
+
+/// Interceptor to inject the server key as an authorisation header
+#[derive(Clone, Debug)]
+struct PactPluginInterceptor {
+  /// Server key to inject
+  server_key: MetadataValue<Ascii>
+}
+
+impl PactPluginInterceptor {
+  fn new(server_key: &str) -> anyhow::Result<Self> {
+    let token = MetadataValue::try_from(server_key)?;
+    Ok(PactPluginInterceptor {
+      server_key: token
+    })
+  }
+}
+
+impl Interceptor for PactPluginInterceptor {
+  fn call(&mut self, mut request: Request<()>) -> Result<Request<()>, Status> {
+    request.metadata_mut().insert("authorization", self.server_key.clone());
+    Ok(request)
   }
 }
 
