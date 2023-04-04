@@ -1,5 +1,13 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.4.0 - Use shared gRPC plugin client
+
+* 6235b6c - feat: Use a shared channel and gRPC client to communicate with a plugin (Ronald Holshausen, Tue Apr 4 13:47:14 2023 +1000)
+* 550c331 - refactor: Use a shared channel to the plugin which is clonable (Ronald Holshausen, Mon Apr 3 15:28:56 2023 +1000)
+* 6ed7c4d - refactor: Move plugin repository models to the plugin driver (Ronald Holshausen, Mon Apr 3 11:27:14 2023 +1000)
+* 548f9ea - chore: Bump minor version, update all dependecies (esp tonic to 0.9.0) (Ronald Holshausen, Mon Apr 3 10:33:23 2023 +1000)
+* ea27510 - bump version to 0.3.4 (Ronald Holshausen, Tue Mar 14 16:57:43 2023 +1100)
+
 # 0.3.3 - Maintenance Release
 
 * 922c57c - chore: bump pact models to 1.0.6 (Ronald Holshausen, Tue Mar 14 16:54:32 2023 +1100)
