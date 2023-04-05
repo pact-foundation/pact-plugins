@@ -14,8 +14,6 @@ mod tests {
   /// Main test method for the AreaCalculator calculate service method call.
   #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
   async fn test_proto_client() {
-    let _ = env_logger::builder().is_test(true).try_init();
-
     // Configures the Pact interaction for the test. This will load the Protobuf plugin, which will provide all the
     // Protobuf and gRPC support to the Pact framework.
     let mut pact_builder = PactBuilderAsync::new_v4("grpc-consumer-rust", "area-calculator-provider");
