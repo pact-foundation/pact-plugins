@@ -1422,9 +1422,9 @@ checksum = "b15813163c1d831bf4a13c3610c05c0d03b39feb07f7e09fa234dac9b15aaf39"
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.4.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a32b9ed8dd52cf1c16c261add3c0bff08ca6904e680c62179f7b9503475ddb0d"
+checksum = "aa2bc8777bd8bc8895f21209a38810f4038116c6905011c0f43fa30aad6f16ae"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1459,9 +1459,9 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "0.10.6"
+version = "0.10.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a95d59568251519e2e45d21b5497ba5e57080421b753675dd51f97f9843b5d5f"
+checksum = "f15ea07f5c1af17c7009163620a191a289c6144d2b99c6190174a9a0e31d6a67"
 dependencies = [
  "anyhow",
  "async-trait",
