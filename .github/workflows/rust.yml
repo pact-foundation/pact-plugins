@@ -36,7 +36,7 @@ jobs:
           RUST_LOG: trace
           RUST_BACKTRACE: 1
       - name: FFI Tests
-        run: cargo test -- --test-threads 1
+        run: cargo test
         working-directory: drivers/rust/driver_ffi
         env:
           RUST_LOG: trace

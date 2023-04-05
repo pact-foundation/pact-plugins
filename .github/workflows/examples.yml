@@ -44,7 +44,7 @@ jobs:
           cd csv-consumer-jvm
           ./gradlew check
           cd ../csv-consumer-rust
-          pact_do_not_track=true cargo test -- --test-threads 1
+          pact_do_not_track=true cargo test
           cd ../csv-provider
           cargo build
           nohup ./target/debug/csv-provider &
@@ -121,7 +121,7 @@ jobs:
           cd ../protobuf-consumer-maven
           mvn verify
           cd ../protobuf-consumer-rust
-          pact_do_not_track=true cargo test -- --test-threads 1
+          pact_do_not_track=true cargo test
           cd ../protobuf-provider
           go build main.go
           nohup ./main &
@@ -134,7 +134,7 @@ jobs:
         working-directory: examples/protobuf
       - name: Run area calculator Protobuf example
         run: |
-          pact_do_not_track=true cargo test -- --test-threads 1
+          pact_do_not_track=true cargo test
         shell: bash
         working-directory: examples/protobuf/area_calculator_example/consumer
 
