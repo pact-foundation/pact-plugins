@@ -772,7 +772,7 @@ pub mod pact_plugin_client {
     /// Attempt to create a new client by connecting to a given endpoint.
     pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
       where
-        D: std::convert::TryInto<tonic::transport::Endpoint>,
+        D: TryInto<tonic::transport::Endpoint>,
         D::Error: Into<StdError>,
     {
       let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
@@ -828,11 +828,30 @@ pub mod pact_plugin_client {
       self.inner = self.inner.accept_compressed(encoding);
       self
     }
+    /// Limits the maximum size of a decoded message.
+    ///
+    /// Default: `4MB`
+    #[must_use]
+    pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
+      self.inner = self.inner.max_decoding_message_size(limit);
+      self
+    }
+    /// Limits the maximum size of an encoded message.
+    ///
+    /// Default: `usize::MAX`
+    #[must_use]
+    pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
+      self.inner = self.inner.max_encoding_message_size(limit);
+      self
+    }
     /// Check that the plugin loaded OK. Returns the catalogue entries describing what the plugin provides
     pub async fn init_plugin(
       &mut self,
       request: impl tonic::IntoRequest<super::InitPluginRequest>,
-    ) -> Result<tonic::Response<super::InitPluginResponse>, tonic::Status> {
+    ) -> std::result::Result<
+      tonic::Response<super::InitPluginResponse>,
+      tonic::Status,
+    > {
       self.inner
         .ready()
         .await
@@ -846,13 +865,16 @@ pub mod pact_plugin_client {
       let path = http::uri::PathAndQuery::from_static(
         "/io.pact.plugin.PactPlugin/InitPlugin",
       );
-      self.inner.unary(request.into_request(), path, codec).await
+      let mut req = request.into_request();
+      req.extensions_mut()
+        .insert(GrpcMethod::new("io.pact.plugin.PactPlugin", "InitPlugin"));
+      self.inner.unary(req, path, codec).await
     }
     /// Updated catalogue. This will be sent when the core catalogue has been updated (probably by a plugin loading).
     pub async fn update_catalogue(
       &mut self,
       request: impl tonic::IntoRequest<super::Catalogue>,
-    ) -> Result<tonic::Response<()>, tonic::Status> {
+    ) -> std::result::Result<tonic::Response<()>, tonic::Status> {
       self.inner
         .ready()
         .await
@@ -866,13 +888,19 @@ pub mod pact_plugin_client {
       let path = http::uri::PathAndQuery::from_static(
         "/io.pact.plugin.PactPlugin/UpdateCatalogue",
       );
-      self.inner.unary(request.into_request(), path, codec).await
+      let mut req = request.into_request();
+      req.extensions_mut()
+        .insert(GrpcMethod::new("io.pact.plugin.PactPlugin", "UpdateCatalogue"));
+      self.inner.unary(req, path, codec).await
     }
     /// Request to perform a comparison of some contents (matching request)
     pub async fn compare_contents(
       &mut self,
       request: impl tonic::IntoRequest<super::CompareContentsRequest>,
-    ) -> Result<tonic::Response<super::CompareContentsResponse>, tonic::Status> {
+    ) -> std::result::Result<
+      tonic::Response<super::CompareContentsResponse>,
+      tonic::Status,
+    > {
       self.inner
         .ready()
         .await
@@ -886,13 +914,16 @@ pub mod pact_plugin_client {
       let path = http::uri::PathAndQuery::from_static(
         "/io.pact.plugin.PactPlugin/CompareContents",
       );
-      self.inner.unary(request.into_request(), path, codec).await
+      let mut req = request.into_request();
+      req.extensions_mut()
+        .insert(GrpcMethod::new("io.pact.plugin.PactPlugin", "CompareContents"));
+      self.inner.unary(req, path, codec).await
     }
     /// Request to configure/setup the interaction for later verification. Data returned will be persisted in the pact file.
     pub async fn configure_interaction(
       &mut self,
       request: impl tonic::IntoRequest<super::ConfigureInteractionRequest>,
-    ) -> Result<
+    ) -> std::result::Result<
       tonic::Response<super::ConfigureInteractionResponse>,
       tonic::Status,
     > {
@@ -909,13 +940,21 @@ pub mod pact_plugin_client {
       let path = http::uri::PathAndQuery::from_static(
         "/io.pact.plugin.PactPlugin/ConfigureInteraction",
       );
-      self.inner.unary(request.into_request(), path, codec).await
+      let mut req = request.into_request();
+      req.extensions_mut()
+        .insert(
+          GrpcMethod::new("io.pact.plugin.PactPlugin", "ConfigureInteraction"),
+        );
+      self.inner.unary(req, path, codec).await
     }
     /// Request to generate the content using any defined generators
     pub async fn generate_content(
       &mut self,
       request: impl tonic::IntoRequest<super::GenerateContentRequest>,
-    ) -> Result<tonic::Response<super::GenerateContentResponse>, tonic::Status> {
+    ) -> std::result::Result<
+      tonic::Response<super::GenerateContentResponse>,
+      tonic::Status,
+    > {
       self.inner
         .ready()
         .await
@@ -929,13 +968,19 @@ pub mod pact_plugin_client {
       let path = http::uri::PathAndQuery::from_static(
         "/io.pact.plugin.PactPlugin/GenerateContent",
       );
-      self.inner.unary(request.into_request(), path, codec).await
+      let mut req = request.into_request();
+      req.extensions_mut()
+        .insert(GrpcMethod::new("io.pact.plugin.PactPlugin", "GenerateContent"));
+      self.inner.unary(req, path, codec).await
     }
     /// Start a mock server
     pub async fn start_mock_server(
       &mut self,
       request: impl tonic::IntoRequest<super::StartMockServerRequest>,
-    ) -> Result<tonic::Response<super::StartMockServerResponse>, tonic::Status> {
+    ) -> std::result::Result<
+      tonic::Response<super::StartMockServerResponse>,
+      tonic::Status,
+    > {
       self.inner
         .ready()
         .await
@@ -949,14 +994,20 @@ pub mod pact_plugin_client {
       let path = http::uri::PathAndQuery::from_static(
         "/io.pact.plugin.PactPlugin/StartMockServer",
       );
-      self.inner.unary(request.into_request(), path, codec).await
+      let mut req = request.into_request();
+      req.extensions_mut()
+        .insert(GrpcMethod::new("io.pact.plugin.PactPlugin", "StartMockServer"));
+      self.inner.unary(req, path, codec).await
     }
     /// Shutdown a running mock server
     /// TODO: Replace the message types with MockServerRequest and MockServerResults in the next major version
     pub async fn shutdown_mock_server(
       &mut self,
       request: impl tonic::IntoRequest<super::ShutdownMockServerRequest>,
-    ) -> Result<tonic::Response<super::ShutdownMockServerResponse>, tonic::Status> {
+    ) -> std::result::Result<
+      tonic::Response<super::ShutdownMockServerResponse>,
+      tonic::Status,
+    > {
       self.inner
         .ready()
         .await
@@ -970,13 +1021,21 @@ pub mod pact_plugin_client {
       let path = http::uri::PathAndQuery::from_static(
         "/io.pact.plugin.PactPlugin/ShutdownMockServer",
       );
-      self.inner.unary(request.into_request(), path, codec).await
+      let mut req = request.into_request();
+      req.extensions_mut()
+        .insert(
+          GrpcMethod::new("io.pact.plugin.PactPlugin", "ShutdownMockServer"),
+        );
+      self.inner.unary(req, path, codec).await
     }
     /// Get the matching results from a running mock server
     pub async fn get_mock_server_results(
       &mut self,
       request: impl tonic::IntoRequest<super::MockServerRequest>,
-    ) -> Result<tonic::Response<super::MockServerResults>, tonic::Status> {
+    ) -> std::result::Result<
+      tonic::Response<super::MockServerResults>,
+      tonic::Status,
+    > {
       self.inner
         .ready()
         .await
@@ -990,14 +1049,19 @@ pub mod pact_plugin_client {
       let path = http::uri::PathAndQuery::from_static(
         "/io.pact.plugin.PactPlugin/GetMockServerResults",
       );
-      self.inner.unary(request.into_request(), path, codec).await
+      let mut req = request.into_request();
+      req.extensions_mut()
+        .insert(
+          GrpcMethod::new("io.pact.plugin.PactPlugin", "GetMockServerResults"),
+        );
+      self.inner.unary(req, path, codec).await
     }
     /// Prepare an interaction for verification. This should return any data required to construct any request
     /// so that it can be amended before the verification is run
     pub async fn prepare_interaction_for_verification(
       &mut self,
       request: impl tonic::IntoRequest<super::VerificationPreparationRequest>,
-    ) -> Result<
+    ) -> std::result::Result<
       tonic::Response<super::VerificationPreparationResponse>,
       tonic::Status,
     > {
@@ -1014,13 +1078,24 @@ pub mod pact_plugin_client {
       let path = http::uri::PathAndQuery::from_static(
         "/io.pact.plugin.PactPlugin/PrepareInteractionForVerification",
       );
-      self.inner.unary(request.into_request(), path, codec).await
+      let mut req = request.into_request();
+      req.extensions_mut()
+        .insert(
+          GrpcMethod::new(
+            "io.pact.plugin.PactPlugin",
+            "PrepareInteractionForVerification",
+          ),
+        );
+      self.inner.unary(req, path, codec).await
     }
     /// Execute the verification for the interaction.
     pub async fn verify_interaction(
       &mut self,
       request: impl tonic::IntoRequest<super::VerifyInteractionRequest>,
-    ) -> Result<tonic::Response<super::VerifyInteractionResponse>, tonic::Status> {
+    ) -> std::result::Result<
+      tonic::Response<super::VerifyInteractionResponse>,
+      tonic::Status,
+    > {
       self.inner
         .ready()
         .await
@@ -1034,7 +1109,12 @@ pub mod pact_plugin_client {
       let path = http::uri::PathAndQuery::from_static(
         "/io.pact.plugin.PactPlugin/VerifyInteraction",
       );
-      self.inner.unary(request.into_request(), path, codec).await
+      let mut req = request.into_request();
+      req.extensions_mut()
+        .insert(
+          GrpcMethod::new("io.pact.plugin.PactPlugin", "VerifyInteraction"),
+        );
+      self.inner.unary(req, path, codec).await
     }
   }
 }
@@ -1049,49 +1129,70 @@ pub mod pact_plugin_server {
     async fn init_plugin(
       &self,
       request: tonic::Request<super::InitPluginRequest>,
-    ) -> Result<tonic::Response<super::InitPluginResponse>, tonic::Status>;
+    ) -> std::result::Result<
+      tonic::Response<super::InitPluginResponse>,
+      tonic::Status,
+    >;
     /// Updated catalogue. This will be sent when the core catalogue has been updated (probably by a plugin loading).
     async fn update_catalogue(
       &self,
       request: tonic::Request<super::Catalogue>,
-    ) -> Result<tonic::Response<()>, tonic::Status>;
+    ) -> std::result::Result<tonic::Response<()>, tonic::Status>;
     /// Request to perform a comparison of some contents (matching request)
     async fn compare_contents(
       &self,
       request: tonic::Request<super::CompareContentsRequest>,
-    ) -> Result<tonic::Response<super::CompareContentsResponse>, tonic::Status>;
+    ) -> std::result::Result<
+      tonic::Response<super::CompareContentsResponse>,
+      tonic::Status,
+    >;
     /// Request to configure/setup the interaction for later verification. Data returned will be persisted in the pact file.
     async fn configure_interaction(
       &self,
       request: tonic::Request<super::ConfigureInteractionRequest>,
-    ) -> Result<tonic::Response<super::ConfigureInteractionResponse>, tonic::Status>;
+    ) -> std::result::Result<
+      tonic::Response<super::ConfigureInteractionResponse>,
+      tonic::Status,
+    >;
     /// Request to generate the content using any defined generators
     async fn generate_content(
       &self,
       request: tonic::Request<super::GenerateContentRequest>,
-    ) -> Result<tonic::Response<super::GenerateContentResponse>, tonic::Status>;
+    ) -> std::result::Result<
+      tonic::Response<super::GenerateContentResponse>,
+      tonic::Status,
+    >;
     /// Start a mock server
     async fn start_mock_server(
       &self,
       request: tonic::Request<super::StartMockServerRequest>,
-    ) -> Result<tonic::Response<super::StartMockServerResponse>, tonic::Status>;
+    ) -> std::result::Result<
+      tonic::Response<super::StartMockServerResponse>,
+      tonic::Status,
+    >;
     /// Shutdown a running mock server
     /// TODO: Replace the message types with MockServerRequest and MockServerResults in the next major version
     async fn shutdown_mock_server(
       &self,
       request: tonic::Request<super::ShutdownMockServerRequest>,
-    ) -> Result<tonic::Response<super::ShutdownMockServerResponse>, tonic::Status>;
+    ) -> std::result::Result<
+      tonic::Response<super::ShutdownMockServerResponse>,
+      tonic::Status,
+    >;
     /// Get the matching results from a running mock server
     async fn get_mock_server_results(
       &self,
       request: tonic::Request<super::MockServerRequest>,
-    ) -> Result<tonic::Response<super::MockServerResults>, tonic::Status>;
+    ) -> std::result::Result<
+      tonic::Response<super::MockServerResults>,
+      tonic::Status,
+    >;
     /// Prepare an interaction for verification. This should return any data required to construct any request
     /// so that it can be amended before the verification is run
     async fn prepare_interaction_for_verification(
       &self,
       request: tonic::Request<super::VerificationPreparationRequest>,
-    ) -> Result<
+    ) -> std::result::Result<
       tonic::Response<super::VerificationPreparationResponse>,
       tonic::Status,
     >;
@@ -1099,13 +1200,18 @@ pub mod pact_plugin_server {
     async fn verify_interaction(
       &self,
       request: tonic::Request<super::VerifyInteractionRequest>,
-    ) -> Result<tonic::Response<super::VerifyInteractionResponse>, tonic::Status>;
+    ) -> std::result::Result<
+      tonic::Response<super::VerifyInteractionResponse>,
+      tonic::Status,
+    >;
   }
   #[derive(Debug)]
   pub struct PactPluginServer<T: PactPlugin> {
     inner: _Inner<T>,
     accept_compression_encodings: EnabledCompressionEncodings,
     send_compression_encodings: EnabledCompressionEncodings,
+    max_decoding_message_size: Option<usize>,
+    max_encoding_message_size: Option<usize>,
   }
   struct _Inner<T>(Arc<T>);
   impl<T: PactPlugin> PactPluginServer<T> {
@@ -1118,6 +1224,8 @@ pub mod pact_plugin_server {
         inner,
         accept_compression_encodings: Default::default(),
         send_compression_encodings: Default::default(),
+        max_decoding_message_size: None,
+        max_encoding_message_size: None,
       }
     }
     pub fn with_interceptor<F>(
@@ -1141,6 +1249,22 @@ pub mod pact_plugin_server {
       self.send_compression_encodings.enable(encoding);
       self
     }
+    /// Limits the maximum size of a decoded message.
+    ///
+    /// Default: `4MB`
+    #[must_use]
+    pub fn max_decoding_message_size(mut self, limit: usize) -> Self {
+      self.max_decoding_message_size = Some(limit);
+      self
+    }
+    /// Limits the maximum size of an encoded message.
+    ///
+    /// Default: `usize::MAX`
+    #[must_use]
+    pub fn max_encoding_message_size(mut self, limit: usize) -> Self {
+      self.max_encoding_message_size = Some(limit);
+      self
+    }
   }
   impl<T, B> tonic::codegen::Service<http::Request<B>> for PactPluginServer<T>
     where
@@ -1154,7 +1278,7 @@ pub mod pact_plugin_server {
     fn poll_ready(
       &mut self,
       _cx: &mut Context<'_>,
-    ) -> Poll<Result<(), Self::Error>> {
+    ) -> Poll<std::result::Result<(), Self::Error>> {
       Poll::Ready(Ok(()))
     }
     fn call(&mut self, req: http::Request<B>) -> Self::Future {
@@ -1176,13 +1300,15 @@ pub mod pact_plugin_server {
               &mut self,
               request: tonic::Request<super::InitPluginRequest>,
             ) -> Self::Future {
-              let inner = self.0.clone();
+              let inner = Arc::clone(&self.0);
               let fut = async move { (*inner).init_plugin(request).await };
               Box::pin(fut)
             }
           }
           let accept_compression_encodings = self.accept_compression_encodings;
           let send_compression_encodings = self.send_compression_encodings;
+          let max_decoding_message_size = self.max_decoding_message_size;
+          let max_encoding_message_size = self.max_encoding_message_size;
           let inner = self.inner.clone();
           let fut = async move {
             let inner = inner.0;
@@ -1192,6 +1318,10 @@ pub mod pact_plugin_server {
               .apply_compression_config(
                 accept_compression_encodings,
                 send_compression_encodings,
+              )
+              .apply_max_message_size_config(
+                max_decoding_message_size,
+                max_encoding_message_size,
               );
             let res = grpc.unary(method, req).await;
             Ok(res)
@@ -1212,7 +1342,7 @@ pub mod pact_plugin_server {
               &mut self,
               request: tonic::Request<super::Catalogue>,
             ) -> Self::Future {
-              let inner = self.0.clone();
+              let inner = Arc::clone(&self.0);
               let fut = async move {
                 (*inner).update_catalogue(request).await
               };
@@ -1221,6 +1351,8 @@ pub mod pact_plugin_server {
           }
           let accept_compression_encodings = self.accept_compression_encodings;
           let send_compression_encodings = self.send_compression_encodings;
+          let max_decoding_message_size = self.max_decoding_message_size;
+          let max_encoding_message_size = self.max_encoding_message_size;
           let inner = self.inner.clone();
           let fut = async move {
             let inner = inner.0;
@@ -1230,6 +1362,10 @@ pub mod pact_plugin_server {
               .apply_compression_config(
                 accept_compression_encodings,
                 send_compression_encodings,
+              )
+              .apply_max_message_size_config(
+                max_decoding_message_size,
+                max_encoding_message_size,
               );
             let res = grpc.unary(method, req).await;
             Ok(res)
@@ -1252,7 +1388,7 @@ pub mod pact_plugin_server {
               &mut self,
               request: tonic::Request<super::CompareContentsRequest>,
             ) -> Self::Future {
-              let inner = self.0.clone();
+              let inner = Arc::clone(&self.0);
               let fut = async move {
                 (*inner).compare_contents(request).await
               };
@@ -1261,6 +1397,8 @@ pub mod pact_plugin_server {
           }
           let accept_compression_encodings = self.accept_compression_encodings;
           let send_compression_encodings = self.send_compression_encodings;
+          let max_decoding_message_size = self.max_decoding_message_size;
+          let max_encoding_message_size = self.max_encoding_message_size;
           let inner = self.inner.clone();
           let fut = async move {
             let inner = inner.0;
@@ -1270,6 +1408,10 @@ pub mod pact_plugin_server {
               .apply_compression_config(
                 accept_compression_encodings,
                 send_compression_encodings,
+              )
+              .apply_max_message_size_config(
+                max_decoding_message_size,
+                max_encoding_message_size,
               );
             let res = grpc.unary(method, req).await;
             Ok(res)
@@ -1292,7 +1434,7 @@ pub mod pact_plugin_server {
               &mut self,
               request: tonic::Request<super::ConfigureInteractionRequest>,
             ) -> Self::Future {
-              let inner = self.0.clone();
+              let inner = Arc::clone(&self.0);
               let fut = async move {
                 (*inner).configure_interaction(request).await
               };
@@ -1301,6 +1443,8 @@ pub mod pact_plugin_server {
           }
           let accept_compression_encodings = self.accept_compression_encodings;
           let send_compression_encodings = self.send_compression_encodings;
+          let max_decoding_message_size = self.max_decoding_message_size;
+          let max_encoding_message_size = self.max_encoding_message_size;
           let inner = self.inner.clone();
           let fut = async move {
             let inner = inner.0;
@@ -1310,6 +1454,10 @@ pub mod pact_plugin_server {
               .apply_compression_config(
                 accept_compression_encodings,
                 send_compression_encodings,
+              )
+              .apply_max_message_size_config(
+                max_decoding_message_size,
+                max_encoding_message_size,
               );
             let res = grpc.unary(method, req).await;
             Ok(res)
@@ -1332,7 +1480,7 @@ pub mod pact_plugin_server {
               &mut self,
               request: tonic::Request<super::GenerateContentRequest>,
             ) -> Self::Future {
-              let inner = self.0.clone();
+              let inner = Arc::clone(&self.0);
               let fut = async move {
                 (*inner).generate_content(request).await
               };
@@ -1341,6 +1489,8 @@ pub mod pact_plugin_server {
           }
           let accept_compression_encodings = self.accept_compression_encodings;
           let send_compression_encodings = self.send_compression_encodings;
+          let max_decoding_message_size = self.max_decoding_message_size;
+          let max_encoding_message_size = self.max_encoding_message_size;
           let inner = self.inner.clone();
           let fut = async move {
             let inner = inner.0;
@@ -1350,6 +1500,10 @@ pub mod pact_plugin_server {
               .apply_compression_config(
                 accept_compression_encodings,
                 send_compression_encodings,
+              )
+              .apply_max_message_size_config(
+                max_decoding_message_size,
+                max_encoding_message_size,
               );
             let res = grpc.unary(method, req).await;
             Ok(res)
@@ -1372,7 +1526,7 @@ pub mod pact_plugin_server {
               &mut self,
               request: tonic::Request<super::StartMockServerRequest>,
             ) -> Self::Future {
-              let inner = self.0.clone();
+              let inner = Arc::clone(&self.0);
               let fut = async move {
                 (*inner).start_mock_server(request).await
               };
@@ -1381,6 +1535,8 @@ pub mod pact_plugin_server {
           }
           let accept_compression_encodings = self.accept_compression_encodings;
           let send_compression_encodings = self.send_compression_encodings;
+          let max_decoding_message_size = self.max_decoding_message_size;
+          let max_encoding_message_size = self.max_encoding_message_size;
           let inner = self.inner.clone();
           let fut = async move {
             let inner = inner.0;
@@ -1390,6 +1546,10 @@ pub mod pact_plugin_server {
               .apply_compression_config(
                 accept_compression_encodings,
                 send_compression_encodings,
+              )
+              .apply_max_message_size_config(
+                max_decoding_message_size,
+                max_encoding_message_size,
               );
             let res = grpc.unary(method, req).await;
             Ok(res)
@@ -1412,7 +1572,7 @@ pub mod pact_plugin_server {
               &mut self,
               request: tonic::Request<super::ShutdownMockServerRequest>,
             ) -> Self::Future {
-              let inner = self.0.clone();
+              let inner = Arc::clone(&self.0);
               let fut = async move {
                 (*inner).shutdown_mock_server(request).await
               };
@@ -1421,6 +1581,8 @@ pub mod pact_plugin_server {
           }
           let accept_compression_encodings = self.accept_compression_encodings;
           let send_compression_encodings = self.send_compression_encodings;
+          let max_decoding_message_size = self.max_decoding_message_size;
+          let max_encoding_message_size = self.max_encoding_message_size;
           let inner = self.inner.clone();
           let fut = async move {
             let inner = inner.0;
@@ -1430,6 +1592,10 @@ pub mod pact_plugin_server {
               .apply_compression_config(
                 accept_compression_encodings,
                 send_compression_encodings,
+              )
+              .apply_max_message_size_config(
+                max_decoding_message_size,
+                max_encoding_message_size,
               );
             let res = grpc.unary(method, req).await;
             Ok(res)
@@ -1452,7 +1618,7 @@ pub mod pact_plugin_server {
               &mut self,
               request: tonic::Request<super::MockServerRequest>,
             ) -> Self::Future {
-              let inner = self.0.clone();
+              let inner = Arc::clone(&self.0);
               let fut = async move {
                 (*inner).get_mock_server_results(request).await
               };
@@ -1461,6 +1627,8 @@ pub mod pact_plugin_server {
           }
           let accept_compression_encodings = self.accept_compression_encodings;
           let send_compression_encodings = self.send_compression_encodings;
+          let max_decoding_message_size = self.max_decoding_message_size;
+          let max_encoding_message_size = self.max_encoding_message_size;
           let inner = self.inner.clone();
           let fut = async move {
             let inner = inner.0;
@@ -1470,6 +1638,10 @@ pub mod pact_plugin_server {
               .apply_compression_config(
                 accept_compression_encodings,
                 send_compression_encodings,
+              )
+              .apply_max_message_size_config(
+                max_decoding_message_size,
+                max_encoding_message_size,
               );
             let res = grpc.unary(method, req).await;
             Ok(res)
@@ -1496,7 +1668,7 @@ pub mod pact_plugin_server {
                 super::VerificationPreparationRequest,
               >,
             ) -> Self::Future {
-              let inner = self.0.clone();
+              let inner = Arc::clone(&self.0);
               let fut = async move {
                 (*inner).prepare_interaction_for_verification(request).await
               };
@@ -1505,6 +1677,8 @@ pub mod pact_plugin_server {
           }
           let accept_compression_encodings = self.accept_compression_encodings;
           let send_compression_encodings = self.send_compression_encodings;
+          let max_decoding_message_size = self.max_decoding_message_size;
+          let max_encoding_message_size = self.max_encoding_message_size;
           let inner = self.inner.clone();
           let fut = async move {
             let inner = inner.0;
@@ -1514,6 +1688,10 @@ pub mod pact_plugin_server {
               .apply_compression_config(
                 accept_compression_encodings,
                 send_compression_encodings,
+              )
+              .apply_max_message_size_config(
+                max_decoding_message_size,
+                max_encoding_message_size,
               );
             let res = grpc.unary(method, req).await;
             Ok(res)
@@ -1536,7 +1714,7 @@ pub mod pact_plugin_server {
               &mut self,
               request: tonic::Request<super::VerifyInteractionRequest>,
             ) -> Self::Future {
-              let inner = self.0.clone();
+              let inner = Arc::clone(&self.0);
               let fut = async move {
                 (*inner).verify_interaction(request).await
               };
@@ -1545,6 +1723,8 @@ pub mod pact_plugin_server {
           }
           let accept_compression_encodings = self.accept_compression_encodings;
           let send_compression_encodings = self.send_compression_encodings;
+          let max_decoding_message_size = self.max_decoding_message_size;
+          let max_encoding_message_size = self.max_encoding_message_size;
           let inner = self.inner.clone();
           let fut = async move {
             let inner = inner.0;
@@ -1554,6 +1734,10 @@ pub mod pact_plugin_server {
               .apply_compression_config(
                 accept_compression_encodings,
                 send_compression_encodings,
+              )
+              .apply_max_message_size_config(
+                max_decoding_message_size,
+                max_encoding_message_size,
               );
             let res = grpc.unary(method, req).await;
             Ok(res)
@@ -1582,12 +1766,14 @@ pub mod pact_plugin_server {
         inner,
         accept_compression_encodings: self.accept_compression_encodings,
         send_compression_encodings: self.send_compression_encodings,
+        max_decoding_message_size: self.max_decoding_message_size,
+        max_encoding_message_size: self.max_encoding_message_size,
       }
     }
   }
   impl<T: PactPlugin> Clone for _Inner<T> {
     fn clone(&self) -> Self {
-      Self(self.0.clone())
+      Self(Arc::clone(&self.0))
     }
   }
   impl<T: std::fmt::Debug> std::fmt::Debug for _Inner<T> {
