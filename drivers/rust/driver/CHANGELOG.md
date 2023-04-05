@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.4.1 - Bugfix Release
+
+* b84a0ba - revert "feat: Use a shared channel and gRPC client to communicate with a plugin" (Ronald Holshausen, Wed Apr 5 16:48:56 2023 +1000)
+* 5fb6107 - chore: Update the generated proto code (Ronald Holshausen, Wed Apr 5 13:50:31 2023 +1000)
+* 88cbfc0 - bump version to 0.4.1 (Ronald Holshausen, Tue Apr 4 14:13:50 2023 +1000)
+
 # 0.4.0 - Use shared gRPC plugin client
 
 * 6235b6c - feat: Use a shared channel and gRPC client to communicate with a plugin (Ronald Holshausen, Tue Apr 4 13:47:14 2023 +1000)
