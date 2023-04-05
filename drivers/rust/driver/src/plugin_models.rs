@@ -9,7 +9,6 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tokio::sync::Mutex;
 use tonic::metadata::{Ascii, MetadataValue};
 use tonic::{Request, Status};
 use tonic::codegen::InterceptedService;
@@ -177,103 +176,71 @@ pub struct PactPlugin {
   pub child: Arc<ChildPluginProcess>,
 
   /// Count of access to the plugin. If this is ever zero, the plugin process will be shutdown
-  access_count: Arc<AtomicUsize>,
-
-  /// Channel connected to the plugin process
-  channel: Option<Channel>,
-
-  /// Client to use to call the plugin process
-  client: Arc<Mutex<Option<PactPluginClient<InterceptedService<Channel, PactPluginInterceptor>>>>>
+  access_count: Arc<AtomicUsize>
 }
 
 #[async_trait]
 impl PactPluginRpc for PactPlugin {
-  /// Send an init request to the plugin process. This function will setup the channel and client
-  /// to use to connect to the plugin process.
+  /// Send an init request to the plugin process
   async fn init_plugin(&mut self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
-    let channel = self.connect_channel().await?;
-    self.channel = Some(channel.clone());
-    let interceptor = PactPluginInterceptor::new(self.child.plugin_info.server_key.as_str())?;
-    let mut client = PactPluginClient::with_interceptor(channel, interceptor);
-    {
-      let mut guard = self.client.lock().await;
-      let _ = guard.insert(client.clone());
-    }
+    let mut client = self.get_plugin_client().await?;
     let response = client.init_plugin(Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   /// Send a compare contents request to the plugin process
   async fn compare_contents(&self, request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
-    let mut guard = self.client.lock().await;
-    let client = guard.as_mut().ok_or_else(||
-      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
-    let response = client.compare_contents(Request::new(request)).await?;
+    let mut client = self.get_plugin_client().await?;
+    let response = client.compare_contents(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   /// Send a configure contents request to the plugin process
   async fn configure_interaction(&self, request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
-    let mut guard = self.client.lock().await;
-    let client = guard.as_mut().ok_or_else(||
-      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
+    let mut client = self.get_plugin_client().await?;
     let response = client.configure_interaction(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   /// Send a generate content request to the plugin
   async fn generate_content(&self, request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
-    let mut guard = self.client.lock().await;
-    let client = guard.as_mut().ok_or_else(||
-      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
+    let mut client = self.get_plugin_client().await?;
     let response = client.generate_content(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   async fn start_mock_server(&self, request: StartMockServerRequest) -> anyhow::Result<StartMockServerResponse> {
-    let mut guard = self.client.lock().await;
-    let client = guard.as_mut().ok_or_else(||
-      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
+    let mut client = self.get_plugin_client().await?;
     let response = client.start_mock_server(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   async fn shutdown_mock_server(&self, request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse> {
-    let mut guard = self.client.lock().await;
-    let client = guard.as_mut().ok_or_else(||
-      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
+    let mut client = self.get_plugin_client().await?;
     let response = client.shutdown_mock_server(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   async fn get_mock_server_results(&self, request: MockServerRequest) -> anyhow::Result<MockServerResults> {
-    let mut guard = self.client.lock().await;
-    let client = guard.as_mut().ok_or_else(||
-      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
+    let mut client = self.get_plugin_client().await?;
     let response = client.get_mock_server_results(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   async fn prepare_interaction_for_verification(&self, request: VerificationPreparationRequest) -> anyhow::Result<VerificationPreparationResponse> {
-    let mut guard = self.client.lock().await;
-    let client = guard.as_mut().ok_or_else(||
-      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
+    let mut client = self.get_plugin_client().await?;
     let response = client.prepare_interaction_for_verification(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   async fn verify_interaction(&self, request: VerifyInteractionRequest) -> anyhow::Result<VerifyInteractionResponse> {
-    let mut guard = self.client.lock().await;
-    let client = guard.as_mut().ok_or_else(||
-      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
+    let mut client = self.get_plugin_client().await?;
     let response = client.verify_interaction(tonic::Request::new(request)).await?;
     Ok(response.get_ref().clone())
   }
 
   async fn update_catalogue(&self, request: Catalogue) -> anyhow::Result<()> {
-    let mut guard = self.client.lock().await;
-    let client = guard.as_mut().ok_or_else(||
-      anyhow!("Plugin client has not been created, init_plugin must be called first"))?;
+    let mut client = self.get_plugin_client().await?;
     client.update_catalogue(tonic::Request::new(request)).await?;
     Ok(())
   }
@@ -285,9 +252,7 @@ impl PactPlugin {
     PactPlugin {
       manifest: manifest.clone(),
       child: Arc::new(child),
-      access_count: Arc::new(AtomicUsize::new(1)),
-      channel: None,
-      client: Arc::default()
+      access_count: Arc::new(AtomicUsize::new(1))
     }
   }
 
@@ -338,6 +303,12 @@ impl PactPlugin {
           .map_err(|err| anyhow!(err))
       }
     }
+  }
+
+  async fn get_plugin_client(&self) -> anyhow::Result<PactPluginClient<InterceptedService<Channel, PactPluginInterceptor>>> {
+    let channel = self.connect_channel().await?;
+    let interceptor = PactPluginInterceptor::new(self.child.plugin_info.server_key.as_str())?;
+    Ok(PactPluginClient::with_interceptor(channel, interceptor))
   }
 }
 
