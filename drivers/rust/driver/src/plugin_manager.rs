@@ -257,10 +257,10 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
   if !path.is_absolute() || !path.exists() {
     path = PathBuf::from(manifest.plugin_dir.clone()).join(path);
   }
-  debug!("Starting plugin using {:?}", path);
+  debug!("Starting plugin using {:?}", &path);
 
   let log_level = max_level();
-  let mut child_command = Command::new(path);
+  let mut child_command = Command::new(path.clone());
   let mut child_command = child_command
     .env("LOG_LEVEL", log_level.to_string())
     .env("RUST_LOG", log_level.to_string())
@@ -273,7 +273,9 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
   let child = child_command
     .stdout(Stdio::piped())
     .stderr(Stdio::piped())
-    .spawn().context("Was not able to start plugin process")?;
+    .spawn()
+    .map_err(|err| anyhow!("Was not able to start plugin process for '{}' - {}",
+      path.to_string_lossy(), err))?;
   let child_pid = child.id().unwrap_or_default();
   debug!("Plugin {} started with PID {}", manifest.name, child_pid);
 
@@ -622,12 +624,15 @@ pub async fn install_plugin_from_url(
         .context("Failed to parsing JSON manifest file from GitHub")?;
       debug!(?manifest, "Loaded manifest from GitHub");
 
-      println!("Installing plugin {} version {}", manifest.name, manifest.version);
+      debug!("Installing plugin {} version {}", manifest.name, manifest.version);
       let plugin_dir = create_plugin_dir(&manifest)
         .context("Failed to creating plugins directory")?;
       download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag).await?;
 
-      Ok(manifest)
+      Ok(PactPluginManifest {
+        plugin_dir: plugin_dir.to_string_lossy().to_string(),
+        .. manifest
+      })
     } else {
       bail!("GitHub release page does not have a valid tag_name attribute");
     }
