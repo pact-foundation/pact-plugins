@@ -1,6 +1,6 @@
 use std::fs;
 use std::fs::File;
-use std::io::{BufReader, Read, Write};
+use std::io::{BufReader, Write};
 use std::path::PathBuf;
 
 use anyhow::{anyhow, bail, Context};
@@ -9,17 +9,25 @@ use comfy_table::presets::UTF8_FULL;
 use comfy_table::Table;
 use itertools::Itertools;
 use serde_json::Value;
-use sha2::{Digest, Sha256};
-use tracing::{debug, info, trace, warn};
+use tracing::{debug, info, trace};
+use pact_plugin_driver::download::download_json_from_github;
 
 use pact_plugin_driver::plugin_models::PactPluginManifest;
-use pact_plugin_driver::repository::{ManifestSource, PluginEntry, PluginRepositoryIndex};
+use pact_plugin_driver::repository::{
+  calculate_sha,
+  get_sha_file_for_repository_file,
+  load_index_file,
+  load_sha,
+  ManifestSource,
+  PluginEntry,
+  PluginRepositoryIndex
+};
 
-use crate::{PluginVersionCommand, RepositoryCommands, resolve_plugin_dir};
-use crate::install::{download_json_from_github, fetch_json_from_url, json_to_string};
+use crate::{PluginVersionCommand, RepositoryCommands};
+use crate::install::{fetch_json_from_url, json_to_string};
 use crate::repository::ManifestSource::GitHubRelease;
 
-const DEFAULT_INDEX: &str = include_str!("../repository.index");
+pub(crate) const DEFAULT_INDEX: &str = include_str!("../repository.index");
 
 pub(crate) fn handle_command(repository_command: &RepositoryCommands) -> anyhow::Result<()> {
   match repository_command {
@@ -106,16 +114,6 @@ fn validate_repository_file(filename: &String) -> anyhow::Result<()> {
   } else {
     Err(anyhow!("Repository file '{}' does not exist", abs_path.to_string_lossy()))
   }
-}
-
-fn load_index_file(path: &PathBuf) -> anyhow::Result<PluginRepositoryIndex> {
-  debug!(?path, "Loading index file");
-  let f = File::open(path.as_path())?;
-  let mut reader = BufReader::new(f);
-  let mut buffer = String::new();
-  reader.read_to_string(&mut buffer)?;
-  let index: PluginRepositoryIndex = toml::from_str(buffer.as_str())?;
-  Ok(index)
 }
 
 fn handle_add_plugin_command(command: &PluginVersionCommand) -> anyhow::Result<()> {
@@ -227,48 +225,6 @@ fn generate_sha_digest(repository_file: &PathBuf) -> anyhow::Result<String> {
   let mut f = File::create(file)?;
   f.write_all(calculated.as_bytes())?;
   Ok(calculated)
-}
-
-fn get_sha_file_for_repository_file(repository_file: &PathBuf) -> anyhow::Result<PathBuf> {
-  let filename_base = repository_file.file_name()
-    .ok_or_else(|| anyhow!("Could not get the filename for repository file '{}'", repository_file.to_string_lossy()))?
-    .to_string_lossy();
-  let sha_file = format!("{}.sha256", filename_base);
-  let file = repository_file.parent()
-    .ok_or_else(|| anyhow!("Could not get the parent path for repository file '{}'", repository_file.to_string_lossy()))?
-    .join(sha_file.as_str());
-  Ok(file)
-}
-
-fn calculate_sha(repository_file: &PathBuf) -> anyhow::Result<String> {
-  let mut f = File::open(repository_file)?;
-  let mut hasher = Sha256::new();
-  let mut buffer = [0_u8; 256];
-  let mut done = false;
-
-  while !done {
-    let amount = f.read(&mut buffer)?;
-    if amount == 0 {
-      done = true;
-    } else if amount == 256 {
-      hasher.update(&buffer);
-    } else {
-      let b = &buffer[0..amount];
-      hasher.update(b);
-    }
-  }
-
-  let result = hasher.finalize();
-  let calculated = format!("{:x}", result);
-  Ok(calculated)
-}
-
-fn load_sha(repository_file: &PathBuf) -> anyhow::Result<String> {
-  let sha_file = get_sha_file_for_repository_file(repository_file)?;
-  let mut f = File::open(sha_file)?;
-  let mut buffer = String::new();
-  f.read_to_string(&mut buffer)?;
-  Ok(buffer)
 }
 
 fn validate_filename(filename: &str, file_description: &str) -> anyhow::Result<PathBuf> {
@@ -409,88 +365,6 @@ fn handle_add_all_versions(
   trace!("Result = {:?}", result);
   runtime.shutdown_background();
   result
-}
-
-pub async fn fetch_repository_index() -> anyhow::Result<PluginRepositoryIndex> {
-  fetch_index_from_github()
-    .await
-    .or_else(|err| {
-      warn!("Was not able to load index from GitHub - {}", err);
-      load_local_index()
-    })
-    .or_else(|err| {
-      warn!("Was not able to load local index - {}", err);
-      toml::from_str::<PluginRepositoryIndex>(DEFAULT_INDEX)
-        .map_err(|err| anyhow!(err))
-    })
-}
-
-fn load_local_index() -> anyhow::Result<PluginRepositoryIndex> {
-  let (_, plugin_dir) = resolve_plugin_dir();
-  let dir = PathBuf::from(plugin_dir);
-  if !dir.exists() {
-    return Err(anyhow!("Plugin directory does not exist"));
-  }
-
-  let repository_file = dir.join("repository.index");
-
-  let sha = calculate_sha(&repository_file)?;
-  let expected_sha = load_sha(&repository_file)?;
-  if sha != expected_sha {
-    return Err(anyhow!("Error: SHA256 digest does not match: expected {} but got {}", expected_sha, sha));
-  }
-
-  let index = load_index_file(&repository_file)?;
-  Ok(index)
-}
-
-async fn fetch_index_from_github() -> anyhow::Result<PluginRepositoryIndex> {
-  let http_client = reqwest::ClientBuilder::new()
-    .user_agent(APP_USER_AGENT)
-    .build()?;
-
-  info!("Fetching index from github");
-  let index_contents = http_client.get("https://raw.githubusercontent.com/pact-foundation/pact-plugins/main/repository/repository.index")
-    .send()
-    .await?
-    .text()
-    .await?;
-
-  let index_sha = http_client.get("https://raw.githubusercontent.com/pact-foundation/pact-plugins/main/repository/repository.index.sha256")
-    .send()
-    .await?
-    .text()
-    .await?;
-  let mut hasher = Sha256::new();
-  hasher.update(index_contents.as_bytes());
-  let result = hasher.finalize();
-  let calculated = format!("{:x}", result);
-
-  if calculated != index_sha {
-    return Err(anyhow!("Error: SHA256 digest from GitHub does not match: expected {} but got {}", index_sha, calculated));
-  }
-
-  if let Err(err) = cache_index(&index_contents, &index_sha) {
-    warn!("Could not cache index to local file - {}", err);
-  }
-
-  let index: PluginRepositoryIndex = toml::from_str(index_contents.as_str())?;
-  Ok(index)
-}
-
-fn cache_index(index_contents: &String, sha: &String) -> anyhow::Result<()> {
-  let (_, plugin_dir) = resolve_plugin_dir();
-  let dir = PathBuf::from(plugin_dir);
-  if !dir.exists() {
-    fs::create_dir_all(&dir)?;
-  }
-  let repository_file = dir.join("repository.index");
-  let mut f = File::create(repository_file)?;
-  f.write_all(index_contents.as_bytes())?;
-  let sha_file = dir.join("repository.index.sha256");
-  let mut f2 = File::create(sha_file)?;
-  f2.write_all(sha.as_bytes())?;
-  Ok(())
 }
 
 #[cfg(test)]

@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::fs::File;
-use std::io::BufReader;
+use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::str::from_utf8;
@@ -11,7 +11,7 @@ use std::str::FromStr;
 use std::sync::Mutex;
 use std::thread;
 
-use anyhow::{anyhow, Context};
+use anyhow::{anyhow, bail, Context};
 use bytes::Bytes;
 use itertools::Either;
 use lazy_static::lazy_static;
@@ -19,30 +19,28 @@ use log::max_level;
 use maplit::hashmap;
 use os_info::Type;
 use pact_models::bodies::OptionalBody;
+use pact_models::json_utils::json_to_string;
 use pact_models::PactSpecification;
 use pact_models::prelude::{ContentType, Pact};
 use pact_models::prelude::v4::V4Pact;
 use pact_models::v4::interaction::V4Interaction;
+use reqwest::Client;
 use semver::Version;
 use serde_json::Value;
 use sysinfo::{Pid, PidExt, ProcessExt, Signal, System, SystemExt};
 use tokio::process::Command;
-use tracing::{debug, trace, warn};
+use tracing::{debug, error, info, trace, warn};
 
 use crate::catalogue_manager::{all_entries, CatalogueEntry, register_plugin_entries, remove_plugin_entries};
 use crate::child_process::ChildPluginProcess;
 use crate::content::ContentMismatch;
+use crate::download::{download_json_from_github, download_plugin_executable, fetch_json_from_url};
 use crate::metrics::send_metrics;
 use crate::mock_server::{MockServerConfig, MockServerDetails, MockServerResults};
 use crate::plugin_models::{PactPlugin, PactPluginManifest, PactPluginRpc, PluginDependency};
 use crate::proto::*;
-use crate::utils::{
-  optional_string,
-  proto_value_to_json,
-  to_proto_struct,
-  to_proto_value,
-  versions_compatible
-};
+use crate::repository::{fetch_repository_index, USER_AGENT};
+use crate::utils::{optional_string, proto_value_to_json, to_proto_struct, to_proto_value, versions_compatible};
 use crate::verification::{InteractionVerificationData, InteractionVerificationResult};
 
 lazy_static! {
@@ -66,8 +64,24 @@ pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<PactPlugin
       Ok(plugin.clone())
     },
     None => {
-      debug!("Did not find plugin, will start it");
-      let manifest = load_plugin_manifest(plugin)?;
+      debug!("Did not find plugin, will attempt to start it");
+      let manifest = match load_plugin_manifest(plugin) {
+        Ok(manifest) => manifest,
+        Err(err) => {
+          error!("Could not load plugin manifest from disk: {}", err);
+          let http_client = reqwest::ClientBuilder::new()
+            .user_agent(USER_AGENT)
+            .build()?;
+          let index = fetch_repository_index(&http_client, None).await?;
+          match index.lookup_plugin_version(&plugin.name, &plugin.version) {
+            Some(entry) => {
+              info!("Found an entry for the plugin in the plugin index, will try install that");
+              install_plugin_from_url(&http_client, entry.source.value().as_str()).await?
+            }
+            None => Err(err)?
+          }
+        }
+      };
       send_metrics(&manifest);
       initialise_plugin(&manifest, &mut inner).await
     }
@@ -166,7 +180,7 @@ fn load_manifest_from_dir(plugin_dep: &PluginDependency, plugin_dir: &PathBuf) -
   }
 }
 
-fn pact_plugin_dir() -> anyhow::Result<PathBuf> {
+pub(crate) fn pact_plugin_dir() -> anyhow::Result<PathBuf> {
   let env_var = env::var_os("PACT_PLUGIN_DIR");
   let plugin_dir = env_var.unwrap_or_default();
   let plugin_dir = plugin_dir.to_string_lossy();
@@ -583,6 +597,63 @@ pub async fn verify_interaction(
     verify_interaction_response::Response::Error(err) => Err(anyhow!("Failed to verify the request: {}", err)),
     verify_interaction_response::Response::Result(data) => Ok(data.into())
   }
+}
+
+/// Tries to download and install the plugin from the given URL, returning the manifest for the
+/// plugin if successful.
+pub async fn install_plugin_from_url(
+  http_client: &Client,
+  source_url: &str
+) -> anyhow::Result<PactPluginManifest> {
+  let response = fetch_json_from_url(source_url, http_client).await?;
+  if let Some(map) = response.as_object() {
+    if let Some(tag) = map.get("tag_name") {
+      let tag = json_to_string(tag);
+      debug!(%tag, "Found tag");
+      let url = if source_url.ends_with("/latest") {
+        source_url.strip_suffix("/latest").unwrap_or(source_url)
+      } else {
+        let suffix = format!("/tag/{}", tag);
+        source_url.strip_suffix(suffix.as_str()).unwrap_or(source_url)
+      };
+      let manifest_json = download_json_from_github(&http_client, url, &tag, "pact-plugin.json")
+        .await.context("Downloading manifest file from GitHub")?;
+      let manifest: PactPluginManifest = serde_json::from_value(manifest_json)
+        .context("Failed to parsing JSON manifest file from GitHub")?;
+      debug!(?manifest, "Loaded manifest from GitHub");
+
+      println!("Installing plugin {} version {}", manifest.name, manifest.version);
+      let plugin_dir = create_plugin_dir(&manifest)
+        .context("Failed to creating plugins directory")?;
+      download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag).await?;
+
+      Ok(manifest)
+    } else {
+      bail!("GitHub release page does not have a valid tag_name attribute");
+    }
+  } else {
+    bail!("Response from source is not a valid JSON from a GitHub release page")
+  }
+}
+
+fn create_plugin_dir(manifest: &PactPluginManifest) -> anyhow::Result<PathBuf> {
+  let plugins_dir = pact_plugin_dir()?;
+  if !plugins_dir.exists() {
+    info!(plugins_dir = %plugins_dir.display(), "Creating plugins directory");
+    fs::create_dir_all(plugins_dir.clone())?;
+  }
+
+  let plugin_dir = plugins_dir.join(format!("{}-{}", manifest.name, manifest.version));
+  info!(plugin_dir = %plugin_dir.display(), "Creating plugin directory");
+  fs::create_dir(plugin_dir.clone())?;
+
+  info!("Writing plugin manifest file");
+  let file_name = plugin_dir.join("pact-plugin.json");
+  let mut f = File::create(file_name)?;
+  let json = serde_json::to_string(manifest)?;
+  f.write_all(json.as_bytes())?;
+
+  Ok(plugin_dir.clone())
 }
 
 #[cfg(test)]

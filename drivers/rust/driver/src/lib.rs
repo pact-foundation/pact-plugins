@@ -11,3 +11,4 @@ mod metrics;
 pub mod mock_server;
 pub mod verification;
 pub mod repository;
+pub mod download;

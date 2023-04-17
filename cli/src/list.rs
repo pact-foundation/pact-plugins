@@ -8,11 +8,13 @@ use anyhow::anyhow;
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::Table;
 use itertools::Itertools;
-use pact_plugin_driver::plugin_models::PactPluginManifest;
 use tracing::trace;
 
+use pact_plugin_driver::plugin_models::PactPluginManifest;
+use pact_plugin_driver::repository::fetch_repository_index;
+
 use crate::{ListCommands, resolve_plugin_dir};
-use crate::repository::fetch_repository_index;
+use crate::repository::{APP_USER_AGENT, DEFAULT_INDEX};
 
 pub fn list_plugins(command: &ListCommands) -> anyhow::Result<()> {
   match command {
@@ -25,7 +27,10 @@ fn list_known_plugins(show_all_versions: &bool) -> anyhow::Result<()> {
   let runtime = tokio::runtime::Builder::new_multi_thread()
     .enable_all()
     .build()?;
-  let index = runtime.block_on(fetch_repository_index())?;
+  let http_client = reqwest::ClientBuilder::new()
+    .user_agent(APP_USER_AGENT)
+    .build()?;
+  let index = runtime.block_on(fetch_repository_index(&http_client, Some(DEFAULT_INDEX)))?;
   trace!("Result = {:?}", index);
   runtime.shutdown_background();
 

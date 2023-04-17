@@ -1,14 +1,24 @@
 //! Module for dealing with the plugin repository
 
 use std::collections::HashMap;
+use std::fs;
+use std::fs::File;
+use std::io::{BufReader, Read, Write};
+use std::path::PathBuf;
 
+use anyhow::anyhow;
 use chrono::{DateTime, Utc};
+use reqwest::Client;
 use semver::Version;
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
+use tracing::{debug, info, warn};
+use crate::plugin_manager::pact_plugin_dir;
 
 use crate::plugin_models::PactPluginManifest;
 
 pub const DEFAULT_INDEX: &str = include_str!("../repository.index");
+pub const USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"));
 
 /// Struct representing the plugin repository index file
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -24,6 +34,25 @@ pub struct PluginRepositoryIndex {
 
   /// Plugin entries
   pub entries: HashMap<String, PluginEntry>
+}
+
+impl PluginRepositoryIndex {
+  /// Looks up the plugin in the index. If no version is provided, will return the latest version
+  pub fn lookup_plugin_version(&self, name: &str, version: &Option<String>) -> Option<PluginVersion> {
+    self.entries.get(name).map(|entry| {
+      let version = if let Some(version) = version {
+        debug!("Installing plugin {}/{} from index", name, version);
+        version.as_str()
+      } else {
+        debug!("Installing plugin {}/latest from index", name);
+        entry.latest_version.as_str()
+      };
+      entry.versions.iter()
+        .find(|v| v.version == version)
+    })
+      .flatten()
+      .map(|entry| entry.clone())
+  }
 }
 
 /// Struct to store the plugin version entries
@@ -130,4 +159,139 @@ impl Default for PluginRepositoryIndex {
       entries: Default::default()
     }
   }
+}
+
+/// Retrieves the latest repository index, first from GitHub, and if not able to, then any locally
+/// cached index, otherwise defaults to the version compiled into the library.
+pub async fn fetch_repository_index(
+  http_client: &Client,
+  default_index: Option<&str>
+) -> anyhow::Result<PluginRepositoryIndex> {
+  fetch_index_from_github(http_client)
+    .await
+    .or_else(|err| {
+      warn!("Was not able to load index from GitHub - {}", err);
+      load_local_index()
+    })
+    .or_else(|err| {
+      warn!("Was not able to load local index, will use built in one - {}", err);
+      toml::from_str::<PluginRepositoryIndex>(default_index.unwrap_or(DEFAULT_INDEX))
+        .map_err(|err| anyhow!(err))
+    })
+}
+
+fn load_local_index() -> anyhow::Result<PluginRepositoryIndex> {
+  let plugin_dir = pact_plugin_dir()?;
+  if !plugin_dir.exists() {
+    return Err(anyhow!("Plugin directory does not exist"));
+  }
+
+  let repository_file = plugin_dir.join("repository.index");
+
+  let sha = calculate_sha(&repository_file)?;
+  let expected_sha = load_sha(&repository_file)?;
+  if sha != expected_sha {
+    return Err(anyhow!("Error: SHA256 digest does not match: expected {} but got {}", expected_sha, sha));
+  }
+
+  load_index_file(&repository_file)
+}
+
+async fn fetch_index_from_github(http_client: &Client) -> anyhow::Result<PluginRepositoryIndex> {
+  info!("Fetching index from github");
+  let index_contents = http_client.get("https://raw.githubusercontent.com/pact-foundation/pact-plugins/main/repository/repository.index")
+    .send()
+    .await?
+    .text()
+    .await?;
+
+  let index_sha = http_client.get("https://raw.githubusercontent.com/pact-foundation/pact-plugins/main/repository/repository.index.sha256")
+    .send()
+    .await?
+    .text()
+    .await?;
+  let mut hasher = Sha256::new();
+  hasher.update(index_contents.as_bytes());
+  let result = hasher.finalize();
+  let calculated = format!("{:x}", result);
+
+  if calculated != index_sha {
+    return Err(anyhow!("Error: SHA256 digest from GitHub does not match: expected {} but got {}", index_sha, calculated));
+  }
+
+  if let Err(err) = cache_index(&index_contents, &index_sha) {
+    warn!("Could not cache index to local file - {}", err);
+  }
+
+  Ok(toml::from_str(index_contents.as_str())?)
+}
+
+fn cache_index(index_contents: &String, sha: &String) -> anyhow::Result<()> {
+  let plugin_dir = pact_plugin_dir()?;
+  if !plugin_dir.exists() {
+    fs::create_dir_all(&plugin_dir)?;
+  }
+  let repository_file = plugin_dir.join("repository.index");
+  let mut f = File::create(repository_file)?;
+  f.write_all(index_contents.as_bytes())?;
+  let sha_file = plugin_dir.join("repository.index.sha256");
+  let mut f2 = File::create(sha_file)?;
+  f2.write_all(sha.as_bytes())?;
+  Ok(())
+}
+
+/// Loads the index file from the given path
+pub fn load_index_file(path: &PathBuf) -> anyhow::Result<PluginRepositoryIndex> {
+  debug!(?path, "Loading index file");
+  let f = File::open(path.as_path())?;
+  let mut reader = BufReader::new(f);
+  let mut buffer = String::new();
+  reader.read_to_string(&mut buffer)?;
+  let index: PluginRepositoryIndex = toml::from_str(buffer.as_str())?;
+  Ok(index)
+}
+
+/// Returns the SHA file for a given repository file.
+pub fn get_sha_file_for_repository_file(repository_file: &PathBuf) -> anyhow::Result<PathBuf> {
+  let filename_base = repository_file.file_name()
+    .ok_or_else(|| anyhow!("Could not get the filename for repository file '{}'", repository_file.to_string_lossy()))?
+    .to_string_lossy();
+  let sha_file = format!("{}.sha256", filename_base);
+  let file = repository_file.parent()
+    .ok_or_else(|| anyhow!("Could not get the parent path for repository file '{}'", repository_file.to_string_lossy()))?
+    .join(sha_file.as_str());
+  Ok(file)
+}
+
+/// Calculates the SHA hash for a given repository file path
+pub fn calculate_sha(repository_file: &PathBuf) -> anyhow::Result<String> {
+  let mut f = File::open(repository_file)?;
+  let mut hasher = Sha256::new();
+  let mut buffer = [0_u8; 256];
+  let mut done = false;
+
+  while !done {
+    let amount = f.read(&mut buffer)?;
+    if amount == 0 {
+      done = true;
+    } else if amount == 256 {
+      hasher.update(&buffer);
+    } else {
+      let b = &buffer[0..amount];
+      hasher.update(b);
+    }
+  }
+
+  let result = hasher.finalize();
+  let calculated = format!("{:x}", result);
+  Ok(calculated)
+}
+
+/// Loads the SHA for a given repository file
+pub fn load_sha(repository_file: &PathBuf) -> anyhow::Result<String> {
+  let sha_file = get_sha_file_for_repository_file(repository_file)?;
+  let mut f = File::open(sha_file)?;
+  let mut buffer = String::new();
+  f.read_to_string(&mut buffer)?;
+  Ok(buffer)
 }

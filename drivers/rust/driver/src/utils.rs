@@ -1,11 +1,14 @@
 //! Utils for dealing with protobufs structs
 
 use std::collections::HashMap;
+use anyhow::bail;
+use os_info::Type;
 
 use prost_types::{ListValue, Struct};
 use prost_types::value::Kind;
 use semver::{Version, VersionReq};
 use serde_json::{json, Value};
+use tracing::debug;
 
 /// Converts a map of key -> JSON to a prost Struct
 pub fn to_proto_struct(values: &HashMap<String, Value>) -> Struct {
@@ -106,6 +109,25 @@ pub fn optional_string<S: Into<String>>(string: S) -> Option<String> {
   } else {
     Some(string)
   }
+}
+
+/// Returns the current running OS and architecture
+pub fn os_and_arch() -> anyhow::Result<(&'static str, &'static str)> {
+  let os_info = os_info::get();
+  debug!("Detected OS: {}", os_info);
+
+  let os = match os_info.os_type() {
+    Type::Alpine | Type::Amazon| Type::Android| Type::Arch| Type::CentOS| Type::Debian |
+    Type::EndeavourOS | Type::Fedora | Type::Gentoo | Type::Linux | Type::Manjaro | Type::Mariner |
+    Type::Mint | Type::NixOS | Type::openSUSE | Type::OracleLinux | Type::Redhat |
+    Type::RedHatEnterprise | Type::Pop | Type::Raspbian | Type::Solus | Type::SUSE |
+    Type::Ubuntu => "linux",
+    Type::Macos => "osx",
+    Type::Windows => "windows",
+    _ => bail!("{} is not a supported operating system", os_info)
+  };
+
+  Ok((os, std::env::consts::ARCH))
 }
 
 #[cfg(test)]

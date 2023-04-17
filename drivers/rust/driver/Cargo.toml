@@ -20,14 +20,17 @@ async-trait = "0.1.68"
 backtrace = "0.3.67"
 bytes = "1.4.0"
 chrono = { version = "0.4.23", features = ["serde"]}
+flate2 = "1.0"
+futures-util = "0.3.21"
 home = "0.5.4"
+indicatif = "0.17.2"
 itertools = "0.10.5"
 lazy_static = "1.4.0"
 log = "0.4.17"
 maplit = "1.0.2"
 md5 = "0.7.0"
 os_info = "3.7.0"
-pact_models = "^1.0"
+pact_models = "1.0"
 prost = "0.11.8"
 prost-types = "0.11.8"
 regex = "1.7.3"
@@ -42,11 +45,12 @@ tonic = "0.9.0"
 tracing = { version = "0.1.37", features = [ "log" ] }  # This needs to be the same version across all the pact libs (i.e. pact ffi)
 tracing-core = "0.1.30"  # This needs to be the same version across all the pact libs (i.e. pact ffi)
 uuid = { version = "1.3.0", features = ["v4"] }
+zip = "0.6.2"
 
 [dependencies.reqwest]
 version = "0.11.16"
 default-features = false
-features = ["rustls-tls", "rustls-tls-native-roots", "json", "gzip", "deflate"]
+features = ["rustls-tls", "rustls-tls-native-roots", "json", "gzip", "deflate", "stream"]
 
 [dev-dependencies]
 env_logger = "0.10.0"
