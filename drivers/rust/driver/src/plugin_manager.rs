@@ -29,7 +29,7 @@ use semver::Version;
 use serde_json::Value;
 use sysinfo::{Pid, PidExt, ProcessExt, Signal, System, SystemExt};
 use tokio::process::Command;
-use tracing::{debug, error, info, trace, warn};
+use tracing::{debug, info, trace, warn};
 
 use crate::catalogue_manager::{all_entries, CatalogueEntry, register_plugin_entries, remove_plugin_entries};
 use crate::child_process::ChildPluginProcess;
