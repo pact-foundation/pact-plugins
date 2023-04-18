@@ -1,5 +1,13 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.4.2 - Support auto-downloading plugins
+
+* 9424024 - chore: cleanup unused import (Ronald Holshausen, Tue Apr 18 10:55:11 2023 +1000)
+* a01455d - fix: only display download progress bar when invoked from CLI (Ronald Holshausen, Tue Apr 18 10:46:58 2023 +1000)
+* 639caeb - fix: when auto-installing a plugin, need to correctly set the plugin dir (Ronald Holshausen, Mon Apr 17 16:37:16 2023 +1000)
+* f6706d6 - refactor: Move all code to download plugins to the driver to support auto-installing known plugins (Ronald Holshausen, Mon Apr 17 15:57:31 2023 +1000)
+* 586aba8 - bump version to 0.4.2 (Ronald Holshausen, Wed Apr 5 16:51:15 2023 +1000)
+
 # 0.4.1 - Bugfix Release
 
 * b84a0ba - revert "feat: Use a shared channel and gRPC client to communicate with a plugin" (Ronald Holshausen, Wed Apr 5 16:48:56 2023 +1000)
