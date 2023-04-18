@@ -68,7 +68,7 @@ pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<PactPlugin
       let manifest = match load_plugin_manifest(plugin) {
         Ok(manifest) => manifest,
         Err(err) => {
-          error!("Could not load plugin manifest from disk: {}", err);
+          warn!("Could not load plugin manifest from disk, will try auto install it: {}", err);
           let http_client = reqwest::ClientBuilder::new()
             .user_agent(USER_AGENT)
             .build()?;
@@ -627,7 +627,7 @@ pub async fn install_plugin_from_url(
       debug!("Installing plugin {} version {}", manifest.name, manifest.version);
       let plugin_dir = create_plugin_dir(&manifest)
         .context("Failed to creating plugins directory")?;
-      download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag).await?;
+      download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag, false).await?;
 
       Ok(PactPluginManifest {
         plugin_dir: plugin_dir.to_string_lossy().to_string(),

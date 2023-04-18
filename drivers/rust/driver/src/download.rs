@@ -55,7 +55,8 @@ pub async fn download_plugin_executable(
   plugin_dir: &PathBuf,
   http_client: &Client,
   base_url: &str,
-  tag: &String
+  tag: &String,
+  display_progress: bool
 ) -> anyhow::Result<PathBuf> {
   let (os, arch) = os_and_arch()?;
 
@@ -65,10 +66,10 @@ pub async fn download_plugin_executable(
   let sha_file = format!("pact-{}-plugin-{}-{}{}.gz.sha256", manifest.name, os, arch, ext);
   if github_file_exists(http_client, base_url, tag, gz_file.as_str()).await? {
     debug!(file = %gz_file, "Found a GZipped file");
-    let file = download_file_from_github(http_client, base_url, tag, gz_file.as_str(), plugin_dir).await?;
+    let file = download_file_from_github(http_client, base_url, tag, gz_file.as_str(), plugin_dir, display_progress).await?;
 
     if github_file_exists(http_client, base_url, tag, sha_file.as_str()).await? {
-      let sha_file = download_file_from_github(http_client, base_url, tag, sha_file.as_str(), plugin_dir).await?;
+      let sha_file = download_file_from_github(http_client, base_url, tag, sha_file.as_str(), plugin_dir, display_progress).await?;
       check_sha(&file, &sha_file)?;
       fs::remove_file(sha_file)?;
     }
@@ -88,14 +89,14 @@ pub async fn download_plugin_executable(
   let zip_file = format!("pact-{}-plugin-{}-{}.zip", manifest.name, os, arch);
   let zip_sha_file = format!("pact-{}-plugin-{}-{}.zip.sha256", manifest.name, os, arch);
   if github_file_exists(http_client, base_url, tag, zip_file.as_str()).await? {
-    return download_zip_file(plugin_dir, http_client, base_url, tag, zip_file, zip_sha_file).await;
+    return download_zip_file(plugin_dir, http_client, base_url, tag, zip_file, zip_sha_file, display_progress).await;
   }
 
   // Check for a Zip file
   let zip_file = format!("pact-{}-plugin.zip", manifest.name);
   let zip_sha_file = format!("pact-{}-plugin.zip.sha256", manifest.name);
   if github_file_exists(http_client, base_url, tag, zip_file.as_str()).await? {
-    return download_zip_file(plugin_dir, http_client, base_url, tag, zip_file, zip_sha_file).await;
+    return download_zip_file(plugin_dir, http_client, base_url, tag, zip_file, zip_sha_file, display_progress).await;
   }
 
   bail!("Did not find a matching file pattern on GitHub to install")
@@ -117,13 +118,14 @@ pub async fn download_zip_file(
   base_url: &str,
   tag: &String,
   zip_file: String,
-  zip_sha_file: String
+  zip_sha_file: String,
+  display_progress: bool
 ) -> anyhow::Result<PathBuf> {
   debug!(file = %zip_file, "Found a Zip file");
-  let file = download_file_from_github(http_client, base_url, tag, zip_file.as_str(), plugin_dir).await?;
+  let file = download_file_from_github(http_client, base_url, tag, zip_file.as_str(), plugin_dir, display_progress).await?;
 
   if github_file_exists(http_client, base_url, tag, zip_sha_file.as_str()).await? {
-    let sha_file = download_file_from_github(http_client, base_url, tag, zip_sha_file.as_str(), plugin_dir).await?;
+    let sha_file = download_file_from_github(http_client, base_url, tag, zip_sha_file.as_str(), plugin_dir, display_progress).await?;
     check_sha(&file, &sha_file)?;
     fs::remove_file(sha_file)?;
   }
@@ -194,7 +196,8 @@ pub async fn download_file_from_github(
   base_url: &str,
   tag: &String,
   filename: &str,
-  plugin_dir: &PathBuf
+  plugin_dir: &PathBuf,
+  display_progress: bool
 ) -> anyhow::Result<PathBuf> {
   let url = format!("{}/download/{}/{}", base_url, tag, filename);
   debug!("Downloading file from {}", url);
@@ -204,11 +207,13 @@ pub async fn download_file_from_github(
     .ok_or(anyhow!("Failed to get content length from '{}'", url))?;
 
   let pb = ProgressBar::new(total_size);
-  pb.set_style(
-    ProgressStyle::with_template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
-      .unwrap()
-      .progress_chars("#>-"));
-  pb.set_message(format!("Downloading {}", url));
+  if display_progress {
+    pb.set_style(
+      ProgressStyle::with_template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
+        .unwrap()
+        .progress_chars("#>-"));
+    pb.set_message(format!("Downloading {}", url));
+  }
 
   let path = plugin_dir.join(filename);
   let mut file = File::create(path.clone())?;
@@ -220,10 +225,15 @@ pub async fn download_file_from_github(
     file.write_all(&chunk)?;
     let new = min(downloaded + (chunk.len() as u64), total_size);
     downloaded = new;
-    pb.set_position(new);
+    if display_progress {
+      pb.set_position(new);
+    }
   }
 
-  pb.finish_with_message(format!("Downloaded {} to {}", url, path.display()));
+  if display_progress {
+    pb.finish_with_message(format!("Downloaded {} to {}", url, path.display()));
+  }
+  debug!(url, downloaded_bytes = downloaded, "File downloaded OK");
   Ok(path.clone())
 }
 

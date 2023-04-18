@@ -101,7 +101,7 @@ async fn install_plugin_from_url(
         println!("Installing plugin {} version {}", manifest.name, manifest.version);
         let plugin_dir = create_plugin_dir(&manifest, override_prompt)
           .context("Creating plugins directory")?;
-        download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag).await?;
+        download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag, true).await?;
 
         env::set_var("pact_do_not_track", "true");
         load_plugin(&manifest.as_dependency())
