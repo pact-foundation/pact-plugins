@@ -11,8 +11,8 @@ ext {
 }
 
 dependencies {
-    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.10'
-    implementation 'org.jetbrains.kotlin:kotlin-reflect:1.8.10'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.21'
+    implementation 'org.jetbrains.kotlin:kotlin-reflect:1.8.21'
     implementation 'com.vdurmont:semver4j:3.1.0'
     implementation 'io.grpc:grpc-protobuf:1.53.0'
     implementation 'io.grpc:grpc-stub:1.53.0'
