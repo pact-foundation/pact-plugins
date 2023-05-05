@@ -371,6 +371,9 @@ object DefaultPluginManager: KLogging(), PluginManager {
   private val PLUGIN_MANIFEST_REGISTER: MutableMap<String, PactPluginManifest> = mutableMapOf()
   private val PLUGIN_REGISTER: MutableMap<String, PactPlugin> = ConcurrentHashMap()
 
+  private var pluginDownloader: PluginDownloader = DefaultPluginDownloader
+  private var repository: Repository = DefaultRepository()
+
   init {
     getRuntime().addShutdownHook(Thread {
       logger.debug { "SHUTDOWN - shutting down all plugins" }
@@ -386,12 +389,31 @@ object DefaultPluginManager: KLogging(), PluginManager {
       return if (plugin != null) {
         Result.Ok(plugin)
       } else {
-        when (val manifest = loadPluginManifest(name, version)) {
-          is Result.Ok -> {
-            PluginMetrics.sendMetrics(manifest.value)
-            initialisePlugin(manifest.value)
+        val pluginManifest = when (val manifest = loadPluginManifest(name, version)) {
+          is Result.Ok -> manifest
+          is Result.Err -> {
+            logger.warn { "Could not load plugin manifest from disk, will try auto install it: ${manifest.error}" }
+            when (val index = repository.fetchRepositoryIndex()) {
+              is Result.Ok -> {
+                val pluginVersion = index.value.lookupPluginVersion(name, version)
+                if (pluginVersion != null) {
+                  logger.info { "Found an entry for the plugin in the plugin index, will try install that" }
+                  pluginDownloader.installPluginFromUrl(pluginVersion.source.value)
+                } else {
+                  Result.Err(manifest.error)
+                }
+              }
+              is Result.Err -> Result.Err(index.error)
+            }
           }
-          is Result.Err -> Result.Err(manifest.error)
+        }
+
+        when (pluginManifest) {
+          is Result.Ok -> {
+            PluginMetrics.sendMetrics(pluginManifest.value)
+            initialisePlugin(pluginManifest.value)
+          }
+          is Result.Err -> pluginManifest
         }
       }
     }

@@ -18,6 +18,7 @@ import spock.util.environment.RestoreSystemProperties
 
 import static org.mockito.Mockito.doReturn
 
+@SuppressWarnings('LineLength')
 class DefaultPluginManagerSpec extends Specification {
   def cleanup() {
     DefaultPluginManager.INSTANCE.PLUGIN_MANIFEST_REGISTER.remove('test/1.2.3')
@@ -273,5 +274,27 @@ class DefaultPluginManagerSpec extends Specification {
 
     cleanup:
     DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove('test-invokeContentMatcher/1.2.3')
+  }
+
+  def 'loadPlugin - if the requested plugin is not installed, but exists in the plugin index, it will auto-install it'() {
+    given:
+    def manager = DefaultPluginManager.INSTANCE
+    manager.repository = Mock(Repository)
+    manager.pluginDownloader = Mock(PluginDownloader)
+
+    when:
+    manager.loadPlugin('test', null)
+
+    then:
+    1 * manager.repository.fetchRepositoryIndex() >> new Result.Ok(
+      new PluginRepositoryIndex(0, 0, '', [test: new PluginEntry('test', '1', [
+        new PluginVersion('1', new ManifestSource.File('test'), null)
+      ])]
+    ))
+    1 * manager.pluginDownloader.installPluginFromUrl('test') >> new Result.Err('boom')
+
+    cleanup:
+    manager.repository = new DefaultRepository()
+    manager.pluginDownloader = DefaultPluginDownloader.INSTANCE
   }
 }

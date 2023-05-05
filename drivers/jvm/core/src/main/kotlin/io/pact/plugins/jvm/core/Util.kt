@@ -204,3 +204,5 @@ public fun String?.ifNullOrEmpty(function: () -> String?): String? {
     this
   }
 }
+
+public fun ByteArray.toHex(): String = joinToString(separator = "") { eachByte -> "%02x".format(eachByte) }

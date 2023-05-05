@@ -31,6 +31,8 @@ dependencies {
     implementation 'org.apache.tika:tika-core:2.7.0'
     implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.2.1'
     implementation 'com.vdurmont:semver4j:3.1.0'
+    implementation 'com.moandjiezana.toml:toml4j:0.7.2'
+    implementation 'org.rauschig:jarchivelib:1.2.0'
 
     protobuf files('../../../proto/')
 
@@ -70,6 +72,10 @@ sourceSets {
             srcDirs 'build/generated/source/proto/main/java'
         }
     }
+}
+
+processResources {
+    from '../../../repository/'
 }
 
 test {
