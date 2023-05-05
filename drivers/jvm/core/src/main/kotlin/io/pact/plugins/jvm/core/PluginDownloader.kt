@@ -18,12 +18,10 @@ import org.rauschig.jarchivelib.ArchiverFactory
 import java.io.File
 import java.io.StringReader
 import java.util.zip.GZIPInputStream
-import java.util.zip.ZipEntry
 import javax.json.Json
 import javax.json.JsonObject
 import javax.json.JsonString
 import javax.json.JsonValue
-
 
 interface PluginDownloader {
   /**
@@ -189,9 +187,12 @@ object DefaultPluginDownloader: PluginDownloader, KLogging() {
        File(pluginDir, FilenameUtils.removeExtension(manifest.entryPoint) + ext)
      }
     return try {
-      val stream = GZIPInputStream(gzFile.inputStream())
-      val bytes = IOUtils.copy(stream, file.outputStream())
-      logger.debug { "Wrote $bytes bytes to $file" }
+      GZIPInputStream(gzFile.inputStream()).use {
+        file.outputStream().use { out ->
+          val bytes = IOUtils.copy(it, out)
+          logger.debug { "Wrote $bytes bytes to $file" }
+        }
+      }
       gzFile.delete()
       Result.Ok(file)
     } catch (ex: RuntimeException) {
@@ -203,7 +204,7 @@ object DefaultPluginDownloader: PluginDownloader, KLogging() {
   private fun checkSha(file: File, shaFile: File): Result<Unit, String> {
     return try {
       logger.debug { "Checking SHA of downloaded file: ${file.name} against ${shaFile.name}" }
-      val sha = shaFile.readText().trim()
+      val sha = shaFile.readText().split(" ").first()
       logger.debug { "Downloaded SHA $sha" }
 
       val calculated = DigestUtils.getSha256Digest().digest(file.readBytes()).toHex()

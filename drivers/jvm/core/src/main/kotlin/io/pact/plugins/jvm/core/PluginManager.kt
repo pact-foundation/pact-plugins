@@ -398,7 +398,13 @@ object DefaultPluginManager: KLogging(), PluginManager {
                 val pluginVersion = index.value.lookupPluginVersion(name, version)
                 if (pluginVersion != null) {
                   logger.info { "Found an entry for the plugin in the plugin index, will try install that" }
-                  pluginDownloader.installPluginFromUrl(pluginVersion.source.value)
+                  when (val installed = pluginDownloader.installPluginFromUrl(pluginVersion.source.value)) {
+                    is Result.Ok -> {
+                      PLUGIN_MANIFEST_REGISTER["$name/${installed.value.version}"] = installed.value
+                      installed
+                    }
+                    is Result.Err -> installed
+                  }
                 } else {
                   Result.Err(manifest.error)
                 }
