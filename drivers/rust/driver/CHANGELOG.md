@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.4.3 - Maintenance Release
+
+* f9b9ca2 - chore: Update dependecies and upgrade pact models to 1.1 (Ronald Holshausen, Mon May 15 13:29:39 2023 +1000)
+* a915437 - bump version to 0.4.3 (Ronald Holshausen, Tue Apr 18 10:58:32 2023 +1000)
+
 # 0.4.2 - Support auto-downloading plugins
 
 * 9424024 - chore: cleanup unused import (Ronald Holshausen, Tue Apr 18 10:55:11 2023 +1000)
