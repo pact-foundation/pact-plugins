@@ -1569,9 +1569,9 @@ dependencies = [
 
 [[package]]
 name = "pact_ffi"
-version = "0.4.4"
+version = "0.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "620ccc2500578c2cece2019215e595270bf68d10915f5315c8668d0a6103d6b4"
+checksum = "eb6edd84f0cf19fee991042df4dd5f978ca54f0dc17980a1af4a66a69ffe0fbd"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -1653,9 +1653,9 @@ dependencies = [
 
 [[package]]
 name = "pact_mock_server"
-version = "1.0.2"
+version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fc59b5169021e5b0ac1318d2adc92e126da8291a018cd3b8b42fef0e3b0b5ab7"
+checksum = "daaea27b75fbc1bf7740562518a77933f8bb2ba5b0d4115f61f52691553fbabd"
 dependencies = [
  "anyhow",
  "bytes",
@@ -1723,9 +1723,9 @@ dependencies = [
 
 [[package]]
 name = "pact_verifier"
-version = "0.15.3"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1a49b72e752fb0f94efadc7d329b51ba61af80f817b1ff2e6b1ea1ce15cae60"
+checksum = "ffb7f531e623ac382b413521fc23a72496000969c6ac3e0b050a9243ef22b418"
 dependencies = [
  "ansi_term",
  "anyhow",
