@@ -19,7 +19,7 @@ anyhow = "1.0.70"
 async-trait = "0.1.68"
 backtrace = "0.3.67"
 bytes = "1.4.0"
-chrono = { version = "0.4.23", features = ["serde"]}
+chrono = { version = "0.4.23", features = ["serde"], default-features = false}
 flate2 = "1.0"
 futures-util = "0.3.21"
 home = "0.5.4"
