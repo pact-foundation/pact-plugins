@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.4.4 - Maintenance Release
+
+* c2bb2a6 - chore: Use "Minimum version, with restricted compatibility range" for all Pact crate versions (Ronald Holshausen, Tue May 23 11:49:28 2023 +1000)
+* 88a2e1b - bump version to 0.4.4 (Ronald Holshausen, Mon May 15 13:51:36 2023 +1000)
+
 # 0.4.3 - Maintenance Release
 
 * f9b9ca2 - chore: Update dependecies and upgrade pact models to 1.1 (Ronald Holshausen, Mon May 15 13:29:39 2023 +1000)
