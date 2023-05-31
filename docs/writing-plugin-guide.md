@@ -100,6 +100,64 @@ If you provide SHA256 files (with the same name but with `.sha256` appended), th
 artifact against the digest checksum in that file. For example, the Protobuf plugin executable for Linux is named 
 `pact-protobuf-plugin-linux-x86_64.gz` and the digest `pact-protobuf-plugin-linux-x86_64.gz.sha256`.
 
+#### Adding plugins to the `pact-plugin-cli` index
+
+The `pact-plugin-cli` has a built-in index of known plugins which can be installed by name. For example, to install the
+Protobuf plugin, run `pact-plugin-cli install protobuf` and it will know how to download that plugin from the index.
+
+You can add entries to the index using the `pact-plugin-cli repository` commands. The index files are checked in to
+https://github.com/pact-foundation/pact-plugins/tree/main/repository. So the steps to add a new plugin or plugin 
+version are (using the [AVRO plugin](https://github.com/austek/pact-avro-plugin) as an example):
+
+1. Fork and clone the https://github.com/pact-foundation/pact-plugins repo.
+2. You can list the current index and also validate it with:
+```console
+❯ pact-plugin-cli repository list repository/repository.index
+┌──────────┬──────────┬────────────────┬──────────┐
+│ Key      ┆ Name     ┆ Latest Version ┆ Versions │
+╞══════════╪══════════╪════════════════╪══════════╡
+│ csv      ┆ csv      ┆ 0.0.3          ┆ 4        │
+├╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌┤
+│ protobuf ┆ protobuf ┆ 0.3.0          ┆ 29       │
+└──────────┴──────────┴────────────────┴──────────┘
+
+❯ pact-plugin-cli repository validate repository/repository.index
+'/home/ronald/Development/Projects/Pact/pact-plugins/repository/repository.index' OK
+
+┌────────────────┬──────────────────────────────────────────────────────────────────┬─────────────────────────────────────────────┐
+│ Key            ┆ Value                                                            ┆                                             │
+╞════════════════╪══════════════════════════════════════════════════════════════════╪═════════════════════════════════════════════╡
+│ Format Version ┆ 0                                                                ┆                                             │
+├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ Index Version  ┆ 5                                                                ┆                                             │
+├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ Last Modified  ┆ 2023-03-10 05:36:45.725083896 UTC                                ┆ Local: 2023-03-10 16:36:45.725083896 +11:00 │
+├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ Plugin Entries ┆ 2                                                                ┆                                             │
+├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ Total Versions ┆ 33                                                               ┆                                             │
+├╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ SHA            ┆ d41450c9849112b08a8633c27893ac2ec0e9fe958e0861e570083da7b307ad56 ┆                                             │
+└────────────────┴──────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────┘
+```
+3. Add a new entry for the plugin. You can also get it to scan the GitHub project to add all versions.
+```console
+❯ pact-plugin-cli repository add-plugin-version git-hub repository/repository.index https://github.com/austek/pact-avro-plugin/releases/tag/v0.0.3
+Added plugin version avro/0.0.3 to repository file '/home/ronald/Development/Projects/Pact/pact-plugins/repository/repository.index'
+
+❯ pact-plugin-cli repository list repository/repository.index
+┌──────────┬──────────┬────────────────┬──────────┐
+│ Key      ┆ Name     ┆ Latest Version ┆ Versions │
+╞══════════╪══════════╪════════════════╪══════════╡
+│ avro     ┆ avro     ┆ 0.0.3          ┆ 1        │
+├╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌┤
+│ csv      ┆ csv      ┆ 0.0.3          ┆ 4        │
+├╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌┤
+│ protobuf ┆ protobuf ┆ 0.3.0          ┆ 29       │
+└──────────┴──────────┴────────────────┴──────────┘
+```
+4. Then commit the changed files and create a PR.
+
 ### If your plugin needs to use disk storage
 
 By default, the plugins should be stateless. They will receive all the required data from Pact framework running the test.
