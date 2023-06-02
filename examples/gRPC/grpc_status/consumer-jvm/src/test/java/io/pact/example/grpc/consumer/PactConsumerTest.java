@@ -31,7 +31,7 @@ import static au.com.dius.pact.consumer.dsl.PactBuilder.filePath;
  * This example simulates the Parallelogram shape not being implemented, and an UNIMPLEMENTED status is returned
  */
 @ExtendWith(PactConsumerTestExt.class)
-@PactTestFor(providerName = "validate-token-provider", providerType = ProviderType.SYNCH_MESSAGE, pactVersion = PactSpecVersion.V4)
+@PactTestFor(providerName = "grpc-provider", providerType = ProviderType.SYNCH_MESSAGE, pactVersion = PactSpecVersion.V4)
 public class PactConsumerTest {
   @Pact(consumer = "grpc-consumer-jvm")
   V4Pact testMetadataPact(PactBuilder builder) {
@@ -52,7 +52,7 @@ public class PactConsumerTest {
 
         "responseMetadata", Map.of(
           "grpc-status", "UNIMPLEMENTED",
-          "grpc-message", "we don't currently support parallelograms"
+          "grpc-message", "matching(type, 'we dont currently support parallelograms')"
         )
       ))
       .toPact();
@@ -71,6 +71,6 @@ public class PactConsumerTest {
       stub.calculate(shapeMessage);
     });
     Assertions.assertEquals(Status.Code.UNIMPLEMENTED, exception.getStatus().getCode());
-    Assertions.assertEquals("we don't currently support parallelograms", exception.getStatus().getDescription());
+    Assertions.assertEquals("we dont currently support parallelograms", exception.getStatus().getDescription());
   }
 }
