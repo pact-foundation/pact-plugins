@@ -5,7 +5,7 @@ response for one of the shapes. There are two consumer projects (one in Java and
 providers. They are setup to test sending the unimplemented shape message and assert that the correct gRPC status and
 message is returned.
 
-[Java Consumer](consumer-jvm)
-[Rust consumer](consumer-rust)
-[Java Provider](provider-jvm)
-[Rust Provider](provider-rust)
+* [Java Consumer](consumer-jvm)
+* [Rust consumer](consumer-rust)
+* [Java Provider](provider-jvm)
+* [Rust Provider](provider-rust)
