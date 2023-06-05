@@ -1,0 +1,2 @@
+rootProject.name = 'grpc-status-provider-jvm'
+include('server')

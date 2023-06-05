@@ -52,7 +52,7 @@ public class PactConsumerTest {
 
         "responseMetadata", Map.of(
           "grpc-status", "UNIMPLEMENTED",
-          "grpc-message", "matching(type, 'we dont currently support parallelograms')"
+          "grpc-message", "matching(type, 'we do not currently support parallelograms')"
         )
       ))
       .toPact();
@@ -71,6 +71,6 @@ public class PactConsumerTest {
       stub.calculate(shapeMessage);
     });
     Assertions.assertEquals(Status.Code.UNIMPLEMENTED, exception.getStatus().getCode());
-    Assertions.assertEquals("we dont currently support parallelograms", exception.getStatus().getDescription());
+    Assertions.assertEquals("we do not currently support parallelograms", exception.getStatus().getDescription());
   }
 }

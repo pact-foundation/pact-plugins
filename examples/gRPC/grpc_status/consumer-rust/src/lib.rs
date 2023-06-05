@@ -35,7 +35,7 @@ mod tests {
 
           "responseMetadata": {
             "grpc-status": "UNIMPLEMENTED",
-            "grpc-message": "we don't currently support parallelograms"
+            "grpc-message": "we do not currently support parallelograms"
           }
         })).await;
         i
@@ -58,6 +58,6 @@ mod tests {
     expect!(response.as_ref()).to(be_err());
     let status = response.unwrap_err();
     expect!(status.code()).to(be_equal_to(Code::Unimplemented));
-    expect!(status.message()).to(be_equal_to("we don't currently support parallelograms"));
+    expect!(status.message()).to(be_equal_to("we do not currently support parallelograms"));
   }
 }
