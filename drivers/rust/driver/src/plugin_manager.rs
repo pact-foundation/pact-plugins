@@ -538,7 +538,7 @@ pub async fn prepare_validation_for_interaction(
   let validation_response = response.response
     .ok_or_else(|| anyhow!("Did not get a valid response from the prepare interaction for verification call"))?;
   match &validation_response {
-    verification_preparation_response::Response::Error(err) => Err(anyhow!("Failed to prepate the request: {}", err)),
+    verification_preparation_response::Response::Error(err) => Err(anyhow!("Failed to prepare the request: {}", err)),
     verification_preparation_response::Response::InteractionData(data) => {
       let content_type = data.body.as_ref().and_then(|body| ContentType::parse(body.content_type.as_str()).ok());
       Ok(InteractionVerificationData {
