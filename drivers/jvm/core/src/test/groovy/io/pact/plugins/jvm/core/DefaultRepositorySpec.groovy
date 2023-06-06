@@ -21,8 +21,8 @@ class DefaultRepositorySpec extends Specification {
     protobuf.name == 'protobuf'
     !protobuf.latestVersion.empty
     !protobuf.versions.empty
-    lastVersion.version == "0.0.0"
-    lastVersion.source == new ManifestSource.GitHubRelease("https://github.com/pactflow/pact-protobuf-plugin/releases/tag/v-0.0.0")
+    lastVersion.version ==~ "\\d+\\.\\d+\\.\\d+"
+    lastVersion.source == new ManifestSource.GitHubRelease("https://github.com/pactflow/pact-protobuf-plugin/releases/tag/v-${lastVersion.version}")
   }
 
   def 'if loading from GitHub fails, falls back to the local cached copy'() {
