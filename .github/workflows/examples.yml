@@ -129,7 +129,7 @@ jobs:
           cd ../protobuf-consumer-maven
           mvn verify
           cd ../../..
-          docker run -it -v $(pwd):/build protobuf-container -c 'cd examples/protobuf/protobuf-consumer-rust && cargo test'
+          docker run -t -v $(pwd):/build protobuf-container -c 'cd examples/protobuf/protobuf-consumer-rust && cargo test'
           cd examples/protobuf/protobuf-provider
           go build main.go
           nohup ./main &
