@@ -52,7 +52,7 @@ github.com/hashicorp/logutils
 ## explicit
 # github.com/mitchellh/go-testing-interface v1.14.1
 ## explicit; go 1.14
-# github.com/pact-foundation/pact-go/v2 v2.0.0-beta.14.0.20220821133132-63f276fae621
+# github.com/pact-foundation/pact-go/v2 v2.0.0-beta.21
 ## explicit; go 1.15
 github.com/pact-foundation/pact-go/v2/internal/native
 github.com/pact-foundation/pact-go/v2/log
