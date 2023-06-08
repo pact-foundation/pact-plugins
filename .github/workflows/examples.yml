@@ -120,7 +120,8 @@ jobs:
         if: runner.os == 'macOS'
       - name: Build docker container
         run: docker build -f examples/protobuf/Dockerfile.rust -t protobuf-container .
-      - name: Run Protobuf examples
+        if: runner.os == 'Linux'
+      - name: Run Protobuf examples (Linux)
         run: |
           set -e
           cd protobuf-consumer-jvm
@@ -139,6 +140,27 @@ jobs:
           pact_do_not_track=true ~/bin/pact_verifier_cli -f ../protobuf-consumer-jvm/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
         shell: bash
         working-directory: examples/protobuf
+        if: runner.os == 'Linux'
+      - name: Run Protobuf examples (Non-Linux)
+        run: |
+          set -e
+          cd protobuf-consumer-jvm
+          ./gradlew check
+          cd ../protobuf-consumer-maven
+          mvn verify
+          cd ../protobuf-consumer-rust
+          pact_do_not_track=true cargo test
+          cd ../protobuf-provider
+          go build main.go
+          nohup ./main &
+          PID=$!
+          trap "kill $PID" EXIT
+          timeout --foreground -s TERM 30s bash -c 'while [[ "$(curl -s -o /dev/null -m 3 -L -w ''%{http_code}'' -XPOST -d'{}' http://127.0.0.1:8111)" != "200" ]]; do echo "Waiting for http://127.0.0.1:8111" && sleep 2; done'
+          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../protobuf-consumer-rust/target/pacts/protobuf-consumer-rust-protobuf-provider.json -p 8111
+          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../protobuf-consumer-jvm/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
+        shell: bash
+        working-directory: examples/protobuf
+        if: runner.os != 'Linux'
       - name: Run area calculator Protobuf example
         run: |
           pact_do_not_track=true cargo test
