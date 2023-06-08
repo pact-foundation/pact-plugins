@@ -301,6 +301,8 @@ github.com/pact-foundation/pact-go/v2 v2.0.0-beta.14.0.20220821133132-63f276fae6
 github.com/pact-foundation/pact-go/v2 v2.0.0-beta.14.0.20220821133132-63f276fae621/go.mod h1:kB2X26JGY+sd07XdG9LI4OK+aY8cTQ/IB56oBg2wT9o=
 github.com/pact-foundation/pact-go/v2 v2.0.0-beta.21 h1:slc1Hg+MQHHCb9OKe0yOqavqscFYN4AvK6IEY+J4PSg=
 github.com/pact-foundation/pact-go/v2 v2.0.0-beta.21/go.mod h1:kB2X26JGY+sd07XdG9LI4OK+aY8cTQ/IB56oBg2wT9o=
+github.com/pact-foundation/pact-go/v2 v2.0.0-beta.22 h1:gH8b7Jz2Q/h1+TAExCYwhtCi1/2tNXPUkSrHH1lEZPY=
+github.com/pact-foundation/pact-go/v2 v2.0.0-beta.22/go.mod h1:kB2X26JGY+sd07XdG9LI4OK+aY8cTQ/IB56oBg2wT9o=
 github.com/pascaldekloe/goe v0.0.0-20180627143212-57f6aae5913c/go.mod h1:lzWF7FIEvWOWxwDKqyGYQf6ZUaNfKdP144TG7ZOy1lc=
 github.com/pelletier/go-toml v1.2.0/go.mod h1:5z9KED0ma1S8pY6P1sdut58dfprrGBbd/94hg7ilaic=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=

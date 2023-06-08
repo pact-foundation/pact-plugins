@@ -4,7 +4,7 @@ go 1.18
 
 require (
 	github.com/golang/protobuf v1.5.2
-	github.com/pact-foundation/pact-go/v2 v2.0.0-beta.21
+	github.com/pact-foundation/pact-go/v2 v2.0.0-beta.22
 	google.golang.org/grpc v1.46.2
 )
 
