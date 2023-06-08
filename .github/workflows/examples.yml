@@ -118,6 +118,8 @@ jobs:
           brew install coreutils
         shell: bash
         if: runner.os == 'macOS'
+      - name: Build docker container
+        run: docker build -f examples/protobuf/Dockerfile.rust -t protobuf-container .
       - name: Run Protobuf examples
         run: |
           set -e
@@ -125,9 +127,9 @@ jobs:
           ./gradlew check
           cd ../protobuf-consumer-maven
           mvn verify
-          cd ../protobuf-consumer-rust
-          pact_do_not_track=true cargo test
-          cd ../protobuf-provider
+          cd ../../..
+          docker run -it -v $(pwd):/build protobuf-container -c 'cd examples/protobuf/protobuf-consumer-rust && cargo test'
+          cd examples/protobuf/protobuf-provider
           go build main.go
           nohup ./main &
           PID=$!
