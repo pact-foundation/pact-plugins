@@ -28,4 +28,4 @@ bytes = "1.1.0"
 test-log = "0.2.11"
 
 [build-dependencies]
-tonic-build = "0.8.4"
+tonic-build = "0.9.2"
