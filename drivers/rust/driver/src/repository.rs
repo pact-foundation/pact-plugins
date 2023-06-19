@@ -13,8 +13,8 @@ use semver::Version;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use tracing::{debug, info, warn};
-use crate::plugin_manager::pact_plugin_dir;
 
+use crate::plugin_manager::pact_plugin_dir;
 use crate::plugin_models::PactPluginManifest;
 
 pub const DEFAULT_INDEX: &str = include_str!("../repository.index");
@@ -152,11 +152,30 @@ impl PluginEntry {
 
 impl Default for PluginRepositoryIndex {
   fn default() -> Self {
-    PluginRepositoryIndex {
-      index_version: 0,
-      format_version: 0,
-      timestamp: Utc::now(),
-      entries: Default::default()
+    #[cfg(feature = "datetime")]
+    {
+      let timestamp = Utc::now();
+      PluginRepositoryIndex {
+        index_version: 0,
+        format_version: 0,
+        timestamp,
+        entries: Default::default()
+      }
+    }
+    #[cfg(not(feature = "datetime"))]
+    {
+      use std::time::{SystemTime, UNIX_EPOCH};
+      let now = SystemTime::now().duration_since(UNIX_EPOCH)
+        .expect("system time before Unix epoch");
+      let naive = chrono::NaiveDateTime::from_timestamp_opt(now.as_secs() as i64, now.subsec_nanos())
+        .unwrap();
+      let timestamp = DateTime::from_utc(naive, Utc);
+      PluginRepositoryIndex {
+        index_version: 0,
+        format_version: 0,
+        timestamp,
+        entries: Default::default()
+      }
     }
   }
 }
@@ -294,4 +313,29 @@ pub fn load_sha(repository_file: &PathBuf) -> anyhow::Result<String> {
   let mut buffer = String::new();
   f.read_to_string(&mut buffer)?;
   Ok(buffer)
+}
+
+#[cfg(test)]
+mod tests {
+  use std::time::{SystemTime, UNIX_EPOCH};
+
+  use expectest::prelude::*;
+
+  use crate::repository::PluginRepositoryIndex;
+
+  #[test]
+  fn plugin_repository_index_default() {
+    let index = PluginRepositoryIndex::default();
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+
+    expect!(index.index_version).to(be_equal_to(0));
+    expect!(index.format_version).to(be_equal_to(0));
+    expect!(index.entries.len()).to(be_equal_to(0));
+
+    let timestamp = index.timestamp.to_string();
+    expect!(timestamp).to_not(be_equal_to("1970-01-01 00:00:00 UTC"));
+
+    let ts = index.timestamp.naive_utc().timestamp() as u64;
+    expect!(ts / 3600).to(be_equal_to(now / 3600));
+  }
 }
