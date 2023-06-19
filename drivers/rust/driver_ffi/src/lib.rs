@@ -104,7 +104,7 @@ mod tests {
     dir = dir.join("test_message_client");
     create_dir_all(dir.clone()).unwrap();
     let file_path = dir.join("plugin.proto");
-    let proto_file = include_str!("../../driver/plugin.proto");
+    let proto_file = include_str!("../../../../proto/plugin.proto");
     write(file_path.as_path(), proto_file).unwrap();
 
     expect!(pactffi_using_plugin(pact_handle, plugin_name.as_ptr(), null())).to(be_equal_to(0));
@@ -163,7 +163,7 @@ mod tests {
     dir = dir.join("test_proto_service");
     create_dir_all(dir.clone()).unwrap();
     let file_path = dir.join("plugin.proto");
-    let proto_file = include_str!("../../driver/plugin.proto");
+    let proto_file = include_str!("../../../../proto/plugin.proto");
     write(file_path.as_path(), proto_file).unwrap();
 
     expect!(pactffi_using_plugin(pact_handle, plugin_name.as_ptr(), null())).to(be_equal_to(0));
@@ -243,7 +243,7 @@ mod tests {
     dir = dir.join("test_grpc_service");
     create_dir_all(dir.clone()).unwrap();
     let file_path = dir.join("plugin.proto");
-    let proto_file = include_str!("../../driver/plugin.proto");
+    let proto_file = include_str!("../../../../proto/plugin.proto");
     write(file_path.as_path(), proto_file).unwrap();
 
     expect!(pactffi_using_plugin(pact_handle, plugin_name.as_ptr(), null())).to(be_equal_to(0));

@@ -63,10 +63,11 @@ checksum = "9c7d0618f0e0b7e8ff11427422b64564d5fb0be1940354bfe2e0529b18a9d9b8"
 
 [[package]]
 name = "ariadne"
-version = "0.1.5"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f1cb2a2046bea8ce5e875551f5772024882de0b540c7f93dfc5d6cf1ca8b030c"
+checksum = "72fe02fc62033df9ba41cba57ee19acf5e742511a140c7dbc3a873e19a19a1bd"
 dependencies = [
+ "unicode-width",
  "yansi",
 ]
 
@@ -185,9 +186,9 @@ checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
 name = "base64"
-version = "0.21.1"
+version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3f1e31e207a6b8fb791a38ea3105e6cb541f55e4d029902d3039a4ad07cc4105"
+checksum = "604178f6c5c21f02dc555784810edfb88d34ac2c73b2eae109655649ee73ce3d"
 
 [[package]]
 name = "base64ct"
@@ -1499,7 +1500,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "sysinfo",
+ "sysinfo 0.28.4",
  "tokio",
  "toml",
  "tonic",
@@ -1538,7 +1539,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
- "sysinfo",
+ "sysinfo 0.29.2",
  "tokio",
  "toml",
  "tonic",
@@ -1621,7 +1622,7 @@ checksum = "b43445eaf3e05a4f04ef2e176a07ba487977126aa0facf2fd088e6d9875749f6"
 dependencies = [
  "ansi_term",
  "anyhow",
- "base64 0.21.1",
+ "base64 0.21.2",
  "bytes",
  "chrono",
  "difference",
@@ -1683,13 +1684,13 @@ dependencies = [
 
 [[package]]
 name = "pact_models"
-version = "1.1.2"
+version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "567295b1516677ede76b6c61fc0608645dd8ab7f9326f640eaf914cc4cd2efdc"
+checksum = "b3648ae912d5bcf8f6431494999e5f4abade967ef4dc7b3c5d6c966d053f44c8"
 dependencies = [
  "anyhow",
  "ariadne",
- "base64 0.13.1",
+ "base64 0.21.2",
  "bytes",
  "chrono",
  "chrono-tz",
@@ -1730,7 +1731,7 @@ dependencies = [
  "ansi_term",
  "anyhow",
  "async-trait",
- "base64 0.21.1",
+ "base64 0.21.2",
  "bytes",
  "difference",
  "futures",
@@ -2116,9 +2117,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.8.2"
+version = "1.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d1a59b5d8e97dee33696bf13c5ba8ab85341c002922fba050069326b9c498974"
+checksum = "d0ab3ca65655bb1e41f2a8c8cd662eb4fb035e67c3f78da1d61dffe89d07300f"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -2153,7 +2154,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cde824a14b7c14f85caff81225f411faacc04a2013f41670f41443742b1c1c55"
 dependencies = [
  "async-compression",
- "base64 0.21.1",
+ "base64 0.21.2",
  "bytes",
  "encoding_rs",
  "futures-core",
@@ -2254,7 +2255,7 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d194b56d58803a43635bdc398cd17e383d6f71f9182b9a192c127ca42494a59b"
 dependencies = [
- "base64 0.21.1",
+ "base64 0.21.2",
 ]
 
 [[package]]
@@ -2577,6 +2578,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "sysinfo"
+version = "0.29.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9557d0845b86eea8182f7b10dff120214fb6cd9fd937b6f4917714e546a38695"
+dependencies = [
+ "cfg-if",
+ "core-foundation-sys",
+ "libc",
+ "ntapi",
+ "once_cell",
+ "rayon",
+ "winapi",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2818,7 +2834,7 @@ checksum = "3082666a3a6433f7f511c7192923fa1fe07c69332d3c6a2e6bb040b569199d5a"
 dependencies = [
  "async-trait",
  "axum",
- "base64 0.21.1",
+ "base64 0.21.2",
  "bytes",
  "futures-core",
  "futures-util",
