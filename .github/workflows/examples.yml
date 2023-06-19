@@ -163,7 +163,7 @@ jobs:
         if: runner.os != 'Linux'
       - name: Run area calculator Protobuf example
         run: |
-          pact_do_not_track=true cargo test
+          pact_do_not_track=true cargo test -- --test-threads 1
         shell: bash
         working-directory: examples/protobuf/area_calculator_example/consumer
 
