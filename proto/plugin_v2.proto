@@ -6,8 +6,8 @@ import "google/protobuf/struct.proto";
 import "google/protobuf/wrappers.proto";
 import "google/protobuf/empty.proto";
 
-package io.pact.plugin;
-option go_package = "io.pact.plugin";
+package io.pact.plugin_v2;
+option go_package = "io.pact.plugin_v2";
 
 // Request to verify the plugin has loaded OK
 message InitPluginRequest {
