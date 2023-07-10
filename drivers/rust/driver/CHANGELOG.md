@@ -1,5 +1,15 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.4.5 - Bugfix Release
+
+* b3389e4 - update cargo.lock (Elena Gantner, Wed Jun 21 18:49:46 2023 +0200)
+* c12a06f - chore: remove rustls-tls feature from reqwest (Elena Gantner, Wed Jun 21 14:16:32 2023 +0200)
+* 94a4dee - chore: add features that map to the pact_model features (Ronald Holshausen, Mon Jun 19 13:03:54 2023 +1000)
+* 16063a9 - fix: correct typo in error message (Ronald Holshausen, Mon Jun 5 12:03:17 2023 +1000)
+* da4d5c5 - Merge pull request #32 from tbeemster/remove-chrono-default-features (Ronald Holshausen, Wed May 24 10:01:23 2023 +1000)
+* e96d662 - Default features are removed for chrono dependency (Timothé Beemster, Tue May 23 16:04:03 2023 +0200)
+* 958c03f - bump version to 0.4.5 (Ronald Holshausen, Tue May 23 11:51:54 2023 +1000)
+
 # 0.4.4 - Maintenance Release
 
 * c2bb2a6 - chore: Use "Minimum version, with restricted compatibility range" for all Pact crate versions (Ronald Holshausen, Tue May 23 11:49:28 2023 +1000)
