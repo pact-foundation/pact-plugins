@@ -9,6 +9,15 @@
 * [ ] Provide a messaging bus to facilitate communication between the language implementation and the plugins.
 * [X] Manage the plugin lifecycles.
 
+## Crate features
+
+All features are enabled by default
+
+* `datetime`: Enables support of date and time expressions and generators. This will add the
+  `chronos` crate as a dependency.
+* `xml`: Enables support for parsing XML documents. This feature will add the `sxd-document`
+  crate as a dependency.
+
 ## Building the Rust driver
 
 The Rust driver is built with Cargo. The build can be run with `cargo build`, but there is a test `DriverPactTest`
