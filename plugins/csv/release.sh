@@ -17,6 +17,10 @@ case "$1" in
             gzip -c target/release/pact-csv-plugin > target/artifacts/pact-csv-plugin-linux-x86_64.gz
             openssl dgst -sha256 -r target/artifacts/pact-csv-plugin-linux-x86_64.gz > target/artifacts/pact-csv-plugin-linux-x86_64.gz.sha256
             cp pact-plugin.json target/artifacts/
+            cargo install cross
+            cross build --target aarch64-unknown-linux-gnu --release
+            gzip -c target/aarch64-unknown-linux-gnu/release/pact-csv-plugin > target/artifacts/pact-csv-plugin-linux-aarch64.gz
+            openssl dgst -sha256 -r target/artifacts/pact-csv-plugin-linux-aarch64.gz > target/artifacts/pact-csv-plugin-linux-aarch64.gz.sha256
             ;;
   Windows)  echo  "Building for Windows"
             cargo build --release
