@@ -2,7 +2,7 @@ package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.model.ContentType
 import io.pact.plugin.Plugin
-import mu.KLogging
+import io.github.oshai.kotlinlogging.KLogging
 import java.lang.IllegalArgumentException
 
 /**

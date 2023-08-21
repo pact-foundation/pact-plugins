@@ -19,15 +19,16 @@ import au.com.dius.pact.core.model.matchingrules.MatchingRuleCategory
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
 import au.com.dius.pact.core.model.matchingrules.RuleLogic
 import au.com.dius.pact.core.support.Json.toJson
+import au.com.dius.pact.core.support.Result
 import au.com.dius.pact.core.support.Utils.lookupEnvironmentValue
 import au.com.dius.pact.core.support.isNotEmpty
 import au.com.dius.pact.core.support.json.JsonValue
-import au.com.dius.pact.core.support.Result
 import au.com.dius.pact.core.support.mapError
 import com.google.protobuf.ByteString
 import com.google.protobuf.BytesValue
 import com.google.protobuf.Struct
 import com.vdurmont.semver4j.Semver
+import io.github.oshai.kotlinlogging.KLogging
 import io.grpc.CallCredentials
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
@@ -44,7 +45,6 @@ import io.pact.plugins.jvm.core.Utils.structToJson
 import io.pact.plugins.jvm.core.Utils.toProtoStruct
 import io.pact.plugins.jvm.core.Utils.toProtoValue
 import io.pact.plugins.jvm.core.Utils.valueToJson
-import mu.KLogging
 import org.apache.commons.lang3.SystemUtils
 import java.io.File
 import java.io.PrintWriter
@@ -54,8 +54,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 import javax.json.Json
-import javax.json.JsonObject
 import javax.json.JsonArray
+import javax.json.JsonObject
 
 /**
  * Type of plugin dependency

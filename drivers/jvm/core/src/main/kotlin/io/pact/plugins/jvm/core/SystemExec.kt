@@ -1,7 +1,7 @@
 package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.support.Result
-import mu.KLogging
+import io.github.oshai.kotlinlogging.KLogging
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader

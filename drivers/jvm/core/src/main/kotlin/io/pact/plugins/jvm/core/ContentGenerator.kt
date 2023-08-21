@@ -6,7 +6,7 @@ import au.com.dius.pact.core.model.PluginData
 import au.com.dius.pact.core.model.generators.Generator
 import au.com.dius.pact.core.model.generators.GeneratorTestMode
 import au.com.dius.pact.core.support.json.JsonValue
-import mu.KLogging
+import io.github.oshai.kotlinlogging.KLogging
 
 /**
  * Interface to a content generator

@@ -2,7 +2,7 @@ package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.support.Result
 import au.com.dius.pact.core.support.isNotEmpty
-import mu.KLogging
+import io.github.oshai.kotlinlogging.KLogging
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.commons.io.FilenameUtils
 import org.apache.commons.io.IOUtils

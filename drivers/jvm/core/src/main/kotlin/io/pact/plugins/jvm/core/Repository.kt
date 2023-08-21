@@ -4,7 +4,7 @@ import au.com.dius.pact.core.support.Result
 import au.com.dius.pact.core.support.Result.Err
 import au.com.dius.pact.core.support.Result.Ok
 import com.moandjiezana.toml.Toml
-import mu.KLogging
+import io.github.oshai.kotlinlogging.KLogging
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.hc.client5.http.fluent.Request
 import java.io.File

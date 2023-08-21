@@ -7,7 +7,7 @@ import com.google.protobuf.ListValue
 import com.google.protobuf.NullValue
 import com.google.protobuf.Struct
 import com.google.protobuf.Value
-import mu.KLogging
+import io.github.oshai.kotlinlogging.KLogging
 import org.apache.commons.lang3.SystemUtils
 import java.io.BufferedReader
 import java.io.IOException

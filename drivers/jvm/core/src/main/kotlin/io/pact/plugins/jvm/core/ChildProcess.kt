@@ -1,6 +1,6 @@
 package io.pact.plugins.jvm.core
 
-import mu.KLogging
+import io.github.oshai.kotlinlogging.KLogging
 import java.io.StringReader
 import java.lang.Thread.sleep
 import java.util.concurrent.LinkedBlockingDeque
