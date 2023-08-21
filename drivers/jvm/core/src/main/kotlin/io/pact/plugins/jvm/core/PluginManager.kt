@@ -38,7 +38,6 @@ import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.PactPluginGrpc.newBlockingStub
 import io.pact.plugin.Plugin
 import io.pact.plugins.jvm.core.Utils.fromProtoValue
-import io.pact.plugins.jvm.core.Utils.handleWith
 import io.pact.plugins.jvm.core.Utils.jsonToValue
 import io.pact.plugins.jvm.core.Utils.mapToProtoStruct
 import io.pact.plugins.jvm.core.Utils.structToJson
@@ -881,7 +880,7 @@ object DefaultPluginManager: KLogging(), PluginManager {
   }
 
   private fun tryInitPlugin(plugin: PactPlugin, address: String): Result<PactPlugin, Exception> {
-    return handleWith<PactPlugin> {
+    try {
       val channel = ManagedChannelBuilder.forTarget(address)
         .usePlaintext()
         .build()
@@ -889,9 +888,19 @@ object DefaultPluginManager: KLogging(), PluginManager {
       plugin.stub = stub
       plugin.channel = channel
 
-      initPlugin(plugin)
+      try {
+        initPlugin(plugin)
+      } catch (e: Exception) {
+        plugin.stub = null
+        plugin.channel = null
+        channel.shutdownNow()
+        throw e
+      }
 
-      plugin
+      return Result.Ok(plugin)
+    } catch (e: Exception) {
+      logger.error(e) { "Failed to initialise the plugin" }
+      return Result.Err(e)
     }
   }
 
@@ -977,11 +986,11 @@ object DefaultPluginManager: KLogging(), PluginManager {
   }
 
   private fun logLevel() = when {
-    logger.isTraceEnabled -> "trace"
-    logger.isDebugEnabled -> "debug"
-    logger.isInfoEnabled -> "info"
-    logger.isWarnEnabled -> "warn"
-    logger.isErrorEnabled -> "error"
+    logger.isTraceEnabled() -> "trace"
+    logger.isDebugEnabled() -> "debug"
+    logger.isInfoEnabled() -> "info"
+    logger.isWarnEnabled() -> "warn"
+    logger.isErrorEnabled() -> "error"
     else -> ""
   }
 
