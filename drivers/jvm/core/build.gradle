@@ -28,7 +28,7 @@ dependencies {
     implementation 'org.apache.commons:commons-lang3:3.12.0'
     implementation 'au.com.dius.pact.core:support:4.5.8'
     implementation 'au.com.dius.pact.core:model:4.5.8'
-    implementation 'org.apache.tika:tika-core:2.7.0'
+    implementation 'org.apache.tika:tika-core:2.8.0'
     implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.2.1'
     implementation 'com.vdurmont:semver4j:3.1.0'
     implementation 'com.moandjiezana.toml:toml4j:0.7.2'
@@ -36,23 +36,23 @@ dependencies {
 
     protobuf files('../../../proto/')
 
-    testImplementation 'org.apache.groovy:groovy:4.0.10'
-    testImplementation 'org.apache.groovy:groovy-json:4.0.10'
-    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.2'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
-    testRuntimeOnly 'org.junit.vintage:junit-vintage-engine:5.9.2'
+    testImplementation 'org.apache.groovy:groovy:4.0.11'
+    testImplementation 'org.apache.groovy:groovy-json:4.0.11'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.0'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.0'
+    testRuntimeOnly 'org.junit.vintage:junit-vintage-engine:5.10.0'
     testImplementation 'org.hamcrest:hamcrest:2.2'
     testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
-    testImplementation 'net.bytebuddy:byte-buddy:1.14.2'
+    testImplementation 'net.bytebuddy:byte-buddy:1.14.5'
     testImplementation 'org.objenesis:objenesis:3.3'
-    testImplementation 'au.com.dius.pact.consumer:junit5:4.5.4'
-    testImplementation('au.com.dius.pact.consumer:groovy:4.5.4') {
+    testImplementation 'au.com.dius.pact.consumer:junit5:4.5.8'
+    testImplementation('au.com.dius.pact.consumer:groovy:4.5.8') {
         transitive = false
     }
-    testImplementation 'ch.qos.logback:logback-classic:1.4.6'
-    testImplementation 'org.mockito:mockito-core:5.2.0'
-    testImplementation 'org.mockito:mockito-junit-jupiter:5.2.0'
-    testImplementation 'org.json:json:20230227'
+    testImplementation 'ch.qos.logback:logback-classic:1.4.8'
+    testImplementation 'org.mockito:mockito-core:5.4.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.4.0'
+    testImplementation 'org.json:json:20230618'
 }
 
 protobuf {
