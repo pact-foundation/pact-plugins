@@ -136,7 +136,11 @@ pub(crate) async fn fetch_json_from_url(source: &str, http_client: &Client) -> a
 }
 
 fn already_installed(manifest: &PactPluginManifest) -> bool {
-  find_plugin(&manifest.name, &Some(manifest.version.clone())).is_ok()
+  if let Ok(res) = find_plugin(&manifest.name, &Some(manifest.version.clone())) {
+    return res.len() > 0
+  }
+
+  return false
 }
 
 fn create_plugin_dir(manifest: &PactPluginManifest, override_prompt: bool) -> anyhow::Result<PathBuf> {
