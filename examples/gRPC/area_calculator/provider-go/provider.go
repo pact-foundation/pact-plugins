@@ -68,6 +68,11 @@ func (calc *calculatorServer) CalculateMulti(ctx context.Context, req *ac.AreaRe
 	return &ac.AreaResponse{Value: areas}, nil
 }
 
+func NewServer() *calculatorServer {
+	s := &calculatorServer{}
+	return s
+}
+
 func main() {
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -78,6 +83,6 @@ func main() {
 
 	var opts []grpc.ServerOption
 	grpcServer := grpc.NewServer(opts...)
-	ac.RegisterCalculatorServer(grpcServer, &calculatorServer{})
+	ac.RegisterCalculatorServer(grpcServer, NewServer())
 	grpcServer.Serve(lis)
 }

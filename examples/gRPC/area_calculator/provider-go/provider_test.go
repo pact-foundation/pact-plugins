@@ -2,35 +2,35 @@ package main
 
 import (
 	"fmt"
-	// "log"
 
-	// "net"
 	"os"
 	"path/filepath"
 	"testing"
+	"log"
+	"net"
 
-	// ac "area_calculator/provider/io.pact/area_calculator"
-	// "area_calculator/provider/provider"
+	ac "area_calculator/provider/io.pact/area_calculator"
+	area_provider "area_calculator/provider"
 	l "github.com/pact-foundation/pact-go/v2/log"
 	"github.com/pact-foundation/pact-go/v2/provider"
 	"github.com/stretchr/testify/assert"
-	// "google.golang.org/grpc"
+	"google.golang.org/grpc"
 )
 
 var dir, _ = os.Getwd()
 
 func TestGrpcProvider(t *testing.T) {
-	// go startProvider()
+	go startProvider()
 	l.SetLogLevel("INFO")
 
 	verifier := provider.NewVerifier()
 
 	err := verifier.VerifyProvider(t, provider.VerifyRequest{
-		ProviderBaseURL: "http://localhost:51022",
+		ProviderBaseURL: "http://localhost:8222",
 		Transports: []provider.Transport{
 			provider.Transport{
 				Protocol: "grpc",
-				Port:     51022,
+				Port:     8222,
 			},
 		},
 		Provider: "area-calculator-provider",
@@ -42,13 +42,13 @@ func TestGrpcProvider(t *testing.T) {
 	assert.NoError(t, err)
 }
 
-// func startProvider() {
-// 	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", 8222))
-// 	if err != nil {
-// 		log.Fatalf("failed to listen: %v", err)
-// 	}
-// 	var opts []grpc.ServerOption
-// 	grpcServer := grpc.NewServer(opts...)
-// 	ac.RegisterCalculatorServer(grpcServer, calculatorServer{})
-// 	grpcServer.Serve(lis)
-// }
+func startProvider() {
+	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:%d", 8222))
+	if err != nil {
+		log.Fatalf("failed to listen: %v", err)
+	}
+	var opts []grpc.ServerOption
+	grpcServer := grpc.NewServer(opts...)
+	ac.RegisterCalculatorServer(grpcServer, area_provider.NewServer())
+	grpcServer.Serve(lis)
+}
