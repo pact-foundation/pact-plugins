@@ -1,7 +1,14 @@
-# Example Rust consumer project
+# Example Java and JUnit 5 with Maven consumer project
 
-This example project has a consumer stub for the area calculator service call and exercises it in a Pact test. 
-It tests the following interaction from the proto file:
+## Pre-Reqs
+
+- Java 11
+- Maven
+
+## Outline
+
+This example project has a consumer stub for the area calculator service call and exercises it in a Pact test. The
+test is written in Java and JUnit 5. It tests the following interaction from the proto file:
 
 ```protobuf
   rpc calculate (ShapeMessage) returns (AreaResponse) {}
@@ -13,19 +20,19 @@ To run the test in this project, it requires the gRPC plugin to be installed. Se
 
 ## Generated gRPC stub
 
-The gRPC structs are automatically generated using Prost in the build script.
+The gRPC stub and Java classes are automatically generated using the Protobuf Maven plugin.
 
-## Test method
+## Test class
 
-The test method [test_proto_client](src/lib.rs) first sets up the interaction using the Pact DSL, then sets up a 
-gRPC mock server to use. The generated stub structs are then used to send the `ShapeMessage` to the mock server, 
-and an `AreaResponse` message is received back. This is then validated.
-
+The test class [PactConsumerTest](examples/gRPC/area_calculator/consumer-maven/src/test/java/io/pact/example/grpc/maven/PactConsumerTest.java) first sets up
+the interaction using the Pact DSL, then during the test method receives a gRPC mock server to use. The generated
+stub classes are then used to send the `ShapeMessage` to the mock server, and an `AreaResponse` message is received back.
+This is then validated.
 
 ## Run the test
 
 ```sh
-cargo test
+mvn test
 ```
 
 A pact file, will be generated in the `./target/pacts` folder.
@@ -39,15 +46,19 @@ These will be used to replay against the provider to verify the contract can be 
 ```json
 {
   "consumer": {
-    "name": "grpc-consumer-rust"
+    "name": "grpc-consumer-jvm"
   },
   "interactions": [
     {
+      "comments": {
+        "testname": "io.pact.example.grpc.maven.PactConsumerTest.calculateRectangleArea(MockServer, SynchronousMessages)"
+      },
       "description": "calculate rectangle area request",
       "interactionMarkup": {
-        "markup": "```protobuf\nmessage ShapeMessage {\n    message .area_calculator.Rectangle rectangle = 2;\n}\n```\n```protobuf\nmessage AreaResponse {\n    repeated float value = 1;\n}\n```\n",
+        "markup": "```protobuf\nmessage ShapeMessage {\n    message .area_calculator.Rectangle rectangle = 2;\n}\n```\n\n```protobuf\nmessage AreaResponse {\n    repeated float value = 1;\n}\n```\n",
         "markupType": "COMMON_MARK"
       },
+      "key": "c7fbe3ee",
       "pending": false,
       "pluginConfiguration": {
         "protobuf": {
@@ -58,7 +69,7 @@ These will be used to replay against the provider to verify the contract can be 
       "request": {
         "contents": {
           "content": "EgoNAABAQBUAAIBA",
-          "contentType": "application/protobuf;message=ShapeMessage",
+          "contentType": "application/protobuf; message=ShapeMessage",
           "contentTypeHint": "BINARY",
           "encoded": "base64"
         },
@@ -90,7 +101,7 @@ These will be used to replay against the provider to verify the contract can be 
         {
           "contents": {
             "content": "CgQAAEBB",
-            "contentType": "application/protobuf;message=AreaResponse",
+            "contentType": "application/protobuf; message=AreaResponse",
             "contentTypeHint": "BINARY",
             "encoded": "base64"
           },
@@ -116,9 +127,8 @@ These will be used to replay against the provider to verify the contract can be 
     }
   ],
   "metadata": {
-    "pactRust": {
-      "consumer": "1.0.4",
-      "models": "1.1.11"
+    "pact-jvm": {
+      "version": "4.4.2"
     },
     "pactSpecification": {
       "version": "4.0"
@@ -140,4 +150,5 @@ These will be used to replay against the provider to verify the contract can be 
     "name": "area-calculator-provider"
   }
 }
+
 ```
