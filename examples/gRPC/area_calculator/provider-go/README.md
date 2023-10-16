@@ -22,12 +22,24 @@ protobuf and grpc protoc plugins, and then run `protoc --go_out=. --go-grpc_out=
 
 **NOTE:** You need to first run the tests in `../consumer-go` to have the Pact file generated.
 
-You can verify the provider by using the Pact Verification CLI tool. For example, to verify the Pact file from the Go consumer example, start the provider and then run the verifier.
+### Pact Go
+
+See `./provider_test.go`
+
+`go test provider_test.go`
+
+This will start our Provider on a given port, which is imported in the test, then setups up the verification options, executing the request against the provider
+
+### CLI Tool
+
+You can verify the provider by using the Pact Verification CLI tool. For example, to verify the Pact file from the Go consumer example, start the provider and then run the verifier cli, in a separate terminal
 
 ```shell
 ❯ go run provider.go
 2022/08/23 17:07:30 Server started 127.0.0.1:39821
 ```
+
+In terminal 2.
 
 ```shell
 ❯ pact_verifier_cli -f ../consumer-go/pacts/grpc-consumer-go-area-calculator-provider.json --transport grpc -p 39821
