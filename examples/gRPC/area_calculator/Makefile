@@ -1,5 +1,10 @@
 
 
+# Verifier CLI
+
+verifier_cli_install_cargo:
+	cargo install pact_verifier_cli
+
 # GoLang
 consumer_build_go:
 	cd consumer-go && \
