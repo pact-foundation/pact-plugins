@@ -1,0 +1,62 @@
+{
+  "name": "pact-js-grpc",
+  "version": "1.0.0",
+  "description": "Pact JS gRPC Example",
+  "scripts": {
+    "clean": "rimraf pacts",
+    "pretest": "npm run clean",
+    "test": "npm run test:consumer && npm run test:provider",
+    "test:consumer": "cross-env ENABLE_FEATURE_V4=true mocha test/*.consumer.spec.ts",
+    "test:provider": "cross-env ENABLE_FEATURE_V4=true mocha test/*.provider.spec.ts",
+    "build": "npm run build:typescript",
+    "build:typescript": "tsc -p .",
+    "watch": "npm run build:typescript -- -w",
+    "build:proto": "proto-loader-gen-types --longs=String --enums=String --defaults --oneofs --grpcLib=@grpc/grpc-js --outDir=proto/ ./proto/area_calculator.proto",
+    "prewatch": "npm run build:proto",
+    "prebuild": "npm run build:proto",
+    "lint": "npm run lint:prettier && npm run lint:eslint",
+    "lint:prettier": "prettier --check \"**/*.{ts,js,json,svg,md,yml}\"",
+    "lint:eslint": "eslint . --ext .js,.ts",
+    "lint:fix": "npm run lint:fix:prettier && npm run lint:eslint -- --fix",
+    "lint:fix:prettier": "prettier --write '**/*.{ts,tsx,js,json,svg,md,yml}'",
+    "start:provider": "ts-node provider.ts",
+    "start:consumer": "ts-node consumer.ts"
+  },
+  "author": "you@saf.dev",
+  "license": "MIT",
+  "dependencies": {
+    "@grpc/grpc-js": "^1.9.5",
+    "@grpc/proto-loader": "^0.7.10"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "@pact-foundation/pact": "12.1.0",
+    "@pact-foundation/pact-core": "^14.0.5",
+    "@types/chai": "^4.3.8",
+    "@types/chai-as-promised": "7.1.6",
+    "@types/mocha": "^10.0.2",
+    "@tsconfig/node16": "^16.1.1",
+    "chai": "^4.3.10",
+    "chai-as-promised": "^7.1.1",
+    "mocha": "^10.2.0",
+    "rimraf": "^5.0.5",
+    "ts-node": "^10.9.1",
+    "@types/node": "^20.8.6",
+    "@typescript-eslint/eslint-plugin": "^6.8.0",
+    "@typescript-eslint/parser": "^6.8.0",
+    "eslint": "^8.51.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-plugin-node": "^11.1.0",
+    "eslint-plugin-prettier": "^5.0.1",
+    "prettier": "^3.0.3",
+    "typescript": "^5.2.2"
+  },
+  "eslintConfig": {
+    "ignorePatterns": [
+      "**/*.js",
+      "proto/**/*.ts"
+    ]},
+  "config": {
+    "pact_do_not_track": true
+  }
+}
