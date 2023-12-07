@@ -12,3 +12,6 @@ target
 pacts
 *.out
 
+# Misc
+
+.DS_Store
