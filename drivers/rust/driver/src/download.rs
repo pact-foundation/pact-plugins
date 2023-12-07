@@ -20,6 +20,7 @@ use futures_util::StreamExt;
 
 use crate::plugin_models::PactPluginManifest;
 use crate::utils::os_and_arch;
+use tar::Archive;
 
 pub(crate) async fn fetch_json_from_url(source: &str, http_client: &Client) -> anyhow::Result<Value> {
   info!(%source, "Fetching root document for source");
@@ -85,7 +86,7 @@ pub async fn download_plugin_executable(
     return Ok(file);
   }
 
-  // Check for a arch specific Zip file
+  // Check for an arch specific Zip file
   let zip_file = format!("pact-{}-plugin-{}-{}.zip", manifest.name, os, arch);
   let zip_sha_file = format!("pact-{}-plugin-{}-{}.zip.sha256", manifest.name, os, arch);
   if github_file_exists(http_client, base_url, tag, zip_file.as_str()).await? {
@@ -97,6 +98,34 @@ pub async fn download_plugin_executable(
   let zip_sha_file = format!("pact-{}-plugin.zip.sha256", manifest.name);
   if github_file_exists(http_client, base_url, tag, zip_file.as_str()).await? {
     return download_zip_file(plugin_dir, http_client, base_url, tag, zip_file, zip_sha_file, display_progress).await;
+  }
+
+  // Check for a tar.gz file
+  let tar_gz_file = format!("pact-{}-plugin.tar.gz", manifest.name);
+  let tar_gz_sha_file = format!("pact-{}-plugin.tar.gz.sha256", manifest.name);
+  if github_file_exists(http_client, base_url, tag, tar_gz_file.as_str()).await? {
+    return download_tar_gz_file(plugin_dir, http_client, base_url, tag, tar_gz_file, tar_gz_sha_file, display_progress).await;
+  }
+
+  // Check for an arch specific tar.gz file
+  let tar_gz_file = format!("pact-{}-plugin-{}-{}.tar.gz", manifest.name, os, arch);
+  let tar_gz_sha_file = format!("pact-{}-plugin-{}-{}.tar.gz.sha256", manifest.name, os, arch);
+  if github_file_exists(http_client, base_url, tag, tar_gz_file.as_str()).await? {
+    return download_tar_gz_file(plugin_dir, http_client, base_url, tag, tar_gz_file, tar_gz_sha_file, display_progress).await;
+  }
+
+  // Check for an arch specific tgz file
+  let tgz_file = format!("pact-{}-plugin-{}-{}.tgz", manifest.name, os, arch);
+  let tgz_sha_file = format!("pact-{}-plugin-{}-{}.tgz.sha256", manifest.name, os, arch);
+  if github_file_exists(http_client, base_url, tag, tgz_file.as_str()).await? {
+    return download_tar_gz_file(plugin_dir, http_client, base_url, tag, tgz_file, tgz_sha_file, display_progress).await;
+  }
+
+  // Check for a tgz file
+  let tgz_file = format!("pact-{}-plugin.tgz", manifest.name);
+  let tgz_sha_file = format!("pact-{}-plugin.tgz.sha256", manifest.name);
+  if github_file_exists(http_client, base_url, tag, tgz_file.as_str()).await? {
+    return download_tar_gz_file(plugin_dir, http_client, base_url, tag, tgz_file, tgz_sha_file, display_progress).await;
   }
 
   bail!("Did not find a matching file pattern on GitHub to install")
@@ -131,6 +160,28 @@ pub async fn download_zip_file(
   }
 
   unzip_file(&file, plugin_dir)
+}
+
+/// Downloads a plugin tar gz file from GitHub and installs it
+pub async fn download_tar_gz_file(
+  plugin_dir: &PathBuf,
+  http_client: &Client,
+  base_url: &str,
+  tag: &String,
+  tar_gz_file: String,
+  tar_gz_sha_file: String,
+  display_progress: bool
+) -> anyhow::Result<PathBuf> {
+  debug!(file = %tar_gz_file, "Found a tar gz file");
+  let file = download_file_from_github(http_client, base_url, tag, tar_gz_file.as_str(), plugin_dir, display_progress).await?;
+
+  if github_file_exists(http_client, base_url, tag, tar_gz_sha_file.as_str()).await? {
+    let sha_file = download_file_from_github(http_client, base_url, tag, tar_gz_sha_file.as_str(), plugin_dir, display_progress).await?;
+    check_sha(&file, &sha_file)?;
+    fs::remove_file(sha_file)?;
+  }
+
+  extract_tar_gz(&file, plugin_dir)
 }
 
 fn unzip_file(zip_file: &PathBuf, plugin_dir: &PathBuf) -> anyhow::Result<PathBuf> {
@@ -188,6 +239,17 @@ fn gunzip_file(
   fs::remove_file(gz_file)?;
 
   Ok(file)
+}
+
+fn extract_tar_gz(tar_gz_file: &PathBuf, plugin_dir: &PathBuf) -> anyhow::Result<PathBuf> {
+  let file = File::open(tar_gz_file)?;
+  let gz_decoder = GzDecoder::new(file);
+  let mut archive = Archive::new(gz_decoder);
+
+  archive.unpack(plugin_dir)?;
+  debug!("Unpacked {:?} plugin", tar_gz_file);
+  fs::remove_file(tar_gz_file)?;
+  Ok(tar_gz_file.clone())
 }
 
 /// Downloads a file from GitHub showing console progress

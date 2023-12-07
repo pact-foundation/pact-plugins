@@ -94,7 +94,7 @@ The `pact-plugin-cli` command can be used to manage plugins. To be able to insta
   * `os` is the operating system (linux, windows, osx)
   * `arch` is the system architecture (x86_64, aarch64 for Apple M1. See https://doc.rust-lang.org/stable/std/env/consts/constant.ARCH.html)
   * Windows executables require `.exe` extension in the filename. Leave this out for Unix and OSX.
-* For bundled plugins (like with Node.js or Java), you can use a Zip file. The file must be named `pact-${name}-plugin.zip` or `pact-${name}-plugin-${os}-${arch}.zip` if you have OS/arch specific bundles.
+* For bundled plugins (like with Node.js or Java), you can use a Zip or Tar.gz file. The file must be named `pact-${name}-plugin.zip` or `pact-${name}-plugin-${os}-${arch}.zip` if you have OS/arch specific bundles. If using tarballs, `.tar.gz` or `.tgz` is supported.
 
 If you provide SHA256 files (with the same name but with `.sha256` appended), the installation command will check the downloaded
 artifact against the digest checksum in that file. For example, the Protobuf plugin executable for Linux is named 
