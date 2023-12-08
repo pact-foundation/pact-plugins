@@ -140,6 +140,31 @@ object DefaultPluginDownloader: PluginDownloader, KLogging() {
       return downloadZipFile(pluginDir, url, tag, zipFile, zipShaFile)
     }
 
+    // Check for a tar.gz file
+    val tarGzFile = "pact-${manifest.name}-plugin.tar.gz"
+    val tarGzShaFile = "pact-${manifest.name}-plugin.tar.gz.sha256"
+    if (githubFileExists(url, tag, tarGzFile)) {
+      return downloadTarGzfile(pluginDir, url, tag, tarGzFile, tarGzShaFile)
+    }
+    // Check for an arch specific tar.gz file
+    val archTarGzFile = "pact-${manifest.name}-plugin-$os-$arch.tar.gz"
+    val archTarGzShaFile = "pact-${manifest.name}-plugin-$os-$arch.tag.gz.sha256"
+    if (githubFileExists(url, tag, archTarGzFile)) {
+      return downloadTarGzfile(pluginDir, url, tag, archTarGzFile, archTarGzShaFile)
+    }
+    // Check for a tgz file
+    val tgzFile = "pact-${manifest.name}-plugin.tgz"
+    val tgzShaFile = "pact-${manifest.name}-plugin.tgz.sha256"
+    if (githubFileExists(url, tag, tgzFile)) {
+      return downloadTarGzfile(pluginDir, url, tag, tgzFile, tgzShaFile)
+    }
+    // Check for an arch specific tgz file
+    val archTgzFile = "pact-${manifest.name}-plugin-$os-$arch.tgz"
+    val archTgzShaFile = "pact-${manifest.name}-plugin-$os-$arch.tgz.sha256"
+    if (githubFileExists(url, tag, archTgzFile)) {
+      return downloadTarGzfile(pluginDir, url, tag, archTgzFile, archTgzShaFile)
+    }
+
     return Result.Err("Did not find a matching file pattern on GitHub to install")
   }
 
@@ -198,6 +223,36 @@ object DefaultPluginDownloader: PluginDownloader, KLogging() {
     } catch (ex: RuntimeException) {
       logger.error(ex) { "Failed to unzip download file" }
       Result.Err("Failed to unzip download file: ${ex.message}")
+    }
+  }
+ 
+  private fun downloadTarGzfile(    
+  pluginDir: File,
+  url: String,
+  tag: String,
+  tarGzFile: String,
+  tarGzShaFile: String): Result<File, String> {
+    when (val fileResult = downloadFileFromGithub(url, tag, tarGzFile, pluginDir)) {
+      is Result.Ok -> {
+        if (githubFileExists(url, tag, tarGzShaFile)) {
+          val shaFile = downloadFileFromGithub(url, tag, tarGzShaFile, pluginDir)
+          if (shaFile is Result.Ok) {
+            when (val shaResult = checkSha(fileResult.value, shaFile.value)) {
+              is Result.Ok -> shaFile.value.delete()
+              is Result.Err -> {
+                shaFile.value.delete()
+                fileResult.value.delete()
+                return shaResult
+              }
+            }
+          }
+        }
+
+        val archiver = ArchiverFactory.createArchiver("tar", "gz")
+        archiver.extract(fileResult.value, pluginDir)
+        return Result.Ok(fileResult.value)
+      }
+      is Result.Err -> return fileResult
     }
   }
 
