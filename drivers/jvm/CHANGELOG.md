@@ -1,5 +1,37 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 0.4.2 - Maintenance Release
+
+* 6281dbe - chore: Update the setup java step in CI (Ronald Holshausen, Thu Dec 14 08:28:44 2023 +1100)
+* 67db244 - chore: Update the setup java step in CI (Ronald Holshausen, Thu Dec 14 08:21:39 2023 +1100)
+* 067af42 - chore: Update the setup java step in CI (Ronald Holshausen, Thu Dec 14 08:05:44 2023 +1100)
+* 5a46c57 - chore: Update the setup java step in CI (Ronald Holshausen, Thu Dec 14 07:58:34 2023 +1100)
+* a75ff0a - chore: Upgrade dependencies (Ronald Holshausen, Thu Dec 14 06:40:04 2023 +1100)
+* 08a2c09 - chore: Upgrade Gradle and Gradle plugins (Ronald Holshausen, Thu Dec 14 06:32:02 2023 +1100)
+* ff14943 - Merge pull request #50 from pact-foundation/feat/targz_plugin_binaries_jvm (Ronald Holshausen, Thu Dec 14 11:57:53 2023 +1100)
+* 5ee6077 - feat: support tgz for bundled plugins - jvm driver (Yousaf Nabi, Fri Dec 8 13:23:20 2023 +0000)
+* 375a0fd - Merge pull request #49 from pact-foundation/feat/targz_plugin_binaries (Ronald Holshausen, Fri Dec 8 09:16:00 2023 +1100)
+* dd3359c - feat: support tgz for bundled plugins (Yousaf Nabi, Thu Dec 7 16:09:31 2023 +0000)
+* 0304612 - chore: macos gitignores (Yousaf Nabi, Thu Dec 7 16:07:17 2023 +0000)
+* f57ddf3 - Merge pull request #47 from austek/refactor/avro_plugin_versions (Yousaf Nabi, Mon Dec 4 13:03:54 2023 +0000)
+* a29a624 - Add Avro plugin 0.0.4 (austek, Thu Nov 30 09:42:19 2023 +0000)
+* df04057 - feat: Add Protobuf plugin 0.3.7 to the plugin index (Ronald Holshausen, Wed Nov 8 18:02:14 2023 +1100)
+* 85e7a5f - chore: add latest CSV plugin to index (Ronald Holshausen, Fri Oct 20 16:30:08 2023 +1100)
+* 5571d89 - chore(csv-plugin): bump version (Ronald Holshausen, Fri Oct 20 15:39:43 2023 +1100)
+* 581f670 - chore(csv-plugn): Upgrade dependencies (Ronald Holshausen, Fri Oct 20 14:55:57 2023 +1100)
+* 44c8bfd - Merge pull request #46 from YOU54F/workshops (Ronald Holshausen, Tue Oct 17 14:27:02 2023 +1100)
+* cc3614c - chore(examples): add pact-js grpc example (Yousaf Nabi, Tue Oct 17 01:53:59 2023 +0100)
+* fa7867f - chore(examples): gRPC area calc workshops (Yousaf Nabi, Mon Oct 16 23:34:34 2023 +0100)
+* 4606ed7 - chore(docs): update docs for demo (Yousaf Nabi, Mon Oct 16 22:56:46 2023 +0100)
+* b9e5467 - chore(examples): gRPC go workshop (Yousaf Nabi, Mon Oct 16 22:52:29 2023 +0100)
+* ee583ac - chore(examples): gRPC go workshop (Yousaf Nabi, Mon Oct 16 22:27:51 2023 +0100)
+* 8fed50b - chore(examples): gRPC go workshop (Yousaf Nabi, Mon Oct 16 22:26:26 2023 +0100)
+* cb3d444 - chore(examples): gRPC go workshop (Yousaf Nabi, Mon Oct 16 22:19:11 2023 +0100)
+* 1220875 - Merge pull request #45 from pact-foundation/fix/issue-16 (Ronald Holshausen, Thu Oct 5 10:38:21 2023 +1100)
+* 20a925c - fix(cli): --skip-if-installed always skipped (Matt Fellows, Tue Oct 3 12:18:13 2023 +1100)
+* b1d5576 - feat: Add Protobuf plugin 0.3.6 to the plugin index (Ronald Holshausen, Thu Sep 21 09:52:47 2023 +1000)
+* 2d81e04 - bump version to 0.4.2 (Ronald Holshausen, Mon Aug 21 14:09:53 2023 +1000)
+
 # 0.4.1 - Maintenance Release
 
 * 21ddb76 - chore: Upgrade dependencies (Ronald Holshausen, Mon Aug 21 11:51:31 2023 +1000)
