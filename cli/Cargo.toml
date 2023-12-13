@@ -14,26 +14,26 @@ exclude = [
 ]
 
 [dependencies]
-pact-plugin-driver = { version = "0.4.2", path = "../drivers/rust/driver" }
-clap = { version = "4.1.8", features = [ "derive", "cargo" ] }
-comfy-table = "6.1.3"
-home = "0.5.3"
-anyhow = "1.0.57"
-serde = { version = "1.0.154", features = [ "derive" ] }
-serde_json = "1.0.81"
-itertools = "0.10.3"
+pact-plugin-driver = { version = "0.4.6", path = "../drivers/rust/driver" }
+clap = { version = "4.4.11", features = [ "derive", "cargo" ] }
+comfy-table = "7.1.0"
+home = "0.5.5"
+anyhow = "1.0.75"
+serde = { version = "1.0.193", features = [ "derive" ] }
+serde_json = "1.0.108"
+itertools = "0.12.0"
 requestty = "0.5.0"
-reqwest = { version = "0.11.10", default-features = false, features = ["rustls-tls-native-roots", "json", "stream"] }
+reqwest = { version = "0.11.22", default-features = false, features = ["rustls-tls-native-roots", "json", "stream"] }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1.37"
 tracing-subscriber = "0.3.16"
-chrono = { version = "0.4.23", features = ["serde"]}
-toml = "0.7.2"
-url = "2.3.1"
+chrono = { version = "0.4.31", features = ["serde"]}
+toml = "0.8.8"
+url = "2.5.0"
 
 [dev-dependencies]
-trycmd = "0.14.13"
-tempfile = "3.4.0"
+trycmd = "0.14.19"
+tempfile = "3.8.1"
 expectest = "0.12.0"
-test-log = "0.2.11"
-env_logger = "0.10.0"
+test-log = "0.2.14"
+env_logger = "0.10.1"

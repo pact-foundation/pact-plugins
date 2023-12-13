@@ -53,7 +53,7 @@ fn new_repository(filename: &Option<String>, overwrite: bool) -> anyhow::Result<
     if let Some(parent) = path.parent() {
       if !parent.exists() {
         info!(?parent, "Parent directory does not exist, creating it");
-        fs::create_dir_all(parent.clone())?;
+        fs::create_dir_all(parent)?;
       }
     }
 
@@ -270,7 +270,7 @@ fn list_entries(filename: &String) -> anyhow::Result<()> {
     .load_preset(UTF8_FULL)
     .set_header(vec!["Key", "Name", "Latest Version", "Versions"]);
 
-  for (key, entry) in index.entries.iter().sorted_by_key(|(k, _)| k.clone()) {
+  for (key, entry) in index.entries.iter().sorted_by_key(|(k, _)| k.as_str()) {
     table.add_row(vec![
       key.as_str(),
       entry.name.as_str(),
