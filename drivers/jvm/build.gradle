@@ -24,7 +24,7 @@ subprojects {
     mavenCentral()
   }
 
-  version = '0.4.2'
+  version = '0.4.3'
 
   targetCompatibility = '11'
   sourceCompatibility = '11'
