@@ -16,7 +16,7 @@ jobs:
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
-        java-version: '16'
+        java-version: 17
     - name: Install Protoc
       uses: arduino/setup-protoc@v1
       with:
@@ -48,6 +48,7 @@ jobs:
       - name: Set up JDK
         uses: actions/setup-java@v4
         with:
+          distribution: 'temurin'
           java-version: ${{ matrix.jdk }}
       - name: Install Protoc
         uses: arduino/setup-protoc@v1
