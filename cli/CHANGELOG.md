@@ -1,5 +1,17 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.1 - Maintenance Release
+
+* f5d40d1 - chore: update repository.index (Ronald Holshausen, Thu Dec 14 10:34:21 2023 +1100)
+* 45866c1 - chore: Upgrade dependencies (Ronald Holshausen, Thu Dec 14 10:21:16 2023 +1100)
+* dd3359c - feat: support tgz for bundled plugins (Yousaf Nabi, Thu Dec 7 16:09:31 2023 +0000)
+* 20a925c - fix(cli): --skip-if-installed always skipped (Matt Fellows, Tue Oct 3 12:18:13 2023 +1100)
+* a01455d - fix: only display download progress bar when invoked from CLI (Ronald Holshausen, Tue Apr 18 10:46:58 2023 +1000)
+* f6706d6 - refactor: Move all code to download plugins to the driver to support auto-installing known plugins (Ronald Holshausen, Mon Apr 17 15:57:31 2023 +1000)
+* 6ed7c4d - refactor: Move plugin repository models to the plugin driver (Ronald Holshausen, Mon Apr 3 11:27:14 2023 +1000)
+* a282599 - bump version to 0.1.1 (Ronald Holshausen, Mon Mar 20 18:00:59 2023 +1100)
+* 1456eef - chore: update release script (Ronald Holshausen, Mon Mar 20 17:59:30 2023 +1100)
+
 # 0.1.0 - Support installing known plugins from an index
 
 * 9c0077b - chore: update build script for repository index (Ronald Holshausen, Mon Mar 20 17:51:06 2023 +1100)
