@@ -1,5 +1,14 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.4.6 - Maintenance Release
+
+* 28621e3 - chore: update repository.index (Ronald Holshausen, Thu Dec 14 10:04:18 2023 +1100)
+* 2979225 - chore: Upgrade dependencies (Ronald Holshausen, Thu Dec 14 09:53:50 2023 +1100)
+* aa38e61 - chore: Upgrade dependencies (Ronald Holshausen, Thu Dec 14 09:33:38 2023 +1100)
+* dd3359c - feat: support tgz for bundled plugins (Yousaf Nabi, Thu Dec 7 16:09:31 2023 +0000)
+* 3d89adf - chore: Add features to readme (Ronald Holshausen, Mon Jul 10 17:18:53 2023 +1000)
+* f4f3e1b - bump version to 0.4.6 (Ronald Holshausen, Mon Jul 10 17:08:37 2023 +1000)
+
 # 0.4.5 - Bugfix Release
 
 * b3389e4 - update cargo.lock (Elena Gantner, Wed Jun 21 18:49:46 2023 +0200)
