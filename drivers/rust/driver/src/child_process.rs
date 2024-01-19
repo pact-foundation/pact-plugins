@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use sysinfo::{Pid, PidExt, ProcessExt, Signal, System, SystemExt};
+use sysinfo::{Pid, Signal, System};
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Child;
 use tracing::{debug, error, trace, warn};
