@@ -4,7 +4,7 @@ version = "0.0.0"
 edition = "2018"
 
 [dev-dependencies]
-pact-plugin-driver = { version = "~0.4", path = "../driver" }
+pact-plugin-driver = { version = "~0.5", path = "../driver" }
 pact_ffi = "~0.4.5"
 env_logger = "0.10.0"
 expectest = "0.12.0"
