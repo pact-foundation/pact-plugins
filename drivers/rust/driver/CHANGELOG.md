@@ -1,5 +1,14 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.5.0 - Maintenance Release
+
+* a61d1b9 - chore: update repository.index (Ronald Holshausen, Sat Jan 20 14:25:27 2024 +1100)
+* 9fcb42a - chore: Upgrade tonic and prost to latest (Ronald Holshausen, Sat Jan 20 14:01:26 2024 +1100)
+* 1cf8809 - feat: Add support for atLeast and atMost with matching rule definitions (Ronald Holshausen, Sat Jan 20 13:56:43 2024 +1100)
+* 5579e58 - chore: Upgrade dependencies (Ronald Holshausen, Sat Jan 20 08:41:28 2024 +1100)
+* a1a07b4 - chore: dump minor version (Ronald Holshausen, Sat Jan 20 08:12:00 2024 +1100)
+* 0a422f9 - bump version to 0.4.7 (Ronald Holshausen, Thu Dec 14 10:06:34 2023 +1100)
+
 # 0.4.6 - Maintenance Release
 
 * 28621e3 - chore: update repository.index (Ronald Holshausen, Thu Dec 14 10:04:18 2023 +1100)
