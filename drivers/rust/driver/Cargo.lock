@@ -1294,7 +1294,7 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "0.5.0"
+version = "0.5.1"
 dependencies = [
  "anyhow",
  "async-trait",
