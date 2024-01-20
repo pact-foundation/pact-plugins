@@ -5,14 +5,14 @@ edition = "2018"
 
 [dev-dependencies]
 pact-plugin-driver = { version = "~0.5", path = "../driver" }
-pact_ffi = "~0.4.5"
-env_logger = "0.10.0"
+pact_ffi = "~0.4.11"
+env_logger = "0.10.1"
 expectest = "0.12.0"
-serde_json = "1.0.95"
-reqwest = { version = "0.11.16", default-features = false, features = ["rustls-tls-native-roots", "blocking", "json"] }
-csv = "1.2.1"
-prost = "0.11.8"
-prost-types = "0.11.8"
-test-log = "0.2.11"
-tokio = { version = "1.27.0", features = ["full"] }
-tonic = "0.9.0"
+serde_json = "1.0.108"
+reqwest = { version = "0.11.23", default-features = false, features = ["rustls-tls-native-roots", "blocking", "json"] }
+csv = "1.3.0"
+prost = "0.12.3"
+prost-types = "0.12.3"
+test-log = "0.2.14"
+tokio = { version = "1.35.1", features = ["full"] }
+tonic = "0.10.2"
