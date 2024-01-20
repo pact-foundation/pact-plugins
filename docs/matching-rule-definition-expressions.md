@@ -70,6 +70,28 @@ Configures a matching rule to be applied to each value in a map or list.
 
 For example: `eachValue(matching(type, 100))`  
 
+### atLeast(SIZE)
+
+Configures a type matching rule to be applied to a map or list (if another rule is not applied),
+and asserts the length is at least the given size.
+
+For example: `atLeast(2)`
+
+### atMost(SIZE)
+
+Configures a type matching rule to be applied to a map or list (if another rule is not applied), and asserts the
+length is at most the given size.
+If an expression is provided, that will be used instead of the type matching rule.
+
+For example: `atMost(2)`
+
+## Composing expressions
+
+Expressions can be composed by separating them with a comma. For example
+`atLeast(2), atMost(10), eachValue(matching(regex, '\d+', '1234'))`. This will configure an
+array to have at least 2 items, at most 10, and each item in the array must match the
+given regex.
+
 ## Grammar
 
 There is a grammar for the definitions in [ANTLR4 format](https://github.com/pact-foundation/pact-plugins/blob/main/docs/matching-rule-definition.g4).
