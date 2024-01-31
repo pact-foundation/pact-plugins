@@ -1301,7 +1301,9 @@ pub mod pact_plugin_server {
               request: tonic::Request<super::InitPluginRequest>,
             ) -> Self::Future {
               let inner = Arc::clone(&self.0);
-              let fut = async move { (*inner).init_plugin(request).await };
+              let fut = async move {
+                <T as PactPlugin>::init_plugin(&inner, request).await
+              };
               Box::pin(fut)
             }
           }
@@ -1344,7 +1346,7 @@ pub mod pact_plugin_server {
             ) -> Self::Future {
               let inner = Arc::clone(&self.0);
               let fut = async move {
-                (*inner).update_catalogue(request).await
+                <T as PactPlugin>::update_catalogue(&inner, request).await
               };
               Box::pin(fut)
             }
@@ -1390,7 +1392,7 @@ pub mod pact_plugin_server {
             ) -> Self::Future {
               let inner = Arc::clone(&self.0);
               let fut = async move {
-                (*inner).compare_contents(request).await
+                <T as PactPlugin>::compare_contents(&inner, request).await
               };
               Box::pin(fut)
             }
@@ -1436,7 +1438,8 @@ pub mod pact_plugin_server {
             ) -> Self::Future {
               let inner = Arc::clone(&self.0);
               let fut = async move {
-                (*inner).configure_interaction(request).await
+                <T as PactPlugin>::configure_interaction(&inner, request)
+                  .await
               };
               Box::pin(fut)
             }
@@ -1482,7 +1485,7 @@ pub mod pact_plugin_server {
             ) -> Self::Future {
               let inner = Arc::clone(&self.0);
               let fut = async move {
-                (*inner).generate_content(request).await
+                <T as PactPlugin>::generate_content(&inner, request).await
               };
               Box::pin(fut)
             }
@@ -1528,7 +1531,7 @@ pub mod pact_plugin_server {
             ) -> Self::Future {
               let inner = Arc::clone(&self.0);
               let fut = async move {
-                (*inner).start_mock_server(request).await
+                <T as PactPlugin>::start_mock_server(&inner, request).await
               };
               Box::pin(fut)
             }
@@ -1574,7 +1577,8 @@ pub mod pact_plugin_server {
             ) -> Self::Future {
               let inner = Arc::clone(&self.0);
               let fut = async move {
-                (*inner).shutdown_mock_server(request).await
+                <T as PactPlugin>::shutdown_mock_server(&inner, request)
+                  .await
               };
               Box::pin(fut)
             }
@@ -1620,7 +1624,8 @@ pub mod pact_plugin_server {
             ) -> Self::Future {
               let inner = Arc::clone(&self.0);
               let fut = async move {
-                (*inner).get_mock_server_results(request).await
+                <T as PactPlugin>::get_mock_server_results(&inner, request)
+                  .await
               };
               Box::pin(fut)
             }
@@ -1670,7 +1675,11 @@ pub mod pact_plugin_server {
             ) -> Self::Future {
               let inner = Arc::clone(&self.0);
               let fut = async move {
-                (*inner).prepare_interaction_for_verification(request).await
+                <T as PactPlugin>::prepare_interaction_for_verification(
+                  &inner,
+                  request,
+                )
+                  .await
               };
               Box::pin(fut)
             }
@@ -1716,7 +1725,7 @@ pub mod pact_plugin_server {
             ) -> Self::Future {
               let inner = Arc::clone(&self.0);
               let fut = async move {
-                (*inner).verify_interaction(request).await
+                <T as PactPlugin>::verify_interaction(&inner, request).await
               };
               Box::pin(fut)
             }

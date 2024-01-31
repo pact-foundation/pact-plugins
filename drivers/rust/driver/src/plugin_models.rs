@@ -9,9 +9,9 @@ use anyhow::anyhow;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use tonic::metadata::{Ascii, MetadataValue};
 use tonic::{Request, Status};
 use tonic::codegen::InterceptedService;
+use tonic::metadata::{Ascii, MetadataValue};
 use tonic::service::Interceptor;
 use tonic::transport::Channel;
 use tracing::{debug, trace};
@@ -342,4 +342,84 @@ pub struct PluginInteractionConfig {
   pub pact_configuration: HashMap<String, Value>,
   /// Interaction plugin config
   pub interaction_configuration: HashMap<String, Value>
+}
+
+#[cfg(test)]
+pub(crate) mod tests {
+  use async_trait::async_trait;
+  use lazy_static::lazy_static;
+  use std::sync::RwLock;
+
+  use crate::plugin_models::PactPluginRpc;
+  use crate::proto::*;
+  use crate::proto::verification_preparation_response::Response;
+
+  lazy_static!{
+     pub(crate) static ref PREPARE_INTERACTION_FOR_VERIFICATION_ARG: RwLock<Option<VerificationPreparationRequest>> = RwLock::new(None);
+     pub(crate) static ref VERIFY_INTERACTION_ARG: RwLock<Option<VerifyInteractionRequest>> = RwLock::new(None);
+  }
+
+  #[derive(Default)]
+  pub(crate) struct MockPlugin {}
+
+  #[async_trait]
+  impl PactPluginRpc for MockPlugin {
+    async fn init_plugin(&mut self, _request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
+      unimplemented!()
+    }
+
+    async fn compare_contents(&self, _request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
+      unimplemented!()
+    }
+
+    async fn configure_interaction(&self, _request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
+      unimplemented!()
+    }
+
+    async fn generate_content(&self, _request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
+      unimplemented!()
+    }
+
+    async fn start_mock_server(&self, _request: StartMockServerRequest) -> anyhow::Result<StartMockServerResponse> {
+      unimplemented!()
+    }
+
+    async fn shutdown_mock_server(&self, _request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse> {
+      unimplemented!()
+    }
+
+    async fn get_mock_server_results(&self, _request: MockServerRequest) -> anyhow::Result<MockServerResults> {
+      unimplemented!()
+    }
+
+    async fn prepare_interaction_for_verification(&self, request: VerificationPreparationRequest) -> anyhow::Result<VerificationPreparationResponse> {
+      let mut w = PREPARE_INTERACTION_FOR_VERIFICATION_ARG.write().unwrap();
+      let _ = w.insert(request);
+      let data = InteractionData {
+        body: None,
+        metadata: Default::default()
+      };
+      Ok(VerificationPreparationResponse {
+        response: Some(Response::InteractionData(data))
+      })
+    }
+
+    async fn verify_interaction(&self, request: VerifyInteractionRequest) -> anyhow::Result<VerifyInteractionResponse> {
+      let mut w = VERIFY_INTERACTION_ARG.write().unwrap();
+      let _ = w.insert(request);
+      let result = VerificationResult {
+        success: false,
+        response_data: None,
+        mismatches: vec![],
+        output: vec![]
+      };
+      Ok(VerifyInteractionResponse {
+        response: Some(verify_interaction_response::Response::Result(result))
+      })
+    }
+
+    async fn update_catalogue(&self, _request: Catalogue) -> anyhow::Result<()> {
+      unimplemented!()
+    }
+  }
 }

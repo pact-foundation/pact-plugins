@@ -524,6 +524,18 @@ pub async fn prepare_validation_for_interaction(
   let plugin = lookup_plugin(&manifest.as_dependency())
     .ok_or_else(|| anyhow!("Did not find a running plugin for manifest {:?}", manifest))?;
 
+  prepare_validation_for_interaction_inner(&plugin, manifest, pact, interaction, context).await
+}
+
+pub(crate) async fn prepare_validation_for_interaction_inner(
+  plugin: &(dyn PactPluginRpc + Send + Sync),
+  manifest: &PactPluginManifest,
+  pact: &V4Pact,
+  interaction: &(dyn V4Interaction + Send + Sync),
+  context: &HashMap<String, Value>
+) -> anyhow::Result<InteractionVerificationData> {
+  let mut pact = pact.clone();
+  pact.interactions = pact.interactions.iter().map(|i| i.with_unique_key()).collect();
   let request = VerificationPreparationRequest {
     pact: pact.to_json(PactSpecification::V4)?.to_string(),
     interaction_key: interaction.unique_key(),
@@ -573,6 +585,26 @@ pub async fn verify_interaction(
   let plugin = lookup_plugin(&manifest.as_dependency())
     .ok_or_else(|| anyhow!("Did not find a running plugin for manifest {:?}", manifest))?;
 
+  verify_interaction_inner(
+    &plugin,
+    &manifest,
+    verification_data,
+    config,
+    pact,
+    interaction
+  ).await
+}
+
+pub(crate) async fn verify_interaction_inner(
+  plugin: &(dyn PactPluginRpc + Send + Sync),
+  manifest: &PactPluginManifest,
+  verification_data: &InteractionVerificationData,
+  config: &HashMap<String, Value>,
+  pact: &V4Pact,
+  interaction: &(dyn V4Interaction + Send + Sync)
+) -> anyhow::Result<InteractionVerificationResult> {
+  let mut pact = pact.clone();
+  pact.interactions = pact.interactions.iter().map(|i| i.with_unique_key()).collect();
   let request = VerifyInteractionRequest {
     pact: pact.to_json(PactSpecification::V4)?.to_string(),
     interaction_key: interaction.unique_key(),
@@ -665,12 +697,26 @@ fn create_plugin_dir(manifest: &PactPluginManifest) -> anyhow::Result<PathBuf> {
 mod tests {
   use std::fs::{self, File};
 
+  use maplit::hashmap;
+  use pact_models::v4::sync_message::SynchronousMessage;
+  use pact_models::prelude::v4::V4Pact;
+  use pact_models::v4::interaction::V4Interaction;
+
   use expectest::prelude::*;
   use tempdir::TempDir;
 
   use crate::plugin_models::PluginDependency;
+  use crate::plugin_manager::prepare_validation_for_interaction_inner;
+  use crate::plugin_manager::verify_interaction_inner;
+  use crate::plugin_models::tests::MockPlugin;
+  use crate::plugin_models::tests::PREPARE_INTERACTION_FOR_VERIFICATION_ARG;
+  use crate::plugin_models::tests::VERIFY_INTERACTION_ARG;
+  use crate::verification::InteractionVerificationData;
 
-  use super::{load_manifest_from_dir, PactPluginManifest};
+  use super::{
+    load_manifest_from_dir,
+    PactPluginManifest
+  };
 
   #[test]
   fn load_manifest_from_dir_test() {
@@ -734,5 +780,81 @@ mod tests {
 
     let result = load_manifest_from_dir(&dep, &tmp_dir.path().to_path_buf()).unwrap();
     expect!(result.version).to(be_equal_to("0.1.20"));
+  }
+
+  #[test_log::test(tokio::test)]
+  async fn prepare_validation_for_interaction_passes_in_pact_with_interaction_keys_set() {
+    let manifest = PactPluginManifest {
+      name: "test-plugin".to_string(),
+      version: "0.0.0".to_string(),
+      .. PactPluginManifest::default()
+    };
+    let mock_plugin = MockPlugin {
+      .. MockPlugin::default()
+    };
+
+    let interaction = SynchronousMessage {
+      .. SynchronousMessage::default()
+    };
+    let pact = V4Pact {
+      interactions: vec![ interaction.boxed_v4() ],
+      .. V4Pact::default()
+    };
+    let context = hashmap!{};
+
+    let result = prepare_validation_for_interaction_inner(
+      &mock_plugin,
+      &manifest,
+      &pact,
+      &interaction,
+      &context
+    ).await;
+
+    expect!(result).to(be_ok());
+    let request = {
+      let r = PREPARE_INTERACTION_FOR_VERIFICATION_ARG.read().unwrap();
+      r.clone()
+    }.unwrap();
+    let pact_in = V4Pact::pact_from_json(&serde_json::from_str(request.pact.as_str()).unwrap(), "").unwrap();
+    expect!(pact_in.interactions[0].key().unwrap()).to(be_equal_to(request.interaction_key));
+  }
+
+  #[test_log::test(tokio::test)]
+  async fn verify_interaction_passes_in_pact_with_interaction_keys_set() {
+    let manifest = PactPluginManifest {
+      name: "test-plugin".to_string(),
+      version: "0.0.0".to_string(),
+      .. PactPluginManifest::default()
+    };
+    let mock_plugin = MockPlugin {
+      .. MockPlugin::default()
+    };
+
+    let interaction = SynchronousMessage {
+      .. SynchronousMessage::default()
+    };
+    let pact = V4Pact {
+      interactions: vec![ interaction.boxed_v4() ],
+      .. V4Pact::default()
+    };
+    let context = hashmap!{};
+    let data = InteractionVerificationData::default();
+
+    let result = verify_interaction_inner(
+      &mock_plugin,
+      &manifest,
+      &data,
+      &context,
+      &pact,
+      &interaction
+    ).await;
+
+    expect!(result).to(be_ok());
+    let request = {
+      let r = VERIFY_INTERACTION_ARG.read().unwrap();
+      r.clone()
+    }.unwrap();
+    let pact_in = V4Pact::pact_from_json(&serde_json::from_str(request.pact.as_str()).unwrap(), "").unwrap();
+    expect!(pact_in.interactions[0].key().unwrap()).to(be_equal_to(request.interaction_key));
   }
 }
