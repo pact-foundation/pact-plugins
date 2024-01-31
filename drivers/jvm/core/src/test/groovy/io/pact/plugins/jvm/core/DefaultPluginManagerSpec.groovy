@@ -5,9 +5,11 @@ import au.com.dius.pact.core.model.ContentType
 import au.com.dius.pact.core.model.ContentTypeHint
 import au.com.dius.pact.core.model.OptionalBody
 import au.com.dius.pact.core.model.Provider
+import au.com.dius.pact.core.model.V4Interaction
 import au.com.dius.pact.core.model.V4Pact
 import au.com.dius.pact.core.support.Result
 import groovy.json.JsonOutput
+import groovy.json.JsonSlurper
 import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.Plugin
 import org.mockito.ArgumentCaptor
@@ -296,5 +298,88 @@ class DefaultPluginManagerSpec extends Specification {
     cleanup:
     manager.repository = new DefaultRepository()
     manager.pluginDownloader = DefaultPluginDownloader.INSTANCE
+  }
+
+  def 'prepare validation for interaction passes in pact with interaction keys set'() {
+    given:
+    def manifest = Mock(PactPluginManifest) {
+      getName() >> 'test-prepareValidationForInteraction'
+      getVersion() >> '1.2.3'
+    }
+    def manager = DefaultPluginManager.INSTANCE
+    PactPlugin mockPlugin = Mock() {
+      getManifest() >> manifest
+    }
+    manager.PLUGIN_REGISTER['test-prepareValidationForInteraction/1.2.3'] = mockPlugin
+    def transportEntry = new CatalogueEntry(CatalogueEntryType.TRANSPORT, CatalogueEntryProviderType.PLUGIN,
+      'test-prepareValidationForInteraction', 'stuff')
+
+    def interaction = new V4Interaction.SynchronousHttp('test interaction for prepareValidationForInteraction')
+    def pact = new V4Pact(new Consumer(), new Provider(), [ interaction ])
+
+    def response = Plugin.VerificationPreparationResponse.newBuilder().build()
+    def mockStub = Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
+    ArgumentCaptor<Plugin.VerificationPreparationRequest> argument = ArgumentCaptor.forClass(Plugin.VerificationPreparationRequest)
+    doReturn(response).when(mockStub).prepareInteractionForVerification(argument.capture())
+
+    when:
+    def result = manager.prepareValidationForInteraction(
+        transportEntry,
+        pact,
+        interaction,
+        [:]
+    )
+    def pactIn =  new JsonSlurper().parseText(argument.value.pact)
+    def interactionIn = pactIn.interactions[0]
+
+    then:
+    1 * mockPlugin.withGrpcStub(_) >> { args -> args[0].apply(mockStub) }
+    result instanceof Result.Ok
+    interactionIn.key == argument.value.interactionKey
+
+    cleanup:
+    DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove('test-prepareValidationForInteraction/1.2.3')
+  }
+
+  def 'verify interaction passes in pact with interaction keys set'() {
+    given:
+    def manifest = Mock(PactPluginManifest) {
+      getName() >> 'test-verifyInteraction'
+      getVersion() >> '1.2.3'
+    }
+    def manager = DefaultPluginManager.INSTANCE
+    PactPlugin mockPlugin = Mock() {
+      getManifest() >> manifest
+    }
+    manager.PLUGIN_REGISTER['test-verifyInteraction/1.2.3'] = mockPlugin
+    def transportEntry = new CatalogueEntry(CatalogueEntryType.TRANSPORT, CatalogueEntryProviderType.PLUGIN,
+      'test-verifyInteraction', 'stuff')
+
+    def interaction = new V4Interaction.SynchronousHttp('test interaction for verifyInteraction')
+    def pact = new V4Pact(new Consumer(), new Provider(), [ interaction ])
+
+    def response = Plugin.VerifyInteractionResponse.newBuilder().build()
+    def mockStub = Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
+    ArgumentCaptor<Plugin.VerifyInteractionRequest> argument = ArgumentCaptor.forClass(Plugin.VerifyInteractionRequest)
+    doReturn(response).when(mockStub).verifyInteraction(argument.capture())
+
+    when:
+    def result = manager.verifyInteraction(
+      transportEntry,
+      new InteractionVerificationData(OptionalBody.empty(), [:]),
+      [:],
+      pact,
+      interaction
+    )
+    def pactIn =  new JsonSlurper().parseText(argument.value.pact)
+    def interactionIn = pactIn.interactions[0]
+
+    then:
+    1 * mockPlugin.withGrpcStub(_) >> { args -> args[0].apply(mockStub) }
+    result instanceof Result.Ok
+    interactionIn.key == argument.value.interactionKey
+
+    cleanup:
+    DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove('test-prepareValidationForInteraction/1.2.3')
   }
 }
