@@ -380,6 +380,6 @@ class DefaultPluginManagerSpec extends Specification {
     interactionIn.key == argument.value.interactionKey
 
     cleanup:
-    DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove('test-prepareValidationForInteraction/1.2.3')
+    DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove('test-verifyInteraction/1.2.3')
   }
 }
