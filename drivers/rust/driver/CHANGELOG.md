@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.5.1 - Bugfix Release
+
+* e7dcd4c - chore: update repository.index (Ronald Holshausen, Wed Jan 31 19:00:38 2024 +1100)
+* 1b54a4a - fix: ensure the Pact has the correct interaction keys before sending verification request to a plugin (Ronald Holshausen, Wed Jan 31 16:35:34 2024 +1100)
+* 5d526e3 - bump version to 0.5.1 (Ronald Holshausen, Sat Jan 20 14:29:22 2024 +1100)
+
 # 0.5.0 - Maintenance Release
 
 * a61d1b9 - chore: update repository.index (Ronald Holshausen, Sat Jan 20 14:25:27 2024 +1100)
