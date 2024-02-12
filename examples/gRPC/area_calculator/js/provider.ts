@@ -98,7 +98,7 @@ export const bindServer = (server: grpc.Server, host: string) => {
         console.error(`Server error: ${err.message}`);
       } else {
         console.log(`Server bound on port: ${port}`);
-        server.start();
+        server;
       }
     }
   );

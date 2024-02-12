@@ -36,7 +36,7 @@ describe("Plugins - grpc Protocol", () => {
           .addSynchronousInteraction("A gRPC calculateOne request")
           .usingPlugin({
             plugin: "protobuf",
-            version: "0.3.6",
+            version: "0.3.13",
           })
           .withPluginContents(JSON.stringify(grpcMessage), "application/grpc")
           .startTransport("grpc", HOST)
