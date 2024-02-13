@@ -14,7 +14,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use reqwest::Client;
 use serde_json::Value;
 use sha2::{Digest, Sha256};
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use futures_util::StreamExt;
 
@@ -62,10 +62,21 @@ pub async fn download_plugin_executable(
   let (os, arch, musl) = os_and_arch()?;
 
   // Check for a single exec .gz file
-  let ext = if os == "windows" { ".exe" } else { "" };
-  let gz_file = format!("pact-{}-plugin-{}-{}{}{}.gz", manifest.name, os, arch,musl, ext);
-  let sha_file = format!("pact-{}-plugin-{}-{}{}{}.gz.sha256", manifest.name, os, arch,musl, ext);
-  if github_file_exists(http_client, base_url, tag, gz_file.as_str()).await? {
+    let ext = if os == "windows" { ".exe" } else { "" };
+    let mut gz_file = format!("pact-{}-plugin-{}-{}{}.gz", manifest.name, os, arch, ext);
+    let mut sha_file = format!("pact-{}-plugin-{}-{}{}.gz.sha256", manifest.name, os, arch, ext);
+    if musl != "" {
+      let gz_file_musl = format!("pact-{}-plugin-{}-{}{}{}.gz", manifest.name, os, arch, musl, ext);
+      let sha_file_musl = format!("pact-{}-plugin-{}-{}{}{}.gz.sha256", manifest.name, os, arch, musl, ext);
+      if github_file_exists(http_client, base_url, tag, gz_file_musl.as_str()).await? {
+        gz_file = gz_file_musl;
+        sha_file = sha_file_musl;
+      } else {
+        warn!("musl detected, but no musl specific plugin implementation found - you may experience issues");
+      }
+    }
+
+    if github_file_exists(http_client, base_url, tag, gz_file.as_str()).await? {
     debug!(file = %gz_file, "Found a GZipped file");
     let file = download_file_from_github(http_client, base_url, tag, gz_file.as_str(), plugin_dir, display_progress).await?;
 
@@ -87,8 +98,20 @@ pub async fn download_plugin_executable(
   }
 
   // Check for an arch specific Zip file
-  let zip_file = format!("pact-{}-plugin-{}-{}{}.zip", manifest.name, os, arch, musl);
-  let zip_sha_file = format!("pact-{}-plugin-{}-{}{}.zip.sha256", manifest.name, os, arch, musl);
+  let mut zip_file = format!("pact-{}-plugin-{}-{}.zip", manifest.name, os, arch);
+  let mut zip_sha_file = format!("pact-{}-plugin-{}-{}.zip.sha256", manifest.name, os, arch);
+
+  if musl != "" {
+    let zip_file_musl = format!("pact-{}-plugin-{}-{}{}.zip", manifest.name, os, arch, musl);
+    let zip_sha_file_musl = format!("pact-{}-plugin-{}-{}{}.zip.sha256", manifest.name, os, arch, musl);
+    if github_file_exists(http_client, base_url, tag, zip_file_musl.as_str()).await? {
+      zip_file = zip_file_musl;
+      zip_sha_file = zip_sha_file_musl;
+    } else {
+      warn!("musl detected, but no musl specific plugin implementation found - you may experience issues");
+    }
+  }
+
   if github_file_exists(http_client, base_url, tag, zip_file.as_str()).await? {
     return download_zip_file(plugin_dir, http_client, base_url, tag, zip_file, zip_sha_file, display_progress).await;
   }
@@ -108,15 +131,39 @@ pub async fn download_plugin_executable(
   }
 
   // Check for an arch specific tar.gz file
-  let tar_gz_file = format!("pact-{}-plugin-{}-{}{}.tar.gz", manifest.name, os, arch, musl);
-  let tar_gz_sha_file = format!("pact-{}-plugin-{}-{}{}.tar.gz.sha256", manifest.name, os, arch, musl);
+  let mut tar_gz_file = format!("pact-{}-plugin-{}-{}{}.tar.gz", manifest.name, os, arch, musl);
+  let mut tar_gz_sha_file = format!("pact-{}-plugin-{}-{}{}.tar.gz.sha256", manifest.name, os, arch, musl);
+
+  if musl != "" {
+    let tar_gz_file_musl = format!("pact-{}-plugin-{}-{}{}.tar.gz", manifest.name, os, arch, musl);
+    let tar_gz_sha_file_musl = format!("pact-{}-plugin-{}-{}{}.tar.gz.sha256", manifest.name, os, arch, musl);
+    if github_file_exists(http_client, base_url, tag, tar_gz_file_musl.as_str()).await? {
+      tar_gz_file = tar_gz_file_musl;
+      tar_gz_sha_file = tar_gz_sha_file_musl;
+    } else {
+      warn!("musl detected, but no musl specific plugin implementation found - you may experience issues");
+    }
+  }
+
   if github_file_exists(http_client, base_url, tag, tar_gz_file.as_str()).await? {
     return download_tar_gz_file(plugin_dir, http_client, base_url, tag, tar_gz_file, tar_gz_sha_file, display_progress).await;
   }
 
   // Check for an arch specific tgz file
-  let tgz_file = format!("pact-{}-plugin-{}-{}{}.tgz", manifest.name, os, arch, musl);
-  let tgz_sha_file = format!("pact-{}-plugin-{}-{}{}.tgz.sha256", manifest.name, os, arch, musl);
+  let mut tgz_file = format!("pact-{}-plugin-{}-{}{}.tgz", manifest.name, os, arch, musl);
+  let mut tgz_sha_file = format!("pact-{}-plugin-{}-{}{}.tgz.sha256", manifest.name, os, arch, musl);
+
+  if musl != "" {
+    let tgz_file_musl = format!("pact-{}-plugin-{}-{}{}.tgz", manifest.name, os, arch, musl);
+    let tgz_sha_file_musl = format!("pact-{}-plugin-{}-{}{}.tgz.sha256", manifest.name, os, arch, musl);
+    if github_file_exists(http_client, base_url, tag, tgz_file_musl.as_str()).await? {
+      tgz_file = tgz_file_musl;
+      tgz_sha_file = tgz_sha_file_musl;
+    } else {
+      warn!("musl detected, but no musl specific plugin implementation found - you may experience issues");
+    }
+  }
+
   if github_file_exists(http_client, base_url, tag, tgz_file.as_str()).await? {
     return download_tar_gz_file(plugin_dir, http_client, base_url, tag, tgz_file, tgz_sha_file, display_progress).await;
   }

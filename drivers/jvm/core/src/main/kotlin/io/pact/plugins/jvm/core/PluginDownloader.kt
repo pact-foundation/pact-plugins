@@ -96,8 +96,20 @@ object DefaultPluginDownloader: PluginDownloader, KLogging() {
 
     // Check for a single exec .gz file
     val ext = if (os == "windows") ".exe" else ""
-    val gzFile = "pact-${manifest.name}-plugin-$os-$arch$muslExt$ext.gz"
-    val shaFileName = "pact-${manifest.name}-plugin-$os-$arch$muslExt$ext.gz.sha256"
+    val gzFile = "pact-${manifest.name}-plugin-$os-$arch$ext.gz"
+    val shaFileName = "pact-${manifest.name}-plugin-$os-$arch$ext.gz.sha256"
+
+    if (isMusl()){
+      val gzFileMusl = "pact-${manifest.name}-plugin-$os-$arch$muslExt$ext.gz"
+      val shaFileNameMusl = "pact-${manifest.name}-plugin-$os-$arch$muslExt$ext.gz.sha256"
+
+      if (githubFileExists(url, tag, gzFileMusl)){
+        val gzFile = gzFileMusl
+        val shaFileName = shaFileNameMusl
+      } else {
+        logger.warn { "musl detected, but no musl specific plugin implementation found - you may experience issues" }
+      }
+    }
     if (githubFileExists(url, tag, gzFile)) {
       logger.debug { "Found a GZipped file $gzFile" }
       when (val fileResult = downloadFileFromGithub(url, tag, gzFile, pluginDir)) {
@@ -131,8 +143,21 @@ object DefaultPluginDownloader: PluginDownloader, KLogging() {
     }
 
     // Check for an arch specific Zip file
-    val archZipFile = "pact-${manifest.name}-plugin-$os-$arch$muslExt.zip"
-    val archZipShaFile = "pact-${manifest.name}-plugin-$os-$arch$muslExt.zip.sha256"
+    val archZipFile = "pact-${manifest.name}-plugin-$os-$arch.zip"
+    val archZipShaFile = "pact-${manifest.name}-plugin-$os-$arch.zip.sha256"
+
+    if (isMusl()){
+      val archZipFileMusl = "pact-${manifest.name}-plugin-$os-$arch$muslExt.zip"
+      val archZipShaFileMusl = "pact-${manifest.name}-plugin-$os-$arch$muslExt.zip.sha256"
+
+      if (githubFileExists(url, tag, archZipFileMusl)){
+        val archZipFile = archZipFileMusl
+        val archZipShaFile = archZipShaFileMusl
+      } else {
+        logger.warn { "musl detected, but no musl specific plugin implementation found - you may experience issues" }
+      }
+    }
+
     if (githubFileExists(url, tag, archZipFile)) {
       return downloadZipFile(pluginDir, url, tag, archZipFile, archZipShaFile)
     }
@@ -150,9 +175,23 @@ object DefaultPluginDownloader: PluginDownloader, KLogging() {
     if (githubFileExists(url, tag, tarGzFile)) {
       return downloadTarGzfile(pluginDir, url, tag, tarGzFile, tarGzShaFile)
     }
+
     // Check for an arch specific tar.gz file
-    val archTarGzFile = "pact-${manifest.name}-plugin-$os-$arch$muslExt.tar.gz"
-    val archTarGzShaFile = "pact-${manifest.name}-plugin-$os-$arch$muslExt.tag.gz.sha256"
+    val archTarGzFile = "pact-${manifest.name}-plugin-$os-$arch.tar.gz"
+    val archTarGzShaFile = "pact-${manifest.name}-plugin-$os-$arch.tag.gz.sha256"
+
+    if (isMusl()){
+      val archTarGzFileMusl = "pact-${manifest.name}-plugin-$os-$arch$muslExt.tar.gz"
+      val archTarGzShaFileMusl = "pact-${manifest.name}-plugin-$os-$arch$muslExt.tag.gz.sha256"
+
+      if (githubFileExists(url, tag, archTarGzFileMusl)){
+        val archTarGzFile = archTarGzFileMusl
+        val archTarGzShaFile = archTarGzShaFileMusl
+      } else {
+        logger.warn { "musl detected, but no musl specific plugin implementation found - you may experience issues" }
+      }
+    }
+
     if (githubFileExists(url, tag, archTarGzFile)) {
       return downloadTarGzfile(pluginDir, url, tag, archTarGzFile, archTarGzShaFile)
     }
@@ -162,9 +201,23 @@ object DefaultPluginDownloader: PluginDownloader, KLogging() {
     if (githubFileExists(url, tag, tgzFile)) {
       return downloadTarGzfile(pluginDir, url, tag, tgzFile, tgzShaFile)
     }
+
     // Check for an arch specific tgz file
-    val archTgzFile = "pact-${manifest.name}-plugin-$os-$arch$muslExt.tgz"
-    val archTgzShaFile = "pact-${manifest.name}-plugin-$os-$arch$muslExt.tgz.sha256"
+    val archTgzFile = "pact-${manifest.name}-plugin-$os-$arch.tgz"
+    val archTgzShaFile = "pact-${manifest.name}-plugin-$os-$arch.tgz.sha256"
+
+    if (isMusl()){
+      val archTgzFileMusl = "pact-${manifest.name}-plugin-$os-$arch$muslExt.tgz"
+      val archTgzShaFileMusl = "pact-${manifest.name}-plugin-$os-$arch$muslExt.tgz.sha256"
+  
+      if (githubFileExists(url, tag, archTgzFileMusl)){
+        val archTgzFile = archTgzFileMusl
+        val archTgzShaFileMusl = archTgzShaFileMusl
+      } else {
+        logger.warn { "musl detected, but no musl specific plugin implementation found - you may experience issues" }
+      }
+    }
+
     if (githubFileExists(url, tag, archTgzFile)) {
       return downloadTarGzfile(pluginDir, url, tag, archTgzFile, archTgzShaFile)
     }
