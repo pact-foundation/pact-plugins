@@ -111,23 +111,33 @@ pub fn optional_string<S: Into<String>>(string: S) -> Option<String> {
   }
 }
 
+#[cfg(target_env = "musl")]
+fn is_musl() -> bool {
+    true
+}
+
+#[cfg(not(target_env = "musl"))]
+fn is_musl() -> bool {
+    false
+}
+
 /// Returns the current running OS and architecture
-pub fn os_and_arch() -> anyhow::Result<(&'static str, &'static str)> {
+pub fn os_and_arch() -> anyhow::Result<(&'static str, &'static str, &'static str)> {
   let os_info = os_info::get();
   debug!("Detected OS: {}", os_info);
 
-  let os = match os_info.os_type() {
+  let (os, musl) = match os_info.os_type() {
     Type::Alpine | Type::Amazon| Type::Android| Type::Arch| Type::CentOS| Type::Debian |
     Type::EndeavourOS | Type::Fedora | Type::Gentoo | Type::Linux | Type::Manjaro | Type::Mariner |
     Type::Mint | Type::NixOS | Type::openSUSE | Type::OracleLinux | Type::Redhat |
     Type::RedHatEnterprise | Type::Pop | Type::Raspbian | Type::Solus | Type::SUSE |
-    Type::Ubuntu => "linux",
-    Type::Macos => "osx",
-    Type::Windows => "windows",
+    Type::Ubuntu  => ("linux", if is_musl() == true {"-musl"}else {""}),
+    Type::Macos => ("osx",""),
+    Type::Windows => ("windows",""),
     _ => bail!("{} is not a supported operating system", os_info)
   };
 
-  Ok((os, std::env::consts::ARCH))
+  Ok((os, std::env::consts::ARCH, musl))
 }
 
 #[cfg(test)]
