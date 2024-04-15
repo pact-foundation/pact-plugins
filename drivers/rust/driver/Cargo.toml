@@ -20,49 +20,45 @@ datetime = ["pact_models/datetime"] # Support for date/time matchers and express
 xml = ["pact_models/xml"] # support for matching XML documents
 
 [dependencies]
-anyhow = "1.0.79"
-async-trait = "0.1.77"
-backtrace = "0.3.69"
-bytes = "1.5.0"
-chrono = { version = "0.4.32", features = ["serde"], default-features = false }
+anyhow = "1.0.82"
+async-trait = "0.1.80"
+backtrace = "0.3.71"
+bytes = "1.6.0"
+chrono = { version = "0.4.37", features = ["serde"], default-features = false }
 flate2 = "1.0.28"
 futures-util = "0.3.30"
 home = "0.5.9"
-indicatif = "0.17.7"
-itertools = "0.12.0"
+indicatif = "0.17.8"
+itertools = "0.12.1"
 lazy_static = "1.4.0"
-log = "0.4.20"
+log = "0.4.21"
 maplit = "1.0.2"
 md5 = "0.7.0"
 os_info = "3.7.0"
 pact_models = { version = "~1.1.18", default-features = false }
-prost = "0.12.3"
-prost-types = "0.12.3"
-regex = "1.10.3"
-semver = "1.0.21"
-serde_json = "1.0.111"
-serde = { version = "1.0.195",  features = ["derive"] }
+prost = "0.12.4"
+prost-types = "0.12.4"
+regex = "1.10.4"
+reqwest = { version = "0.12.3", default-features = false, features = ["rustls-tls-native-roots", "json", "gzip", "deflate", "stream"] }
+semver = "1.0.22"
+serde_json = "1.0.115"
+serde = { version = "1.0.197",  features = ["derive"] }
 sha2 = "0.10.8"
-sysinfo = "0.30.5"
+sysinfo = "0.30.10"
 tar = '0.4.40'
-toml = "0.8.8"
-tokio = { version = "1.35.1", features = ["full"] }
+toml = "0.8.12"
+tokio = { version = "1.37.0", features = ["full"] }
 tonic = "0.10.2"
 tracing = { version = "0.1.40", features = [ "log" ] }  # This needs to be the same version across all the pact libs (i.e. pact ffi)
 tracing-core = "0.1.32"  # This needs to be the same version across all the pact libs (i.e. pact ffi)
-uuid = { version = "1.7.0", features = ["v4"] }
+uuid = { version = "1.8.0", features = ["v4"] }
 zip = "0.6.6"
 
-[dependencies.reqwest]
-version = "0.11.23"
-default-features = false
-features = ["rustls-tls-native-roots", "json", "gzip", "deflate", "stream"]
-
 [dev-dependencies]
-env_logger = "0.11.0"
+env_logger = "0.11.3"
 expectest = "0.12.0"
 tempdir = "0.3.7"
-test-log = "0.2.14"
+test-log = "0.2.15"
 
 [build-dependencies]
 tonic-build = "0.10.2"

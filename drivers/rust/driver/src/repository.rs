@@ -335,7 +335,7 @@ mod tests {
     let timestamp = index.timestamp.to_string();
     expect!(timestamp).to_not(be_equal_to("1970-01-01 00:00:00 UTC"));
 
-    let ts = index.timestamp.naive_utc().timestamp() as u64;
+    let ts = index.timestamp.naive_utc().and_utc().timestamp() as u64;
     expect!(ts / 3600).to(be_equal_to(now / 3600));
   }
 }
