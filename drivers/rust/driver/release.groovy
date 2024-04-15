@@ -40,7 +40,6 @@ executeOnShell 'git pull'
 ask('Execute Build?: [Y]') {
   executeOnShell 'cargo clean'
   executeOnShell 'cargo build'
-  executeOnShell 'cargo doc'
   executeOnShell 'cargo test'
 }
 
