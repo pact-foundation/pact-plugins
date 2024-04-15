@@ -1,5 +1,12 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.5.2 - Bugfix Release
+
+* 96d39bb - chore: update repository.index (Ronald Holshausen, Mon Apr 15 14:56:42 2024 +1000)
+* f31e4de - fix: Correct import for non-Windows targets (Ronald Holshausen, Mon Apr 15 11:37:42 2024 +1000)
+* d9e441e - fix: Tests using plugins on Windows were hanging for 5 minutes (Ronald Holshausen, Mon Apr 15 11:28:57 2024 +1000)
+* 2ff974d - bump version to 0.5.2 (Ronald Holshausen, Wed Jan 31 19:02:58 2024 +1100)
+
 # 0.5.1 - Bugfix Release
 
 * e7dcd4c - chore: update repository.index (Ronald Holshausen, Wed Jan 31 19:00:38 2024 +1100)
