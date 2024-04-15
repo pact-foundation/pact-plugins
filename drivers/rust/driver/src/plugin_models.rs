@@ -16,7 +16,10 @@ use tonic::service::Interceptor;
 use tonic::transport::Channel;
 use tracing::{debug, trace};
 
+#[cfg(not(windows))]
 use crate::child_process::ChildPluginProcess;
+#[cfg(windows)]
+use crate::child_process_windows::ChildPluginProcess;
 use crate::proto::*;
 use crate::proto::pact_plugin_client::PactPluginClient;
 

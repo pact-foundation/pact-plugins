@@ -6,6 +6,7 @@ use std::fs::File;
 use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use std::process::Stdio;
+#[cfg(windows)] use std::process::Command;
 use std::str::from_utf8;
 use std::str::FromStr;
 use std::sync::Mutex;
@@ -17,7 +18,7 @@ use itertools::Either;
 use lazy_static::lazy_static;
 use log::max_level;
 use maplit::hashmap;
-use os_info::Type;
+#[cfg(not(windows))] use os_info::Type;
 use pact_models::bodies::OptionalBody;
 use pact_models::json_utils::json_to_string;
 use pact_models::PactSpecification;
@@ -32,7 +33,8 @@ use tokio::process::Command;
 use tracing::{debug, info, trace, warn};
 
 use crate::catalogue_manager::{all_entries, CatalogueEntry, register_plugin_entries, remove_plugin_entries};
-use crate::child_process::ChildPluginProcess;
+#[cfg(not(windows))] use crate::child_process::ChildPluginProcess;
+#[cfg(windows)] use crate::child_process_windows::ChildPluginProcess;
 use crate::content::ContentMismatch;
 use crate::download::{download_json_from_github, download_plugin_executable, fetch_json_from_url};
 use crate::metrics::send_metrics;
@@ -185,7 +187,7 @@ pub(crate) fn pact_plugin_dir() -> anyhow::Result<PathBuf> {
   let plugin_dir = env_var.unwrap_or_default();
   let plugin_dir = plugin_dir.to_string_lossy();
   if plugin_dir.is_empty() {
-    home::home_dir().map(|dir| dir.join(".pact/plugins"))
+    home::home_dir().map(|dir| dir.join(".pact").join("plugins"))
   } else {
     PathBuf::from_str(plugin_dir.as_ref()).ok()
   }.ok_or_else(|| anyhow!("No Pact plugin directory was found (in $HOME/.pact/plugins or $PACT_PLUGIN_DIR)"))
@@ -241,6 +243,7 @@ pub async fn init_handshake(manifest: &PactPluginManifest, plugin: &mut (dyn Pac
   Ok(())
 }
 
+#[cfg(not(windows))]
 async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<PactPlugin> {
   debug!("Starting plugin with manifest {:?}", manifest);
 
@@ -277,6 +280,55 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
     .map_err(|err| anyhow!("Was not able to start plugin process for '{}' - {}",
       path.to_string_lossy(), err))?;
   let child_pid = child.id().unwrap_or_default();
+  debug!("Plugin {} started with PID {}", manifest.name, child_pid);
+
+  match ChildPluginProcess::new(child, manifest).await {
+    Ok(child) => Ok(PactPlugin::new(manifest, child)),
+    Err(err) => {
+      let mut s = System::new();
+      s.refresh_processes();
+      if let Some(process) = s.process(Pid::from_u32(child_pid)) {
+        process.kill_with(Signal::Term);
+      } else {
+        warn!("Child process with PID {} was not found", child_pid);
+      }
+      Err(err)
+    }
+  }
+}
+
+#[cfg(windows)]
+async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<PactPlugin> {
+  debug!("Starting plugin with manifest {:?}", manifest);
+
+  let mut path = if let Some(entry) = manifest.entry_points.get("windows") {
+    PathBuf::from(entry)
+  } else {
+    PathBuf::from(&manifest.entry_point)
+  };
+  if !path.is_absolute() || !path.exists() {
+    path = PathBuf::from(manifest.plugin_dir.clone()).join(path);
+  }
+  debug!("Starting plugin using {:?}", &path);
+
+  let log_level = max_level();
+  let mut child_command = Command::new(path.clone());
+  let mut child_command = child_command
+    .env("LOG_LEVEL", log_level.to_string())
+    .env("RUST_LOG", log_level.to_string())
+    .current_dir(manifest.plugin_dir.clone());
+
+  if let Some(args) = &manifest.args {
+    child_command = child_command.args(args);
+  }
+
+  let child = child_command
+    .stdout(Stdio::piped())
+    .stderr(Stdio::piped())
+    .spawn()
+    .map_err(|err| anyhow!("Was not able to start plugin process for '{}' - {}",
+      path.to_string_lossy(), err))?;
+  let child_pid = child.id();
   debug!("Plugin {} started with PID {}", manifest.name, child_pid);
 
   match ChildPluginProcess::new(child, manifest).await {
