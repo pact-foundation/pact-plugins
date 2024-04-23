@@ -16,3 +16,6 @@ prost-types = "0.12.3"
 test-log = "0.2.14"
 tokio = { version = "1.35.1", features = ["full"] }
 tonic = "0.11.0"
+
+[patch.crates-io]
+pact_ffi = { git = 'https://github.com/pact-foundation/pact-reference.git' }
