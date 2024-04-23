@@ -18,3 +18,5 @@ pact_consumer = "~1.2.0"
 async-trait = "0.1.74"
 test-log = "0.2.14"
 
+[patch.crates-io]
+pact_consumer = { git = 'https://github.com/pact-foundation/pact-reference.git' }
