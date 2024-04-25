@@ -11,6 +11,8 @@ build
 target
 pacts
 *.out
+# Generated Release Artifacts
+release_artifacts
 
 # Misc
 
