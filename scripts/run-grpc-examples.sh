@@ -44,7 +44,7 @@ trap "kill $PID" EXIT
 sleep 1
 ls -la
 PROVIDER_PORT=$(cat provider.go.out | cut -f4 -d:)
-~/bin/pact_verifier_cli -f ../consumer-jvm/build/pacts/grpc-consumer-jvm-area-calculator-provider.json\
+~/.pact/bin/pact_verifier_cli -f ../consumer-jvm/build/pacts/grpc-consumer-jvm-area-calculator-provider.json\
   -f ../consumer-rust/target/pacts/grpc-consumer-rust-area-calculator-provider.json\
   -f ../consumer-go/pacts/grpc-consumer-go-area-calculator-provider.json\
   -p "$PROVIDER_PORT"

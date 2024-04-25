@@ -31,10 +31,10 @@ jobs:
         run: scripts/install-plugin-cli.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/bin/pact-plugin-cli -y install protobuf
+        run: ~/.pact/bin/pact-plugin-cli -y install protobuf
         shell: bash
       - name: Install csv plugin
-        run: ~/bin/pact-plugin-cli -y install csv
+        run: ~/.pact/bin/pact-plugin-cli -y install csv
         shell: bash
       - name: Install Pact verifier
         run: scripts/install-verifier-cli.sh
@@ -51,8 +51,8 @@ jobs:
           nohup ./target/debug/csv-provider &
           PID=$!
           trap "kill $PID" EXIT
-          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../csv-consumer-rust/target/pacts/CsvClient-CsvServer.json -p 8080
-          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
+          pact_do_not_track=true ~/.pact/bin/pact_verifier_cli -f ../csv-consumer-rust/target/pacts/CsvClient-CsvServer.json -p 8080
+          pact_do_not_track=true ~/.pact/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
           cd ../csv-provider-jvm
           mkdir -p server/src/test/resources/pacts
           cp ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json server/src/test/resources/pacts
@@ -70,7 +70,7 @@ jobs:
           nohup ./target/debug/csv-provider &
           PID=$!
           trap "kill $PID" EXIT
-          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
+          pact_do_not_track=true ~/.pact/bin/pact_verifier_cli -f ../csv-consumer-jvm/build/pacts/CsvClient-CsvServer.json -p 8080
         shell: bash
         working-directory: examples/csv
         if: runner.os == 'Windows'
@@ -110,7 +110,7 @@ jobs:
         run: scripts/install-plugin-cli.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/bin/pact-plugin-cli -y install protobuf
+        run: ~/.pact/bin/pact-plugin-cli -y install protobuf
         shell: bash
       - name: Install Pact verifier
         run: scripts/install-verifier-cli.sh
@@ -138,8 +138,8 @@ jobs:
           PID=$!
           trap "kill $PID" EXIT
           timeout --foreground -s TERM 30s bash -c 'while [[ "$(curl -s -o /dev/null -m 3 -L -w ''%{http_code}'' -XPOST -d'{}' http://127.0.0.1:8111)" != "200" ]]; do echo "Waiting for http://127.0.0.1:8111" && sleep 2; done'
-          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../protobuf-consumer-rust/target/pacts/protobuf-consumer-rust-protobuf-provider.json -p 8111
-          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../protobuf-consumer-jvm/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
+          pact_do_not_track=true ~/.pact/bin/pact_verifier_cli -f ../protobuf-consumer-rust/target/pacts/protobuf-consumer-rust-protobuf-provider.json -p 8111
+          pact_do_not_track=true ~/.pact/bin/pact_verifier_cli -f ../protobuf-consumer-jvm/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
         shell: bash
         working-directory: examples/protobuf
         if: runner.os == 'Linux'
@@ -158,8 +158,8 @@ jobs:
           PID=$!
           trap "kill $PID" EXIT
           timeout --foreground -s TERM 30s bash -c 'while [[ "$(curl -s -o /dev/null -m 3 -L -w ''%{http_code}'' -XPOST -d'{}' http://127.0.0.1:8111)" != "200" ]]; do echo "Waiting for http://127.0.0.1:8111" && sleep 2; done'
-          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../protobuf-consumer-rust/target/pacts/protobuf-consumer-rust-protobuf-provider.json -p 8111
-          pact_do_not_track=true ~/bin/pact_verifier_cli -f ../protobuf-consumer-jvm/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
+          pact_do_not_track=true ~/.pact/bin/pact_verifier_cli -f ../protobuf-consumer-rust/target/pacts/protobuf-consumer-rust-protobuf-provider.json -p 8111
+          pact_do_not_track=true ~/.pact/bin/pact_verifier_cli -f ../protobuf-consumer-jvm/build/pacts/protobuf-consumer-protobuf-provider.json -p 8111
         shell: bash
         working-directory: examples/protobuf
         if: runner.os != 'Linux'
@@ -199,7 +199,7 @@ jobs:
         run: scripts/install-plugin-cli.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/bin/pact-plugin-cli -y install protobuf
+        run: ~/.pact/bin/pact-plugin-cli -y install protobuf
         shell: bash
       - name: Install Pact verifier
         run: scripts/install-verifier-cli.sh

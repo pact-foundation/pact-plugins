@@ -24,10 +24,10 @@ jobs:
         run: scripts/install-plugin-cli.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/bin/pact-plugin-cli -y install protobuf
+        run: ~/.pact/bin/pact-plugin-cli -y install protobuf
         shell: bash
       - name: Install csv plugin
-        run: ~/bin/pact-plugin-cli -y install csv
+        run: ~/.pact/bin/pact-plugin-cli -y install csv
         shell: bash
       - name: Tests
         run: cargo test
@@ -63,7 +63,7 @@ jobs:
           curl -LO https://github.com/pact-foundation/pact-ruby-standalone/releases/download/v1.88.77/pact-1.88.77-linux-x86_64.tar.gz
           tar xzf pact-1.88.77-linux-x86_64.tar.gz
           VER=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
-          pact/bin/pact-broker publish -a "$VER+$GITHUB_SHA" -b https://pact-foundation.pactflow.io -k ${{ secrets.PACTFLOW_TOKEN }} target/pacts
+          pact/bin/pact-broker publish -a "$VER+$GITHUB_SHA" -b https://saf.pactflow.io -k ${{ secrets.PACTFLOW_TOKEN }} target/pacts
         working-directory: drivers/rust/driver_pact_tests
         if: runner.os == 'Linux'
 
