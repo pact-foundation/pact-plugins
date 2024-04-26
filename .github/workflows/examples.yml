@@ -9,7 +9,7 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
+        operating-system: [ ubuntu-latest, windows-latest, macos-12 ]
     env:
       PACT_DO_NOT_TRACK: true
       RUST_LOG: trace
@@ -24,7 +24,7 @@ jobs:
         with:
           toolchain: stable
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1
+        uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install plugin cli
@@ -84,7 +84,7 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
+        operating-system: [ ubuntu-latest, windows-latest, macos-12 ]
     env:
       PACT_DO_NOT_TRACK: true
       RUST_LOG: trace
@@ -99,7 +99,7 @@ jobs:
         with:
           toolchain: stable
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1
+        uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install Go
@@ -173,7 +173,7 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
+        operating-system: [ ubuntu-latest, windows-latest, macos-12 ]
     env:
       PACT_DO_NOT_TRACK: true
       RUST_LOG: trace
@@ -188,7 +188,7 @@ jobs:
         with:
           toolchain: stable
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1
+        uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install Go
