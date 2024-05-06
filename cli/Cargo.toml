@@ -37,3 +37,14 @@ tempfile = "3.8.1"
 expectest = "0.12.0"
 test-log = "0.2.14"
 env_logger = "0.10.1"
+
+[profile.release]
+strip = true
+opt-level = "z" 
+codegen-units = 1
+lto = true
+
+# References
+# https://doc.rust-lang.org/stable/rustc/codegen-options/
+# https://doc.rust-lang.org/rustc/profile-guided-optimization.html
+# https://github.com/johnthagen/min-sized-rust
