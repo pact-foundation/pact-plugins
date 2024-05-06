@@ -7,7 +7,7 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
+        operating-system: [ ubuntu-latest, windows-latest, macos-12 ]
     env:
       pact_do_not_track: true
     steps:
@@ -17,17 +17,17 @@ jobs:
           toolchain: stable
           components: clippy
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1
+        uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install plugin cli
         run: scripts/install-plugin-cli.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/bin/pact-plugin-cli -y install protobuf
+        run: ~/.pact/bin/pact-plugin-cli -y install protobuf
         shell: bash
       - name: Install csv plugin
-        run: ~/bin/pact-plugin-cli -y install csv
+        run: ~/.pact/bin/pact-plugin-cli -y install csv
         shell: bash
       - name: Tests
         run: cargo test

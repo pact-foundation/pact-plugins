@@ -9,7 +9,7 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
+        operating-system: [ ubuntu-latest, windows-latest, macos-12 ]
     steps:
     - uses: actions/checkout@v4
     - name: Set up JDK 19
@@ -18,7 +18,7 @@ jobs:
         distribution: 'temurin'
         java-version: 19
     - name: Install Protoc
-      uses: arduino/setup-protoc@v1
+      uses: arduino/setup-protoc@v3
       with:
         repo-token: ${{ secrets.GITHUB_TOKEN }}
     - name: Build plugin driver
@@ -28,7 +28,7 @@ jobs:
       run: scripts/install-plugin-cli.sh
       shell: bash
     - name: Install Protobuf plugin
-      run: ~/bin/pact-plugin-cli -y install protobuf
+      run: ~/.pact/bin/pact-plugin-cli -y install protobuf
       shell: bash
     - name: Run plugin driver tests
       run: ./gradlew -s --no-daemon -i check
@@ -51,7 +51,7 @@ jobs:
           distribution: 'temurin'
           java-version: ${{ matrix.jdk }}
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1
+        uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Build plugin driver
@@ -61,7 +61,7 @@ jobs:
         run: scripts/install-plugin-cli.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/bin/pact-plugin-cli -y install protobuf
+        run: ~/.pact/bin/pact-plugin-cli -y install protobuf
         shell: bash
       - name: Run plugin driver tests
         run: ./gradlew -s --no-daemon -i check

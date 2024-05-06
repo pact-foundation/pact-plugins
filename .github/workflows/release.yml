@@ -4,51 +4,88 @@ on:
   release:
     types: [published]
 
+  pull_request:
+    branches:
+      - main
+  push:
+    branches:
+      - feat/musl_built_binaries
+  
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-release:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
-        operating-system: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - operating-system: ubuntu-20.04
+            targets: x86_64-unknown-linux-gnu,x86_64-unknown-linux-musl,aarch64-unknown-linux-gnu,aarch64-unknown-linux-musl
+          - operating-system: windows-2019
+            targets: aarch64-pc-windows-msvc,x86_64-pc-windows-msvc
+          - operating-system: macos-12
+            targets: aarch64-apple-darwin,x86_64-apple-darwin
+      fail-fast: false
     env:
       pact_do_not_track: true
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install stable Rust toolchain
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
           toolchain: stable
-          override: true
-          target: aarch64-apple-darwin
+          targets: ${{ matrix.targets }}
+
+      - name: Rust caching
+        uses: Swatinem/rust-cache@v2
+
+      - name: Set up QEMU
+        if: runner.os == 'Linux'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: runner.os == 'Linux'
+        uses: docker/setup-buildx-action@v3
+
       - name: Install LLVM
         run: choco install -y llvm
         if: runner.os == 'Windows'
       - name: Install Protoc
-        uses: arduino/setup-protoc@v1
+        uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
-      - if: startsWith(github.ref, 'refs/tags/csv-plugin')
-        run: ./release.sh ${{ runner.os }}
+      - name: Cargo flags
+        id: cargo-flags
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" = "release" ]]; then
+            echo "flags=--release" >> "$GITHUB_OUTPUT"
+          else
+            echo "flags=" >> "$GITHUB_OUTPUT"
+          fi 
+      - if: |
+          github.event_name == 'push' ||
+          github.event_name == 'pull_request' ||
+          startsWith(github.ref, 'refs/tags/csv-plugin')
+        run: ./release.sh ${{ runner.os }} ${{ steps.cargo-flags.outputs.flags }}
         shell: bash
         working-directory: plugins/csv
-      - name: Upload Release Assets
-        if: startsWith(github.ref, 'refs/tags/csv-plugin')
-        uses: svenstaro/upload-release-action@v2
-        with:
-          repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: plugins/csv/target/artifacts/*
-          file_glob: true
-          tag: ${{ github.ref }}
-      - if: startsWith(github.ref, 'refs/tags/pact-plugin-cli')
-        run: ./release.sh ${{ runner.os }}
+      - if: |
+          github.event_name == 'push' ||
+          github.event_name == 'pull_request' ||
+          startsWith(github.ref, 'refs/tags/pact-plugin-cli')
+        run: ./release.sh ${{ runner.os }} ${{ steps.cargo-flags.outputs.flags }}
         shell: bash
         working-directory: cli
       - name: Upload Release Assets
-        if: startsWith(github.ref, 'refs/tags/pact-plugin-cli')
+        if: |
+          startsWith(github.ref, 'refs/tags/pact-plugin-cli') ||
+          startsWith(github.ref, 'refs/tags/csv-plugin')
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: cli/target/artifacts/*
+          file: release_artifacts/*
           file_glob: true
           tag: ${{ github.ref }}
