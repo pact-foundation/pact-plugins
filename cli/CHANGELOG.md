@@ -1,5 +1,14 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.1.2 - Feature Release
+
+* cd8a64a - chore: update repository.index (Yousaf Nabi, Fri May 10 14:52:15 2024 +0100)
+* 18dbf5c - feat: reduce executable size (Yousaf Nabi, Fri Apr 26 15:46:58 2024 +0100)
+* 20c8dae - feat: linux musl static bins / windows aarch64 (Yousaf Nabi, Thu Apr 25 19:26:03 2024 +0100)
+* 53cc657 - chore: fix build after updating version (Ronald Holshausen, Sat Jan 20 08:15:55 2024 +1100)
+* 8718c9e - chore: fix build after updating version (Ronald Holshausen, Sat Jan 20 08:14:36 2024 +1100)
+* 710f70a - bump version to 0.1.2 (Ronald Holshausen, Thu Dec 14 10:36:50 2023 +1100)
+
 # 0.1.1 - Maintenance Release
 
 * f5d40d1 - chore: update repository.index (Ronald Holshausen, Thu Dec 14 10:34:21 2023 +1100)
