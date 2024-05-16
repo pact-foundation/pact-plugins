@@ -49,6 +49,7 @@ The plugin manifest file describes what the plugin provides and how to load it. 
 | entryPoint | The main executable for the plugin |
 | entryPoints | Optional map of additional entry points. This allows additional entry points for other operating systems (i.e. requiring a .bat file for Windows) |
 | dependencies | List of system dependencies or plugins required to be able to execute this plugin |
+| args | Optional, comma seperated list of arguments to pass to the plugin entrypoint |
 
 Example of a manifest for a plugin written in Ruby that provides matching CSV files:
 
@@ -60,7 +61,8 @@ Example of a manifest for a plugin written in Ruby that provides matching CSV fi
   "version": "0.0.0",
   "executableType": "exec",
   "minimumRequiredVersion": "2.7.2",
-  "entryPoint": "bundle exec main.rb"
+  "entryPoint": "bin/bundle",
+  "args": ["exec", "ruby", "main.rb"]
 }
 ```
 
