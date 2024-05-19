@@ -12,7 +12,7 @@ jobs:
         operating-system: [ ubuntu-latest, windows-latest, macos-12 ]
     steps:
     - uses: actions/checkout@v4
-    - name: Set up JDK 19
+    - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
         distribution: 'temurin'
