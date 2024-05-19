@@ -2,7 +2,7 @@ package io.pact.plugins.jvm.core
 
 import spock.lang.Specification
 
-import javax.json.Json
+import jakarta.json.Json
 
 class DefaultPactPluginManifestSpec extends Specification {
 

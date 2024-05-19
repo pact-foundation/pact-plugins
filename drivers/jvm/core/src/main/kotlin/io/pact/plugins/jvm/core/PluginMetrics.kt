@@ -2,15 +2,17 @@ package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.support.contains
 import au.com.dius.pact.core.support.isNotEmpty
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.pact.plugins.jvm.core.Utils.lookupVersion
-import io.github.oshai.kotlinlogging.KLogging
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.hc.client5.http.fluent.Request
 import org.apache.hc.core5.http.message.BasicNameValuePair
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-object PluginMetrics: KLogging() {
+private val logger = KotlinLogging.logger {}
+
+object PluginMetrics {
 
   const val GA_ID = "UA-117778936-1"
   const val GA_URL = "https://www.google-analytics.com/collect"
@@ -65,7 +67,7 @@ object PluginMetrics: KLogging() {
             .execute()
             .returnResponse()
           if (response.code > 299) {
-            logger.debug("Got response from metrics: ${response.code} ${response.reasonPhrase}")
+            logger.debug { "Got response from metrics: ${response.code} ${response.reasonPhrase}" }
           }
         } catch (ex: Exception) {
           logger.debug(ex) { "Failed to send plugin load metrics" }
