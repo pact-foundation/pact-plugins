@@ -52,12 +52,11 @@ subprojects {
     from sourceSets.main.allSource
   }
 
-  kotlin {
-    jvmToolchain {
-      languageVersion.set(JavaLanguageVersion.of(17))
-      implementation.set(JvmImplementation.VENDOR_SPECIFIC)
-      vendor.set(JvmVendorSpec.ADOPTIUM)
-    }
+  compileKotlin {
+    kotlinOptions.jvmTarget = '17'
+  }
+  compileTestKotlin {
+    kotlinOptions.jvmTarget = '17'
   }
 
   test {
