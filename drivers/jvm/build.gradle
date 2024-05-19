@@ -55,8 +55,9 @@ subprojects {
   kotlin {
     jvmToolchain {
       languageVersion.set(JavaLanguageVersion.of(17))
+      implementation.set(JvmImplementation.VENDOR_SPECIFIC)
+      vendor.set(JvmVendorSpec.ADOPTIUM)
     }
-    jvmToolchain(17)
   }
 
   test {
