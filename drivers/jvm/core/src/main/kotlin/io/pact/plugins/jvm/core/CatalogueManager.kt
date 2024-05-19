@@ -1,14 +1,16 @@
 package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.model.ContentType
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.pact.plugin.Plugin
-import io.github.oshai.kotlinlogging.KLogging
 import java.lang.IllegalArgumentException
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * The catalogue manager stores all the entries from the core Pact framework as well as all the loaded plugins
  */
-object CatalogueManager : KLogging() {
+object CatalogueManager {
   private val catalogue = mutableMapOf<String, CatalogueEntry>()
 
   /**

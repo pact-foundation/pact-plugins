@@ -1,12 +1,14 @@
 package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.support.Result
-import io.github.oshai.kotlinlogging.KLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStreamReader
 
-object SystemExec: KLogging() {
+private val logger = KotlinLogging.logger {}
+
+object SystemExec {
   fun execute(prog: String, vararg args: String): Result<String, Pair<Int, String>> {
     val pb = ProcessBuilder(prog, *args)
     return try {
