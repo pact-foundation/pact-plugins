@@ -1,10 +1,8 @@
-import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-
 plugins {
   id 'java'
   id 'org.jetbrains.kotlin.jvm' version '1.8.22'
   id 'org.jetbrains.dokka' version '1.8.20'
-  id 'io.gitlab.arturbosch.detekt' version '1.23.4'
+  id 'io.gitlab.arturbosch.detekt' version '1.23.6'
   id 'maven-publish'
   id 'signing'
 }
@@ -41,7 +39,8 @@ subprojects {
     }
   }
 
-  task javadocJar(type: Jar, dependsOn: [javadoc, dokkaJavadoc]) {
+  tasks.register('javadocJar', Jar) {
+    dependsOn = [javadoc, dokkaJavadoc]
     archiveClassifier = 'javadoc'
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
     from javadoc.destinationDir, dokkaJavadoc.outputDirectory
@@ -53,10 +52,11 @@ subprojects {
     from sourceSets.main.allSource
   }
 
-  tasks.withType(KotlinCompile).configureEach {
-    kotlinOptions {
-      jvmTarget = "11"
-    }
+  compileKotlin {
+    kotlinOptions.jvmTarget = '11'
+  }
+  compileTestKotlin {
+    kotlinOptions.jvmTarget = '11'
   }
 
   test {
@@ -119,6 +119,6 @@ subprojects {
   }
 
   detekt {
-    config = files(rootProject.file("config/detekt-config.yml"))
+    config.setFrom(rootProject.file("config/detekt-config.yml"))
   }
 }

@@ -1,8 +1,8 @@
 package io.pact.plugins.jvm.core
 
-import javax.json.JsonNumber
-import javax.json.JsonString
-import javax.json.JsonValue
+import jakarta.json.JsonNumber
+import jakarta.json.JsonString
+import jakarta.json.JsonValue
 
 fun toInteger(value: JsonValue?) =
   if (value is JsonNumber) value.intValue()

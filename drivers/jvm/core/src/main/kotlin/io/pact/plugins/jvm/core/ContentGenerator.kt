@@ -6,7 +6,9 @@ import au.com.dius.pact.core.model.PluginData
 import au.com.dius.pact.core.model.generators.Generator
 import au.com.dius.pact.core.model.generators.GeneratorTestMode
 import au.com.dius.pact.core.support.json.JsonValue
-import io.github.oshai.kotlinlogging.KLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * Interface to a content generator
@@ -33,7 +35,7 @@ interface ContentGenerator {
   ): OptionalBody
 }
 
-open class CatalogueContentGenerator(override val catalogueEntry: CatalogueEntry) : ContentGenerator, KLogging() {
+open class CatalogueContentGenerator(override val catalogueEntry: CatalogueEntry) : ContentGenerator {
   override val isCore: Boolean
     get() = catalogueEntry.providerType == CatalogueEntryProviderType.CORE
 

@@ -4,10 +4,12 @@ import au.com.dius.pact.core.support.Result
 import au.com.dius.pact.core.support.Result.Err
 import au.com.dius.pact.core.support.Result.Ok
 import com.moandjiezana.toml.Toml
-import io.github.oshai.kotlinlogging.KLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.hc.client5.http.fluent.Request
 import java.io.File
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * Class representing the plugin repository index file
@@ -49,7 +51,7 @@ data class PluginRepositoryIndex(
     }
   }
 
-  companion object: KLogging() {
+  companion object {
     fun from(toml: Toml): PluginRepositoryIndex {
       val table = toml.getTable("entries")
       return PluginRepositoryIndex(
@@ -173,7 +175,7 @@ interface Repository {
   fun fetchIndexFromGithub(): Result<PluginRepositoryIndex, String>
 }
 
-open class DefaultRepository: Repository, KLogging() {
+open class DefaultRepository: Repository {
   override fun fetchRepositoryIndex(): Result<PluginRepositoryIndex, String> {
     return fetchIndexFromGithub()
       .orElse {

@@ -1,12 +1,14 @@
 package io.pact.plugins.jvm.core
 
-import io.github.oshai.kotlinlogging.KLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import java.io.StringReader
 import java.lang.Thread.sleep
 import java.util.concurrent.LinkedBlockingDeque
-import javax.json.Json
-import javax.json.JsonObject
-import javax.json.stream.JsonParsingException
+import jakarta.json.Json
+import jakarta.json.JsonObject
+import jakarta.json.stream.JsonParsingException
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * This class manages the running child process for a plugin
@@ -43,7 +45,7 @@ open class ChildProcess(
           if (line != null) {
             logger.debug { "Plugin ${manifest.name} [${process.pid()}] || $line" }
             if (line.trim().startsWith("{")) {
-              logger.debug("Got JSON message from plugin process")
+              logger.debug { "Got JSON message from plugin process" }
               try {
                 val jsonReader = Json.createReader(StringReader(line.trim()));
                 channel.offer(jsonReader.readObject())
@@ -80,6 +82,4 @@ open class ChildProcess(
   open fun destroy() {
     process.destroy()
   }
-
-  companion object : KLogging()
 }
