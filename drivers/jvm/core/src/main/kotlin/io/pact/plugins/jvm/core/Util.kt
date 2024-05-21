@@ -7,7 +7,7 @@ import com.google.protobuf.ListValue
 import com.google.protobuf.NullValue
 import com.google.protobuf.Struct
 import com.google.protobuf.Value
-import io.github.oshai.kotlinlogging.KLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.commons.lang3.SystemUtils
 import java.io.BufferedReader
 import java.io.IOException
@@ -16,7 +16,9 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.jar.JarInputStream
 
-object Utils : KLogging() {
+private val logger = KotlinLogging.logger {}
+
+object Utils {
   fun lookupVersion(clazz: Class<*>): String {
     val url = clazz.protectionDomain?.codeSource?.location
     return if (url != null) {
