@@ -3,6 +3,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Stdio;
+#[cfg(windows)] use std::process::Command;
 use std::str::from_utf8;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -13,7 +14,7 @@ use bytes::Bytes;
 use itertools::Either;
 use log::max_level;
 use maplit::hashmap;
-use os_info::Type;
+#[cfg(not(windows))] use os_info::Type;
 use pact_models::bodies::OptionalBody;
 use pact_models::content_types::{ContentType, ContentTypeHint};
 use pact_models::generators::{Generator, GeneratorCategory, Generators};
@@ -25,7 +26,7 @@ use pact_models::prelude::v4::V4Pact;
 use pact_models::v4::interaction::V4Interaction;
 use serde_json::Value;
 use sysinfo::{Pid, Signal, System};
-use tokio::process::Command;
+#[cfg(not(windows))] use tokio::process::Command;
 use tonic::{Request, Status};
 use tonic::codegen::InterceptedService;
 use tonic::metadata::Ascii;
@@ -34,7 +35,8 @@ use tonic::transport::Channel;
 use tracing::{debug, trace, warn};
 
 use crate::catalogue_manager::{CatalogueEntry, register_plugin_entries};
-use crate::child_process::ChildPluginProcess;
+#[cfg(not(windows))] use crate::child_process::ChildPluginProcess;
+#[cfg(windows)]  use crate::child_process_windows::ChildPluginProcess;
 use crate::content::{ContentMismatch, InteractionContents};
 use crate::mock_server::{MockServerConfig, MockServerDetails};
 use crate::plugin_models::{CompareContentResult, PactPlugin, PactPluginManifest};
@@ -736,7 +738,7 @@ pub(crate) async fn start_plugin_process(manifest: &PactPluginManifest) -> anyho
 }
 
 #[cfg(windows)]
-async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<GrpcPactPlugin> {
+pub(crate) async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<GrpcPactPlugin> {
   debug!("Starting plugin with manifest {:?}", manifest);
 
   let mut path = if let Some(entry) = manifest.entry_points.get("windows") {
