@@ -13,5 +13,5 @@ pub mod mock_server;
 pub mod verification;
 pub mod repository;
 pub mod download;
-mod grpc_plugin;
+pub mod grpc_plugin;
 #[cfg(feature = "lua")] mod lua_plugin;

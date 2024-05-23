@@ -7,8 +7,8 @@ use pact_consumer::prelude::*;
 use prost::Message;
 use serde_json::json;
 
-use pact_plugin_driver::plugin_manager::init_handshake;
-use pact_plugin_driver::plugin_models::{PactPluginManifest, PactPluginRpc};
+use pact_plugin_driver::grpc_plugin::{init_handshake, PactPluginRpc};
+use pact_plugin_driver::plugin_models::PactPluginManifest;
 use pact_plugin_driver::proto::*;
 
 struct MockPlugin {
