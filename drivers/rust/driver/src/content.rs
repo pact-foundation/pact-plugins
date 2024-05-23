@@ -1,32 +1,26 @@
 //! Support for matching and generating content based on content types
 use std::collections::HashMap;
-use std::str::from_utf8;
 
 use anyhow::anyhow;
-use bytes::Bytes;
 use maplit::hashmap;
 use pact_models::bodies::OptionalBody;
-use pact_models::content_types::ContentTypeHint;
-use pact_models::matchingrules::{Category, MatchingRule, MatchingRuleCategory, RuleList};
-use pact_models::path_exp::DocPath;
-use pact_models::prelude::{ContentType, Generator, GeneratorCategory, Generators, RuleLogic};
+use pact_models::matchingrules::MatchingRuleCategory;
+use pact_models::prelude::{ContentType, Generator, Generators};
 use pact_models::plugins::PluginData;
 use serde_json::Value;
 use tracing::{debug, error};
 
 use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
 use crate::plugin_manager::lookup_plugin;
-use crate::plugin_models::{PactPluginManifest, PactPluginRpc, PluginInteractionConfig};
-use crate::proto::{
-  Body,
-  CompareContentsRequest,
-  ConfigureInteractionRequest,
-  GenerateContentRequest,
-  PluginConfiguration as ProtoPluginConfiguration
+use crate::plugin_models::{
+  PactPluginManifest,
+  PluginInteractionConfig,
+  CompareContentRequest,
+  CompareContentResult,
+  GenerateContentRequest
 };
-use crate::proto::body;
-use crate::proto::interaction_response::MarkupType;
-use crate::utils::{proto_struct_to_json, proto_struct_to_map, to_proto_struct};
+use crate::proto::{PluginConfiguration as ProtoPluginConfiguration};
+use crate::utils::proto_struct_to_map;
 
 /// Matcher for contents based on content type
 #[derive(Clone, Debug)]
@@ -174,145 +168,20 @@ impl ContentMatcher {
 
   /// Get the plugin to configure the interaction contents for the interaction part based on the
   /// provided definition
-  pub async fn configure_interation(
+  pub async fn configure_interaction(
     &self,
     content_type: &ContentType,
     definition: HashMap<String, Value>
   ) -> anyhow::Result<(Vec<InteractionContents>, Option<PluginConfiguration>)> {
     debug!("Sending ConfigureContents request to plugin {:?}", self.catalogue_entry);
-    let request = ConfigureInteractionRequest {
-      content_type: content_type.to_string(),
-      contents_config: Some(to_proto_struct(&definition)),
-    };
-
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()
       .expect("Plugin type is required");
     match lookup_plugin(&plugin_manifest.as_dependency()) {
-      Some(plugin) => match plugin.configure_interaction(request).await {
-        Ok(response) => {
-          debug!("Got response: {:?}", response);
-          if response.error.is_empty() {
-            let mut results = vec![];
-
-            for response in &response.interaction {
-              let body = match &response.contents {
-                Some(body) => {
-                  let returned_content_type = ContentType::parse(body.content_type.as_str()).ok();
-                  let contents = body.content.as_ref().cloned().unwrap_or_default();
-                  OptionalBody::Present(Bytes::from(contents), returned_content_type,
-                                        Some(match body.content_type_hint() {
-                                          body::ContentTypeHint::Text => ContentTypeHint::TEXT,
-                                          body::ContentTypeHint::Binary => ContentTypeHint::BINARY,
-                                          body::ContentTypeHint::Default => ContentTypeHint::DEFAULT,
-                                        }))
-                },
-                None => OptionalBody::Missing
-              };
-
-              let rules = Self::setup_matching_rules(&response.rules)?;
-
-              let generators = if !response.generators.is_empty() || !response.metadata_generators.is_empty() {
-                let mut categories = hashmap!{};
-
-                if !response.generators.is_empty() {
-                  let mut generators = hashmap!{};
-                  for (k, gen) in &response.generators {
-                    generators.insert(DocPath::new(k)?,
-                      Generator::create(gen.r#type.as_str(),
-                        &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default())?);
-                  }
-                  categories.insert(GeneratorCategory::BODY, generators);
-                }
-
-                if !response.metadata_generators.is_empty() {
-                  let mut generators = hashmap!{};
-                  for (k, gen) in &response.metadata_generators {
-                    generators.insert(DocPath::new(k)?,
-                      Generator::create(gen.r#type.as_str(),
-                        &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default())?);
-                  }
-                  categories.insert(GeneratorCategory::METADATA, generators);
-                }
-
-                Some(Generators { categories })
-              } else {
-                None
-              };
-
-              let metadata = response.message_metadata.as_ref().map(|md| proto_struct_to_map(md));
-              let metadata_rules = Self::setup_matching_rules(&response.metadata_rules)?;
-
-              let plugin_config = if let Some(plugin_configuration) = &response.plugin_configuration {
-                PluginConfiguration {
-                  interaction_configuration: plugin_configuration.interaction_configuration.as_ref()
-                    .map(|val| proto_struct_to_map(val)).unwrap_or_default(),
-                  pact_configuration: plugin_configuration.pact_configuration.as_ref()
-                    .map(|val| proto_struct_to_map(val)).unwrap_or_default()
-                }
-              } else {
-                PluginConfiguration::default()
-              };
-
-              debug!("body={}", body);
-              debug!("rules={:?}", rules);
-              debug!("generators={:?}", generators);
-              debug!("metadata={:?}", metadata);
-              debug!("metadata_rules={:?}", metadata_rules);
-              debug!("pluginConfig={:?}", plugin_config);
-
-              results.push(InteractionContents {
-                part_name: response.part_name.clone(),
-                body,
-                rules,
-                generators,
-                metadata,
-                metadata_rules,
-                plugin_config,
-                interaction_markup: response.interaction_markup.clone(),
-                interaction_markup_type: match response.interaction_markup_type() {
-                  MarkupType::Html => "HTML".to_string(),
-                  _ => "COMMON_MARK".to_string(),
-                }
-              })
-            }
-
-            Ok((results, response.plugin_configuration.map(|config| PluginConfiguration::from(config))))
-          } else {
-            Err(anyhow!("Request to configure interaction failed: {}", response.error))
-          }
-        }
-        Err(err) => {
-          error!("Call to plugin failed - {}", err);
-          Err(anyhow!("Call to plugin failed - {}", err))
-        }
-      },
+      Some(plugin) => plugin.configure_interaction(content_type, &definition).await,
       None => {
         error!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry);
         Err(anyhow!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry))
       }
-    }
-  }
-
-  fn setup_matching_rules(rules_map: &HashMap<String, crate::proto::MatchingRules>) -> anyhow::Result<Option<MatchingRuleCategory>> {
-    if !rules_map.is_empty() {
-      let mut rules = hashmap!{};
-      for (k, rule_list) in rules_map {
-        let mut vec = vec![];
-        for rule in &rule_list.rule {
-          let mr = MatchingRule::create(rule.r#type.as_str(), &rule.values.as_ref().map(|rule| {
-            proto_struct_to_json(rule)
-          }).unwrap_or_default())?;
-          vec.push(mr);
-        }
-        rules.insert(DocPath::new(k)?, RuleList {
-          rules: vec,
-          rule_logic: RuleLogic::And,
-          cascaded: false
-        });
-      }
-      Ok(Some(MatchingRuleCategory { name: Category::BODY, rules }))
-    } else {
-      Ok(None)
     }
   }
 
@@ -329,87 +198,52 @@ impl ContentMatcher {
     allow_unexpected_keys: bool,
     plugin_config: Option<PluginInteractionConfig>
   ) -> Result<(), HashMap<String, Vec<ContentMismatch>>> {
-    let request = CompareContentsRequest {
-      expected: Some(Body {
-        content_type: expected.content_type().unwrap_or_default().to_string(),
-        content: expected.value().map(|b| b.to_vec()),
-        content_type_hint: body::ContentTypeHint::Default as i32
-      }),
-      actual: Some(Body {
-        content_type: actual.content_type().unwrap_or_default().to_string(),
-        content: actual.value().map(|b| b.to_vec()),
-        content_type_hint: body::ContentTypeHint::Default as i32
-      }),
+    let request = CompareContentRequest {
+      expected_contents: expected.clone(),
+      actual_contents: actual.clone(),
       allow_unexpected_keys,
-      rules: context.rules.iter().map(|(k, r)| {
-        (k.to_string(), crate::proto::MatchingRules {
-          rule: r.rules.iter().map(|rule|{
-            crate::proto::MatchingRule {
-              r#type: rule.name(),
-              values: Some(to_proto_struct(&rule.values().iter().map(|(k, v)| (k.to_string(), v.clone())).collect())),
-            }
-          }).collect()
-        })
-      }).collect(),
-      plugin_configuration: plugin_config.map(|config| ProtoPluginConfiguration {
-        interaction_configuration: Some(to_proto_struct(&config.interaction_configuration)),
-        pact_configuration: Some(to_proto_struct(&config.pact_configuration))
-      })
+      matching_rules: context.rules.clone(),
+      plugin_configuration: plugin_config.clone(),
+      .. CompareContentRequest::default()
     };
 
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()
       .expect("Plugin type is required");
     match lookup_plugin(&plugin_manifest.as_dependency()) {
-      Some(plugin) => match plugin.compare_contents(request).await {
-        Ok(response) => if let Some(mismatch) = response.type_mismatch {
-          Err(hashmap!{
+      Some(plugin) => match plugin.match_contents(request).await {
+        Ok(response) => match response {
+          CompareContentResult::Error(err) => Err(hashmap! {
+              String::default() => vec![
+                ContentMismatch {
+                  expected: Default::default(),
+                  actual: Default::default(),
+                  mismatch: err.clone(),
+                  path: "".to_string(),
+                  diff: None,
+                  mismatch_type: None
+                }
+              ]
+            }),
+          CompareContentResult::TypeMismatch(expected, actual) => Err(hashmap!{
             String::default() => vec![
               ContentMismatch {
-                expected: mismatch.expected.clone(),
-                actual: mismatch.actual.clone(),
-                mismatch: format!("Expected content type '{}' but got '{}'", mismatch.expected, mismatch.actual),
+                expected: expected.clone(),
+                actual: actual.clone(),
+                mismatch: format!("Expected content type '{}' but got '{}'", expected, actual),
                 path: "".to_string(),
                 diff: None,
                 mismatch_type: None
               }
             ]
-          })
-        } else if !response.error.is_empty() {
-          Err(hashmap! {
-            String::default() => vec![
-              ContentMismatch {
-                expected: Default::default(),
-                actual: Default::default(),
-                mismatch: response.error.clone(),
-                path: "".to_string(),
-                diff: None,
-                mismatch_type: None
-              }
-            ]
-          })
-        } else if !response.results.is_empty() {
-          Err(response.results.iter().map(|(k, v)| {
-            (k.clone(), v.mismatches.iter().map(|mismatch| {
-              ContentMismatch {
-                expected: mismatch.expected.as_ref()
-                  .map(|e| from_utf8(&e).unwrap_or_default().to_string())
-                  .unwrap_or_default(),
-                actual: mismatch.actual.as_ref()
-                  .map(|a| from_utf8(&a).unwrap_or_default().to_string())
-                  .unwrap_or_default(),
-                mismatch: mismatch.mismatch.clone(),
-                path: mismatch.path.clone(),
-                diff: if mismatch.diff.is_empty() {
-                  None
-                } else {
-                  Some(mismatch.diff.clone())
-                },
-                mismatch_type: Some(mismatch.mismatch_type.clone())
-              }
-            }).collect())
-          }).collect())
-        } else {
-          Ok(())
+          }),
+          CompareContentResult::Mismatches(mismatches) => {
+            if mismatches.is_empty() {
+              Ok(())
+            } else {
+              Err(mismatches.clone())
+            }
+          }
+          CompareContentResult::OK => Ok(())
         }
         Err(err) => {
           error!("Call to plugin failed - {}", err);
@@ -496,24 +330,12 @@ impl ContentGenerator {
     let interaction_data = interaction_data.get(&pact_plugin_manifest.name);
 
     let request = GenerateContentRequest {
-      contents: Some(crate::proto::Body {
-        content_type: content_type.to_string(),
-        content: Some(body.value().unwrap_or_default().to_vec()),
-        content_type_hint: body::ContentTypeHint::Default as i32
-      }),
-      generators: generators.iter().map(|(k, v)| {
-        (k.clone(), crate::proto::Generator {
-          r#type: v.name(),
-          values: Some(to_proto_struct(&v.values().iter()
-            .map(|(k, v)| (k.to_string(), v.clone())).collect())),
-        })
-      }).collect(),
-      plugin_configuration: Some(ProtoPluginConfiguration {
-        pact_configuration: plugin_data.as_ref().map(to_proto_struct),
-        interaction_configuration: interaction_data.map(to_proto_struct),
-        .. ProtoPluginConfiguration::default()
-      }),
-      test_context: Some(to_proto_struct(&context.iter().map(|(k, v)| (k.to_string(), v.clone())).collect())),
+      content_type: content_type.clone(),
+      content: body.clone(),
+      generators: generators.clone(),
+      plugin_data: plugin_data.clone(),
+      interaction_data: interaction_data.cloned(),
+      test_context: context.iter().map(|(k, v)| (k.to_string(), v.clone())).collect(),
       .. GenerateContentRequest::default()
     };
 
@@ -522,16 +344,7 @@ impl ContentGenerator {
     match lookup_plugin(&plugin_manifest.as_dependency()) {
       Some(plugin) => {
         debug!("Sending generateContent request to plugin {:?}", plugin_manifest);
-        match plugin.generate_content(request).await?.contents {
-          Some(contents) => {
-            Ok(OptionalBody::Present(
-              Bytes::from(contents.content.unwrap_or_default()),
-              ContentType::parse(contents.content_type.as_str()).ok(),
-              None
-            ))
-          }
-          None => Ok(OptionalBody::Empty)
-        }
+        plugin.generate_contents(request).await
       },
       None => {
         error!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry);

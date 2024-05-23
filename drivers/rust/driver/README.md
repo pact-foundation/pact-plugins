@@ -17,6 +17,7 @@ All features are enabled by default
   `chronos` crate as a dependency.
 * `xml`: Enables support for parsing XML documents. This feature will add the `sxd-document`
   crate as a dependency.
+* `lua`: Enables plugins written in Lua (Lua 5.4).
 
 ## Building the Rust driver
 

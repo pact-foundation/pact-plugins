@@ -1,6 +1,6 @@
 [package]
 name = "pact-plugin-driver"
-version = "0.6.2"
+version = "0.7.0"
 description = "Pact support library that provides an interface for interacting with Pact plugins"
 edition = "2021"
 documentation = "https://docs.rs/pact-plugin-driver"
@@ -15,9 +15,10 @@ exclude = [
 ]
 
 [features]
-default = ["datetime", "xml"]
+default = ["datetime", "xml", "lua"]
 datetime = ["pact_models/datetime"] # Support for date/time matchers and expressions
 xml = ["pact_models/xml"] # support for matching XML documents
+lua = ["dep:mlua"] # support for plugins written in Lua
 
 [dependencies]
 anyhow = "1.0.82"
@@ -29,11 +30,12 @@ flate2 = "1.0.28"
 futures-util = "0.3.30"
 home = "0.5.9"
 indicatif = "0.17.8"
-itertools = "0.12.1"
+itertools = "0.13.0"
 lazy_static = "1.4.0"
 log = "0.4.21"
 maplit = "1.0.2"
 md5 = "0.7.0"
+mlua = { version = "0.9.8", features = ["lua54", "vendored"], optional = true }
 os_info = "3.7.0"
 pact_models = { version = "~1.2.0", default-features = false }
 prost = "0.12.4"
@@ -52,7 +54,7 @@ tonic = "0.11.0"
 tracing = { version = "0.1.40", features = [ "log" ] }  # This needs to be the same version across all the pact libs (i.e. pact ffi)
 tracing-core = "0.1.32"  # This needs to be the same version across all the pact libs (i.e. pact ffi)
 uuid = { version = "1.8.0", features = ["v4"] }
-zip = "0.6.6"
+zip = "1.3.1"
 
 [dev-dependencies]
 env_logger = "0.11.3"

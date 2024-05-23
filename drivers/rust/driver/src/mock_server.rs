@@ -19,7 +19,7 @@ pub struct MockServerConfig {
 }
 
 /// Details of the running mock server
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct MockServerDetails {
   /// Unique key for the mock server
   pub key: String,
@@ -28,7 +28,7 @@ pub struct MockServerDetails {
   /// Port the mock server is running on
   pub port: u32,
   /// Plugin the mock server belongs to
-  pub plugin: PactPlugin
+  pub plugin: Box<dyn PactPlugin + Send + Sync>
 }
 
 /// Results from the mock server
