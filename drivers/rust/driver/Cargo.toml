@@ -55,9 +55,9 @@ tonic = "0.11.0"
 tracing = { version = "0.1.40", features = [ "log" ] }  # This needs to be the same version across all the pact libs (i.e. pact ffi)
 tracing-core = "0.1.32"  # This needs to be the same version across all the pact libs (i.e. pact ffi)
 uuid = { version = "1.8.0", features = ["v4"] }
-zip = "1.3.1"
+zip = "2.1.0"
 rand = "0.8.5"
-base64 = "0.21.7"
+base64 = "0.22.1"
 
 [dev-dependencies]
 env_logger = "0.11.3"
