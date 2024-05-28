@@ -1,0 +1,11 @@
+{
+  "manifestVersion": 1,
+  "pluginInterfaceVersion": 1,
+  "name": "jwt",
+  "version": "0.0.0",
+  "executableType": "lua",
+  "entryPoint": "plugin.lua",
+  "pluginConfig": {
+  }
+}
+
