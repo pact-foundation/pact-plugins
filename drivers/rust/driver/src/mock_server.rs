@@ -1,6 +1,7 @@
 //! Module to support dealing with mock servers from plugins
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use crate::content::ContentMismatch;
 use crate::plugin_models::PactPlugin;
@@ -19,7 +20,7 @@ pub struct MockServerConfig {
 }
 
 /// Details of the running mock server
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MockServerDetails {
   /// Unique key for the mock server
   pub key: String,
@@ -28,7 +29,7 @@ pub struct MockServerDetails {
   /// Port the mock server is running on
   pub port: u32,
   /// Plugin the mock server belongs to
-  pub plugin: Box<dyn PactPlugin + Send + Sync>
+  pub plugin: Arc<dyn PactPlugin + Send + Sync>
 }
 
 /// Results from the mock server

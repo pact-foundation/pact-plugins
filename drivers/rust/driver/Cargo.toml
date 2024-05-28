@@ -35,13 +35,14 @@ lazy_static = "1.4.0"
 log = "0.4.21"
 maplit = "1.0.2"
 md5 = "0.7.0"
-mlua = { version = "0.9.8", features = ["lua54", "vendored"], optional = true }
+mlua = { version = "0.9.8", features = ["lua54", "vendored", "async", "serialize", "send"], optional = true }
 os_info = "3.7.0"
 pact_models = { version = "~1.2.0", default-features = false }
 prost = "0.12.4"
 prost-types = "0.12.4"
 regex = "1.10.4"
 reqwest = { version = "0.12.3", default-features = false, features = ["rustls-tls-native-roots", "json", "gzip", "deflate", "stream"] }
+rsa = { version = "0.9.6", features = ["sha2"] }
 semver = "1.0.22"
 serde_json = "1.0.115"
 serde = { version = "1.0.197",  features = ["derive"] }
@@ -55,6 +56,8 @@ tracing = { version = "0.1.40", features = [ "log" ] }  # This needs to be the s
 tracing-core = "0.1.32"  # This needs to be the same version across all the pact libs (i.e. pact ffi)
 uuid = { version = "1.8.0", features = ["v4"] }
 zip = "1.3.1"
+rand = "0.8.5"
+base64 = "0.21.7"
 
 [dev-dependencies]
 env_logger = "0.11.3"

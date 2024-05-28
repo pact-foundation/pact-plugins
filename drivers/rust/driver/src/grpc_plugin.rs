@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use anyhow::anyhow;
 use async_trait::async_trait;
 use bytes::Bytes;
-use itertools::Either;
+use itertools::{Either, Itertools};
 use log::max_level;
 use maplit::hashmap;
 #[cfg(not(windows))] use os_info::Type;
@@ -34,13 +34,42 @@ use tonic::service::Interceptor;
 use tonic::transport::Channel;
 use tracing::{debug, trace, warn};
 
-use crate::catalogue_manager::{CatalogueEntry, register_plugin_entries};
+use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType, CatalogueEntryType, register_plugin_entries};
 #[cfg(not(windows))] use crate::child_process::ChildPluginProcess;
 #[cfg(windows)]  use crate::child_process_windows::ChildPluginProcess;
 use crate::content::{ContentMismatch, InteractionContents};
 use crate::mock_server::{MockServerConfig, MockServerDetails};
 use crate::plugin_models::{CompareContentResult, PactPlugin, PactPluginManifest};
-use crate::proto::{body, Body, Catalogue, CompareContentsRequest, CompareContentsResponse, ConfigureInteractionRequest, ConfigureInteractionResponse, GenerateContentRequest, GenerateContentResponse, InitPluginRequest, InitPluginResponse, InteractionData, metadata_value, MetadataValue, MockServerRequest, MockServerResults, PluginConfiguration, ShutdownMockServerRequest, ShutdownMockServerResponse, start_mock_server_response, StartMockServerRequest, StartMockServerResponse, verification_preparation_response, VerificationPreparationRequest, VerificationPreparationResponse, verify_interaction_response, VerifyInteractionRequest, VerifyInteractionResponse};
+use crate::proto::{
+  body,
+  Body,
+  Catalogue,
+  CompareContentsRequest,
+  CompareContentsResponse,
+  ConfigureInteractionRequest,
+  ConfigureInteractionResponse,
+  GenerateContentRequest,
+  GenerateContentResponse,
+  InitPluginRequest,
+  InitPluginResponse,
+  InteractionData,
+  metadata_value,
+  MetadataValue,
+  MockServerRequest,
+  MockServerResults,
+  PluginConfiguration,
+  ShutdownMockServerRequest,
+  ShutdownMockServerResponse,
+  start_mock_server_response,
+  StartMockServerRequest,
+  StartMockServerResponse,
+  verification_preparation_response,
+  VerificationPreparationRequest,
+  VerificationPreparationResponse,
+  verify_interaction_response,
+  VerifyInteractionRequest,
+  VerifyInteractionResponse
+};
 use crate::proto::interaction_response::MarkupType;
 use crate::proto::pact_plugin_client::PactPluginClient;
 use crate::utils::{optional_string, proto_struct_to_json, proto_struct_to_map, proto_value_to_json, to_proto_struct, to_proto_value};
@@ -574,7 +603,7 @@ impl PactPlugin for GrpcPactPlugin {
         key: details.key.clone(),
         base_url: details.address.clone(),
         port: details.port,
-        plugin: self.boxed()
+        plugin: self.arced()
       })
     }
   }
@@ -679,7 +708,18 @@ pub async fn init_handshake(manifest: &PactPluginManifest, plugin: &mut (dyn Pac
   };
   let response = plugin.init_plugin(request).await?;
   debug!("Got init response {:?} from plugin {}", response, manifest.name);
-  register_plugin_entries(manifest, &response.catalogue);
+  let vec = response.catalogue.iter().map(|entry| {
+    let entry_type = CatalogueEntryType::from(entry.r#type());
+    CatalogueEntry {
+      entry_type,
+      provider_type: CatalogueEntryProviderType::PLUGIN,
+      plugin: Some(manifest.clone()),
+      key: entry.key.clone(),
+      values: entry.values.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+    }
+  }).collect_vec();
+  register_plugin_entries(manifest, vec);
+
   Ok(())
 }
 

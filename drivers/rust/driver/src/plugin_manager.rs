@@ -24,6 +24,7 @@ use tracing::{debug, info, trace, warn};
 use crate::catalogue_manager::{all_entries, CatalogueEntry, remove_plugin_entries};
 use crate::download::{download_json_from_github, download_plugin_executable, fetch_json_from_url};
 use crate::grpc_plugin::{init_handshake, start_plugin_process};
+use crate::lua_plugin::start_lua_plugin;
 use crate::metrics::send_metrics;
 use crate::mock_server::{MockServerConfig, MockServerDetails, MockServerResults};
 use crate::plugin_models::{PactPlugin, PactPluginManifest, PluginDependency};
@@ -236,7 +237,19 @@ async fn initialise_plugin<'a>(
     }
     "lua" => {
       #[cfg(feature = "lua")] {
-        todo!()
+        let mut plugin = start_lua_plugin(manifest)?;
+        debug!("Plugin started OK ({:?}), sending init message", plugin);
+
+        plugin.init()?;
+
+        // This causes a deadlock
+        //publish_updated_catalogue();
+
+        let arc = Arc::new(plugin);
+        let key = format!("{}/{}", manifest.name, manifest.version);
+        plugin_register.insert(key, arc.clone());
+
+        Ok(arc)
       }
       #[cfg(not(feature = "lua"))] {
         Err(anyhow!("Lua plugins are not supported (Lua feature flag is not enabled)"))
@@ -278,16 +291,18 @@ pub fn publish_updated_catalogue() {
   let inner = PLUGIN_REGISTER.lock().unwrap();
   trace!("publish_updated_catalogue {:?}: Got PLUGIN_REGISTER lock", thread_id);
   for plugin in inner.values() {
-    tokio::task::spawn(publish_catalogue_to_plugin(catalogue.clone(), plugin.clone()));
+    publish_catalogue_to_plugin(catalogue.clone(), plugin.clone());
   }
 
   trace!("publish_updated_catalogue {:?}: Releasing PLUGIN_REGISTER lock", thread_id);
 }
 
-async fn publish_catalogue_to_plugin(catalogue: Vec<CatalogueEntry>, plugin: Arc<dyn PactPlugin + Send + Sync>) {
-  if let Err(err) = plugin.publish_updated_catalogue(catalogue.as_slice()).await {
-    warn!("Failed to send updated catalogue to plugin '{}' - {}", plugin.manifest().name, err);
-  }
+fn publish_catalogue_to_plugin(catalogue: Vec<CatalogueEntry>, plugin: Arc<dyn PactPlugin + Send + Sync>) {
+  tokio::task::spawn(async move {
+    if let Err(err) = plugin.publish_updated_catalogue(catalogue.as_slice()).await {
+      warn!("Failed to send updated catalogue to plugin '{}' - {}", plugin.manifest().name, err);
+    }
+  });
 }
 
 /// Increment access to the plugin.

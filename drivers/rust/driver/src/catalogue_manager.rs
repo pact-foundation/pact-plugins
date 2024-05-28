@@ -15,7 +15,6 @@ use tracing::{debug, error, trace};
 use crate::content::{ContentGenerator, ContentMatcher};
 use crate::plugin_models::PactPluginManifest;
 use crate::proto::catalogue_entry::EntryType;
-use crate::proto::CatalogueEntry as ProtoCatalogueEntry;
 
 lazy_static! {
   static ref CATALOGUE_REGISTER: Mutex<HashMap<String, CatalogueEntry>> = Mutex::new(HashMap::new());
@@ -119,26 +118,20 @@ pub struct CatalogueEntry {
   pub plugin: Option<PactPluginManifest>,
   /// Entry key
   pub key: String,
-  /// assocaited Entry values
+  /// associated Entry values
   pub values: HashMap<String, String>
 }
 
 /// Register the entries in the global catalogue
-pub fn register_plugin_entries(plugin: &PactPluginManifest, catalogue_list: &Vec<ProtoCatalogueEntry>) {
+pub fn register_plugin_entries(plugin: &PactPluginManifest, catalogue_list: Vec<CatalogueEntry>) {
   trace!("register_plugin_entries({:?}, {:?})", plugin, catalogue_list);
 
   let mut guard = CATALOGUE_REGISTER.lock().unwrap();
 
   for entry in catalogue_list {
-    let entry_type = CatalogueEntryType::from(entry.r#type());
+    let entry_type = entry.entry_type;
     let key = format!("plugin/{}/{}/{}", plugin.name, entry_type, entry.key);
-    guard.insert(key.clone(), CatalogueEntry {
-      entry_type,
-      provider_type: CatalogueEntryProviderType::PLUGIN,
-      plugin: Some(plugin.clone()),
-      key: entry.key.clone(),
-      values: entry.values.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
-    });
+    guard.insert(key.clone(), entry.clone());
   }
 
   debug!("Updated catalogue entries:\n{}", guard.keys().sorted().join("\n"))

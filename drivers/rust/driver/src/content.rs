@@ -7,6 +7,7 @@ use pact_models::bodies::OptionalBody;
 use pact_models::matchingrules::MatchingRuleCategory;
 use pact_models::prelude::{ContentType, Generator, Generators};
 use pact_models::plugins::PluginData;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::{debug, error};
 
@@ -104,9 +105,9 @@ impl Default for InteractionContents {
 }
 
 /// Plugin data to persist into the Pact file
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct PluginConfiguration {
-  /// Data to perist on the interaction
+  /// Data to persist on the interaction
   pub interaction_configuration: HashMap<String, Value>,
   /// Data to persist in the Pact metadata
   pub pact_configuration: HashMap<String, Value>
@@ -175,7 +176,7 @@ impl ContentMatcher {
   ) -> anyhow::Result<(Vec<InteractionContents>, Option<PluginConfiguration>)> {
     debug!("Sending ConfigureContents request to plugin {:?}", self.catalogue_entry);
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()
-      .expect("Plugin type is required");
+      .expect("Plugin manifest is required");
     match lookup_plugin(&plugin_manifest.as_dependency()) {
       Some(plugin) => plugin.configure_interaction(content_type, &definition).await,
       None => {
