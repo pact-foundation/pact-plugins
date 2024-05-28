@@ -237,12 +237,12 @@ async fn initialise_plugin<'a>(
     }
     "lua" => {
       #[cfg(feature = "lua")] {
-        let mut plugin = start_lua_plugin(manifest)?;
+        let plugin = start_lua_plugin(manifest)?;
         debug!("Plugin started OK ({:?}), sending init message", plugin);
 
         plugin.init()?;
 
-        // This causes a deadlock
+        // TODO: This causes a deadlock
         //publish_updated_catalogue();
 
         let arc = Arc::new(plugin);

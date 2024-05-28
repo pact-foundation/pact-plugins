@@ -2,8 +2,8 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::process::Stdio;
 #[cfg(windows)] use std::process::Command;
+use std::process::Stdio;
 use std::str::from_utf8;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -828,5 +828,142 @@ pub(crate) async fn start_plugin_process(manifest: &PactPluginManifest) -> anyho
 
 #[cfg(test)]
 pub(crate) mod tests {
+  use async_trait::async_trait;
+  use expectest::prelude::*;
+  use maplit::hashmap;
 
+  use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType, CatalogueEntryType, lookup_entry, remove_plugin_entries};
+  use crate::grpc_plugin::{init_handshake, PactPluginRpc};
+  use crate::plugin_models::PactPluginManifest;
+  use crate::proto::{
+    Catalogue,
+    catalogue_entry,
+    CatalogueEntry as ProtoCatalogueEntry,
+    CompareContentsRequest,
+    CompareContentsResponse,
+    ConfigureInteractionRequest,
+    ConfigureInteractionResponse,
+    GenerateContentRequest,
+    GenerateContentResponse,
+    InitPluginRequest,
+    InitPluginResponse,
+    MockServerRequest,
+    MockServerResults,
+    ShutdownMockServerRequest,
+    ShutdownMockServerResponse,
+    StartMockServerRequest,
+    StartMockServerResponse,
+    VerificationPreparationRequest,
+    VerificationPreparationResponse,
+    VerifyInteractionRequest,
+    VerifyInteractionResponse
+  };
+
+  #[derive(Default, Debug, Clone)]
+  struct MockPlugin {}
+
+  #[async_trait]
+  impl PactPluginRpc for MockPlugin {
+    async fn init_plugin(&mut self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
+      let entries = vec![
+        ProtoCatalogueEntry {
+          r#type: catalogue_entry::EntryType::ContentMatcher as i32,
+          key: "protobuf".to_string(),
+          values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() }
+        },
+        ProtoCatalogueEntry {
+          r#type: catalogue_entry::EntryType::ContentGenerator as i32,
+          key: "protobuf".to_string(),
+          values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() }
+        },
+        ProtoCatalogueEntry {
+          r#type: catalogue_entry::EntryType::Transport as i32,
+          key: "grpc".to_string(),
+          values: hashmap!{}
+        }
+      ];
+      Ok(InitPluginResponse {
+        catalogue: entries
+      })
+    }
+
+    async fn compare_contents(&self, _request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
+      todo!()
+    }
+
+    async fn configure_interaction(&self, _request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
+      todo!()
+    }
+
+    async fn generate_content(&self, _request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
+      todo!()
+    }
+
+    async fn start_mock_server(&self, _request: StartMockServerRequest) -> anyhow::Result<StartMockServerResponse> {
+      todo!()
+    }
+
+    async fn shutdown_mock_server(&self, _request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse> {
+      todo!()
+    }
+
+    async fn get_mock_server_results(&self, _request: MockServerRequest) -> anyhow::Result<MockServerResults> {
+      todo!()
+    }
+
+    async fn prepare_interaction_for_verification(&self, _request: VerificationPreparationRequest) -> anyhow::Result<VerificationPreparationResponse> {
+      todo!()
+    }
+
+    async fn verify_interaction(&self, _request: VerifyInteractionRequest) -> anyhow::Result<VerifyInteractionResponse> {
+      todo!()
+    }
+
+    async fn update_catalogue(&self, _request: Catalogue) -> anyhow::Result<()> {
+      todo!()
+    }
+  }
+
+  #[tokio::test]
+  async fn init_handshake_sets_plugin_catalogue_entries_correctly() {
+    // Given
+    let manifest = PactPluginManifest {
+      name: "init_handshake_sets_plugin_catalogue_entries_correctly".to_string(),
+      .. PactPluginManifest::default()
+    };
+
+    let mut mock_plugin = MockPlugin {};
+
+    // When
+    init_handshake(&manifest, &mut mock_plugin).await.unwrap();
+
+    // Then
+    let matcher_entry = lookup_entry("content-matcher/protobuf");
+    let generator_entry = lookup_entry("content-generator/protobuf");
+    let transport_entry = lookup_entry("transport/grpc");
+
+    remove_plugin_entries("init_handshake_sets_plugin_catalogue_entries_correctly");
+
+    expect!(matcher_entry).to(be_some().value(CatalogueEntry {
+      entry_type: CatalogueEntryType::CONTENT_MATCHER,
+      provider_type: CatalogueEntryProviderType::PLUGIN,
+      plugin: Some(manifest.clone()),
+      key: "protobuf".to_string(),
+      values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() }
+    }));
+    expect!(generator_entry).to(be_some().value(CatalogueEntry {
+      entry_type: CatalogueEntryType::CONTENT_GENERATOR,
+      provider_type: CatalogueEntryProviderType::PLUGIN,
+      plugin: Some(manifest.clone()),
+      key: "protobuf".to_string(),
+      values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() }
+    }));
+    expect!(transport_entry).to(be_some().value(CatalogueEntry {
+      entry_type: CatalogueEntryType::TRANSPORT,
+      provider_type: CatalogueEntryProviderType::PLUGIN,
+      plugin: Some(manifest.clone()),
+      key: "grpc".to_string(),
+      values: hashmap!{}
+    }));
+  }
 }

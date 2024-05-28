@@ -122,6 +122,18 @@ pub struct CatalogueEntry {
   pub values: HashMap<String, String>
 }
 
+impl Default for CatalogueEntry {
+  fn default() -> Self {
+    CatalogueEntry {
+      entry_type: CatalogueEntryType::CONTENT_MATCHER,
+      provider_type: CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: "".to_string(),
+      values: Default::default(),
+    }
+  }
+}
+
 /// Register the entries in the global catalogue
 pub fn register_plugin_entries(plugin: &PactPluginManifest, catalogue_list: Vec<CatalogueEntry>) {
   trace!("register_plugin_entries({:?}, {:?})", plugin, catalogue_list);
@@ -251,10 +263,8 @@ pub fn all_entries() -> Vec<CatalogueEntry> {
 
 #[cfg(test)]
 mod tests {
-  use expectest::prelude::*;
   use maplit::hashmap;
-
-  use crate::proto::catalogue_entry;
+  use pretty_assertions::assert_eq;
 
   use super::*;
 
@@ -266,25 +276,31 @@ mod tests {
       .. PactPluginManifest::default()
     };
     let entries = vec![
-      ProtoCatalogueEntry {
-        r#type: catalogue_entry::EntryType::ContentMatcher as i32,
+      CatalogueEntry {
+        entry_type: CatalogueEntryType::CONTENT_MATCHER,
+        provider_type: CatalogueEntryProviderType::PLUGIN,
         key: "protobuf".to_string(),
-        values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() }
+        values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() },
+        .. CatalogueEntry::default()
       },
-      ProtoCatalogueEntry {
-        r#type: catalogue_entry::EntryType::ContentGenerator as i32,
+      CatalogueEntry {
+        entry_type: CatalogueEntryType::CONTENT_GENERATOR,
+        provider_type: CatalogueEntryProviderType::PLUGIN,
         key: "protobuf".to_string(),
-        values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() }
+        values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() },
+        .. CatalogueEntry::default()
       },
-      ProtoCatalogueEntry {
-        r#type: catalogue_entry::EntryType::Transport as i32,
+      CatalogueEntry {
+        entry_type: CatalogueEntryType::TRANSPORT,
+        provider_type: CatalogueEntryProviderType::PLUGIN,
         key: "grpc".to_string(),
-        values: hashmap!{}
+        values: hashmap!{},
+        .. CatalogueEntry::default()
       }
     ];
 
     // When
-    register_plugin_entries(&manifest, &entries);
+    register_plugin_entries(&manifest, entries);
 
     // Then
     let matcher_entry = lookup_entry("content-matcher/protobuf");
@@ -293,26 +309,26 @@ mod tests {
 
     remove_plugin_entries("sets_plugin_catalogue_entries_correctly");
 
-    expect!(matcher_entry).to(be_some().value(CatalogueEntry {
+    assert_eq!(matcher_entry.unwrap(), CatalogueEntry {
       entry_type: CatalogueEntryType::CONTENT_MATCHER,
       provider_type: CatalogueEntryProviderType::PLUGIN,
-      plugin: Some(manifest.clone()),
+      plugin: None,
       key: "protobuf".to_string(),
       values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() }
-    }));
-    expect!(generator_entry).to(be_some().value(CatalogueEntry {
+    });
+    assert_eq!(generator_entry.unwrap(), CatalogueEntry {
       entry_type: CatalogueEntryType::CONTENT_GENERATOR,
       provider_type: CatalogueEntryProviderType::PLUGIN,
-      plugin: Some(manifest.clone()),
+      plugin: None,
       key: "protobuf".to_string(),
       values: hashmap!{ "content-types".to_string() => "application/protobuf;application/grpc".to_string() }
-    }));
-    expect!(transport_entry).to(be_some().value(CatalogueEntry {
+    });
+    assert_eq!(transport_entry.unwrap(), CatalogueEntry {
       entry_type: CatalogueEntryType::TRANSPORT,
       provider_type: CatalogueEntryProviderType::PLUGIN,
-      plugin: Some(manifest.clone()),
+      plugin: None,
       key: "grpc".to_string(),
       values: hashmap!{}
-    }));
+    });
   }
 }
