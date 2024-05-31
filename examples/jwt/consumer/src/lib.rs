@@ -1,10 +1,14 @@
 #[cfg(test)]
 mod tests {
+  use std::time::{SystemTime, UNIX_EPOCH};
   use expectest::prelude::*;
+  use jsonwebtoken::{Algorithm, encode, EncodingKey, Header};
+  use maplit::btreemap;
   use pact_consumer::mock_server::StartMockServerAsync;
   use pact_consumer::prelude::*;
   use pact_models::prelude::ContentType;
   use serde_json::json;
+  use serde::{Deserialize, Serialize};
 
   const PRIVATE_KEY: &str = r#"-----BEGIN RSA PRIVATE KEY-----
 MIIJKQIBAAKCAgEAv5XJWUG5jhmIywo+a+dv6W7tq2b0l/A4sVRfNuOaF+10KLyg
@@ -58,6 +62,14 @@ TGoVBbVjhFM6qFjI0lkz6Q3bMxlTwp4cN0bqOe+ogGJKCf6Nt0W2xD0Oy10OnXAe
 ceBsAZahv7NEeMe2Py5yrHZoNWxbf64EJXxzLCbtfBLSGvduzUoQDZqXC9Jh
 -----END RSA PRIVATE KEY-----"#;
 
+  #[derive(Debug, Serialize, Deserialize, Default)]
+  struct Claims {
+    aud: String,         // Optional. Audience
+    exp: u64,            // Required (validate_exp defaults to true in validation). Expiration time (as UTC timestamp)
+    iss: String,         // Optional. Issuer
+    sub: String,         // Optional. Subject (whom token refers to)
+  }
+
   #[test_log::test(tokio::test)]
   async fn test_post_jwt() {
     let mut builder = PactBuilder::new_v4("JwtClient", "JwtServer")
@@ -69,6 +81,7 @@ ceBsAZahv7NEeMe2Py5yrHZoNWxbf64EJXxzLCbtfBLSGvduzUoQDZqXC9Jh
         .contents(ContentType::from("application/jwt+json"), json!({
           "audience": "1234566778",
           "subject": "slksjkdjkdks",
+          "issuer": "ldsdkdalds",
           "algorithm": "RS512",
           "key-id": "key-112345564",
           "private-key": PRIVATE_KEY
@@ -78,6 +91,7 @@ ceBsAZahv7NEeMe2Py5yrHZoNWxbf64EJXxzLCbtfBLSGvduzUoQDZqXC9Jh
         .contents(ContentType::from("application/jwt+json"), json!({
           "audience": "1234566778",
           "subject": "slksjkdjkdks",
+          "issuer": "ldsdkdalds",
           "algorithm": "RS512",
           "key-id": "key-112345564",
           "private-key": PRIVATE_KEY
@@ -88,7 +102,26 @@ ceBsAZahv7NEeMe2Py5yrHZoNWxbf64EJXxzLCbtfBLSGvduzUoQDZqXC9Jh
       .await;
 
     let client = reqwest::Client::builder().build().unwrap();
+
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
+    let claims = Claims {
+      aud: "1234566778".to_string(),
+      exp: now,
+      iss: "ldsdkdalds".to_string(),
+      sub: "slksjkdjkdks".to_string(),
+      .. Claims::default()
+    };
+
+    let encoding_key = EncodingKey::from_rsa_pem(PRIVATE_KEY.as_bytes()).unwrap();
+    let header = Header {
+      kid: Some("key-112345564".to_string()),
+      .. Header::new(Algorithm::RS512)
+    };
+    let token = encode(&header, &claims, &encoding_key).unwrap();
+
     let response = client.post(format!("http://127.0.0.1:{}/token", jwt_service.url().port().unwrap()))
+      .header("content-type", "application/jwt+json")
+      .body(token)
       .send()
       .await
       .unwrap();

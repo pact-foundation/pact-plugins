@@ -38,7 +38,7 @@ impl ContentMatcher {
 }
 
 /// Mismatch result
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ContentMismatch {
   /// Expected value in string format
   // TODO: change to bytes

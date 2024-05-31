@@ -250,7 +250,7 @@ pub trait PactPlugin: Debug {
 }
 
 /// Plugin configuration to add to the matching context for an interaction
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct PluginInteractionConfig {
   /// Global plugin config (Pact level)
   pub pact_configuration: HashMap<String, Value>,
