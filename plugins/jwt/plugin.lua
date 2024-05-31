@@ -2,6 +2,8 @@
 
 local jwt = require "jwt"
 local json = require "json"
+local inspect = require "inspect"
+local matching = require "matching"
 
 -- Init function is called after the plugin script is loaded. It needs to return the plugin catalog
 -- entries to be added to the global catalog
@@ -11,7 +13,7 @@ function init(implementation, version)
     -- Add some entropy to the random number generator
     math.randomseed(os.time())
 
-    local params = { ["content-types"] = "application/jwt" }
+    local params = { ["content-types"] = "application/jwt;application/jwt+json" }
     local catalogue_entries = {}
     catalogue_entries[0] = { entryType="CONTENT_MATCHER", providerType="PLUGIN", key="jwt", values=params }
     catalogue_entries[1] = { entryType="CONTENT_GENERATOR", providerType="PLUGIN", key="jwt", values=params }
@@ -56,7 +58,11 @@ function configure_interaction(content_type, config)
     }
 
     local contents = {}
-    --[[ pub part_name: String,
+    --[[ 
+        /// Description of what part this interaction belongs to (in the case of there being more than
+        /// one, for instance, request/response messages)
+        pub part_name: String,
+
         /// Body/Contents of the interaction
         pub body: OptionalBody,
 
@@ -82,10 +88,76 @@ function configure_interaction(content_type, config)
         pub interaction_markup_type: String
     --]]
     contents[0] = {
-        body = signed_token,
+        body = {
+            contents = signed_token,
+            content_type = "application/jwt+json",
+            content_type_hint = "TEXT"
+        },
         plugin_config = plugin_config
     }
 
     -- (Vec<InteractionContents>, Option<PluginConfiguration>)
     return { contents = contents, plugin_config = plugin_config }
+end
+
+-- This function does the actual matching
+function match_contents(match_request)
+    --[[
+    /// The expected contents from the Pact interaction
+    pub expected_contents: OptionalBody,
+    /// The actual contents that was received
+    pub actual_contents: OptionalBody,
+    /// Where there are keys or attributes in the data, indicates whether unexpected values are allowed
+    pub allow_unexpected_keys: bool,
+    /// Matching rules that apply
+    pub matching_rules: HashMap<DocPath, RuleList>,
+    /// Plugin configuration form the Pact
+    pub plugin_configuration: Option<PluginInteractionConfig>
+    --]]
+    logger("Got a match request: " .. inspect(match_request))
+
+    local public_key = match_request.plugin_configuration.interaction_configuration["public-key"]
+    local algorithm = match_request.plugin_configuration.interaction_configuration["algorithm"]
+
+    local expected_jwt, error = jwt.decode_token(match_request.expected_contents.contents)
+    if error then
+        return { error = error }
+    end
+    logger("Expected JWT: " .. inspect(expected_jwt))
+
+    local actual_jwt, actual_error = jwt.decode_token(match_request.actual_contents.contents)
+    if actual_error then
+        return { error = actual_error }
+    end
+    logger("Actual JWT: " .. inspect(actual_jwt))
+
+    --[[
+    /// An error occurred trying to compare the contents
+    Error(String),
+    /// The content type was incorrect
+    TypeMismatch(String, String),
+    /// There were mismatched results
+    Mismatches(HashMap<String, Vec<ContentMismatch>>),
+    /// All OK
+    OK
+    --]]
+
+    local mismatches = {}
+
+    local token_issues = matching.validate_token(actual_jwt, algorithm, public_key)
+    mismatches["$"] = token_issues
+
+    local header_mismatches = matching.match_headers(expected_jwt.header, actual_jwt.header)
+    for k, v in pairs(header_mismatches) do
+        mismatches["header:" .. k] = v
+    end
+
+    local claim_mismatches = matching.match_claims(expected_jwt.payload, actual_jwt.payload)
+    for k, v in pairs(claim_mismatches) do
+        mismatches["claims:" .. k] = v
+    end
+
+    local result = { mismatches = mismatches }
+    logger("returning match result " .. inspect(result))
+    return result
 end
