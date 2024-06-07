@@ -3,14 +3,15 @@ package main
 import (
 	"fmt"
 
+	"log"
+	"net"
 	"os"
 	"path/filepath"
 	"testing"
-	"log"
-	"net"
 
-	ac "area_calculator/provider/io.pact/area_calculator"
 	area_provider "area_calculator/provider"
+	ac "area_calculator/provider/io.pact/area_calculator"
+
 	l "github.com/pact-foundation/pact-go/v2/log"
 	"github.com/pact-foundation/pact-go/v2/provider"
 	"github.com/stretchr/testify/assert"

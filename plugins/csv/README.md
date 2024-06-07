@@ -56,3 +56,22 @@ Without headers:
   "column:3": "matching(datetime, 'yyyy-MM-dd','2000-01-01')"
 }
 ```
+
+## Compatibility
+
+<details><summary>Supported Platforms</summary>
+
+| OS      | Architecture | Supported  | Pact CSV Plugin Version |
+| ------- | ------------ | ---------  | ---------------- |
+| OSX     | x86_64       | ✅         | All              |
+| Linux   | x86_64       | ✅         | All              |
+| Windows | x86_64       | ✅         | All              |
+| OSX     | arm64        | ✅         | >=0.0.1          |
+| Linux   | arm64        | ✅         | >=0.0.4          |
+| Windows | arm64        | ✅         | >=0.0.6          |
+| Alpine  | x86_64       | ✅         | >=0.0.6          |
+| Alpine  | arm64        | ✅         | >=0.0.6          |
+
+_Note:_ From v0.0.6, Linux executables are statically built with `musl` and as designed to work against `glibc` (eg, Debian) and `musl` (eg, Alpine) based distos.
+
+</details>

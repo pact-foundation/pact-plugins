@@ -28,7 +28,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.BytesValue
 import com.google.protobuf.Struct
 import com.vdurmont.semver4j.Semver
-import io.github.oshai.kotlinlogging.KLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
 import io.grpc.CallCredentials
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
@@ -52,9 +52,11 @@ import java.lang.Runtime.getRuntime
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
-import javax.json.Json
-import javax.json.JsonArray
-import javax.json.JsonObject
+import jakarta.json.Json
+import jakarta.json.JsonArray
+import jakarta.json.JsonObject
+
+private val logger = KotlinLogging.logger {}
 
 /**
  * Type of plugin dependency
@@ -175,7 +177,7 @@ data class DefaultPactPluginManifest(
     return map
   }
 
-  companion object : KLogging() {
+  companion object {
     @JvmStatic
     fun fromJson(pluginDir: File, pluginJson: JsonObject): PactPluginManifest {
       val entryPoints = if (pluginJson.containsKey("entryPoints")) {
@@ -366,7 +368,7 @@ interface PluginManager {
   ): Result<InteractionVerificationResult, String>
 }
 
-object DefaultPluginManager: KLogging(), PluginManager {
+object DefaultPluginManager: PluginManager {
   private val PLUGIN_MANIFEST_REGISTER: MutableMap<String, PactPluginManifest> = mutableMapOf()
   private val PLUGIN_REGISTER: MutableMap<String, PactPlugin> = ConcurrentHashMap()
 
@@ -1079,7 +1081,6 @@ class BearerCredentials(private val serverKey: String?) : CallCredentials() {
     }
   }
 
-  override fun thisUsesUnstableApi() {}
 }
 
 /**
