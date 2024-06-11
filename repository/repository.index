@@ -1,4 +1,4 @@
-index_version = 26
+index_version = 27
 format_version = 0
 timestamp = "2023-03-10T05:36:45.725083896Z"
 
@@ -78,9 +78,139 @@ dependencyType = "Plugin"
 
 [entries.avro.versions.manifest.pluginConfig]
 
+[entries.csv]
+name = "csv"
+latest_version = "0.0.6"
+
+[[entries.csv.versions]]
+version = "0.0.0"
+
+[entries.csv.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.0"
+
+[entries.csv.versions.manifest]
+pluginInterfaceVersion = 1
+name = "csv"
+version = "0.0.0"
+executableType = "exec"
+entryPoint = "pact-plugin-csv"
+
+[entries.csv.versions.manifest.entryPoints]
+
+[entries.csv.versions.manifest.pluginConfig]
+
+[[entries.csv.versions]]
+version = "0.0.1"
+
+[entries.csv.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.1"
+
+[entries.csv.versions.manifest]
+pluginInterfaceVersion = 1
+name = "csv"
+version = "0.0.1"
+executableType = "exec"
+entryPoint = "pact-csv-plugin"
+
+[entries.csv.versions.manifest.entryPoints]
+
+[entries.csv.versions.manifest.pluginConfig]
+
+[[entries.csv.versions]]
+version = "0.0.2"
+
+[entries.csv.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.2"
+
+[entries.csv.versions.manifest]
+pluginInterfaceVersion = 1
+name = "csv"
+version = "0.0.2"
+executableType = "exec"
+entryPoint = "pact-csv-plugin"
+
+[entries.csv.versions.manifest.entryPoints]
+
+[entries.csv.versions.manifest.pluginConfig]
+
+[[entries.csv.versions]]
+version = "0.0.3"
+
+[entries.csv.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.3"
+
+[entries.csv.versions.manifest]
+pluginInterfaceVersion = 1
+name = "csv"
+version = "0.0.3"
+executableType = "exec"
+entryPoint = "pact-csv-plugin"
+
+[entries.csv.versions.manifest.entryPoints]
+
+[entries.csv.versions.manifest.pluginConfig]
+
+[[entries.csv.versions]]
+version = "0.0.4"
+
+[entries.csv.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.4"
+
+[entries.csv.versions.manifest]
+pluginInterfaceVersion = 1
+name = "csv"
+version = "0.0.4"
+executableType = "exec"
+entryPoint = "pact-csv-plugin"
+
+[entries.csv.versions.manifest.entryPoints]
+
+[entries.csv.versions.manifest.pluginConfig]
+
+[[entries.csv.versions]]
+version = "0.0.5"
+
+[entries.csv.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.5"
+
+[entries.csv.versions.manifest]
+pluginInterfaceVersion = 1
+name = "csv"
+version = "0.0.5"
+executableType = "exec"
+entryPoint = "pact-csv-plugin"
+
+[entries.csv.versions.manifest.entryPoints]
+
+[entries.csv.versions.manifest.pluginConfig]
+
+[[entries.csv.versions]]
+version = "0.0.6"
+
+[entries.csv.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.6"
+
+[entries.csv.versions.manifest]
+pluginInterfaceVersion = 1
+name = "csv"
+version = "0.0.6"
+executableType = "exec"
+entryPoint = "pact-csv-plugin"
+
+[entries.csv.versions.manifest.entryPoints]
+
+[entries.csv.versions.manifest.pluginConfig]
+
 [entries.protobuf]
 name = "protobuf"
-latest_version = "0.3.15"
+latest_version = "0.4.0"
 
 [[entries.protobuf.versions]]
 version = "0.3.0"
@@ -120,9 +250,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 protocVersion = "3.19.1"
 hostToBindTo = "127.0.0.1"
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 
 [[entries.protobuf.versions]]
 version = "0.2.4"
@@ -163,8 +293,8 @@ entryPoint = "pact-protobuf-plugin"
 
 [entries.protobuf.versions.manifest.pluginConfig]
 protocVersion = "3.19.1"
-hostToBindTo = "127.0.0.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
+hostToBindTo = "127.0.0.1"
 
 [[entries.protobuf.versions]]
 version = "0.2.2"
@@ -183,9 +313,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-protocVersion = "3.19.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 hostToBindTo = "127.0.0.1"
+protocVersion = "3.19.1"
 
 [[entries.protobuf.versions]]
 version = "0.2.1"
@@ -204,9 +334,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 protocVersion = "3.19.1"
 hostToBindTo = "127.0.0.1"
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 
 [[entries.protobuf.versions]]
 version = "0.2.0"
@@ -225,8 +355,8 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-protocVersion = "3.19.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
+protocVersion = "3.19.1"
 hostToBindTo = "127.0.0.1"
 
 [[entries.protobuf.versions]]
@@ -246,9 +376,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-hostToBindTo = "127.0.0.1"
 protocVersion = "3.19.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
+hostToBindTo = "127.0.0.1"
 
 [[entries.protobuf.versions]]
 version = "0.1.16"
@@ -268,8 +398,8 @@ entryPoint = "pact-protobuf-plugin"
 
 [entries.protobuf.versions.manifest.pluginConfig]
 protocVersion = "3.19.1"
-downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 hostToBindTo = "127.0.0.1"
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 
 [[entries.protobuf.versions]]
 version = "0.1.15"
@@ -309,9 +439,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 hostToBindTo = "127.0.0.1"
 protocVersion = "3.19.1"
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 
 [[entries.protobuf.versions]]
 version = "0.1.13"
@@ -351,9 +481,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
+hostToBindTo = "127.0.0.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 protocVersion = "3.19.1"
-hostToBindTo = "127.0.0.1"
 
 [[entries.protobuf.versions]]
 version = "0.1.11"
@@ -372,9 +502,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-hostToBindTo = "127.0.0.1"
-protocVersion = "3.19.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
+protocVersion = "3.19.1"
+hostToBindTo = "127.0.0.1"
 
 [[entries.protobuf.versions]]
 version = "0.1.10"
@@ -393,8 +523,8 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-hostToBindTo = "127.0.0.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
+hostToBindTo = "127.0.0.1"
 protocVersion = "3.19.1"
 
 [[entries.protobuf.versions]]
@@ -414,9 +544,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-protocVersion = "3.19.1"
 hostToBindTo = "127.0.0.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
+protocVersion = "3.19.1"
 
 [[entries.protobuf.versions]]
 version = "0.1.8"
@@ -555,8 +685,8 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 protocVersion = "3.19.1"
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 
 [[entries.protobuf.versions]]
 version = "0.1.1"
@@ -575,8 +705,8 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-protocVersion = "3.19.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
+protocVersion = "3.19.1"
 
 [[entries.protobuf.versions]]
 version = "0.1.0"
@@ -655,8 +785,8 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 protocVersion = "3.19.1"
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 
 [[entries.protobuf.versions]]
 version = "0.0.0"
@@ -695,9 +825,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
-hostToBindTo = "127.0.0.1"
 protocVersion = "3.19.1"
+hostToBindTo = "127.0.0.1"
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 
 [[entries.protobuf.versions]]
 version = "0.3.2"
@@ -716,9 +846,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 hostToBindTo = "127.0.0.1"
 protocVersion = "3.19.1"
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 
 [[entries.protobuf.versions]]
 version = "0.3.3"
@@ -737,9 +867,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-protocVersion = "3.19.1"
 hostToBindTo = "127.0.0.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
+protocVersion = "3.19.1"
 
 [[entries.protobuf.versions]]
 version = "0.3.4"
@@ -780,8 +910,8 @@ entryPoint = "pact-protobuf-plugin"
 
 [entries.protobuf.versions.manifest.pluginConfig]
 hostToBindTo = "127.0.0.1"
-downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 protocVersion = "3.19.1"
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 
 [[entries.protobuf.versions]]
 version = "0.3.6"
@@ -801,8 +931,8 @@ entryPoint = "pact-protobuf-plugin"
 
 [entries.protobuf.versions.manifest.pluginConfig]
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
-protocVersion = "3.19.1"
 hostToBindTo = "127.0.0.1"
+protocVersion = "3.19.1"
 
 [[entries.protobuf.versions]]
 version = "0.3.7"
@@ -822,8 +952,8 @@ entryPoint = "pact-protobuf-plugin"
 
 [entries.protobuf.versions.manifest.pluginConfig]
 hostToBindTo = "127.0.0.1"
-protocVersion = "3.19.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
+protocVersion = "3.19.1"
 
 [[entries.protobuf.versions]]
 version = "0.3.8"
@@ -842,9 +972,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 protocVersion = "3.19.1"
 hostToBindTo = "127.0.0.1"
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 
 [[entries.protobuf.versions]]
 version = "0.3.9"
@@ -885,8 +1015,8 @@ entryPoint = "pact-protobuf-plugin"
 
 [entries.protobuf.versions.manifest.pluginConfig]
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
-protocVersion = "3.19.1"
 hostToBindTo = "127.0.0.1"
+protocVersion = "3.19.1"
 
 [[entries.protobuf.versions]]
 version = "0.3.11"
@@ -926,9 +1056,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 hostToBindTo = "127.0.0.1"
 protocVersion = "3.19.1"
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 
 [[entries.protobuf.versions]]
 version = "0.3.13"
@@ -948,8 +1078,8 @@ entryPoint = "pact-protobuf-plugin"
 
 [entries.protobuf.versions.manifest.pluginConfig]
 protocVersion = "3.19.1"
-downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 hostToBindTo = "127.0.0.1"
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 
 [[entries.protobuf.versions]]
 version = "0.3.14"
@@ -968,9 +1098,9 @@ entryPoint = "pact-protobuf-plugin"
 [entries.protobuf.versions.manifest.entryPoints]
 
 [entries.protobuf.versions.manifest.pluginConfig]
-hostToBindTo = "127.0.0.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 protocVersion = "3.19.1"
+hostToBindTo = "127.0.0.1"
 
 [[entries.protobuf.versions]]
 version = "0.3.15"
@@ -993,132 +1123,23 @@ hostToBindTo = "127.0.0.1"
 downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
 protocVersion = "3.19.1"
 
-[entries.csv]
-name = "csv"
-latest_version = "0.0.6"
+[[entries.protobuf.versions]]
+version = "0.4.0"
 
-[[entries.csv.versions]]
-version = "0.0.0"
-
-[entries.csv.versions.source]
+[entries.protobuf.versions.source]
 type = "GitHubRelease"
-value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.0"
+value = "https://github.com/pactflow/pact-protobuf-plugin/releases/tag/v-0.4.0"
 
-[entries.csv.versions.manifest]
+[entries.protobuf.versions.manifest]
 pluginInterfaceVersion = 1
-name = "csv"
-version = "0.0.0"
+name = "protobuf"
+version = "0.4.0"
 executableType = "exec"
-entryPoint = "pact-plugin-csv"
+entryPoint = "pact-protobuf-plugin"
 
-[entries.csv.versions.manifest.entryPoints]
+[entries.protobuf.versions.manifest.entryPoints]
 
-[entries.csv.versions.manifest.pluginConfig]
-
-[[entries.csv.versions]]
-version = "0.0.1"
-
-[entries.csv.versions.source]
-type = "GitHubRelease"
-value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.1"
-
-[entries.csv.versions.manifest]
-pluginInterfaceVersion = 1
-name = "csv"
-version = "0.0.1"
-executableType = "exec"
-entryPoint = "pact-csv-plugin"
-
-[entries.csv.versions.manifest.entryPoints]
-
-[entries.csv.versions.manifest.pluginConfig]
-
-[[entries.csv.versions]]
-version = "0.0.2"
-
-[entries.csv.versions.source]
-type = "GitHubRelease"
-value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.2"
-
-[entries.csv.versions.manifest]
-pluginInterfaceVersion = 1
-name = "csv"
-version = "0.0.2"
-executableType = "exec"
-entryPoint = "pact-csv-plugin"
-
-[entries.csv.versions.manifest.entryPoints]
-
-[entries.csv.versions.manifest.pluginConfig]
-
-[[entries.csv.versions]]
-version = "0.0.3"
-
-[entries.csv.versions.source]
-type = "GitHubRelease"
-value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.3"
-
-[entries.csv.versions.manifest]
-pluginInterfaceVersion = 1
-name = "csv"
-version = "0.0.3"
-executableType = "exec"
-entryPoint = "pact-csv-plugin"
-
-[entries.csv.versions.manifest.entryPoints]
-
-[entries.csv.versions.manifest.pluginConfig]
-
-[[entries.csv.versions]]
-version = "0.0.4"
-
-[entries.csv.versions.source]
-type = "GitHubRelease"
-value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.4"
-
-[entries.csv.versions.manifest]
-pluginInterfaceVersion = 1
-name = "csv"
-version = "0.0.4"
-executableType = "exec"
-entryPoint = "pact-csv-plugin"
-
-[entries.csv.versions.manifest.entryPoints]
-
-[entries.csv.versions.manifest.pluginConfig]
-
-[[entries.csv.versions]]
-version = "0.0.5"
-
-[entries.csv.versions.source]
-type = "GitHubRelease"
-value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.5"
-
-[entries.csv.versions.manifest]
-pluginInterfaceVersion = 1
-name = "csv"
-version = "0.0.5"
-executableType = "exec"
-entryPoint = "pact-csv-plugin"
-
-[entries.csv.versions.manifest.entryPoints]
-
-[entries.csv.versions.manifest.pluginConfig]
-
-[[entries.csv.versions]]
-version = "0.0.6"
-
-[entries.csv.versions.source]
-type = "GitHubRelease"
-value = "https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.6"
-
-[entries.csv.versions.manifest]
-pluginInterfaceVersion = 1
-name = "csv"
-version = "0.0.6"
-executableType = "exec"
-entryPoint = "pact-csv-plugin"
-
-[entries.csv.versions.manifest.entryPoints]
-
-[entries.csv.versions.manifest.pluginConfig]
+[entries.protobuf.versions.manifest.pluginConfig]
+downloadUrl = "https://github.com/protocolbuffers/protobuf/releases/download"
+hostToBindTo = "127.0.0.1"
+protocVersion = "21.12"
