@@ -39,7 +39,7 @@ pact_models = { version = "~1.2.0", default-features = false }
 prost = "0.12.4"
 prost-types = "0.12.4"
 regex = "1.10.4"
-reqwest = { version = "0.12.3", default-features = false, features = ["native-tls-vendored", "json", "gzip", "deflate", "stream"] }
+reqwest = { version = "0.12.3", default-features = false, features = ["rustls-tls-native-roots", "json", "gzip", "deflate", "stream"] }
 semver = "1.0.22"
 serde_json = "1.0.115"
 serde = { version = "1.0.197",  features = ["derive"] }
