@@ -6,17 +6,17 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 anyhow = "1.0.70"
-tonic = "0.9.2"
-prost = "0.11.0"
-prost-types = "0.11.1"
+tonic = "0.11.0"
+prost = "0.12.6"
+prost-types = "0.12.6"
 
 [dev-dependencies]
 expectest = "0.12.0"
 env_logger = "0.10.0"
 test-log = "0.2.11"
-pact_models = "~1.1.4"
-pact_consumer = "~1.0.1"
-pact-plugin-driver = "~0.4.4"
+pact_models = "1.2.1"
+pact_consumer = "1.2.2"
+pact-plugin-driver = "0.6.2"
 serde_json = "1.0.95"
 regex = "1.7.3"
 fakeit = "1.1.1"
@@ -24,4 +24,10 @@ rand = "0.8.5"
 maplit = "1.0.2"
 
 [build-dependencies]
-tonic-build = "0.9.2"
+tonic-build = "0.11.0"
+parse-zoneinfo = "0.3.1" # requires pact_model to be updated
+# https://github.com/chronotope/parse-zoneinfo/commit/61557cd5407e494770285d1925d64c42973f5db0
+
+[patch.crates-io]
+# Windows plugin shutdown
+pact-plugin-driver = { version = "0.6.2", path = "../../../drivers/rust/driver" }
