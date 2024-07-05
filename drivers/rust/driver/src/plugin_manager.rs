@@ -28,7 +28,8 @@ use pact_models::v4::interaction::V4Interaction;
 use reqwest::Client;
 use semver::Version;
 use serde_json::Value;
-use sysinfo::{Pid, Signal, System};
+use sysinfo::{Pid,System};
+#[cfg(not(windows))] use sysinfo::Signal;
 #[cfg(not(windows))] use tokio::process::Command;
 use tracing::{debug, info, trace, warn};
 
@@ -337,7 +338,7 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
       let mut s = System::new();
       s.refresh_processes();
       if let Some(process) = s.process(Pid::from_u32(child_pid)) {
-        process.kill_with(Signal::Term);
+        process.kill();
       } else {
         warn!("Child process with PID {} was not found", child_pid);
       }
