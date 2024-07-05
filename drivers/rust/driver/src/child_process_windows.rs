@@ -9,7 +9,7 @@ use std::time::Duration;
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use sysinfo::{Pid, Signal, System};
+use sysinfo::{Pid, System};
 use tracing::{debug, error, trace, warn};
 
 use crate::plugin_models::PactPluginManifest;
@@ -118,7 +118,7 @@ impl ChildPluginProcess {
     let mut s = System::new();
     s.refresh_processes();
     if let Some(process) = s.process(Pid::from_u32(self.child_pid as u32)) {
-      process.kill_with(Signal::Term);
+      process.kill();
     } else {
       warn!("Child process with PID {} was not found", self.child_pid);
     }
