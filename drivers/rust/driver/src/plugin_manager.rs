@@ -28,7 +28,8 @@ use pact_models::v4::interaction::V4Interaction;
 use reqwest::Client;
 use semver::Version;
 use serde_json::Value;
-use sysinfo::{Pid, Signal, System};
+use sysinfo::{Pid,System};
+#[cfg(not(windows))] use sysinfo::Signal;
 #[cfg(not(windows))] use tokio::process::Command;
 use tracing::{debug, info, trace, warn};
 
