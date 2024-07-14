@@ -1,13 +1,12 @@
-//! Module for managing running child processes (non-Windows version)
-
+//! Module for managing running child processes
+use std::io::{BufRead, BufReader};
+use std::process::Child;
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
-use sysinfo::{Pid, Signal, System};
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::Child;
+use sysinfo::{Pid, System};
 use tracing::{debug, error, trace, warn};
 
 use crate::plugin_models::PactPluginManifest;
@@ -32,8 +31,7 @@ impl ChildPluginProcess {
   /// Start the child process and try read the startup JSON message from its standard output.
   pub async fn new(mut child: Child, manifest: &PactPluginManifest) -> anyhow::Result<Self> {
     let (tx, rx) = channel();
-    let child_pid = child.id()
-      .ok_or_else(|| anyhow!("Could not get the child process ID"))?;
+    let child_pid = child.id();
     let child_out = child.stdout.take()
       .ok_or_else(|| anyhow!("Could not get the child process standard output stream"))?;
     let child_err = child.stderr.take()
@@ -41,20 +39,19 @@ impl ChildPluginProcess {
 
     trace!("Starting output polling tasks...");
 
-    let mfso = manifest.clone();
-    tokio::task::spawn(async move {
-      trace!("Starting task to poll plugin stdout");
+    let plugin_name = manifest.name.clone();
+    std::thread::spawn(move || {
+      trace!("Starting thread to poll plugin STDOUT");
+
       let mut startup_read = false;
-      let reader = BufReader::new(child_out);
-      let mut lines = reader.lines();
-      let plugin_name = mfso.name.as_str();
-      while let Ok(line) = lines.next_line().await {
-        if let Some(line) = line {
+      let mut reader = BufReader::new(child_out);
+      let mut line = String::with_capacity(256);
+      while let Ok(chars_read) = reader.read_line(&mut line) {
+        if chars_read > 0 {
           debug!("Plugin({}, {}, STDOUT) || {}", plugin_name, child_pid, line);
           if !startup_read {
             let line = line.trim();
             if line.starts_with("{") {
-              startup_read = true;
               match serde_json::from_str::<RunningPluginInfo>(line) {
                 Ok(plugin_info) => {
                   tx.send(Ok(ChildPluginProcess {
@@ -67,25 +64,32 @@ impl ChildPluginProcess {
                   tx.send(Err(anyhow!("Failed to read startup info from plugin - {}", err)))
                     .unwrap_or_default()
                 }
-              }
+              };
+              startup_read = true;
             }
           }
+        } else {
+          trace!("0 bytes read from STDOUT, this indicates EOF");
+          break;
         }
       }
-      trace!("Task to poll plugin stderr done");
+      trace!("Thread to poll plugin STDOUT done");
     });
 
     let plugin_name = manifest.name.clone();
-    tokio::task::spawn(async move {
-      trace!("Starting task to poll plugin stderr");
-      let reader = BufReader::new(child_err);
-      let mut lines = reader.lines();
-      while let Ok(line) = lines.next_line().await {
-        if let Some(line) = line {
+    std::thread::spawn(move || {
+      trace!("Starting thread to poll plugin STDERR");
+      let mut reader = BufReader::new(child_err);
+      let mut line = String::with_capacity(256);
+      while let Ok(chars_read) = reader.read_line(&mut line) {
+        if chars_read > 0 {
           debug!("Plugin({}, {}, STDERR) || {}", plugin_name, child_pid, line);
+        } else {
+          trace!("0 bytes read from STDERR, this indicates EOF");
+          break;
         }
       }
-      trace!("Task to poll plugin stderr done");
+      trace!("Thread to poll plugin STDERR done");
     });
 
     trace!("Starting output polling tasks... DONE");
@@ -111,7 +115,7 @@ impl ChildPluginProcess {
     let mut s = System::new();
     s.refresh_processes();
     if let Some(process) = s.process(Pid::from_u32(self.child_pid as u32)) {
-      process.kill_with(Signal::Term);
+      process.kill();
     } else {
       warn!("Child process with PID {} was not found", self.child_pid);
     }
