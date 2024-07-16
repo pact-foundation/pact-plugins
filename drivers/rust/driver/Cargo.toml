@@ -1,6 +1,6 @@
 [package]
 name = "pact-plugin-driver"
-version = "0.6.2"
+version = "0.7.0"
 description = "Pact support library that provides an interface for interacting with Pact plugins"
 edition = "2021"
 documentation = "https://docs.rs/pact-plugin-driver"
@@ -20,45 +20,45 @@ datetime = ["pact_models/datetime"] # Support for date/time matchers and express
 xml = ["pact_models/xml"] # support for matching XML documents
 
 [dependencies]
-anyhow = "1.0.82"
-async-trait = "0.1.80"
-backtrace = "0.3.71"
-bytes = "1.6.0"
-chrono = { version = "0.4.37", features = ["serde"], default-features = false }
-flate2 = "1.0.28"
+anyhow = "1.0.86"
+async-trait = "0.1.81"
+backtrace = "0.3.73"
+bytes = "1.6.1"
+chrono = { version = "0.4.38", features = ["serde"], default-features = false }
+flate2 = "1.0.30"
 futures-util = "0.3.30"
 home = "0.5.9"
 indicatif = "0.17.8"
-itertools = "0.12.1"
-lazy_static = "1.4.0"
-log = "0.4.21"
+itertools = "0.13.0"
+lazy_static = "1.5.0"
+log = "0.4.22"
 maplit = "1.0.2"
 md5 = "0.7.0"
-os_info = "3.7.0"
-pact_models = { version = "~1.2.0", default-features = false }
-prost = "0.12.4"
-prost-types = "0.12.4"
-regex = "1.10.4"
-reqwest = { version = "0.12.3", default-features = false, features = ["rustls-tls-native-roots", "json", "gzip", "deflate", "stream"] }
-semver = "1.0.22"
-serde_json = "1.0.115"
-serde = { version = "1.0.197",  features = ["derive"] }
+os_info = "3.8.2"
+pact_models = { version = "~1.2.1", default-features = false }
+prost = "=0.12.6"
+prost-types = "=0.12.6"
+regex = "1.10.5"
+reqwest = { version = "0.12.5", default-features = false, features = ["rustls-tls-native-roots", "json", "gzip", "deflate", "stream"] }
+semver = "1.0.23"
+serde_json = "1.0.120"
+serde = { version = "1.0.204",  features = ["derive"] }
 sha2 = "0.10.8"
-sysinfo = "0.30.10"
-tar = '0.4.40'
-toml = "0.8.12"
-tokio = { version = "1.37.0", features = ["full"] }
-tonic = "0.11.0"
-tracing = { version = "0.1.40", features = [ "log" ] }  # This needs to be the same version across all the pact libs (i.e. pact ffi)
-tracing-core = "0.1.32"  # This needs to be the same version across all the pact libs (i.e. pact ffi)
-uuid = { version = "1.8.0", features = ["v4"] }
-zip = "0.6.6"
+sysinfo = "0.30.13"
+tar = "0.4.41"
+toml = "0.8.14"
+tokio = { version = "1.38.0", features = ["full"] }
+tonic = "=0.11.0"
+tracing = { version = "0.1.40", features = [ "log" ] }
+tracing-core = "0.1.32"
+uuid = { version = "1.10.0", features = ["v4"] }
+zip = "=0.6.6"
 
 [dev-dependencies]
 env_logger = "0.11.3"
 expectest = "0.12.0"
 tempdir = "0.3.7"
-test-log = "0.2.15"
+test-log = "0.2.16"
 
 [build-dependencies]
-tonic-build = "0.11.0"
+tonic-build = "=0.11.0"
