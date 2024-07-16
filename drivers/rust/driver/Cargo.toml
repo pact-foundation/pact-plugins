@@ -52,7 +52,7 @@ tonic = "=0.11.0"
 tracing = { version = "0.1.40", features = [ "log" ] }
 tracing-core = "0.1.32"
 uuid = { version = "1.10.0", features = ["v4"] }
-zip = "=0.6.6"
+zip = "2.1.3"
 
 [dev-dependencies]
 env_logger = "0.11.3"
