@@ -14,7 +14,7 @@ exclude = [
 ]
 
 [dependencies]
-pact-plugin-driver = "0.6.2"
+pact-plugin-driver = "0.6.1"
 clap = { version = "4.4.11", features = [ "derive", "cargo" ] }
 comfy-table = "7.1.1"
 home = "0.5.9"
@@ -50,6 +50,3 @@ lto = true
 # https://doc.rust-lang.org/stable/rustc/codegen-options/
 # https://doc.rust-lang.org/rustc/profile-guided-optimization.html
 # https://github.com/johnthagen/min-sized-rust
-
-[patch.crates-io]
-pact-plugin-driver = { version = "0.6.2", path = "../drivers/rust/driver" }
