@@ -6,9 +6,9 @@ edition = "2021"
 [dependencies]
 tokio = { version = "1", features = ["full"] }
 anyhow = "1.0.70"
-tonic = "=0.11.0"
-prost = "=0.12.6"
-prost-types = "=0.12.6"
+tonic = "0.12.0"
+prost = "0.13.1"
+prost-types = "0.13.1"
 
 [dev-dependencies]
 expectest = "0.12.0"
@@ -25,6 +25,6 @@ rand = "0.8.5"
 maplit = "1.0.2"
 
 [build-dependencies]
-tonic-build = "=0.11.0"
+tonic-build = "0.12.0"
 parse-zoneinfo = "0.3.1" # requires pact_model to be updated
 # https://github.com/chronotope/parse-zoneinfo/commit/61557cd5407e494770285d1925d64c42973f5db0
