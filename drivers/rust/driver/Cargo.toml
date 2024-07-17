@@ -35,7 +35,7 @@ log = "0.4.22"
 maplit = "1.0.2"
 md5 = "0.7.0"
 os_info = "3.8.2"
-pact_models = { version = "~1.2.1", default-features = false }
+pact_models = { version = "~1.2.2", default-features = false }
 prost = "0.13.1"
 prost-types = "0.13.1"
 regex = "1.10.5"
