@@ -7,9 +7,6 @@ on:
   pull_request:
     branches:
       - main
-  push:
-    branches:
-      - feat/musl_built_binaries
   
 concurrency:
   group: release-${{ github.ref }}

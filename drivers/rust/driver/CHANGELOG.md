@@ -1,5 +1,17 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.7.0 - Upgrade Tonic to 0.12.0 and Prost to 0.13.1
+
+* 482278e - chore: update repository.index (Ronald Holshausen, Wed Jul 17 09:50:15 2024 +1000)
+* 550c1cc - chore: Upgrade Tonic to 0.12.0 and Prost to 0.13.1 (Ronald Holshausen, Tue Jul 16 16:08:12 2024 +1000)
+* 5622d1f - chore: Upgrade zip crate (Ronald Holshausen, Tue Jul 16 15:53:29 2024 +1000)
+* b5401d2 - chore: Upgrade all dependencies (except tonic and prost) (Ronald Holshausen, Tue Jul 16 11:57:25 2024 +1000)
+* 8ef58fe - chore(plugin-driver): scope Signal import to unix platforms only (Yousaf Nabi, Fri Jul 5 02:00:52 2024 +0100)
+* 21c382a - fix(plugin-driver): shutdown plugins correctly on windows (Yousaf Nabi, Fri Jul 5 01:34:09 2024 +0100)
+* 7fe7d92 - Revert "chore: Update reqwest to use openssl as rustls brings in aws-lc-rs" (Ronald Holshausen, Tue Jun 25 11:20:26 2024 +1000)
+* 7325bb9 - chore: Update reqwest to use openssl as rustls brings in aws-lc-rs (Ronald Holshausen, Tue Jun 25 10:25:52 2024 +1000)
+* c45dc9a - bump version to 0.6.2 (Ronald Holshausen, Tue Apr 23 10:38:27 2024 +1000)
+
 # 0.6.1 - Maintenance Release
 
 * a40de4f - chore: Upgrade pact_models to 1.2.0 (Ronald Holshausen, Tue Apr 23 10:33:57 2024 +1000)

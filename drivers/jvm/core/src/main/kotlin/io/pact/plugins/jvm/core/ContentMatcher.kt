@@ -3,7 +3,9 @@ package io.pact.plugins.jvm.core
 import au.com.dius.pact.core.model.OptionalBody
 import au.com.dius.pact.core.model.matchingrules.MatchingRuleGroup
 import au.com.dius.pact.core.support.Result
-import io.github.oshai.kotlinlogging.KLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
+
+private val logger = KotlinLogging.logger {}
 
 data class ContentMismatch(
   val expected: ByteArray?,
@@ -104,6 +106,4 @@ data class CatalogueContentMatcher(
       }
     }
   }
-
-  companion object : KLogging()
 }

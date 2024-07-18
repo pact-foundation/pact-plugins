@@ -2,7 +2,11 @@ package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.support.Result
 import au.com.dius.pact.core.support.isNotEmpty
-import io.github.oshai.kotlinlogging.KLogging
+import io.github.oshai.kotlinlogging.KotlinLogging
+import jakarta.json.Json
+import jakarta.json.JsonObject
+import jakarta.json.JsonString
+import jakarta.json.JsonValue
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.commons.io.FilenameUtils
 import org.apache.commons.io.IOUtils
@@ -18,10 +22,9 @@ import org.rauschig.jarchivelib.ArchiverFactory
 import java.io.File
 import java.io.StringReader
 import java.util.zip.GZIPInputStream
-import javax.json.Json
-import javax.json.JsonObject
-import javax.json.JsonString
-import javax.json.JsonValue
+
+
+private val logger = KotlinLogging.logger {}
 
 interface PluginDownloader {
   /**
@@ -30,7 +33,7 @@ interface PluginDownloader {
   fun installPluginFromUrl(sourceUrl: String): Result<PactPluginManifest, String>
 }
 
-object DefaultPluginDownloader: PluginDownloader, KLogging() {
+object DefaultPluginDownloader: PluginDownloader {
   override fun installPluginFromUrl(sourceUrl: String): Result<PactPluginManifest, String> {
     val response = when (val response = fetchJsonFromUrl(sourceUrl)) {
       is Result.Ok -> response.value
