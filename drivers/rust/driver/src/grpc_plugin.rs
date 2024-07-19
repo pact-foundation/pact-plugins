@@ -817,7 +817,7 @@ pub(crate) async fn start_plugin_process(manifest: &PactPluginManifest) -> anyho
       let mut s = System::new();
       s.refresh_processes();
       if let Some(process) = s.process(Pid::from_u32(child_pid)) {
-        process.kill_with(Signal::Term);
+        process.kill();
       } else {
         warn!("Child process with PID {} was not found", child_pid);
       }
