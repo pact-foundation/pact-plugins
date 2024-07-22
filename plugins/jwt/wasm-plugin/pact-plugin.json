@@ -1,0 +1,9 @@
+{
+  "manifestVersion": 1,
+  "pluginInterfaceVersion": 1,
+  "name": "jwt",
+  "version": "0.0.0",
+  "executableType": "wasm",
+  "entryPoint": "jwt-plugin.wasm",
+  "pluginConfig": {}
+}

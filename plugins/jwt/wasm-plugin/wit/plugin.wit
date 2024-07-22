@@ -1,0 +1,32 @@
+package plugin:jwt;
+
+world plugin {
+    enum entry-type {
+        // Matcher for contents of messages, requests or response bodies
+        CONTENT-MATCHER,
+        // Generator for contents of messages, requests or response bodies
+        CONTENT-GENERATOR,
+        // Transport for a network protocol
+        TRANSPORT,
+        // Matching rule for content field/values
+        MATCHER,
+        // Type of interaction
+        INTERACTION
+    }
+
+    // Entry to be added to the core catalogue. Each entry describes one of the features the plugin provides.
+    // Entries will be stored in the catalogue under the key "plugin/$name/$type/$key".
+    record catalogue-entry {
+      // Entry type
+      entry-type: entry-type,
+      // Entry key
+      key: string,
+      // Associated data required for the entry. For CONTENT_MATCHER and CONTENT_GENERATOR types, a "content-types"
+      // value (separated by semi-colons) is required for all the content types the plugin supports.
+      values: list<tuple<string, string>>
+    }
+
+    // Init function is called after the plugin is loaded. It needs to return the plugin catalog
+    // entries to be added to the global catalog
+    export init: func(implementation: string, version: string) -> list<catalogue-entry>;
+}
