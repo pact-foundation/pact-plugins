@@ -14,4 +14,5 @@ pub mod verification;
 pub mod repository;
 pub mod download;
 pub mod grpc_plugin;
-#[cfg(feature = "lua")] mod lua_plugin;
+#[cfg(feature = "lua")] pub(crate) mod lua_plugin;
+#[cfg(feature = "wasm")] pub(crate) mod wasm_plugin;

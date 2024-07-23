@@ -1,0 +1,246 @@
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use std::sync::atomic::{AtomicUsize, Ordering};
+use anyhow::anyhow;
+use async_trait::async_trait;
+use itertools::Itertools;
+use pact_models::bodies::OptionalBody;
+use pact_models::content_types::ContentType;
+use pact_models::pact::Pact;
+use pact_models::prelude::v4::V4Pact;
+use pact_models::v4::interaction::V4Interaction;
+use serde_json::Value;
+use tracing::{debug, info, trace};
+use wasmtime::{AsContextMut, Engine, Module, Store};
+use wasmtime::component::{bindgen, Component, Instance, Linker, ResourceTable};
+use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiView};
+use crate::catalogue_manager::{CatalogueEntryProviderType, CatalogueEntryType, register_plugin_entries};
+use crate::content::{InteractionContents, PluginConfiguration};
+use crate::mock_server::{MockServerConfig, MockServerDetails, MockServerResults};
+use crate::plugin_models::{CompareContentRequest, CompareContentResult, GenerateContentRequest, PactPlugin, PactPluginManifest};
+use crate::verification::{InteractionVerificationData, InteractionVerificationResult};
+
+bindgen!();
+
+impl Into<CatalogueEntryType> for EntryType {
+  fn into(self) -> CatalogueEntryType {
+    match self {
+      EntryType::ContentMatcher => CatalogueEntryType::CONTENT_MATCHER,
+      EntryType::ContentGenerator => CatalogueEntryType::CONTENT_GENERATOR,
+      EntryType::Transport => CatalogueEntryType::TRANSPORT,
+      EntryType::Matcher => CatalogueEntryType::MATCHER,
+      EntryType::Interaction => CatalogueEntryType::INTERACTION
+    }
+  }
+}
+
+impl From<CatalogueEntryType> for EntryType {
+  fn from(value: CatalogueEntryType) -> Self {
+    match value {
+      CatalogueEntryType::CONTENT_MATCHER => EntryType::ContentMatcher,
+      CatalogueEntryType::CONTENT_GENERATOR => EntryType::ContentGenerator,
+      CatalogueEntryType::TRANSPORT => EntryType::Transport,
+      CatalogueEntryType::MATCHER => EntryType::Matcher,
+      CatalogueEntryType::INTERACTION => EntryType::Interaction
+    }
+  }
+}
+
+impl From<&crate::catalogue_manager::CatalogueEntry> for CatalogueEntry {
+  fn from(entry: &crate::catalogue_manager::CatalogueEntry) -> Self {
+    CatalogueEntry {
+      entry_type: entry.entry_type.into(),
+      key: entry.key.clone(),
+      values: entry.values.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+    }
+  }
+}
+
+/// Plugin that executes in a WASM VM
+#[derive(Clone)]
+pub struct WasmPlugin {
+  manifest: PactPluginManifest,
+  engine: Engine,
+  component: Component,
+  instance: Arc<Plugin>,
+  store: Arc<Mutex<Store<PluginState>>>,
+  access_count: Arc<AtomicUsize>
+}
+
+#[async_trait]
+impl PactPlugin for WasmPlugin {
+  fn manifest(&self) -> PactPluginManifest {
+    self.manifest.clone()
+  }
+
+  fn kill(&self) {
+    // TODO: work out how to shut the WASM instance down
+  }
+
+  fn update_access(&mut self) {
+    let count = self.access_count.fetch_add(1, Ordering::SeqCst);
+    trace!("update_access: Plugin {}/{} access is now {}", self.manifest.name,
+      self.manifest.version, count + 1);
+  }
+
+  fn drop_access(&mut self) -> usize {
+    let check = self.access_count.fetch_update(Ordering::SeqCst,
+      Ordering::SeqCst, |count| {
+        if count > 0 {
+          Some(count - 1)
+        } else {
+          None
+        }
+      });
+    let count = if let Ok(v) = check {
+      if v > 0 { v - 1 } else { v }
+    } else {
+      0
+    };
+    trace!("drop_access: Plugin {}/{} access is now {}", self.manifest.name, self.manifest.version,
+      count);
+    count
+  }
+
+  fn boxed(&self) -> Box<dyn PactPlugin + Send + Sync> {
+    Box::new(self.clone())
+  }
+
+  fn arced(&self) -> Arc<dyn PactPlugin + Send + Sync> {
+    Arc::new(self.clone())
+  }
+
+  async fn publish_updated_catalogue(&self, catalogue: &[crate::catalogue_manager::CatalogueEntry]) -> anyhow::Result<()> {
+    let mut store = self.store.lock().unwrap();
+    let catalogue = catalogue.iter()
+      .map(|entry| entry.into())
+      .collect_vec();
+    self.instance.call_update_catalogue(store.as_context_mut(), &catalogue)
+  }
+
+  async fn generate_contents(&self, request: GenerateContentRequest) -> anyhow::Result<OptionalBody> {
+    todo!()
+  }
+
+  async fn match_contents(&self, request: CompareContentRequest) -> anyhow::Result<CompareContentResult> {
+    todo!()
+  }
+
+  async fn configure_interaction(&self, content_type: &ContentType, definition: &HashMap<String, Value>) -> anyhow::Result<(Vec<InteractionContents>, Option<PluginConfiguration>)> {
+    todo!()
+  }
+
+  async fn verify_interaction(&self, pact: &V4Pact, interaction: &(dyn V4Interaction + Send + Sync), verification_data: &InteractionVerificationData, config: &HashMap<String, Value>) -> anyhow::Result<InteractionVerificationResult> {
+    todo!()
+  }
+
+  async fn prepare_interaction_for_verification(&self, pact: &V4Pact, interaction: &(dyn V4Interaction + Send + Sync), context: &HashMap<String, Value>) -> anyhow::Result<InteractionVerificationData> {
+    todo!()
+  }
+
+  async fn start_mock_server(&self, config: &MockServerConfig, pact: Box<dyn Pact + Send + Sync>, test_context: HashMap<String, Value>) -> anyhow::Result<MockServerDetails> {
+    todo!()
+  }
+
+  async fn get_mock_server_results(&self, mock_server_key: &str) -> anyhow::Result<Vec<MockServerResults>> {
+    todo!()
+  }
+
+  async fn shutdown_mock_server(&self, mock_server_key: &str) -> anyhow::Result<Vec<MockServerResults>> {
+    todo!()
+  }
+}
+
+impl Debug for WasmPlugin {
+  fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    f.debug_struct("WasmPlugin")
+      .field("manifest", &self.manifest)
+      .finish()
+  }
+}
+
+impl WasmPlugin {
+  /// Calls the plugins init function
+  pub fn init(&self) -> anyhow::Result<()> {
+    let result = {
+      let mut store = self.store.lock().unwrap();
+      self.instance.call_init(store.as_context_mut(), "plugin-driver-rust", option_env!("CARGO_PKG_VERSION")
+        .unwrap_or("0"))?
+    };
+
+    debug!("Got the following entries from the plugin: {:?}", result);
+    register_plugin_entries(&self.manifest, result.iter()
+      .map(|v| {
+        crate::catalogue_manager::CatalogueEntry {
+          entry_type: v.entry_type.into(),
+          provider_type: CatalogueEntryProviderType::PLUGIN,
+          plugin: Some(self.manifest.clone()),
+          key: v.key.clone(),
+          values: v.values.iter().cloned().collect()
+        }
+      })
+      .collect()
+    );
+
+    Ok(())
+  }
+}
+
+struct PluginState {
+  table: ResourceTable,
+  ctx: WasiCtx,
+  plugin_name: String
+}
+
+impl WasiView for PluginState {
+  fn table(&mut self) -> &mut ResourceTable {
+    &mut self.table
+  }
+
+  fn ctx(&mut self) -> &mut WasiCtx {
+    &mut self.ctx
+  }
+}
+
+impl PluginImports for PluginState {
+  fn log(&mut self, message: String) {
+    debug!("Plugin({}) || {}", self.plugin_name, message);
+  }
+}
+
+// Loads and initialises a WASM-based plugin
+pub fn load_wasm_plugin(manifest: &PactPluginManifest) -> anyhow::Result<WasmPlugin> {
+  let engine = Engine::default();
+
+  let mut path = PathBuf::from(&manifest.entry_point);
+  if !path.is_absolute() || !path.exists() {
+    path = PathBuf::from(manifest.plugin_dir.clone()).join(path);
+  }
+  debug!("Loading plugin component from path {:?}", &path);
+  let component = Component::from_file(&engine, path)?;
+
+  let mut linker = Linker::new(&engine);
+  wasmtime_wasi::add_to_linker_sync(&mut linker)?;
+  Plugin::add_to_linker(&mut linker, |state: &mut PluginState| state)?;
+
+  let mut store = Store::new(&engine, PluginState {
+    table: Default::default(),
+    ctx: WasiCtxBuilder::new().build(),
+    plugin_name: format!("{}/{}", manifest.name, manifest.version),
+  });
+  let instance = Plugin::instantiate(&mut store, &component, &linker)?;
+
+  let plugin = WasmPlugin {
+    manifest: manifest.clone(),
+    engine,
+    component,
+    instance: Arc::new(instance),
+    store: Arc::new(Mutex::new(store)),
+    access_count: Arc::new(AtomicUsize::new(1))
+  };
+
+  Ok(plugin)
+}

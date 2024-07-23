@@ -8,7 +8,7 @@ export!(JwtPlugin);
 
 impl Guest for JwtPlugin {
     fn init(implementation: String, version: String) -> Vec<CatalogueEntry> {
-        // logger("hello from the JWT plugin: " .. implementation .. ", " .. version)
+        log(format!("hello from the JWT plugin: {}, {}", implementation, version).as_str());
 
         vec![
             CatalogueEntry {
@@ -23,15 +23,20 @@ impl Guest for JwtPlugin {
             }
         ]
     }
+
+    fn update_catalogue(_catalogue: Vec<CatalogueEntry>) {
+        // no-op
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use expectest::prelude::*;
     use super::*;
 
     #[test]
     fn it_works() {
-        let result = 4; //add(2, 2);
-        assert_eq!(result, 4);
+        let result = JwtPlugin::init("".to_string(), "".to_string());
+        expect!(result.len()).to(be_equal_to(2));
     }
 }

@@ -34,6 +34,7 @@ use crate::plugin_models::{PactPlugin, PactPluginManifest, PluginDependency};
 use crate::repository::{fetch_repository_index, USER_AGENT};
 use crate::utils::versions_compatible;
 use crate::verification::{InteractionVerificationData, InteractionVerificationResult};
+use crate::wasm_plugin::load_wasm_plugin;
 
 lazy_static! {
   static ref PLUGIN_MANIFEST_REGISTER: Mutex<HashMap<String, PactPluginManifest>> = Mutex::new(HashMap::new());
@@ -46,41 +47,53 @@ pub async fn load_plugin<'a>(plugin: &PluginDependency) -> anyhow::Result<Arc<dy
   let thread_id = thread::current().id();
   debug!("Loading plugin {:?}", plugin);
   trace!("Rust plugin driver version {}", option_env!("CARGO_PKG_VERSION").unwrap_or_default());
-  trace!("load_plugin {:?}: Waiting on PLUGIN_REGISTER lock", thread_id);
-  let mut inner = PLUGIN_REGISTER.lock().unwrap();
-  trace!("load_plugin {:?}: Got PLUGIN_REGISTER lock", thread_id);
-  let update_access = |plugin: &mut (dyn PactPlugin + Send + Sync)| {
-    debug!("Found running plugin {:?}", plugin);
-    plugin.update_access();
-    plugin.arced()
-  };
-  let result = match with_plugin_mut(plugin, &mut inner, &update_access) {
-    Some(plugin) => Ok(plugin),
-    None => {
-      debug!("Did not find plugin, will attempt to start it");
-      let manifest = match load_plugin_manifest(plugin) {
-        Ok(manifest) => manifest,
-        Err(err) => {
-          warn!("Could not load plugin manifest from disk, will try auto install it: {}", err);
-          let http_client = reqwest::ClientBuilder::new()
-            .user_agent(USER_AGENT)
-            .build()?;
-          let index = fetch_repository_index(&http_client, None).await?;
-          match index.lookup_plugin_version(&plugin.name, &plugin.version) {
-            Some(entry) => {
-              info!("Found an entry for the plugin in the plugin index, will try install that");
-              install_plugin_from_url(&http_client, entry.source.value().as_str()).await?
+
+  let result = {
+    trace!("load_plugin {:?}: Waiting on PLUGIN_REGISTER lock", thread_id);
+    let mut inner = PLUGIN_REGISTER.lock().unwrap();
+    trace!("load_plugin {:?}: Got PLUGIN_REGISTER lock", thread_id);
+    let update_access = |plugin: &mut (dyn PactPlugin + Send + Sync)| {
+      debug!("Found running plugin {:?}", plugin);
+      plugin.update_access();
+      plugin.arced()
+    };
+    let result = match with_plugin_mut(plugin, &mut inner, &update_access) {
+      Some(plugin) => Ok((plugin, false)),
+      None => {
+        debug!("Did not find plugin, will attempt to start it");
+        let manifest = match load_plugin_manifest(plugin) {
+          Ok(manifest) => manifest,
+          Err(err) => {
+            warn!("Could not load plugin manifest from disk, will try auto install it: {}", err);
+            let http_client = reqwest::ClientBuilder::new()
+              .user_agent(USER_AGENT)
+              .build()?;
+            let index = fetch_repository_index(&http_client, None).await?;
+            match index.lookup_plugin_version(&plugin.name, &plugin.version) {
+              Some(entry) => {
+                info!("Found an entry for the plugin in the plugin index, will try install that");
+                install_plugin_from_url(&http_client, entry.source.value().as_str()).await?
+              }
+              None => Err(err)?
             }
-            None => Err(err)?
           }
-        }
-      };
-      send_metrics(&manifest);
-      initialise_plugin(&manifest, &mut inner).await
-    }
+        };
+        send_metrics(&manifest);
+        initialise_plugin(&manifest, &mut inner).await
+          .map(|plugin| (plugin, true))
+      }
+    };
+    trace!("load_plugin {:?}: Releasing PLUGIN_REGISTER lock", thread_id);
+    result
   };
-  trace!("load_plugin {:?}: Releasing PLUGIN_REGISTER lock", thread_id);
-  result
+
+  if let Ok((_, new_plugin)) = &result {
+    if *new_plugin {
+      publish_updated_catalogue();
+    }
+  }
+
+  result.map(|(plugin, _)| plugin)
 }
 
 fn lookup_plugin_inner(
@@ -230,7 +243,6 @@ async fn initialise_plugin<'a>(
         plugin.kill();
         anyhow!("Failed to send init request to the plugin - {}", err)
       })?;
-      publish_updated_catalogue();
 
       let arc = Arc::new(plugin);
       let key = format!("{}/{}", manifest.name, manifest.version);
@@ -245,9 +257,6 @@ async fn initialise_plugin<'a>(
 
         plugin.init()?;
 
-        // TODO: This causes a deadlock
-        //publish_updated_catalogue();
-
         let arc = Arc::new(plugin);
         let key = format!("{}/{}", manifest.name, manifest.version);
         plugin_register.insert(key, arc.clone());
@@ -256,6 +265,23 @@ async fn initialise_plugin<'a>(
       }
       #[cfg(not(feature = "lua"))] {
         Err(anyhow!("Lua plugins are not supported (Lua feature flag is not enabled)"))
+      }
+    }
+    "wasm" => {
+      #[cfg(feature = "wasm")] {
+        let plugin = load_wasm_plugin(manifest)?;
+        debug!("Plugin loaded OK ({:?}), sending init message", plugin);
+
+        plugin.init()?;
+
+        let arc = Arc::new(plugin);
+        let key = format!("{}/{}", manifest.name, manifest.version);
+        plugin_register.insert(key, arc.clone());
+
+        Ok(arc)
+      }
+      #[cfg(not(feature = "wasm"))] {
+        Err(anyhow!("WASM plugins are not supported (wasm feature flag is not enabled)"))
       }
     }
     _ => Err(anyhow!("Plugin executable type of {} is not supported", manifest.executable_type))

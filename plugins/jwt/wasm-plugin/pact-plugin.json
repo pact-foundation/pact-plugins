@@ -4,6 +4,6 @@
   "name": "jwt",
   "version": "0.0.0",
   "executableType": "wasm",
-  "entryPoint": "jwt-plugin.wasm",
+  "entryPoint": "jwt_plugin.wasm",
   "pluginConfig": {}
 }
