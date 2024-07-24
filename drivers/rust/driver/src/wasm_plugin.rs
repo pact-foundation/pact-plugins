@@ -4,8 +4,10 @@ use std::fmt::{Debug, Formatter};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+
 use anyhow::anyhow;
 use async_trait::async_trait;
+use bytes::Bytes;
 use itertools::Itertools;
 use pact_models::bodies::OptionalBody;
 use pact_models::content_types::ContentType;
@@ -17,8 +19,8 @@ use tracing::{debug, info, trace};
 use wasmtime::{AsContextMut, Engine, Module, Store};
 use wasmtime::component::{bindgen, Component, Instance, Linker, ResourceTable};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiView};
+
 use crate::catalogue_manager::{CatalogueEntryProviderType, CatalogueEntryType, register_plugin_entries};
-use crate::content::{InteractionContents, PluginConfiguration};
 use crate::mock_server::{MockServerConfig, MockServerDetails, MockServerResults};
 use crate::plugin_models::{CompareContentRequest, CompareContentResult, GenerateContentRequest, PactPlugin, PactPluginManifest};
 use crate::verification::{InteractionVerificationData, InteractionVerificationResult};
@@ -55,6 +57,16 @@ impl From<&crate::catalogue_manager::CatalogueEntry> for CatalogueEntry {
       entry_type: entry.entry_type.into(),
       key: entry.key.clone(),
       values: entry.values.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+    }
+  }
+}
+
+impl Into<pact_models::content_types::ContentTypeHint> for ContentTypeHint {
+  fn into(self) -> pact_models::content_types::ContentTypeHint {
+    match self {
+      ContentTypeHint::Binary => pact_models::content_types::ContentTypeHint::BINARY,
+      ContentTypeHint::Text => pact_models::content_types::ContentTypeHint::TEXT,
+      ContentTypeHint::Default => pact_models::content_types::ContentTypeHint::DEFAULT
     }
   }
 }
@@ -129,8 +141,71 @@ impl PactPlugin for WasmPlugin {
     todo!()
   }
 
-  async fn configure_interaction(&self, content_type: &ContentType, definition: &HashMap<String, Value>) -> anyhow::Result<(Vec<InteractionContents>, Option<PluginConfiguration>)> {
-    todo!()
+  async fn configure_interaction(
+    &self,
+    content_type: &ContentType,
+    definition: &HashMap<String, Value>
+  ) -> anyhow::Result<(Vec<crate::content::InteractionContents>, Option<crate::content::PluginConfiguration>)> {
+    let mut store = self.store.lock().unwrap();
+
+    // Unfortunately, WIT does not allow recursive data structures, so we need to feed JSON strings
+    // in and out here.
+    let json = Value::Object(definition.iter()
+      .map(|(k, v)| (k.clone(), v.clone()))
+      .collect());
+    let result = self.instance.call_configure_interaction(store.as_context_mut(),
+      content_type.sub_type.to_string().as_str(), json.to_string().as_str())?
+      .map_err(|err| anyhow!(err))?;
+    debug!("Result from call to configure_interaction: {:?}", result);
+
+    let mut interaction_details = vec![];
+    for config in &result.interaction {
+      interaction_details.push(crate::content::InteractionContents {
+        part_name: config.part_name.clone(),
+        body: OptionalBody::Present(
+          Bytes::copy_from_slice(config.contents.content.as_slice()),
+          ContentType::parse(config.contents.content_type.as_str()).ok(),
+          config.contents.content_type_hint.map(|v| v.into())
+        ),
+        rules: None,
+        generators: None,
+        metadata: None,
+        metadata_rules: None,
+        plugin_config: Default::default(),
+        interaction_markup: "".to_string(),
+        interaction_markup_type: "".to_string(),
+      });
+    }
+    debug!("interaction_details = {:?}", interaction_details);
+
+    let plugin_config = match result.plugin_config {
+      Some(config) => {
+        let interaction_configuration = if config.interaction_configuration.is_empty() {
+          Default::default()
+        } else {
+          serde_json::from_str::<Value>(config.interaction_configuration.as_str())?
+            .as_object()
+            .cloned()
+            .unwrap_or_default()
+        };
+        let pact_configuration = if config.pact_configuration.is_empty() {
+          Default::default()
+        } else {
+          serde_json::from_str::<Value>(config.pact_configuration.as_str())?
+            .as_object()
+            .cloned()
+            .unwrap_or_default()
+        };
+        Some(crate::content::PluginConfiguration {
+          interaction_configuration: interaction_configuration.iter().map(|(k, v)| (k.clone(), v.clone())).collect(),
+          pact_configuration: pact_configuration.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+        })
+      }
+      None => None
+    };
+    debug!("plugin_config = {:?}", plugin_config);
+
+    Ok((interaction_details, plugin_config))
   }
 
   async fn verify_interaction(&self, pact: &V4Pact, interaction: &(dyn V4Interaction + Send + Sync), verification_data: &InteractionVerificationData, config: &HashMap<String, Value>) -> anyhow::Result<InteractionVerificationResult> {

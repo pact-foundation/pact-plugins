@@ -28,10 +28,105 @@ world plugin {
       values: list<tuple<string, string>>
     }
 
+    // Enum of content type override. This is a hint on how the content type should be treated.
+    enum content-type-hint {
+        // Determine the form of the content using the default rules of the Pact implementation
+        DEFAULT,
+        // Contents must always be treated as a text form
+        TEXT,
+        // Contents must always be treated as a binary form
+        BINARY
+    }
+
+    // a request, response or message body
+    record body {
+      // The content type of the body in MIME format (i.e. application/json)
+      content-type: string,
+      // Bytes of the actual content
+      content: list<u8>,
+      // Content type override to apply (if required). If omitted, the default rules of the Pact implementation
+      // will be used
+      content-type-hint: option<content-type-hint>
+    }
+
+    /*
+        // Represents a matching rule
+        message MatchingRule {
+          // Type of the matching rule
+          string type = 1;
+          // Associated data for the matching rule
+          google.protobuf.Struct values = 2;
+        }
+
+        // List of matching rules
+        message MatchingRules {
+          repeated MatchingRule rule = 1;
+        }
+
+        // Example generator
+        message Generator {
+          // Type of generator
+          string type = 1;
+          // Associated data for the generator
+          google.protobuf.Struct values = 2;
+        }*/
+
+    // Plugin configuration added to the pact file by the configure-interaction step
+    record plugin-configuration {
+      // Data to be persisted against the interaction (as JSON)
+      interaction-configuration: string,
+      // Data to be persisted in the Pact file metadata (Global data, as JSON)
+      pact-configuration: string
+    }
+
+    /*
+          // All matching rules to apply
+          map<string, MatchingRules> rules = 2;
+          // Generators to apply
+          map<string, Generator> generators = 3;
+          // For message interactions, any metadata to be applied
+          google.protobuf.Struct messageMetadata = 4;
+          // Plugin specific data to be persisted in the pact file
+          PluginConfiguration pluginConfiguration = 5;
+          // Markdown/HTML formatted text representation of the interaction
+          string interactionMarkup = 6;
+          // Type of markup used
+          enum MarkupType {
+            // CommonMark format
+            COMMON_MARK = 0;
+            // HTML format
+            HTML = 1;
+          }
+          MarkupType interactionMarkupType = 7;
+          // All matching rules to apply to any message metadata
+          map<string, MatchingRules> metadata_rules = 9;
+          // Generators to apply to any message metadata
+          map<string, Generator> metadata_generators = 10;
+        }
+    */
+    record interaction-contents {
+        // Description of what part this interaction belongs to (in the case of there being more than one, for instance,
+        // request/response messages)
+        part-name: string,
+        // Contents for the interaction
+        contents: body,
+        // Plugin specific data to be persisted in the pact file
+        plugin-configuration: plugin-configuration
+    }
+
+    // Details for the interaction to configure
+    record interaction-details {
+        interaction: list<interaction-contents>,
+        plugin-config: option<plugin-configuration>
+    }
+
     // Init function is called after the plugin is loaded. It needs to return the plugin catalog
     // entries to be added to the global catalog
     export init: func(implementation: string, version: string) -> list<catalogue-entry>;
 
     // Updated catalogue. This will be sent when the core catalogue has been updated (probably by a plugin loading).
     export update-catalogue: func(catalogue: list<catalogue-entry>);
+
+    // Request to configure/setup the interaction for later verification. Data returned will be persisted in the pact file.
+    export configure-interaction: func(content-type: string, config-json: string) -> result<interaction-details, string>;
 }

@@ -49,7 +49,7 @@ end
 function jwt.sign_token(config, header, private_key, base_token)
     if header["alg"] ~= "RS512" then
         logger("Signature algorithm is set to " .. header["alg"])
-        error("Only the RS512 alogirthim is supported at the moment")
+        error("Only the RS512 algorithm is supported at the moment")
     end
 
     local signature = rsa_sign(base_token, private_key)
