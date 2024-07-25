@@ -22,7 +22,14 @@ use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiView};
 
 use crate::catalogue_manager::{CatalogueEntryProviderType, CatalogueEntryType, register_plugin_entries};
 use crate::mock_server::{MockServerConfig, MockServerDetails, MockServerResults};
-use crate::plugin_models::{CompareContentRequest, CompareContentResult, GenerateContentRequest, PactPlugin, PactPluginManifest};
+use crate::plugin_models::{
+  CompareContentRequest,
+  CompareContentResult,
+  GenerateContentRequest,
+  PactPlugin,
+  PactPluginManifest,
+  PluginInteractionConfig
+};
 use crate::verification::{InteractionVerificationData, InteractionVerificationResult};
 
 bindgen!();
@@ -67,6 +74,78 @@ impl Into<pact_models::content_types::ContentTypeHint> for ContentTypeHint {
       ContentTypeHint::Binary => pact_models::content_types::ContentTypeHint::BINARY,
       ContentTypeHint::Text => pact_models::content_types::ContentTypeHint::TEXT,
       ContentTypeHint::Default => pact_models::content_types::ContentTypeHint::DEFAULT
+    }
+  }
+}
+
+impl From<CompareContentRequest> for CompareContentsRequest {
+  fn from(value: CompareContentRequest) -> Self {
+    CompareContentsRequest {
+      expected: value.expected_contents.into(),
+      actual: value.actual_contents.into(),
+      allow_unexpected_keys: value.allow_unexpected_keys,
+      plugin_configuration: value.plugin_configuration
+        .map(|config| config.into())
+        .unwrap_or_else(|| PluginConfiguration {
+          interaction_configuration: Default::default(),
+          pact_configuration: Default::default()
+        })
+    }
+  }
+}
+
+impl From<OptionalBody>  for Body {
+  fn from(value: OptionalBody) -> Self {
+    Body {
+      content: value.value().unwrap_or_default().to_vec(),
+      content_type: value.content_type().unwrap_or_default().to_string(),
+      content_type_hint: None
+    }
+  }
+}
+
+impl From<PluginInteractionConfig> for PluginConfiguration {
+  fn from(value: PluginInteractionConfig) -> Self {
+    PluginConfiguration {
+      pact_configuration: Value::Object(value.pact_configuration
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect()).to_string(),
+      interaction_configuration: Value::Object(value.interaction_configuration
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect()).to_string(),
+    }
+  }
+}
+
+impl Into<CompareContentResult> for CompareContentsResponse {
+  fn into(self) -> CompareContentResult {
+    if let Some(type_mismatch) = &self.type_mismatch {
+      CompareContentResult::TypeMismatch(type_mismatch.expected.clone(), type_mismatch.actual.clone())
+    } else if !self.results.is_empty() {
+      let mismatches = self.results
+        .iter()
+        .map(|(path, mismatches)| {
+          (path.clone(), mismatches.iter().map(|m| m.into()).collect())
+        })
+        .collect();
+      CompareContentResult::Mismatches(mismatches)
+    } else {
+      CompareContentResult::OK
+    }
+  }
+}
+
+impl From<&ContentMismatch> for crate::content::ContentMismatch {
+  fn from(value: &ContentMismatch) -> Self {
+    crate::content::ContentMismatch {
+      expected: "".to_string(),
+      actual: "".to_string(),
+      mismatch: value.mismatch.to_string(),
+      path: value.path.to_string(),
+      diff: None,
+      mismatch_type: None,
     }
   }
 }
@@ -137,8 +216,17 @@ impl PactPlugin for WasmPlugin {
     todo!()
   }
 
-  async fn match_contents(&self, request: CompareContentRequest) -> anyhow::Result<CompareContentResult> {
-    todo!()
+  async fn match_contents(
+    &self,
+    request: CompareContentRequest
+  ) -> anyhow::Result<CompareContentResult> {
+    let mut store = self.store.lock().unwrap();
+
+    let result = self.instance.call_compare_contents(store.as_context_mut(), &request.into())?
+      .map_err(|err| anyhow!(err))?;
+    debug!("Result from call to compare_contents: {:?}", result);
+
+    Ok(result.into())
   }
 
   async fn configure_interaction(

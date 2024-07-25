@@ -120,6 +120,53 @@ world plugin {
         plugin-config: option<plugin-configuration>
     }
 
+    // Request to preform a comparison on an actual body given the expected one
+    record compare-contents-request {
+      // Expected body from the Pact interaction
+      expected: body,
+      // Actual received body
+      actual: body,
+      // If unexpected keys or attributes should be allowed. Setting this to false results in additional keys or fields
+      // will cause a mismatch
+      allow-unexpected-keys: bool,
+      // Map of expressions to matching rules. The expressions follow the documented Pact matching rule expressions
+      // map<string, MatchingRules> rules = 4;
+      // Additional data added to the Pact/Interaction by the plugin
+      plugin-configuration: plugin-configuration
+    }
+
+    // Indicates that there was a mismatch with the content type and the body was not compared
+    record content-type-mismatch {
+      // Expected content type (MIME format)
+      expected: string,
+      // Actual content type received (MIME format)
+      actual: string
+    }
+
+    // A mismatch for an particular item of content
+    record content-mismatch {
+      // Expected data bytes
+      expected: list<u8>,
+      // Actual data bytes
+      actual: list<u8>,
+      // Description of the mismatch
+      mismatch: string,
+      // Path to the item that was matched. This is the value as per the documented Pact matching rule expressions.
+      path: string,
+      // Optional diff of the contents
+      diff: option<string>,
+      // Part of the interaction that the mismatch is for: body, headers, metadata, etc.
+      mismatch-type: string
+    }
+
+    // Response to the CompareContentsRequest with the results of the comparison
+    record compare-contents-response {
+      // There was a mismatch with the types of content. If this is set, the results may not be set.
+      type-mismatch: option<content-type-mismatch>,
+      // Results of the match, keyed by matching rule expression
+      results: list<tuple<string, list<content-mismatch>>>
+    }
+
     // Init function is called after the plugin is loaded. It needs to return the plugin catalog
     // entries to be added to the global catalog
     export init: func(implementation: string, version: string) -> list<catalogue-entry>;
@@ -129,4 +176,7 @@ world plugin {
 
     // Request to configure/setup the interaction for later verification. Data returned will be persisted in the pact file.
     export configure-interaction: func(content-type: string, config-json: string) -> result<interaction-details, string>;
+
+    // Request to perform a comparison of some contents (matching request)
+    export compare-contents: func(request: compare-contents-request) -> result<compare-contents-response, string>;
 }

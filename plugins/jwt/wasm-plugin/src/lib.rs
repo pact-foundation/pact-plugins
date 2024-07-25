@@ -1,12 +1,13 @@
 use anyhow::anyhow;
 use base64::Engine;
-use base64::engine::general_purpose::URL_SAFE as BASE64;
+use base64::engine::general_purpose::URL_SAFE_NO_PAD as BASE64;
 use rsa::pkcs1::{DecodeRsaPrivateKey, LineEnding};
 use rsa::pkcs8::EncodePublicKey;
 use rsa::RsaPrivateKey;
 use serde_json::{json, Value};
 
 mod jwt;
+mod matching;
 
 wit_bindgen::generate!();
 
@@ -77,7 +78,7 @@ impl Guest for JwtPlugin {
         let plugin_config = PluginConfiguration {
             interaction_configuration: json!({
                 "public-key": public_key,
-                "algorithm": format!("{}", header["alg"])
+                "algorithm": json_to_string(&header["alg"])
             }).to_string(),
             pact_configuration: "".to_string()
         };
@@ -97,6 +98,53 @@ impl Guest for JwtPlugin {
             interaction: vec![interaction_contents],
             plugin_config: Some(plugin_config)
         })
+    }
+
+    // This function does the actual matching
+    fn compare_contents(request: CompareContentsRequest) -> Result<CompareContentsResponse, String> {
+        log(format!("Got a match request: {:?}", request).as_str());
+
+        let interaction_configuration: Value = serde_json::from_str(request.plugin_configuration.interaction_configuration.as_str())
+          .map_err(|err| format!("Failed to parse the plugin configuration: {}", err))?;
+        let public_key = json_to_string(&interaction_configuration.get("public-key")
+          .cloned()
+          .unwrap_or_default());
+        let algorithm = json_to_string(&interaction_configuration
+          .get("algorithm")
+          .cloned()
+          .unwrap_or_default());
+
+        let expected_jwt = jwt::decode_token(request.expected.content.as_slice())
+          .map_err(|err| format!("Failed to decode the expected token: {}", err))?;
+        log(format!("Expected JWT: {:?}", expected_jwt).as_str());
+
+        let actual_jwt = jwt::decode_token(request.actual.content.as_slice())
+          .map_err(|err| format!("Failed to decode the actual token: {}", err))?;
+        log(format!("Actual JWT: {:?}", actual_jwt).as_str());
+
+        let mut result = CompareContentsResponse {
+            type_mismatch: None,
+            results: vec![]
+        };
+
+        if let Err(token_issues) = matching::validate_token(&actual_jwt, &algorithm, &public_key) {
+            result.results.push(("$".to_string(), token_issues));
+        }
+
+        if let Err(header_mismatches) = matching::match_headers(&expected_jwt.header, &actual_jwt.header) {
+            for (k, v) in header_mismatches {
+                result.results.push((format!("header:{}", k), v));
+            }
+        }
+
+        if let Err(claim_mismatches) = matching::match_claims(&expected_jwt.claims, &actual_jwt.claims) {
+            for (k, v) in claim_mismatches {
+                result.results.push((format!("claims:{}", k), v));
+            }
+        }
+
+        log(format!("returning match result -> {:?}", result).as_str());
+        Ok(result)
     }
 }
 
