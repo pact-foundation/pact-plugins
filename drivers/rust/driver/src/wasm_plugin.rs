@@ -16,7 +16,7 @@ use pact_models::prelude::v4::V4Pact;
 use pact_models::v4::interaction::V4Interaction;
 use serde_json::Value;
 use tracing::{debug, info, trace};
-use wasmtime::{AsContextMut, Engine, Module, Store};
+use wasmtime::{AsContextMut, Config, Engine, Module, Store};
 use wasmtime::component::{bindgen, Component, Instance, Linker, ResourceTable};
 use wasmtime_wasi::{WasiCtx, WasiCtxBuilder, WasiView};
 
@@ -385,15 +385,18 @@ pub fn load_wasm_plugin(manifest: &PactPluginManifest) -> anyhow::Result<WasmPlu
   debug!("Loading plugin component from path {:?}", &path);
   let component = Component::from_file(&engine, path)?;
 
+  trace!("Configuring WASM linker");
   let mut linker = Linker::new(&engine);
   wasmtime_wasi::add_to_linker_sync(&mut linker)?;
   Plugin::add_to_linker(&mut linker, |state: &mut PluginState| state)?;
 
+  trace!("Configuring WASM store");
   let mut store = Store::new(&engine, PluginState {
     table: Default::default(),
     ctx: WasiCtxBuilder::new().build(),
     plugin_name: format!("{}/{}", manifest.name, manifest.version),
   });
+  trace!("Instantiating plugin instance");
   let instance = Plugin::instantiate(&mut store, &component, &linker)?;
 
   let plugin = WasmPlugin {

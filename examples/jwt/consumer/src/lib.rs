@@ -106,7 +106,7 @@ ceBsAZahv7NEeMe2Py5yrHZoNWxbf64EJXxzLCbtfBLSGvduzUoQDZqXC9Jh
     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
     let claims = Claims {
       aud: "1234566778".to_string(),
-      exp: now,
+      exp: now + 5,
       iss: "ldsdkdalds".to_string(),
       sub: "slksjkdjkdks".to_string(),
       .. Claims::default()
