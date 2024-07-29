@@ -41,7 +41,7 @@ mod tests {
         i
       })
       .await
-      .start_mock_server_async(Some("protobuf/transport/grpc"))
+      .start_mock_server_async(Some("protobuf/transport/grpc"), None)
       .await;
 
     let url = mock_server.url();

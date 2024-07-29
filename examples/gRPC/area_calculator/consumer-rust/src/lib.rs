@@ -48,7 +48,7 @@ mod tests {
       })
       .await
       // Start a mock server using gRPC transport
-      .start_mock_server_async(Some("protobuf/transport/grpc"))
+      .start_mock_server_async(Some("protobuf/transport/grpc"), None)
       .await;
 
     // Configure the generated calculator client to connect to the gRPC mock server
