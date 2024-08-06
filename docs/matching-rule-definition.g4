@@ -25,10 +25,10 @@ matchingDefinitionExp :
 matchingRule :
   (
     ( 'equalTo' | 'type' ) COMMA primitiveValue )
-  | 'number' COMMA ( DECIMAL_LITERAL | INTEGER_LITERAL )
-  | 'integer' COMMA INTEGER_LITERAL
-  | 'decimal' COMMA DECIMAL_LITERAL
-  | matcherType=( 'datetime' | 'date' | 'time' ) COMMA string COMMA string
+  | 'number' COMMA ( DECIMAL_LITERAL | INTEGER_LITERAL | 'fromProviderState' fromProviderState )
+  | 'integer' COMMA ( INTEGER_LITERAL | 'fromProviderState' fromProviderState )
+  | 'decimal' COMMA ( DECIMAL_LITERAL | 'fromProviderState' fromProviderState )
+  | matcherType=( 'datetime' | 'date' | 'time' ) COMMA string COMMA ( string | 'fromProviderState' fromProviderState )
   | 'regex' COMMA string COMMA string
   | 'include' COMMA string
   | 'boolean' COMMA BOOLEAN_LITERAL
@@ -42,6 +42,11 @@ primitiveValue :
   | DECIMAL_LITERAL
   | INTEGER_LITERAL
   | BOOLEAN_LITERAL
+  | 'fromProviderState' fromProviderState
+  ;
+
+fromProviderState :
+  LEFT_BRACKET string COMMA primitiveValue RIGHT_BRACKET
   ;
 
 string :
