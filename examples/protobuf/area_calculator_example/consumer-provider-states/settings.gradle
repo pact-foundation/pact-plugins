@@ -1,0 +1,2 @@
+rootProject.name = 'ac-consumer-provider-states'
+include('lib')

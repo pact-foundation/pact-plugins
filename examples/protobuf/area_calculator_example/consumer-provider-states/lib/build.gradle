@@ -1,0 +1,47 @@
+plugins {
+    // Apply the groovy Plugin to add support for Groovy.
+    id 'groovy'
+
+    // Apply the java-library plugin for API and implementation separation.
+    id 'java-library'
+
+    id 'com.google.protobuf' version '0.9.4'
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.google.protobuf:protobuf-java:3.25.4'
+    implementation 'org.apache.groovy:groovy:4.0.22'
+    implementation 'org.slf4j:slf4j-api:1.7.36'
+
+    testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.3'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.3'
+    testImplementation 'io.pact.plugin.driver:core:0.4.2'
+    testImplementation 'au.com.dius.pact.consumer:groovy:4.6.12'
+    testRuntimeOnly 'ch.qos.logback:logback-classic:1.5.6'
+    testRuntimeOnly 'ch.qos.logback:logback-core:1.5.6'
+
+    protobuf files('../../proto')
+}
+
+tasks.named('test') {
+    // Use JUnit Platform for unit tests.
+    useJUnitPlatform()
+}
+
+protobuf {
+    protoc { artifact = "com.google.protobuf:protoc:3.25.4" }
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs 'build/generated/source/proto/main/java'
+        }
+    }
+}
