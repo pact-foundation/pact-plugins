@@ -25,7 +25,8 @@ pub fn install_plugin(
   _source_type: &Option<InstallationSource>,
   override_prompt: bool,
   skip_if_installed: bool,
-  version: &Option<String>
+  version: &Option<String>,
+  skip_load: bool,
 ) -> anyhow::Result<()> {
   let runtime = tokio::runtime::Builder::new_multi_thread()
     .enable_all()
@@ -37,9 +38,9 @@ pub fn install_plugin(
 
     let install_url = Url::parse(source.as_str());
     if let Ok(install_url) = install_url {
-      install_plugin_from_url(&http_client, install_url.as_str(), override_prompt, skip_if_installed).await
+      install_plugin_from_url(&http_client, install_url.as_str(), override_prompt, skip_if_installed,skip_load).await
     } else {
-      install_known_plugin(&http_client, source.as_str(), override_prompt, skip_if_installed, version).await
+      install_known_plugin(&http_client, source.as_str(), override_prompt, skip_if_installed, version, skip_load).await
     }
   });
 
@@ -53,7 +54,8 @@ async fn install_known_plugin(
   name: &str,
   override_prompt: bool,
   skip_if_installed: bool,
-  version: &Option<String>
+  version: &Option<String>,
+  skip_load: bool,
 ) -> anyhow::Result<()> {
   let index = fetch_repository_index(&http_client, Some(DEFAULT_INDEX)).await?;
   if let Some(entry) = index.entries.get(name) {
@@ -65,7 +67,7 @@ async fn install_known_plugin(
       entry.latest_version.as_str()
     };
     if let Some(version_entry) = entry.versions.iter().find(|v| v.version == version) {
-      install_plugin_from_url(&http_client, version_entry.source.value().as_str(), override_prompt, skip_if_installed).await
+      install_plugin_from_url(&http_client, version_entry.source.value().as_str(), override_prompt, skip_if_installed,skip_load).await
     } else {
       Err(anyhow!("'{}' is not a valid version for plugin '{}'", version, name))
     }
@@ -78,7 +80,8 @@ async fn install_plugin_from_url(
   http_client: &Client,
   source_url: &str,
   override_prompt: bool,
-  skip_if_installed: bool
+  skip_if_installed: bool,
+  skip_load: bool
 ) -> anyhow::Result<()> {
   let response = fetch_json_from_url(source_url, &http_client).await?;
   if let Some(map) = response.as_object() {
@@ -104,13 +107,17 @@ async fn install_plugin_from_url(
         download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag, true).await?;
 
         env::set_var("pact_do_not_track", "true");
-        load_plugin(&manifest.as_dependency())
+        if !skip_load {
+            load_plugin(&manifest.as_dependency())
           .await
           .and_then(|plugin| {
-            println!("Installed plugin {} version {} OK", manifest.name, manifest.version);
-            plugin.kill();
-            Ok(())
-          })
+              println!("Installed plugin {} version {} OK", manifest.name, manifest.version);
+              plugin.kill();
+              Ok(())
+          }) }
+          else {
+            return Ok(())
+          }
       } else {
         println!("Skipping installing plugin {} version {} as it is already installed", manifest.name, manifest.version);
         Ok(())

@@ -76,7 +76,11 @@ enum Commands {
 
     #[clap(short, long)]
     /// The version to install. This is only used for known plugins.
-    version: Option<String>
+    version: Option<String>,
+
+    #[clap(long,env="PACT_PLUGIN_CLI_SKIP_LOAD")]
+    /// Skip auto-loading of plugin
+    skip_load: bool
   },
 
   /// Remove a plugin
@@ -232,8 +236,8 @@ fn main() -> Result<(), ExitCode> {
   let result = match &cli.command {
     Commands::List(command) => list_plugins(command),
     Commands::Env => print_env(),
-    Commands::Install { yes, skip_if_installed, source, source_type, version } => {
-      install::install_plugin(source, source_type, *yes || cli.yes, *skip_if_installed, version)
+    Commands::Install { yes, skip_if_installed, source, source_type, version, skip_load } => {
+      install::install_plugin(source, source_type, *yes || cli.yes, *skip_if_installed, version, *skip_load)
     },
     Commands::Remove { yes, name, version } => remove_plugin(name, version, *yes || cli.yes),
     Commands::Enable { name, version } => enable_plugin(name, version),
