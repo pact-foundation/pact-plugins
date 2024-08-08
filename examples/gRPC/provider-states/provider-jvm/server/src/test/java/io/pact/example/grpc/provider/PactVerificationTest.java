@@ -53,6 +53,10 @@ class PactVerificationTest {
   @State("a rectangle")
   Map<String, Object> rectangleState() {
     LOGGER.debug("!!! rectangleState state called !!!");
-    return Map.of("rectangleWidth", 5, "rectangleLength", 10);
+    return Map.of(
+      "rectangleWidth", 5,
+      "rectangleLength", 10,
+      "Auth", "CCV001"
+    );
   }
 }

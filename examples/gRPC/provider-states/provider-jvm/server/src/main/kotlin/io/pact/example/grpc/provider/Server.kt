@@ -2,14 +2,22 @@ package io.pact.example.grpc.provider
 
 import area_calculator.AreaCalculator
 import area_calculator.CalculatorGrpcKt
+import io.grpc.Metadata
 import io.grpc.ServerBuilder
+import io.grpc.ServerCall
+import io.grpc.ServerCallHandler
+import io.grpc.ServerInterceptor
+import io.grpc.Status
 import mu.KLogging
+import java.util.regex.Pattern
 import kotlin.math.PI
 import kotlin.math.pow
 import kotlin.math.sqrt
 
 class Server {
-    private val server = ServerBuilder.forPort(0).addService(CalculatorService()).build()
+    private val server = ServerBuilder.forPort(0)
+        .intercept(CalculatorInterceptor())
+        .addService(CalculatorService()).build()
 
     fun start() {
         server.start()
@@ -33,6 +41,36 @@ class Server {
 
     fun serverPort() = server.port
 }
+
+class CalculatorInterceptor : ServerInterceptor {
+    val authKey: Metadata.Key<String> = Metadata.Key.of("Auth", Metadata.ASCII_STRING_MARSHALLER)
+    val authCheckPatten: Pattern = Pattern.compile("[A-Z]{3}\\d{3}")
+
+    override fun <ReqT : Any?, RespT : Any?> interceptCall(
+        call: ServerCall<ReqT, RespT>,
+        headers: Metadata?,
+        next: ServerCallHandler<ReqT, RespT>?
+    ): ServerCall.Listener<ReqT> {
+        val auth = headers?.get(authKey)
+        return if (auth.isNullOrEmpty()) {
+            call.close(Status.UNAUTHENTICATED, Metadata())
+            NoOpListener()
+        } else {
+            if (authCheckPatten.matcher(auth).matches()) {
+                if (next != null) {
+                    next.startCall(call, headers)
+                } else {
+                    NoOpListener()
+                }
+            } else {
+                call.close(Status.UNAUTHENTICATED, Metadata())
+                NoOpListener()
+            }
+        }
+    }
+}
+
+class NoOpListener<ReqT> : ServerCall.Listener<ReqT>()
 
 class CalculatorService : CalculatorGrpcKt.CalculatorCoroutineImplBase() {
     override suspend fun calculateOne(request: AreaCalculator.ShapeMessage): AreaCalculator.AreaResponse {

@@ -16,14 +16,18 @@ import au.com.dius.pact.core.model.annotations.Pact;
 import com.google.protobuf.InvalidProtocolBufferException;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
+import io.grpc.Metadata;
+import io.grpc.stub.MetadataUtils;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static area_calculator.CalculatorGrpc.newBlockingStub;
 import static au.com.dius.pact.consumer.dsl.PactBuilder.filePath;
+import static io.grpc.Metadata.ASCII_STRING_MARSHALLER;
 import static org.hamcrest.MatcherAssert.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
@@ -48,6 +52,10 @@ public class PactConsumerTest {
               "width", "matching(number, fromProviderState('${rectangleWidth}', 3))"
           )),
 
+          "requestMetadata", Map.of(
+            "Auth", "matching(equalTo, fromProviderState('${Auth}', 'AST00004'))"
+          ),
+
         "response", List.of(
             Map.of(
               "value", "matching(number, 12)"
@@ -61,8 +69,15 @@ public class PactConsumerTest {
   @PactTestFor(pactMethod = "calculateRectangleArea")
   @MockServerConfig(implementation = MockServerImplementation.Plugin, registryEntry = "protobuf/transport/grpc")
   void calculateRectangleArea(MockServer mockServer, V4Interaction.SynchronousMessages interaction) throws InvalidProtocolBufferException {
+    io.grpc.Metadata.Key<String> authKey = io.grpc.Metadata.Key.of("Auth", ASCII_STRING_MARSHALLER);
+    io.grpc.Metadata metadata = new io.grpc.Metadata();
+    metadata.put(authKey, "AST00004");
+    AtomicReference<Metadata> headers = new AtomicReference<>(null);
+    AtomicReference<io.grpc.Metadata> trailers = new AtomicReference<>(null);
     ManagedChannel channel = ManagedChannelBuilder.forTarget("127.0.0.1:" + mockServer.getPort())
       .usePlaintext()
+      .intercept(MetadataUtils.newAttachHeadersInterceptor(metadata))
+      .intercept(MetadataUtils.newCaptureMetadataInterceptor(headers, trailers))
       .build();
     CalculatorGrpc.CalculatorBlockingStub stub = newBlockingStub(channel);
 
