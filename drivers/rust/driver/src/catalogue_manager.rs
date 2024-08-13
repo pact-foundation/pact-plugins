@@ -10,7 +10,7 @@ use maplit::hashset;
 use pact_models::content_types::ContentType;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, trace};
+use tracing::{debug, error, instrument, trace};
 
 use crate::content::{ContentGenerator, ContentMatcher};
 use crate::plugin_models::PactPluginManifest;
@@ -195,6 +195,7 @@ pub fn remove_plugin_entries(name: &str) {
 }
 
 /// Find a content matcher in the global catalogue for the provided content type
+#[instrument(level = "trace", skip(content_type))]
 pub fn find_content_matcher<CT: Into<String>>(content_type: CT) -> Option<ContentMatcher> {
   let content_type_str = content_type.into();
   debug!("Looking for a content matcher for {}", content_type_str);
