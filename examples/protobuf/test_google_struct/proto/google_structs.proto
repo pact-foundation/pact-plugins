@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+import "google/protobuf/struct.proto";
+
+package google_structs;
+
+message Request {
+  string name = 1;
+  google.protobuf.Struct params = 2;
+}
