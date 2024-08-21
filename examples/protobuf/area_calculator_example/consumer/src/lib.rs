@@ -152,7 +152,7 @@ mod tests {
     shape.encode(&mut buffer).unwrap();
     let response = Client::new()
       .post(format!("{}calculate", mock_url))
-      .header("content-type", "application/protobuf;message=ShapeMessage")
+      .header("content-type", "application/protobuf;message=.area_calculator.ShapeMessage")
       .body(buffer.freeze())
       .send()
       .await
