@@ -141,6 +141,11 @@ Options:
   -v, --version <VERSION>
           The version to install. This is only used for known plugins
 
+      --skip-load
+          Skip auto-loading of plugin
+          
+          [env: PACT_PLUGIN_CLI_SKIP_LOAD=]
+
   -h, --help
           Print help (see a summary with '-h')
 
