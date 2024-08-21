@@ -28,7 +28,7 @@ func main() {
       switch body.Description {
         case "Configure Interaction Response":
           log.Println("Configure Interaction Response")
-          w.Header().Add("Content-Type", "application/protobuf; message=InteractionResponse")
+          w.Header().Add("Content-Type", "application/protobuf; message=.io.pact.plugin.InteractionResponse")
 
           genValue, _ := structpb.NewStruct(map[string]interface{}{
              "format": "YYYY-MM-DD",
@@ -70,7 +70,7 @@ func main() {
 
         default:
           log.Println("InitPluginRequest default")
-          w.Header().Add("Content-Type", "application/protobuf; message=InitPluginRequest")
+          w.Header().Add("Content-Type", "application/protobuf; message=.io.pact.plugin.InitPluginRequest")
           init := &io_pact_plugin.InitPluginRequest{
                  Implementation: "Go Provider",
                  Version:  "0.0.0",
