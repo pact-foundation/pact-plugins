@@ -1,7 +1,7 @@
 FROM rust:1-buster
 
-ARG PACT_PLUGIN_CLI_VERSION=0.1.0
-ARG PACT_PLUGIN_PROTOBUF_VERSION=0.3.2
+ARG PACT_PLUGIN_CLI_VERSION=0.1.2
+ARG PACT_PLUGIN_PROTOBUF_VERSION=0.5.1
 
 # Install deps
 RUN apt clean && apt update && apt install -y git-core gcc wget protobuf-compiler
@@ -9,7 +9,7 @@ RUN apt clean && apt update && apt install -y git-core gcc wget protobuf-compile
 # Install pact-plugin-cli + protobuf plugin
 RUN wget https://github.com/pact-foundation/pact-plugins/releases/download/pact-plugin-cli-v${PACT_PLUGIN_CLI_VERSION}/pact-plugin-cli-linux-x86_64.gz && gunzip pact-plugin-cli-linux-x86_64.gz
 RUN mv pact-plugin-cli-linux-x86_64 /usr/local/bin/pact-plugin-cli && chmod +x /usr/local/bin/pact-plugin-cli
-RUN pact-plugin-cli -y install protobuf -v 0.3.2
+RUN pact-plugin-cli -y install protobuf -v $PACT_PLUGIN_PROTOBUF_VERSION
 
 WORKDIR /build
 

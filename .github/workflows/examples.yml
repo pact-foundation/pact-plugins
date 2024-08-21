@@ -121,13 +121,16 @@ jobs:
       - name: Run Protobuf examples (Linux)
         run: |
           set -e
-          cd protobuf-consumer-jvm
+          pushd protobuf-consumer-jvm
           ./gradlew check
-          cd ../protobuf-consumer-maven
+          popd
+          pushd protobuf-consumer-maven
           mvn verify
-          cd ../../..
+          popd
+          pushd ../..
           docker run -t -v $(pwd):/build protobuf-container -c 'cd examples/protobuf/protobuf-consumer-rust && cargo test'
-          cd examples/protobuf/protobuf-provider
+          popd
+          pushd protobuf-provider
           go build main.go
           nohup ./main &
           PID=$!
