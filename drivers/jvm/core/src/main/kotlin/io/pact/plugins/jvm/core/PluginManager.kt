@@ -22,6 +22,7 @@ import au.com.dius.pact.core.support.Json.toJson
 import au.com.dius.pact.core.support.Result
 import au.com.dius.pact.core.support.Utils.lookupEnvironmentValue
 import au.com.dius.pact.core.support.isNotEmpty
+import au.com.dius.pact.core.support.json.JsonParser
 import au.com.dius.pact.core.support.json.JsonValue
 import au.com.dius.pact.core.support.mapError
 import com.google.protobuf.ByteString
@@ -52,9 +53,6 @@ import java.lang.Runtime.getRuntime
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
-import jakarta.json.Json
-import jakarta.json.JsonArray
-import jakarta.json.JsonObject
 
 private val logger = KotlinLogging.logger {}
 
@@ -179,10 +177,10 @@ data class DefaultPactPluginManifest(
 
   companion object {
     @JvmStatic
-    fun fromJson(pluginDir: File, pluginJson: JsonObject): PactPluginManifest {
-      val entryPoints = if (pluginJson.containsKey("entryPoints")) {
+    fun fromJson(pluginDir: File, pluginJson: JsonValue): PactPluginManifest {
+      val entryPoints = if (pluginJson.has("entryPoints")) {
         when (val ep = pluginJson["entryPoints"]) {
-          is JsonObject -> ep.entries.associate { it.key to toString(it.value) }
+          is JsonValue.Object -> ep.entries.entries.associate { it.key to it.value.toString() }
           else -> {
             logger.warn { "entryPoints field in plugin manifest is invalid" }
             emptyMap()
@@ -192,9 +190,9 @@ data class DefaultPactPluginManifest(
         emptyMap()
       }
 
-      val args = if (pluginJson.containsKey("args")) {
+      val args = if (pluginJson.has("args")) {
         when (val aj = pluginJson["args"]) {
-          is JsonArray -> aj.map { toString(it)!! }
+          is JsonValue.Array -> aj.values.map { it.toString() }
           else -> {
             logger.warn { "args field in plugin manifest is invalid" }
             emptyList()
@@ -207,11 +205,11 @@ data class DefaultPactPluginManifest(
       return DefaultPactPluginManifest(
         pluginDir,
         toInteger(pluginJson["pluginInterfaceVersion"]) ?: 1,
-        toString(pluginJson["name"])!!,
-        toString(pluginJson["version"])!!,
-        toString(pluginJson["executableType"])!!,
-        toString(pluginJson["minimumRequiredVersion"]),
-        toString(pluginJson["entryPoint"])!!,
+        pluginJson["name"].asString().orEmpty(),
+        pluginJson["version"].asString().orEmpty(),
+        pluginJson["executableType"].asString().orEmpty(),
+        pluginJson["minimumRequiredVersion"].asString(),
+        pluginJson["entryPoint"].asString().orEmpty(),
         entryPoints,
         args,
         listOf()
@@ -974,8 +972,8 @@ object DefaultPluginManager: PluginManager {
       logger.debug { "Plugin ${manifest.name} started with PID ${cp.pid}" }
       val timeout = System.getProperty("pact.plugin.loadTimeoutInMs")?.toLongOrNull() ?: 10000
       val startupInfo = cp.channel.poll(timeout, TimeUnit.MILLISECONDS)
-      if (startupInfo is JsonObject) {
-        Result.Ok(DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), toString(startupInfo["serverKey"])!!))
+      if (startupInfo is JsonValue.Object) {
+        Result.Ok(DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString()))
       } else {
         cp.destroy()
         Result.Err("Plugin process did not output the correct startup message in $timeout ms - got $startupInfo")
@@ -1009,7 +1007,7 @@ object DefaultPluginManager: PluginManager {
       for (file in File(pluginDir).walk()) {
         if (file.isFile && file.name == "pact-plugin.json") {
           logger.debug { "Found plugin manifest: $file" }
-          val pluginJson = file.bufferedReader().use { Json.createReader(it).readObject() }
+          val pluginJson = file.bufferedReader().use { JsonParser.parseReader(it).asObject() }
           if (pluginJson != null) {
             val plugin = DefaultPactPluginManifest.fromJson(file.parentFile, pluginJson)
             if (plugin.name == name && versionsCompatible(plugin.version, version)) {

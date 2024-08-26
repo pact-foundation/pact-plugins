@@ -2,11 +2,9 @@ package io.pact.plugins.jvm.core
 
 import au.com.dius.pact.core.support.Result
 import au.com.dius.pact.core.support.isNotEmpty
+import au.com.dius.pact.core.support.json.JsonParser
+import au.com.dius.pact.core.support.json.JsonValue
 import io.github.oshai.kotlinlogging.KotlinLogging
-import jakarta.json.Json
-import jakarta.json.JsonObject
-import jakarta.json.JsonString
-import jakarta.json.JsonValue
 import org.apache.commons.codec.digest.DigestUtils
 import org.apache.commons.io.FilenameUtils
 import org.apache.commons.io.IOUtils
@@ -39,26 +37,25 @@ object DefaultPluginDownloader: PluginDownloader {
       is Result.Ok -> response.value
       is Result.Err -> return response
     }
-    return if (response is JsonObject) {
-      val tagName = response["tag_name"]
+    return if (response.isObject) {
+      val tagName = response["tag_name"].asString()
       if (tagName != null) {
-        val tag = asString(tagName)
-        logger.debug { "Found tag $tag" }
+        logger.debug { "Found tag $tagName" }
         val url = if (sourceUrl.endsWith("/latest")) {
           sourceUrl.removeSuffix("/latest")
         } else {
-          sourceUrl.removeSuffix("/tag/$tag")
+          sourceUrl.removeSuffix("/tag/$tagName")
         }
-        when (val manifestJsonResult = downloadJsonFromGithub(url, tag, "pact-plugin.json")) {
+        when (val manifestJsonResult = downloadJsonFromGithub(url, tagName, "pact-plugin.json")) {
           is Result.Ok -> {
             val manifestJson = manifestJsonResult.value
-            if (manifestJson is JsonObject) {
+            if (manifestJson.isObject) {
               val pluginDirs = File(DefaultPluginManager.pluginInstallDirectory())
               if (!pluginDirs.exists()) {
                 pluginDirs.mkdirs()
               }
-              val pluginName = asString(manifestJson["name"])
-              val pluginVersion = asString(manifestJson["version"])
+              val pluginName = manifestJson["name"].asString()
+              val pluginVersion = manifestJson["version"].asString()
               val pluginDir = File(pluginDirs, "${pluginName}-${pluginVersion}")
               pluginDir.mkdir()
               val manifest = DefaultPactPluginManifest.fromJson(pluginDir, manifestJson)
@@ -67,7 +64,7 @@ object DefaultPluginDownloader: PluginDownloader {
               manifestFile.writeText(manifestJson.toString())
 
               logger.debug { "Installing plugin ${manifest.name} version ${manifest.version}" }
-              when (val result = downloadPluginExecutable(manifest, pluginDir, url, tag)) {
+              when (val result = downloadPluginExecutable(manifest, pluginDir, url, tagName)) {
                 is Result.Ok -> Result.Ok(manifest)
                 is Result.Err -> result
               }
@@ -331,14 +328,6 @@ object DefaultPluginDownloader: PluginDownloader {
     return os to osArch
   }
 
-  private fun asString(value: JsonValue?): String {
-    return when (value?.valueType) {
-      JsonValue.ValueType.STRING -> (value as JsonString).string
-      null -> "null"
-      else -> value.toString()
-    }
-  }
-
   private fun downloadJsonFromGithub(url: String, tag: String, fileName: String)
     = fetchJsonFromUrl("$url/download/$tag/$fileName")
 
@@ -352,7 +341,7 @@ object DefaultPluginDownloader: PluginDownloader {
         .returnContent()
         .asString()
       logger.debug { "Got response $json" }
-      Result.Ok(Json.createReader(StringReader(json)).readValue())
+      Result.Ok(JsonParser.parseString(json))
     } catch (ex: RuntimeException) {
       logger.error(ex) { "Failed to fetch JSON from URL" }
       Result.Err("Failed to fetch JSON from URL: ${ex.message}")

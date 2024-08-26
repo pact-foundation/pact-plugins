@@ -1,8 +1,7 @@
 package io.pact.plugins.jvm.core
 
+import au.com.dius.pact.core.support.json.JsonParser
 import spock.lang.Specification
-
-import jakarta.json.Json
 
 class DefaultPactPluginManifestSpec extends Specification {
 
@@ -130,7 +129,7 @@ class DefaultPactPluginManifestSpec extends Specification {
   def 'loading manifest from JSON'() {
     given:
     InputStream pluginFile = DefaultPactPluginManifestSpec.getResourceAsStream('/pact-plugin.json')
-    def pluginJson = Json.createReader(pluginFile).readObject()
+    def pluginJson = JsonParser.parseStream(pluginFile)
 
     when:
     def pluginManifest = DefaultPactPluginManifest.fromJson('pact-plugin.json' as File, pluginJson)
