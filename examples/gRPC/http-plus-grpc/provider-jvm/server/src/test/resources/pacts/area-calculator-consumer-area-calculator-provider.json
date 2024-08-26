@@ -1,0 +1,193 @@
+{
+  "consumer": {
+    "name": "area-calculator-consumer"
+  },
+  "interactions": [
+    {
+      "comments": {
+        "testname": "io.pact.example.grpc.consumer.PactConsumerTest.calculateRectangleArea(MockServer, SynchronousMessages)"
+      },
+      "description": "calculate rectangle area request",
+      "interactionMarkup": {
+        "markup": "```protobuf\nmessage ShapeMessage {\n    message .area_calculator.Rectangle rectangle = 2;\n}\n```\n\n```protobuf\nmessage AreaResponse {\n    repeated float value = 1;\n}\n```\n",
+        "markupType": "COMMON_MARK"
+      },
+      "key": "c7fbe3ee",
+      "pending": false,
+      "pluginConfiguration": {
+        "protobuf": {
+          "descriptorKey": "d58838959e37498cddf51805bedf4dca",
+          "service": ".area_calculator.Calculator/calculateOne"
+        }
+      },
+      "request": {
+        "contents": {
+          "content": "EgoNAABAQBUAAIBA",
+          "contentType": "application/protobuf; message=.area_calculator.ShapeMessage",
+          "contentTypeHint": "BINARY",
+          "encoded": "base64"
+        },
+        "matchingRules": {
+          "body": {
+            "$.rectangle.length": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.rectangle.width": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          }
+        },
+        "metadata": {
+          "contentType": "application/protobuf;message=.area_calculator.ShapeMessage"
+        }
+      },
+      "response": [
+        {
+          "contents": {
+            "content": "CgQAAEBB",
+            "contentType": "application/protobuf; message=.area_calculator.AreaResponse",
+            "contentTypeHint": "BINARY",
+            "encoded": "base64"
+          },
+          "matchingRules": {
+            "body": {
+              "$.value.*": {
+                "combine": "AND",
+                "matchers": [
+                  {
+                    "match": "number"
+                  }
+                ]
+              }
+            }
+          },
+          "metadata": {
+            "contentType": "application/protobuf;message=.area_calculator.AreaResponse"
+          }
+        }
+      ],
+      "transport": "grpc",
+      "type": "Synchronous/Messages"
+    },
+    {
+      "comments": {
+        "testname": "io.pact.example.grpc.consumer.PactConsumerTest.calculateRectangleAreaHttp(MockServer)"
+      },
+      "description": "calculate rectangle area request via HTTP",
+      "interactionMarkup": {
+        "markup": "```protobuf\nmessage AreaResponse {\n    repeated float value = 1;\n}\n```\n",
+        "markupType": "COMMON_MARK"
+      },
+      "key": "5af23083",
+      "pending": false,
+      "pluginConfiguration": {
+        "protobuf": {
+          "request": {
+            "descriptorKey": "d58838959e37498cddf51805bedf4dca",
+            "message": ".area_calculator.ShapeMessage"
+          },
+          "response": {
+            "descriptorKey": "d58838959e37498cddf51805bedf4dca",
+            "message": ".area_calculator.AreaResponse"
+          }
+        }
+      },
+      "request": {
+        "body": {
+          "content": "EgoNAABAQBUAAIBA",
+          "contentType": "application/protobuf; message=.area_calculator.ShapeMessage",
+          "contentTypeHint": "BINARY",
+          "encoded": "base64"
+        },
+        "headers": {
+          "content-type": [
+            "application/protobuf; message=.area_calculator.ShapeMessage"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.rectangle.length": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.rectangle.width": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          }
+        },
+        "method": "POST",
+        "path": "/Calculator/calculateOne"
+      },
+      "response": {
+        "body": {
+          "content": "CgQAAEBB",
+          "contentType": "application/protobuf; message=.area_calculator.AreaResponse",
+          "contentTypeHint": "BINARY",
+          "encoded": "base64"
+        },
+        "headers": {
+          "content-type": [
+            "application/protobuf; message=.area_calculator.AreaResponse"
+          ]
+        },
+        "matchingRules": {
+          "body": {
+            "$.value.*": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          }
+        },
+        "status": 200
+      },
+      "transport": "http",
+      "type": "Synchronous/HTTP"
+    }
+  ],
+  "metadata": {
+    "pact-jvm": {
+      "version": "4.6.14"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    },
+    "plugins": [
+      {
+        "configuration": {
+          "d58838959e37498cddf51805bedf4dca": {
+            "protoDescriptors": "CscHChVhcmVhX2NhbGN1bGF0b3IucHJvdG8SD2FyZWFfY2FsY3VsYXRvciK6AgoMU2hhcGVNZXNzYWdlEjEKBnNxdWFyZRgBIAEoCzIXLmFyZWFfY2FsY3VsYXRvci5TcXVhcmVIAFIGc3F1YXJlEjoKCXJlY3RhbmdsZRgCIAEoCzIaLmFyZWFfY2FsY3VsYXRvci5SZWN0YW5nbGVIAFIJcmVjdGFuZ2xlEjEKBmNpcmNsZRgDIAEoCzIXLmFyZWFfY2FsY3VsYXRvci5DaXJjbGVIAFIGY2lyY2xlEjcKCHRyaWFuZ2xlGAQgASgLMhkuYXJlYV9jYWxjdWxhdG9yLlRyaWFuZ2xlSABSCHRyaWFuZ2xlEkYKDXBhcmFsbGVsb2dyYW0YBSABKAsyHi5hcmVhX2NhbGN1bGF0b3IuUGFyYWxsZWxvZ3JhbUgAUg1wYXJhbGxlbG9ncmFtQgcKBXNoYXBlIikKBlNxdWFyZRIfCgtlZGdlX2xlbmd0aBgBIAEoAlIKZWRnZUxlbmd0aCI5CglSZWN0YW5nbGUSFgoGbGVuZ3RoGAEgASgCUgZsZW5ndGgSFAoFd2lkdGgYAiABKAJSBXdpZHRoIiAKBkNpcmNsZRIWCgZyYWRpdXMYASABKAJSBnJhZGl1cyJPCghUcmlhbmdsZRIVCgZlZGdlX2EYASABKAJSBWVkZ2VBEhUKBmVkZ2VfYhgCIAEoAlIFZWRnZUISFQoGZWRnZV9jGAMgASgCUgVlZGdlQyJICg1QYXJhbGxlbG9ncmFtEh8KC2Jhc2VfbGVuZ3RoGAEgASgCUgpiYXNlTGVuZ3RoEhYKBmhlaWdodBgCIAEoAlIGaGVpZ2h0IkQKC0FyZWFSZXF1ZXN0EjUKBnNoYXBlcxgBIAMoCzIdLmFyZWFfY2FsY3VsYXRvci5TaGFwZU1lc3NhZ2VSBnNoYXBlcyIkCgxBcmVhUmVzcG9uc2USFAoFdmFsdWUYASADKAJSBXZhbHVlMq0BCgpDYWxjdWxhdG9yEk4KDGNhbGN1bGF0ZU9uZRIdLmFyZWFfY2FsY3VsYXRvci5TaGFwZU1lc3NhZ2UaHS5hcmVhX2NhbGN1bGF0b3IuQXJlYVJlc3BvbnNlIgASTwoOY2FsY3VsYXRlTXVsdGkSHC5hcmVhX2NhbGN1bGF0b3IuQXJlYVJlcXVlc3QaHS5hcmVhX2NhbGN1bGF0b3IuQXJlYVJlc3BvbnNlIgBCGVoXaW8ucGFjdC9hcmVhX2NhbGN1bGF0b3JiBnByb3RvMw==",
+            "protoFile": "syntax = \"proto3\";\n\npackage area_calculator;\n\noption go_package = \"io.pact/area_calculator\";\n\nservice Calculator {\n  rpc calculateOne (ShapeMessage) returns (AreaResponse) {}\n  rpc calculateMulti (AreaRequest) returns (AreaResponse) {}\n}\n\nmessage ShapeMessage {\n  oneof shape {\n    Square square = 1;\n    Rectangle rectangle = 2;\n    Circle circle = 3;\n    Triangle triangle = 4;\n    Parallelogram parallelogram = 5;\n  }\n}\n\nmessage Square {\n  float edge_length = 1;\n}\n\nmessage Rectangle {\n  float length = 1;\n  float width = 2;\n}\n\nmessage Circle {\n  float radius = 1;\n}\n\nmessage Triangle {\n  float edge_a = 1;\n  float edge_b = 2;\n  float edge_c = 3;\n}\n\nmessage Parallelogram {\n  float base_length = 1;\n  float height = 2;\n}\n\nmessage AreaRequest {\n  repeated ShapeMessage shapes = 1;\n}\n\nmessage AreaResponse {\n  repeated float value = 1;\n}\n"
+          }
+        },
+        "name": "protobuf",
+        "version": "0.5.1"
+      }
+    ]
+  },
+  "provider": {
+    "name": "area-calculator-provider"
+  }
+}
