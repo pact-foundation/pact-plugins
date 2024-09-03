@@ -1,6 +1,6 @@
 //! Module for managing running child processes
 use std::io::{BufRead, BufReader};
-use std::process::{self, Child, Command};
+use std::process::Child;
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
