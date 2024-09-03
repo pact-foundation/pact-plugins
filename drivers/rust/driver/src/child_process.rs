@@ -119,7 +119,7 @@ impl ChildPluginProcess {
       process.kill();
       // revert windows specific logic once https://github.com/GuillaumeGomez/sysinfo/pull/1341/files is merged/released
       #[cfg(windows)]
-      let _ = Command::new("taskkill.exe").arg("/PID").arg(self.child_pid.to_string()).arg("/F").arg("/T").output();
+      let _ = std::process::Command::new("taskkill.exe").arg("/PID").arg(self.child_pid.to_string()).arg("/F").arg("/T").output();
     } else {
       warn!("Child process with PID {} was not found", self.child_pid);
     }
