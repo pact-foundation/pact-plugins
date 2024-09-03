@@ -1,5 +1,18 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.7.1 - Bugfix Release
+
+* d7871df - chore: update repository.index (Ronald Holshausen, Tue Sep 3 15:39:21 2024 +1000)
+* 9c2a76d - chore: Cleanup compiler warning (Ronald Holshausen, Tue Sep 3 15:20:18 2024 +1000)
+* b5308af - chore: Cleanup compiler warning (Ronald Holshausen, Tue Sep 3 15:00:36 2024 +1000)
+* 88a7f06 - chore: Update dependencies (Ronald Holshausen, Tue Sep 3 10:22:05 2024 +1000)
+* c0a0432 - chore: Upgrade pact_models to 1.2.4 (Ronald Holshausen, Tue Sep 3 10:18:58 2024 +1000)
+* 70b85f1 - chore: Update dependencies (Ronald Holshausen, Tue Sep 3 10:13:17 2024 +1000)
+* 1473cc6 - fix(plugin-driver): use std:process over tokio for plugin loading (Yousaf Nabi, Wed Aug 21 23:55:26 2024 +0100)
+* 7b641ae - chore: cleanup trace level span (Ronald Holshausen, Tue Aug 13 10:53:07 2024 +1000)
+* 5fc5a4d - chore: Upgrade pact_models to 1.2.2 (Ronald Holshausen, Wed Jul 17 11:18:52 2024 +1000)
+* 159fc48 - bump version to 0.7.1 (Ronald Holshausen, Wed Jul 17 09:53:06 2024 +1000)
+
 # 0.7.0 - Upgrade Tonic to 0.12.0 and Prost to 0.13.1
 
 * 482278e - chore: update repository.index (Ronald Holshausen, Wed Jul 17 09:50:15 2024 +1000)
