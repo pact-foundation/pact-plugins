@@ -1,4 +1,4 @@
-index_version = 30
+index_version = 31
 format_version = 0
 timestamp = "2023-03-10T05:36:45.725083896Z"
 
@@ -134,7 +134,7 @@ entryPoint = "pact-csv-plugin"
 
 [entries.avro]
 name = "avro"
-latest_version = "0.0.5"
+latest_version = "0.0.6"
 
 [[entries.avro.versions]]
 version = "0.0.3"
@@ -195,6 +195,30 @@ value = "https://github.com/austek/pact-avro-plugin/releases/tag/v0.0.5"
 pluginInterfaceVersion = 1
 name = "avro"
 version = "0.0.5"
+executableType = "exec"
+entryPoint = "bin/pact-avro-plugin"
+
+[entries.avro.versions.manifest.entryPoints]
+windows = "bin/pact-avro-plugin.bat"
+
+[[entries.avro.versions.manifest.dependencies]]
+name = "jvm"
+version = "17+"
+dependencyType = "Plugin"
+
+[entries.avro.versions.manifest.pluginConfig]
+
+[[entries.avro.versions]]
+version = "0.0.6"
+
+[entries.avro.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/austek/pact-avro-plugin/releases/tag/v0.0.6"
+
+[entries.avro.versions.manifest]
+pluginInterfaceVersion = 1
+name = "avro"
+version = "0.0.6"
 executableType = "exec"
 entryPoint = "bin/pact-avro-plugin"
 
