@@ -1,5 +1,5 @@
 //! Support for matching and generating content based on content types
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::str::from_utf8;
 
 use anyhow::anyhow;
@@ -9,8 +9,8 @@ use pact_models::bodies::OptionalBody;
 use pact_models::content_types::ContentTypeHint;
 use pact_models::matchingrules::{Category, MatchingRule, MatchingRuleCategory, RuleList};
 use pact_models::path_exp::DocPath;
-use pact_models::prelude::{ContentType, Generator, GeneratorCategory, Generators, RuleLogic};
 use pact_models::plugins::PluginData;
+use pact_models::prelude::{ContentType, Generator, GeneratorCategory, Generators, RuleLogic};
 use serde_json::Value;
 use tracing::{debug, error};
 
@@ -21,12 +21,13 @@ use crate::proto::{
   Body,
   CompareContentsRequest,
   ConfigureInteractionRequest,
+  ConfigureInteractionResponse,
   GenerateContentRequest,
   PluginConfiguration as ProtoPluginConfiguration
 };
 use crate::proto::body;
 use crate::proto::interaction_response::MarkupType;
-use crate::utils::{proto_struct_to_json, proto_struct_to_map, to_proto_struct};
+use crate::utils::{proto_struct_to_hashmap, proto_struct_to_json, proto_struct_to_map, to_proto_struct};
 
 /// Matcher for contents based on content type
 #[derive(Clone, Debug)]
@@ -62,7 +63,7 @@ pub struct ContentMismatch {
 }
 
 /// Interaction contents setup by the plugin
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct InteractionContents {
   /// Description of what part this interaction belongs to (in the case of there being more than
   /// one, for instance, request/response messages)
@@ -78,7 +79,7 @@ pub struct InteractionContents {
   pub generators: Option<Generators>,
 
   /// Message metadata
-  pub metadata: Option<HashMap<String, Value>>,
+  pub metadata: Option<BTreeMap<String, Value>>,
 
   /// Matching rules to apply to message metadata
   pub metadata_rules: Option<MatchingRuleCategory>,
@@ -110,7 +111,7 @@ impl Default for InteractionContents {
 }
 
 /// Plugin data to persist into the Pact file
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct PluginConfiguration {
   /// Data to perist on the interaction
   pub interaction_configuration: HashMap<String, Value>,
@@ -137,8 +138,14 @@ impl Default for PluginConfiguration {
 impl From<ProtoPluginConfiguration> for PluginConfiguration {
   fn from(config: ProtoPluginConfiguration) -> Self {
     PluginConfiguration {
-      interaction_configuration: config.interaction_configuration.as_ref().map(|c| proto_struct_to_map(c)).unwrap_or_default(),
-      pact_configuration: config.pact_configuration.as_ref().map(|c| proto_struct_to_map(c)).unwrap_or_default()
+      interaction_configuration: config.interaction_configuration
+        .as_ref()
+        .map(|c| proto_struct_to_hashmap(c))
+        .unwrap_or_default(),
+      pact_configuration: config.pact_configuration
+        .as_ref()
+        .map(|c| proto_struct_to_hashmap(c))
+        .unwrap_or_default()
     }
   }
 }
@@ -174,7 +181,18 @@ impl ContentMatcher {
 
   /// Get the plugin to configure the interaction contents for the interaction part based on the
   /// provided definition
+  #[deprecated(note = "Use the version that is spelled correctly")]
   pub async fn configure_interation(
+    &self,
+    content_type: &ContentType,
+    definition: HashMap<String, Value>
+  ) -> anyhow::Result<(Vec<InteractionContents>, Option<PluginConfiguration>)> {
+    self.configure_interaction(content_type, definition).await
+  }
+
+  /// Get the plugin to configure the interaction contents for the interaction part based on the
+  /// provided definition
+  pub async fn configure_interaction(
     &self,
     content_type: &ContentType,
     definition: HashMap<String, Value>
@@ -192,90 +210,7 @@ impl ContentMatcher {
         Ok(response) => {
           debug!("Got response: {:?}", response);
           if response.error.is_empty() {
-            let mut results = vec![];
-
-            for response in &response.interaction {
-              let body = match &response.contents {
-                Some(body) => {
-                  let returned_content_type = ContentType::parse(body.content_type.as_str()).ok();
-                  let contents = body.content.as_ref().cloned().unwrap_or_default();
-                  OptionalBody::Present(Bytes::from(contents), returned_content_type,
-                                        Some(match body.content_type_hint() {
-                                          body::ContentTypeHint::Text => ContentTypeHint::TEXT,
-                                          body::ContentTypeHint::Binary => ContentTypeHint::BINARY,
-                                          body::ContentTypeHint::Default => ContentTypeHint::DEFAULT,
-                                        }))
-                },
-                None => OptionalBody::Missing
-              };
-
-              let rules = Self::setup_matching_rules(&response.rules)?;
-
-              let generators = if !response.generators.is_empty() || !response.metadata_generators.is_empty() {
-                let mut categories = hashmap!{};
-
-                if !response.generators.is_empty() {
-                  let mut generators = hashmap!{};
-                  for (k, gen) in &response.generators {
-                    generators.insert(DocPath::new(k)?,
-                      Generator::create(gen.r#type.as_str(),
-                        &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default())?);
-                  }
-                  categories.insert(GeneratorCategory::BODY, generators);
-                }
-
-                if !response.metadata_generators.is_empty() {
-                  let mut generators = hashmap!{};
-                  for (k, gen) in &response.metadata_generators {
-                    generators.insert(DocPath::new(k)?,
-                      Generator::create(gen.r#type.as_str(),
-                        &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default())?);
-                  }
-                  categories.insert(GeneratorCategory::METADATA, generators);
-                }
-
-                Some(Generators { categories })
-              } else {
-                None
-              };
-
-              let metadata = response.message_metadata.as_ref().map(|md| proto_struct_to_map(md));
-              let metadata_rules = Self::setup_matching_rules(&response.metadata_rules)?;
-
-              let plugin_config = if let Some(plugin_configuration) = &response.plugin_configuration {
-                PluginConfiguration {
-                  interaction_configuration: plugin_configuration.interaction_configuration.as_ref()
-                    .map(|val| proto_struct_to_map(val)).unwrap_or_default(),
-                  pact_configuration: plugin_configuration.pact_configuration.as_ref()
-                    .map(|val| proto_struct_to_map(val)).unwrap_or_default()
-                }
-              } else {
-                PluginConfiguration::default()
-              };
-
-              debug!("body={}", body);
-              debug!("rules={:?}", rules);
-              debug!("generators={:?}", generators);
-              debug!("metadata={:?}", metadata);
-              debug!("metadata_rules={:?}", metadata_rules);
-              debug!("pluginConfig={:?}", plugin_config);
-
-              results.push(InteractionContents {
-                part_name: response.part_name.clone(),
-                body,
-                rules,
-                generators,
-                metadata,
-                metadata_rules,
-                plugin_config,
-                interaction_markup: response.interaction_markup.clone(),
-                interaction_markup_type: match response.interaction_markup_type() {
-                  MarkupType::Html => "HTML".to_string(),
-                  _ => "COMMON_MARK".to_string(),
-                }
-              })
-            }
-
+            let results = Self::build_interaction_contents(&response)?;
             Ok((results, response.plugin_configuration.map(|config| PluginConfiguration::from(config))))
           } else {
             Err(anyhow!("Request to configure interaction failed: {}", response.error))
@@ -291,6 +226,100 @@ impl ContentMatcher {
         Err(anyhow!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry))
       }
     }
+  }
+
+  pub(crate) fn build_interaction_contents(
+    response: &ConfigureInteractionResponse
+  ) -> anyhow::Result<Vec<InteractionContents>> {
+    let mut results = vec![];
+
+    for response in &response.interaction {
+      let body = match &response.contents {
+        Some(body) => {
+          let contents = body.content.as_ref().cloned().unwrap_or_default();
+          if contents.is_empty() {
+            OptionalBody::Empty
+          } else {
+            let returned_content_type = ContentType::parse(body.content_type.as_str()).ok();
+            OptionalBody::Present(Bytes::from(contents), returned_content_type,
+                                  Some(match body.content_type_hint() {
+                                    body::ContentTypeHint::Text => ContentTypeHint::TEXT,
+                                    body::ContentTypeHint::Binary => ContentTypeHint::BINARY,
+                                    body::ContentTypeHint::Default => ContentTypeHint::DEFAULT,
+                                  }))
+          }
+        },
+        None => OptionalBody::Missing
+      };
+
+      let rules = Self::setup_matching_rules(&response.rules)?;
+
+      let generators = if !response.generators.is_empty() || !response.metadata_generators.is_empty() {
+        let mut categories = hashmap! {};
+
+        if !response.generators.is_empty() {
+          let mut generators = hashmap! {};
+          for (k, gen) in &response.generators {
+            generators.insert(DocPath::new(k)?,
+                              Generator::create(gen.r#type.as_str(),
+                                                &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default())?);
+          }
+          categories.insert(GeneratorCategory::BODY, generators);
+        }
+
+        if !response.metadata_generators.is_empty() {
+          let mut generators = hashmap! {};
+          for (k, gen) in &response.metadata_generators {
+            generators.insert(DocPath::new(k)?,
+                              Generator::create(gen.r#type.as_str(),
+                                                &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default())?);
+          }
+          categories.insert(GeneratorCategory::METADATA, generators);
+        }
+
+        Some(Generators { categories })
+      } else {
+        None
+      };
+
+      let metadata = response.message_metadata.as_ref().map(|md| proto_struct_to_map(md));
+      let metadata_rules = Self::setup_matching_rules(&response.metadata_rules)?;
+
+      let plugin_config = if let Some(plugin_configuration) = &response.plugin_configuration {
+        PluginConfiguration {
+          interaction_configuration: plugin_configuration.interaction_configuration.as_ref()
+            .map(|val| proto_struct_to_hashmap(val)).unwrap_or_default(),
+          pact_configuration: plugin_configuration.pact_configuration.as_ref()
+            .map(|val| proto_struct_to_hashmap(val)).unwrap_or_default()
+        }
+      } else {
+        PluginConfiguration::default()
+      };
+
+      debug!("body={}", body);
+      debug!("rules={:?}", rules);
+      debug!("generators={:?}", generators);
+      debug!("metadata={:?}", metadata);
+      debug!("metadata_rules={:?}", metadata_rules);
+      debug!("pluginConfig={:?}", plugin_config);
+
+      results.push(InteractionContents {
+        part_name: response.part_name.clone(),
+        body,
+        rules,
+        generators,
+        metadata,
+        metadata_rules,
+        plugin_config,
+        interaction_markup: response.interaction_markup.clone(),
+        interaction_markup_type: match response.interaction_markup_type() {
+          MarkupType::Html => "HTML".to_string(),
+          _ => "COMMON_MARK".to_string(),
+        }
+      })
+    }
+
+    Ok(results)
   }
 
   fn setup_matching_rules(rules_map: &HashMap<String, crate::proto::MatchingRules>) -> anyhow::Result<Option<MatchingRuleCategory>> {
@@ -538,5 +567,95 @@ impl ContentGenerator {
         Err(anyhow!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry))
       }
     }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use bytes::Bytes;
+  use maplit::btreemap;
+  use pact_models::bodies::OptionalBody;
+  use pact_models::content_types::{ContentType, ContentTypeHint};
+  use pretty_assertions::assert_eq;
+  use prost_types::value::Kind::StringValue;
+  use serde_json::Value;
+
+  use crate::proto::{Body, body, ConfigureInteractionResponse, InteractionResponse};
+
+  use super::{ContentMatcher, InteractionContents};
+
+  // Issue https://github.com/YOU54F/pact-ruby-ffi/issues/6
+  #[test_log::test]
+  fn build_interaction_contents_deals_with_empty_contents() {
+    let response = ConfigureInteractionResponse {
+      interaction: vec![
+        InteractionResponse {
+          contents: Some(Body {
+            content_type: "application/protobuf; message=.area_calculator.ShapeMessage".to_string(),
+            content: Some(b"\x12\n\r\0\0@@\x15\0\0\x80@".to_vec()),
+            content_type_hint: body::ContentTypeHint::Binary.into()
+          }),
+          message_metadata: Some(prost_types::Struct {
+            fields: btreemap!{
+              "contentType".to_string() => prost_types::Value {
+                kind: Some(StringValue("application/protobuf;message=.area_calculator.ShapeMessage".to_string()))
+              }
+            }
+          }),
+          part_name: "request".to_string(),
+          .. InteractionResponse::default()
+        },
+        InteractionResponse {
+          contents: Some(Body {
+            content_type: "application/protobuf; message=.area_calculator.AreaResponse".to_string(),
+            content: Some(vec![]),
+            content_type_hint: body::ContentTypeHint::Binary.into()
+          }),
+          message_metadata: Some(prost_types::Struct {
+            fields: btreemap!{
+              "grpc-message".to_string() => prost_types::Value {
+                kind: Some(StringValue("Not implemented".to_string()))
+              },
+              "grpc-status".to_string() => prost_types::Value {
+                kind: Some(StringValue("UNIMPLEMENTED".to_string()))
+              },
+              "contentType".to_string() => prost_types::Value {
+                kind: Some(StringValue("application/protobuf;message=.area_calculator.AreaResponse".to_string()))
+              }
+            }
+          }),
+          part_name: "response".to_string(),
+          .. InteractionResponse::default()
+        }
+      ],
+      .. ConfigureInteractionResponse::default()
+    };
+    let result = ContentMatcher::build_interaction_contents(&response).unwrap();
+
+    assert_eq!(result, vec![
+      InteractionContents {
+        part_name: "request".to_string(),
+        interaction_markup_type: "COMMON_MARK".to_string(),
+        body: OptionalBody::Present(Bytes::from(b"\x12\n\r\0\0@@\x15\0\0\x80@".to_vec()),
+          Some(ContentType::parse("application/protobuf;message=.area_calculator.ShapeMessage").unwrap()),
+          Some(ContentTypeHint::BINARY)),
+        metadata: Some(btreemap!{
+          "contentType".to_string() => Value::String("application/protobuf;message=.area_calculator.ShapeMessage".to_string())
+        }),
+        .. InteractionContents::default()
+      },
+
+      InteractionContents {
+        part_name: "response".to_string(),
+        interaction_markup_type: "COMMON_MARK".to_string(),
+        body: OptionalBody::Empty,
+        metadata: Some(btreemap!{
+          "grpc-status".to_string() => Value::String("UNIMPLEMENTED".to_string()),
+          "grpc-message".to_string() => Value::String("Not implemented".to_string()),
+          "contentType".to_string() => Value::String("application/protobuf;message=.area_calculator.AreaResponse".to_string())
+        }),
+        .. InteractionContents::default()
+      }
+    ]);
   }
 }

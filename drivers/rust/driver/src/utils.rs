@@ -1,7 +1,8 @@
 //! Utils for dealing with protobufs structs
 
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use anyhow::bail;
+use itertools::Itertools;
 use os_info::Type;
 
 use prost_types::{ListValue, Struct};
@@ -62,8 +63,18 @@ pub fn proto_value_to_json(val: &prost_types::Value) -> Value {
 }
 
 /// Converts a prost struct to a map of key -> JSON
-pub fn proto_struct_to_map(val: &prost_types::Struct) -> HashMap<String, Value> {
-  val.fields.iter().map(|(k, v)| (k.clone(), proto_value_to_json(v))).collect()
+pub fn proto_struct_to_map(val: &prost_types::Struct) -> BTreeMap<String, Value> {
+  val.fields.iter()
+    .sorted_by(|(k1, _), (k2, _)| Ord::cmp(k1, k2))
+    .map(|(k, v)| (k.clone(), proto_value_to_json(v)))
+    .collect()
+}
+
+/// Converts a prost struct to a hash map of key -> JSON
+pub fn proto_struct_to_hashmap(val: &prost_types::Struct) -> HashMap<String, Value> {
+  val.fields.iter()
+    .map(|(k, v)| (k.clone(), proto_value_to_json(v)))
+    .collect()
 }
 
 /// Convert a proto struct into a String
