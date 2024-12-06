@@ -1,55 +1,57 @@
 # Support script language plugins (Draft)
 
-Discussion for this proposal: 
+Discussion for this proposal: https://github.com/pact-foundation/pact-plugins/discussions/84
 
 ## Summary
 
-Allow plugins to be written in a simple scripting languages (examples would be Lua, Python or Javascript).
+Allow plugins to be written in a scripting language (examples would be Lua, Python or Javascript).
 
 ## Motivation
 
-Current plugins are implemented as executables that start up a gRPC server to communicate 
+Current plugins are implemented as executables that start up a gRPC server to communicate. They run as a separate 
+process and require a fair amount of overhead to setup. A scripting language approach may be simpler. 
 
-## Guide-level explanation
+## Details
 
-Explain the proposal as if it were already a part of Pact. That generally means:
+Scripting languages are executed by an embedded interpreter. This means they are run in the same address space as the
+testing framework, so may be easier to debug (doubtful, but, hey). It also means they can have a simpler interface.
 
-- Explaining the feature largely in terms of examples.
-- Explaining how Pact users should *think* about the feature, and how it should impact the way they use Pact. It should explain the impact as concretely as possible.
-- If applicable, provide sample error messages, deprecation warnings, or migration guidance.
-- If applicable, describe the differences between teaching this to existing Pact users and new Pact users.
-- Discuss how this impacts existing Pacts, and the Pact ecosystem in general.
+Instead of making RPC calls to the plugin process, the plugin just exposes functions that the plugin driver can call. 
+These can map quite easily to the gRPC calls make to the exiting plugins.
 
-## Reference-level explanation
+## Technical details
 
-This is the technical portion of the RFC. Explain the design in sufficient detail that:
+For a POC of a JWT plugin written in Lua, see the feat/lua-plugins branch is this repository:
+* Consumer test https://github.com/pact-foundation/pact-plugins/blob/feat/lua-plugins/examples/jwt/consumer/src/lib.rs
+* Lua Plugin https://github.com/pact-foundation/pact-plugins/tree/feat/lua-plugins/plugins/jwt
 
-- Its interaction with other features is clear.
-- It is reasonably clear how the feature would be implemented.
-- Corner cases are dissected by example.
+All the [gRPC calls](https://github.com/pact-foundation/pact-plugins/blob/feat/lua-plugins/proto/plugin.proto#L398) are 
+implemented as Lua functions. See [match contents as an example](https://github.com/pact-foundation/pact-plugins/blob/feat/lua-plugins/plugins/jwt/plugin.lua#L104).
 
-The section should return to the examples given in the previous section, and explain more fully how the detailed proposal makes those examples work.
+## Benefits
 
-## Drawbacks
+* This will allow plugins to be much simpler, and authored by a wider group of people.
+* Call back functionality (see the [V2 Plugin Interface proposal](https://github.com/pact-foundation/pact-plugins/blob/main/docs/proposals/001_V2_Plugin_Interface.md#capability-for-plugins-to-use-the-functionality-from-the-calling-framework))
+  can be easily implemented as functions that are exposed by the driver to the plugin. With the Lua plugin, [the logger](https://github.com/pact-foundation/pact-plugins/blob/feat/lua-plugins/plugins/jwt/plugin.lua#L11)
+  function is an example. 
 
-Why should we *not* do this?
+## Issues with this approach
 
-## Rationale and alternatives
+### System dependencies
+Scripting languages require their own set of system dependencies. No plugin is going to be useful on its own. Plugins 
+need to be easily installed, and have no dependencies outside their plugin directory, so all dependencies will
+need to be bundled with the plugin.
 
-- Why is this design the best in the space of possible designs?
-- What other designs have been considered and what is the rationale for not choosing them?
-- What is the impact of not doing this?
+While Lua is quite simple in this regard, Python requires dependencies to be installed in a particular manner (not too 
+terrible) and if we allow JavaScript, then people will want to access system functionality. To access files, etc, they will need to
+use Node. If they use Node, they will want to use NPM. Using NPM brings in `node_modules`, and all hell then breaks loose.
+ 
+### Authored by a wider group of people
+One of the advantages of the current plugin architecture, the people writing the plugins need to be very technical. Thus,
+the implemented plugins probably end up being better implemented. If we allow JavaScript, then .....
 
-## Unresolved questions
-
-- What parts of the design do you expect to resolve through the RFC process before this gets merged?
-- What parts of the design do you expect to resolve through the implementation of this feature before stabilization?
-- What related issues do you consider out of scope for this RFC but could be addressed independently in future solutions?
-
-## Future possibilities
-
-Think about what the natural extension and evolution of your proposal would be and how it would affect the Pact specification, Pact users, and the ecosystem in a holistic way. This is also a good place to "dump ideas", if they are out of scope for the RFC you are writing but otherwise related.
-
-If you have tried and cannot think of any future possibilities, you may simply state that you cannot think of anything.
-
-Note that having something written down in the future-possibilities section is not a reason to accept the current or a future RFC; such notes should be in the section on motivation or rationale in this or subsequent RFCs.  The section merely provides additional information.
+### JVM support
+Pact-JVM currently has no non-JVM dependencies. This means it can run anywhere that a JVM can run. An embedded interpreter
+would force Pact-JVM to become system architecture dependant. While there are JVM versions of interpreters (Rhino, Jython),
+these may have particular quirks and would force the plugins authors to test their code running with these interpreters.
+Also, Pact-JVM would have to expose system functionality (IO, Sockets, etc.) through exported functions.
