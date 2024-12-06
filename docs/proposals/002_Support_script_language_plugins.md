@@ -21,7 +21,7 @@ These can map quite easily to the gRPC calls make to the exiting plugins.
 
 ## Technical details
 
-For a POC of a JWT plugin written in Lua, see the feat/lua-plugins branch is this repository:
+For a POC of a JWT plugin written in Lua, see the feat/lua-plugins branch in this repository:
 * Consumer test https://github.com/pact-foundation/pact-plugins/blob/feat/lua-plugins/examples/jwt/consumer/src/lib.rs
 * Lua Plugin https://github.com/pact-foundation/pact-plugins/tree/feat/lua-plugins/plugins/jwt
 
