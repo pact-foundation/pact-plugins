@@ -1,6 +1,6 @@
 # V2 Plugin Interface (Draft)
 
-Discussion for this proposal:
+Discussion for this proposal: https://github.com/pact-foundation/pact-plugins/discussions/83
 
 ## Summary
 
