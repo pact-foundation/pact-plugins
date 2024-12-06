@@ -109,6 +109,7 @@ are defined using [WIT instead](https://github.com/pact-foundation/pact-plugins/
   function is an example. Exporting functions for a WASM file is part of the design of Web Assembly.
 * Plugins can be written in any language that compiles to WASM + WASI and supports WIT (there are quite a lot).
 * Plugins can have a well defined interface that is part of the plugin binary (WASM file).
+* WIT seems to be inspired from languages like Rust. It has types like `tuple`, `option` and `result`.
 
 ## Issues with this approach
 
@@ -119,3 +120,6 @@ are defined using [WIT instead](https://github.com/pact-foundation/pact-plugins/
   the interpreter shared library. This makes the implementation system architecture dependent. It also feels wrong to have
   a stack-based virtual machine embed another stack-based virtual machine.
 * There are multiple implementations. Two main ones are Wasmtime and Wasmer. We would need to pick one to use.
+* WIT does not support recursive definitions (i.e. a record where an attribute can be the same type). JSON is a format
+  like that, so you can't map JSON data with WIT (there is no equivalent for `google.protobuf.Value`). JSON data would have to
+  encoded into a string and decoded on the other side.
