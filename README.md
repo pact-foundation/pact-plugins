@@ -66,6 +66,7 @@ See [PactFlow Protobuf/gRPC plugin](https://github.com/pactflow/pact-protobuf-pl
 #### Plugins that provide matchers/generators (WIP)
 
 TODO 🚧
+See [V2 plugin interface proposal](./docs/proposals/001_V2_Plugin_Interface.md)
 
 ## Background
 
