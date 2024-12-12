@@ -2,15 +2,14 @@ name: Release workflow
 
 on:
   release:
-    types: [published]
-
+    types:
+      - published
+  push:
+    branches:
+      - main
   pull_request:
     branches:
       - main
-  
-concurrency:
-  group: release-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   build-release:
@@ -61,7 +60,7 @@ jobs:
             echo "flags=--release" >> "$GITHUB_OUTPUT"
           else
             echo "flags=" >> "$GITHUB_OUTPUT"
-          fi 
+          fi
       - if: |
           github.event_name == 'push' ||
           github.event_name == 'pull_request' ||

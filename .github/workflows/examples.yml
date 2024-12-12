@@ -1,8 +1,12 @@
 name: Pact Plugin Examples
 
 on:
-  - push
-  - pull_request
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   csv-examples:
