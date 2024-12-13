@@ -395,7 +395,10 @@ pub async fn start_mock_server(
   start_mock_server_v2(catalogue_entry, pact, config, hashmap!{}).await
 }
 
-/// Starts a mock server given the catalog entry for it and a Pact
+/// Starts a mock server given the catalog entry for it and a Pact.
+/// Any transport specific configuration must be passed in the `test_context` field under
+/// the `transport_config` key. Note that the next version of the interface will pass the
+/// transport specific configuration in its own field.
 pub async fn start_mock_server_v2(
   catalogue_entry: &CatalogueEntry,
   pact: Box<dyn Pact + Send + Sync>,
@@ -408,7 +411,7 @@ pub async fn start_mock_server_v2(
     .ok_or_else(|| anyhow!("Did not find a running plugin for manifest {:?}", manifest))?;
 
   debug!(plugin_name = manifest.name.as_str(), plugin_version = manifest.version.as_str(),
-    "Sending startMockServer request to plugin");
+    ?test_context, "Sending startMockServer request to plugin");
   let request = StartMockServerRequest {
     host_interface: config.host_interface.unwrap_or_default(),
     port: config.port,
