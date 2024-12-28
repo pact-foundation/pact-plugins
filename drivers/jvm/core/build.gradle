@@ -30,7 +30,7 @@ dependencies {
     implementation 'org.apache.tika:tika-core:2.9.2'
     implementation 'org.jetbrains.kotlin:kotlin-reflect:1.8.22'
     implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-    implementation 'org.rauschig:jarchivelib:1.2.0'
+    implementation 'io.github.compress4j:compress4j:2.1.1'
     implementation 'org.apache.commons:commons-compress:1.26.1'
 
     protobuf files('../../../proto/')

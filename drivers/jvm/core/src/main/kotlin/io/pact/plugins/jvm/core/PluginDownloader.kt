@@ -4,8 +4,11 @@ import au.com.dius.pact.core.support.Result
 import au.com.dius.pact.core.support.isNotEmpty
 import au.com.dius.pact.core.support.json.JsonParser
 import au.com.dius.pact.core.support.json.JsonValue
+import io.github.compress4j.archivers.ArchiveFormat
+import io.github.compress4j.archivers.ArchiverFactory
 import io.github.oshai.kotlinlogging.KotlinLogging
 import org.apache.commons.codec.digest.DigestUtils
+import org.apache.commons.compress.archivers.zip.ZipArchiveEntry
 import org.apache.commons.io.FilenameUtils
 import org.apache.commons.io.IOUtils
 import org.apache.commons.lang3.SystemUtils.IS_OS_LINUX
@@ -15,8 +18,6 @@ import org.apache.commons.lang3.SystemUtils.IS_OS_WINDOWS
 import org.apache.commons.lang3.SystemUtils.OS_ARCH
 import org.apache.commons.lang3.SystemUtils.OS_NAME
 import org.apache.hc.client5.http.fluent.Request
-import org.rauschig.jarchivelib.ArchiveFormat
-import org.rauschig.jarchivelib.ArchiverFactory
 import java.io.File
 import java.io.StringReader
 import java.util.zip.GZIPInputStream
@@ -192,7 +193,7 @@ object DefaultPluginDownloader: PluginDownloader {
           }
         }
 
-        val archiver = ArchiverFactory.createArchiver(ArchiveFormat.ZIP)
+        val archiver = ArchiverFactory.createArchiver<ZipArchiveEntry>(ArchiveFormat.ZIP)
         archiver.extract(fileResult.value, pluginDir)
         return Result.Ok(fileResult.value)
       }
