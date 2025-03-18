@@ -346,21 +346,27 @@ pub struct PluginInteractionConfig {
 
 #[cfg(test)]
 pub(crate) mod tests {
-  use async_trait::async_trait;
-  use lazy_static::lazy_static;
   use std::sync::RwLock;
+
+  use async_trait::async_trait;
 
   use crate::plugin_models::PactPluginRpc;
   use crate::proto::*;
   use crate::proto::verification_preparation_response::Response;
 
-  lazy_static!{
-     pub(crate) static ref PREPARE_INTERACTION_FOR_VERIFICATION_ARG: RwLock<Option<VerificationPreparationRequest>> = RwLock::new(None);
-     pub(crate) static ref VERIFY_INTERACTION_ARG: RwLock<Option<VerifyInteractionRequest>> = RwLock::new(None);
+  pub(crate) struct MockPlugin {
+    pub prepare_request: RwLock<VerificationPreparationRequest>,
+    pub verify_request: RwLock<VerifyInteractionRequest>
   }
 
-  #[derive(Default)]
-  pub(crate) struct MockPlugin {}
+  impl Default for MockPlugin {
+    fn default() -> Self {
+      MockPlugin {
+        prepare_request: RwLock::new(VerificationPreparationRequest::default()),
+        verify_request: RwLock::new(VerifyInteractionRequest::default())
+      }
+    }
+  }
 
   #[async_trait]
   impl PactPluginRpc for MockPlugin {
@@ -393,8 +399,8 @@ pub(crate) mod tests {
     }
 
     async fn prepare_interaction_for_verification(&self, request: VerificationPreparationRequest) -> anyhow::Result<VerificationPreparationResponse> {
-      let mut w = PREPARE_INTERACTION_FOR_VERIFICATION_ARG.write().unwrap();
-      let _ = w.insert(request);
+      let mut w = self.prepare_request.write().unwrap();
+      *w = request;
       let data = InteractionData {
         body: None,
         metadata: Default::default()
@@ -405,8 +411,8 @@ pub(crate) mod tests {
     }
 
     async fn verify_interaction(&self, request: VerifyInteractionRequest) -> anyhow::Result<VerifyInteractionResponse> {
-      let mut w = VERIFY_INTERACTION_ARG.write().unwrap();
-      let _ = w.insert(request);
+      let mut w = self.verify_request.write().unwrap();
+      *w = request;
       let result = VerificationResult {
         success: false,
         response_data: None,
