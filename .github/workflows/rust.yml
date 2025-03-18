@@ -1,15 +1,6 @@
 name: Pact Plugin Driver (Rust)
 
-on:
-  release:
-    types:
-      - published
-  push:
-    branches:
-      - main
-  pull_request:
-    branches:
-      - main
+on: [push, pull_request]
 
 jobs:
   build:
