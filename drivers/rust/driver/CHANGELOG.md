@@ -1,5 +1,13 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.7.3 - Bugfix Release
+
+* e7b7b27 - chore: Update dependencies (Ronald Holshausen, Wed Mar 19 10:56:54 2025 +1100)
+* 54b76ba - fix: don't override the interaction key if it is already set when calling the verification methods (Ronald Holshausen, Wed Mar 19 10:50:11 2025 +1100)
+* e2ca658 - chore: Update doc comment on transport specific configuration must be passed in the test_context (Ronald Holshausen, Fri Dec 13 14:19:01 2024 +1100)
+* 08247fd - chore: Upgrade dependencies (Ronald Holshausen, Fri Dec 13 14:17:44 2024 +1100)
+* 5d03945 - bump version to 0.7.3 (Ronald Holshausen, Fri Nov 29 15:21:23 2024 +1100)
+
 # 0.7.2 - Bugfix Release
 
 * 5501f24 - chore: update repository.index (Ronald Holshausen, Fri Nov 29 15:19:54 2024 +1100)
