@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.7.4 - Maintenance Release
+
+* c64d7c6 - chore: Upgrade crate to Rust 2024 edition (Ronald Holshausen, Tue Mar 25 16:19:44 2025 +1100)
+* a97cd0c - chore: Upgrade pact_models to 1.3.0 (Ronald Holshausen, Tue Mar 25 16:17:50 2025 +1100)
+* 20ab33f - bump version to 0.7.4 (Ronald Holshausen, Wed Mar 19 11:14:45 2025 +1100)
+
 # 0.7.3 - Bugfix Release
 
 * e7b7b27 - chore: Update dependencies (Ronald Holshausen, Wed Mar 19 10:56:54 2025 +1100)
