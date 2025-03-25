@@ -259,20 +259,20 @@ impl ContentMatcher {
 
         if !response.generators.is_empty() {
           let mut generators = hashmap! {};
-          for (k, gen) in &response.generators {
+          for (k, g) in &response.generators {
             generators.insert(DocPath::new(k)?,
-                              Generator::create(gen.r#type.as_str(),
-                                                &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default())?);
+                              Generator::create(g.r#type.as_str(),
+                                                &g.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default())?);
           }
           categories.insert(GeneratorCategory::BODY, generators);
         }
 
         if !response.metadata_generators.is_empty() {
           let mut generators = hashmap! {};
-          for (k, gen) in &response.metadata_generators {
+          for (k, g) in &response.metadata_generators {
             generators.insert(DocPath::new(k)?,
-                              Generator::create(gen.r#type.as_str(),
-                                                &gen.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default())?);
+                              Generator::create(g.r#type.as_str(),
+                                                &g.values.as_ref().map(|attr| proto_struct_to_json(attr)).unwrap_or_default())?);
           }
           categories.insert(GeneratorCategory::METADATA, generators);
         }
