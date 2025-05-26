@@ -114,6 +114,7 @@ ask('Tag and Push commits?: [Y]') {
 
 ask('Publish artifacts to maven central?: [Y]') {
   executeOnShell './gradlew clean publish -PisRelease=true -S'
+  executeOnShell 'cd core && jreleaser deploy --git-root-search'
 }
 
 def nextVer = Version.valueOf(releaseVer).incrementPatchVersion()

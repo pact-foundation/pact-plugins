@@ -21,3 +21,5 @@ drivers/rust/driver_ffi/Cargo.lock
 drivers/rust/driver_pact_tests/Cargo.lock
 gradle.properties
 
+# jreleaser
+out/
