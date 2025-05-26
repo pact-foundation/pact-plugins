@@ -1,8 +1,8 @@
 plugins {
     id 'java-library'
-    id 'com.google.protobuf' version '0.9.4'
+    id 'com.google.protobuf' version '0.9.5'
     id 'groovy'
-    id 'au.com.dius.pact' version '4.5.9'
+    id 'au.com.dius.pact' version '4.5.13'
 }
 
 ext {
@@ -13,44 +13,44 @@ ext {
 dependencies {
     compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
 
-    implementation 'au.com.dius.pact.core:model:4.5.12'
-    implementation 'au.com.dius.pact.core:support:4.5.12'
-    implementation 'com.google.guava:guava:33.2.0-jre'
+    implementation 'au.com.dius.pact.core:model:4.5.13'
+    implementation 'au.com.dius.pact.core:support:4.5.13'
+    implementation 'com.google.guava:guava:33.4.8-jre'
     implementation 'com.vdurmont:semver4j:3.1.0'
-    implementation 'commons-codec:commons-codec:1.17.0'
+    implementation 'commons-codec:commons-codec:1.18.0'
     implementation('io.github.oshai:kotlin-logging-jvm:6.0.9') {
         exclude group: 'org.jetbrains.kotlin'
     }
-    implementation 'io.grpc:grpc-netty:1.66.0'
-    implementation 'io.grpc:grpc-protobuf:1.66.0'
-    implementation 'io.grpc:grpc-stub:1.66.0'
+    implementation 'io.grpc:grpc-netty:1.72.0'
+    implementation 'io.grpc:grpc-protobuf:1.72.0'
+    implementation 'io.grpc:grpc-stub:1.72.0'
     implementation 'io.hotmoka:toml4j:0.7.3'
-    implementation 'org.apache.commons:commons-lang3:3.14.0'
-    implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.3.1'
-    implementation 'org.apache.tika:tika-core:2.9.2'
+    implementation 'org.apache.commons:commons-lang3:3.17.0'
+    implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.5'
+    implementation 'org.apache.tika:tika-core:2.9.4'
     implementation 'org.jetbrains.kotlin:kotlin-reflect:1.8.22'
     implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
-    implementation 'io.github.compress4j:compress4j:2.1.1'
-    implementation 'org.apache.commons:commons-compress:1.26.1'
+    implementation 'io.github.compress4j:compress4j:2.1.2'
+    implementation 'org.apache.commons:commons-compress:1.27.1'
 
     protobuf files('../../../proto/')
 
     // Groovy dependencies need to be first
-    testImplementation 'org.apache.groovy:groovy-json:4.0.21'
-    testImplementation 'org.apache.groovy:groovy:4.0.21'
+    testImplementation 'org.apache.groovy:groovy-json:4.0.26'
+    testImplementation 'org.apache.groovy:groovy:4.0.26'
 
-    testImplementation 'au.com.dius.pact.consumer:junit5:4.5.9'
-    testImplementation('au.com.dius.pact.consumer:groovy:4.5.9') {
+    testImplementation 'au.com.dius.pact.consumer:junit5:4.5.13'
+    testImplementation('au.com.dius.pact.consumer:groovy:4.5.13') {
         transitive = false
     }
-    testImplementation 'ch.qos.logback:logback-classic:1.5.6'
-    testImplementation 'net.bytebuddy:byte-buddy:1.9.16'
-    testImplementation 'org.eclipse.parsson:parsson:1.1.6'
-    testImplementation 'org.hamcrest:hamcrest:2.2'
-    testImplementation 'org.json:json:20240303'
+    testImplementation 'ch.qos.logback:logback-classic:1.5.18'
+    testImplementation 'net.bytebuddy:byte-buddy:1.17.5'
+    testImplementation 'org.eclipse.parsson:parsson:1.1.7'
+    testImplementation 'org.hamcrest:hamcrest:3.0'
+    testImplementation 'org.json:json:20250517'
     testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
-    testImplementation 'org.mockito:mockito-core:5.12.0'
-    testImplementation 'org.mockito:mockito-junit-jupiter:5.12.0'
+    testImplementation 'org.mockito:mockito-core:5.18.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.18.0'
     testImplementation 'org.objenesis:objenesis:3.4'
     testImplementation 'org.spockframework:spock-core:2.3-groovy-4.0'
 
@@ -59,9 +59,9 @@ dependencies {
 }
 
 protobuf {
-    protoc { artifact = "com.google.protobuf:protoc:3.25.4" }
+    protoc { artifact = "com.google.protobuf:protoc:3.25.7" }
     plugins {
-        grpc { artifact = "io.grpc:protoc-gen-grpc-java:1.66.0" }
+        grpc { artifact = "io.grpc:protoc-gen-grpc-java:1.72.0" }
     }
     generateProtoTasks {
         all()*.plugins { grpc {} }
