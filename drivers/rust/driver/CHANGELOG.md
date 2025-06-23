@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.7.5 - Maintenance Release
+
+* 289e919 - chore: Upgrade tonic to 0.13.1 (Ronald Holshausen, Mon Jun 23 16:23:19 2025 +1000)
+* b2758a0 - chore: Upgrade minor dependencies (Ronald Holshausen, Mon Jun 23 16:13:45 2025 +1000)
+* 99c92dc - bump version to 0.7.5 (Ronald Holshausen, Tue Mar 25 16:22:42 2025 +1100)
+
 # 0.7.4 - Maintenance Release
 
 * c64d7c6 - chore: Upgrade crate to Rust 2024 edition (Ronald Holshausen, Tue Mar 25 16:19:44 2025 +1100)
