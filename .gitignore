@@ -9,7 +9,6 @@
 # Ignore build output directories
 build
 target
-pacts
 *.out
 # Generated Release Artifacts
 release_artifacts

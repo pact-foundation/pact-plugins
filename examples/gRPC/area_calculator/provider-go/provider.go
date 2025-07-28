@@ -65,7 +65,22 @@ func (calc *calculatorServer) CalculateMulti(ctx context.Context, req *ac.AreaRe
 		areas = append(areas, area)
 	}
 
-	return &ac.AreaResponse{Value: areas}, nil
+	// over-simplified version of how we build the response with
+	// nested fields.
+	l1s := []*ac.NestedFieldLevel1{}
+	l1 := &ac.NestedFieldLevel1{
+		FirstLevel:  "First Level",
+		InnerLevels: []*ac.NestedFieldLevel1_NestedFieldLevel2{},
+	}
+
+	l2val := &ac.NestedFieldLevel1_NestedFieldLevel2{
+		InnerLevel: "Inner Level to fail",
+	}
+	l1.InnerLevels = append(l1.InnerLevels, l2val)
+
+	l1s = append(l1s, l1)
+
+	return &ac.AreaResponse{Value: areas, NestedFieldLevel1: l1s}, nil
 }
 
 func NewServer() *calculatorServer {

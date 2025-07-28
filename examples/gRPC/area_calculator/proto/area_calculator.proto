@@ -49,4 +49,14 @@ message AreaRequest {
 
 message AreaResponse {
   repeated float value = 1;
+  repeated NestedFieldLevel1 nestedFieldLevel1 = 2;
+}
+
+message NestedFieldLevel1 {
+  string FirstLevel = 1;
+
+  message NestedFieldLevel2 {
+    string InnerLevel = 1;
+  }
+  repeated NestedFieldLevel2 InnerLevels = 2;
 }

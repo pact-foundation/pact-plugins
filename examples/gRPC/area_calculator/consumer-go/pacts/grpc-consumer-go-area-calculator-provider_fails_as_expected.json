@@ -1,0 +1,139 @@
+{
+  "consumer": {
+    "name": "grpc-consumer-go"
+  },
+  "interactions": [
+    {
+      "description": "calculate rectangle area request",
+      "interactionMarkup": {
+        "markup": "```protobuf\nmessage AreaResponse {\n    repeated float value = 1;\n    message .area_calculator.NestedFieldLevel1 nestedFieldLevel1 = 2;\n}\n```\n",
+        "markupType": "COMMON_MARK"
+      },
+      "pending": false,
+      "pluginConfiguration": {
+        "protobuf": {
+          "descriptorKey": "2dda686de13ae30eb9c7b2290f854107",
+          "service": ".area_calculator.Calculator/calculateMulti"
+        }
+      },
+      "request": {
+        "contents": {
+          "content": "CgwSCg0AAEBAFQAAgEAKBwoFDQAAQEA=",
+          "contentType": "application/protobuf;message=.area_calculator.AreaRequest",
+          "contentTypeHint": "BINARY",
+          "encoded": "base64"
+        },
+        "matchingRules": {
+          "body": {
+            "$.shapes[0].rectangle.length": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.shapes[0].rectangle.width": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            },
+            "$.shapes[1].square.edge_length": {
+              "combine": "AND",
+              "matchers": [
+                {
+                  "match": "number"
+                }
+              ]
+            }
+          }
+        },
+        "metadata": {
+          "contentType": "application/protobuf;message=.area_calculator.AreaRequest"
+        }
+      },
+      "response": [
+        {
+          "contents": {
+            "content": "CggAAEBBAAAQQRIcCgtGaXJzdCBMZXZlbBINCgtJbm5lciBMZXZlbA==",
+            "contentType": "application/protobuf;message=.area_calculator.AreaResponse",
+            "contentTypeHint": "BINARY",
+            "encoded": "base64"
+          },
+          "matchingRules": {
+            "body": {
+              "$.nestedFieldLevel1[0].FirstLevel": {
+                "combine": "AND",
+                "matchers": [
+                  {
+                    "match": "equality"
+                  }
+                ]
+              },
+              "$.nestedFieldLevel1[0].InnerLevels[0].InnerLevel": {
+                "combine": "AND",
+                "matchers": [
+                  {
+                    "match": "equality"
+                  }
+                ]
+              },
+              "$.value[0].*": {
+                "combine": "AND",
+                "matchers": [
+                  {
+                    "match": "number"
+                  }
+                ]
+              },
+              "$.value[1].*": {
+                "combine": "AND",
+                "matchers": [
+                  {
+                    "match": "number"
+                  }
+                ]
+              }
+            }
+          },
+          "metadata": {
+            "contentType": "application/protobuf;message=.area_calculator.AreaResponse"
+          }
+        }
+      ],
+      "transport": "grpc",
+      "type": "Synchronous/Messages"
+    }
+  ],
+  "metadata": {
+    "pact-go": {
+      "version": "2.4.1"
+    },
+    "pactRust": {
+      "ffi": "0.4.27",
+      "mockserver": "1.2.11",
+      "models": "1.2.8"
+    },
+    "pactSpecification": {
+      "version": "4.0"
+    },
+    "plugins": [
+      {
+        "configuration": {
+          "2dda686de13ae30eb9c7b2290f854107": {
+            "protoDescriptors": "CtwJChVhcmVhX2NhbGN1bGF0b3IucHJvdG8SD2FyZWFfY2FsY3VsYXRvciK6AgoMU2hhcGVNZXNzYWdlEjEKBnNxdWFyZRgBIAEoCzIXLmFyZWFfY2FsY3VsYXRvci5TcXVhcmVIAFIGc3F1YXJlEjoKCXJlY3RhbmdsZRgCIAEoCzIaLmFyZWFfY2FsY3VsYXRvci5SZWN0YW5nbGVIAFIJcmVjdGFuZ2xlEjEKBmNpcmNsZRgDIAEoCzIXLmFyZWFfY2FsY3VsYXRvci5DaXJjbGVIAFIGY2lyY2xlEjcKCHRyaWFuZ2xlGAQgASgLMhkuYXJlYV9jYWxjdWxhdG9yLlRyaWFuZ2xlSABSCHRyaWFuZ2xlEkYKDXBhcmFsbGVsb2dyYW0YBSABKAsyHi5hcmVhX2NhbGN1bGF0b3IuUGFyYWxsZWxvZ3JhbUgAUg1wYXJhbGxlbG9ncmFtQgcKBXNoYXBlIikKBlNxdWFyZRIfCgtlZGdlX2xlbmd0aBgBIAEoAlIKZWRnZUxlbmd0aCI5CglSZWN0YW5nbGUSFgoGbGVuZ3RoGAEgASgCUgZsZW5ndGgSFAoFd2lkdGgYAiABKAJSBXdpZHRoIiAKBkNpcmNsZRIWCgZyYWRpdXMYASABKAJSBnJhZGl1cyJPCghUcmlhbmdsZRIVCgZlZGdlX2EYASABKAJSBWVkZ2VBEhUKBmVkZ2VfYhgCIAEoAlIFZWRnZUISFQoGZWRnZV9jGAMgASgCUgVlZGdlQyJICg1QYXJhbGxlbG9ncmFtEh8KC2Jhc2VfbGVuZ3RoGAEgASgCUgpiYXNlTGVuZ3RoEhYKBmhlaWdodBgCIAEoAlIGaGVpZ2h0IkQKC0FyZWFSZXF1ZXN0EjUKBnNoYXBlcxgBIAMoCzIdLmFyZWFfY2FsY3VsYXRvci5TaGFwZU1lc3NhZ2VSBnNoYXBlcyJ2CgxBcmVhUmVzcG9uc2USFAoFdmFsdWUYASADKAJSBXZhbHVlElAKEW5lc3RlZEZpZWxkTGV2ZWwxGAIgAygLMiIuYXJlYV9jYWxjdWxhdG9yLk5lc3RlZEZpZWxkTGV2ZWwxUhFuZXN0ZWRGaWVsZExldmVsMSLAAQoRTmVzdGVkRmllbGRMZXZlbDESHgoKRmlyc3RMZXZlbBgBIAEoCVIKRmlyc3RMZXZlbBJWCgtJbm5lckxldmVscxgCIAMoCzI0LmFyZWFfY2FsY3VsYXRvci5OZXN0ZWRGaWVsZExldmVsMS5OZXN0ZWRGaWVsZExldmVsMlILSW5uZXJMZXZlbHMaMwoRTmVzdGVkRmllbGRMZXZlbDISHgoKSW5uZXJMZXZlbBgBIAEoCVIKSW5uZXJMZXZlbDKtAQoKQ2FsY3VsYXRvchJOCgxjYWxjdWxhdGVPbmUSHS5hcmVhX2NhbGN1bGF0b3IuU2hhcGVNZXNzYWdlGh0uYXJlYV9jYWxjdWxhdG9yLkFyZWFSZXNwb25zZSIAEk8KDmNhbGN1bGF0ZU11bHRpEhwuYXJlYV9jYWxjdWxhdG9yLkFyZWFSZXF1ZXN0Gh0uYXJlYV9jYWxjdWxhdG9yLkFyZWFSZXNwb25zZSIAQhlaF2lvLnBhY3QvYXJlYV9jYWxjdWxhdG9yYgZwcm90bzM=",
+            "protoFile": "syntax = \"proto3\";\n\npackage area_calculator;\n\noption go_package = \"io.pact/area_calculator\";\n\nservice Calculator {\n  rpc calculateOne (ShapeMessage) returns (AreaResponse) {}\n  rpc calculateMulti (AreaRequest) returns (AreaResponse) {}\n}\n\nmessage ShapeMessage {\n  oneof shape {\n    Square square = 1;\n    Rectangle rectangle = 2;\n    Circle circle = 3;\n    Triangle triangle = 4;\n    Parallelogram parallelogram = 5;\n  }\n}\n\nmessage Square {\n  float edge_length = 1;\n}\n\nmessage Rectangle {\n  float length = 1;\n  float width = 2;\n}\n\nmessage Circle {\n  float radius = 1;\n}\n\nmessage Triangle {\n  float edge_a = 1;\n  float edge_b = 2;\n  float edge_c = 3;\n}\n\nmessage Parallelogram {\n  float base_length = 1;\n  float height = 2;\n}\n\nmessage AreaRequest {\n  repeated ShapeMessage shapes = 1;\n}\n\nmessage AreaResponse {\n  repeated float value = 1;\n  repeated NestedFieldLevel1 nestedFieldLevel1 = 2;\n}\n\nmessage NestedFieldLevel1 {\n  string FirstLevel = 1;\n\n  message NestedFieldLevel2 {\n    string InnerLevel = 1;\n  }\n  repeated NestedFieldLevel2 InnerLevels = 2;\n}\n"
+          }
+        },
+        "name": "protobuf",
+        "version": "0.5.4"
+      }
+    ]
+  },
+  "provider": {
+    "name": "area-calculator-provider"
+  }
+}

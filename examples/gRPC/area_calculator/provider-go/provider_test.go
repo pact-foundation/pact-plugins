@@ -1,12 +1,12 @@
-package main
+package main_test
 
 import (
 	"fmt"
+	"path/filepath"
 
 	"log"
 	"net"
 	"os"
-	"path/filepath"
 	"testing"
 
 	area_provider "area_calculator/provider"
@@ -36,6 +36,8 @@ func TestGrpcProvider(t *testing.T) {
 		},
 		Provider: "area-calculator-provider",
 		PactFiles: []string{
+			// filepath.ToSlash(fmt.Sprintf("%s/../consumer-go/pacts/grpc-consumer-go-area-calculator-provider_does_not_fail_as_expected.json", dir)),
+			// filepath.ToSlash(fmt.Sprintf("%s/../consumer-go/pacts/grpc-consumer-go-area-calculator-provider_fails_as_expected.json", dir)),
 			filepath.ToSlash(fmt.Sprintf("%s/../consumer-go/pacts/grpc-consumer-go-area-calculator-provider.json", dir)),
 		},
 	})
