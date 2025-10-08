@@ -57,4 +57,4 @@ name = "pact-plugin-cli"
 path = "src/bin.rs"
 [lib]
 name = "pact_plugin_cli"
-path = "src/main.rs"
+path = "src/lib.rs"
