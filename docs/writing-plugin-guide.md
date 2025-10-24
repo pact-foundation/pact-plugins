@@ -85,7 +85,7 @@ drwxrwxr-x 2 ronald ronald  4096 Oct 18 13:33 tmp
 
 ### Installing using the [pact-plugin-cli](https://github.com/pact-foundation/pact-plugins/tree/main/cli)
 
-The `pact-plugin-cli` command can be used to manage plugins. To be able to install your plugin, the CLI tool requires:
+The `pact-plugin` command can be used to manage plugins. To be able to install your plugin, the CLI tool requires:
 
 * Plugin is released via GitHub releases with attached installation files.
 * The plugin manifest file must be attached to the release and have the correct name and version.
@@ -102,17 +102,17 @@ artifact against the digest checksum in that file. For example, the Protobuf plu
 
 #### Adding plugins to the `pact-plugin-cli` index
 
-The `pact-plugin-cli` has a built-in index of known plugins which can be installed by name. For example, to install the
-Protobuf plugin, run `pact-plugin-cli install protobuf` and it will know how to download that plugin from the index.
+The `pact-plugin` has a built-in index of known plugins which can be installed by name. For example, to install the
+Protobuf plugin, run `pact-plugin install protobuf` and it will know how to download that plugin from the index.
 
-You can add entries to the index using the `pact-plugin-cli repository` commands. The index files are checked in to
+You can add entries to the index using the `pact-plugin repository` commands. The index files are checked in to
 https://github.com/pact-foundation/pact-plugins/tree/main/repository. So the steps to add a new plugin or plugin 
 version are (using the [AVRO plugin](https://github.com/austek/pact-avro-plugin) as an example):
 
 1. Fork and clone the https://github.com/pact-foundation/pact-plugins repo.
 2. You can list the current index and also validate it with:
 ```console
-❯ pact-plugin-cli repository list repository/repository.index
+❯ pact-plugin repository list repository/repository.index
 ┌──────────┬──────────┬────────────────┬──────────┐
 │ Key      ┆ Name     ┆ Latest Version ┆ Versions │
 ╞══════════╪══════════╪════════════════╪══════════╡
@@ -121,7 +121,7 @@ version are (using the [AVRO plugin](https://github.com/austek/pact-avro-plugin)
 │ protobuf ┆ protobuf ┆ 0.3.0          ┆ 29       │
 └──────────┴──────────┴────────────────┴──────────┘
 
-❯ pact-plugin-cli repository validate repository/repository.index
+❯ pact-plugin repository validate repository/repository.index
 '/home/ronald/Development/Projects/Pact/pact-plugins/repository/repository.index' OK
 
 ┌────────────────┬──────────────────────────────────────────────────────────────────┬─────────────────────────────────────────────┐
@@ -142,10 +142,10 @@ version are (using the [AVRO plugin](https://github.com/austek/pact-avro-plugin)
 ```
 3. Add a new entry for the plugin. You can also get it to scan the GitHub project to add all versions.
 ```console
-❯ pact-plugin-cli repository add-plugin-version git-hub repository/repository.index https://github.com/austek/pact-avro-plugin/releases/tag/v0.0.3
+❯ pact-plugin repository add-plugin-version git-hub repository/repository.index https://github.com/austek/pact-avro-plugin/releases/tag/v0.0.3
 Added plugin version avro/0.0.3 to repository file '/home/ronald/Development/Projects/Pact/pact-plugins/repository/repository.index'
 
-❯ pact-plugin-cli repository list repository/repository.index
+❯ pact-plugin repository list repository/repository.index
 ┌──────────┬──────────┬────────────────┬──────────┐
 │ Key      ┆ Name     ┆ Latest Version ┆ Versions │
 ╞══════════╪══════════╪════════════════╪══════════╡

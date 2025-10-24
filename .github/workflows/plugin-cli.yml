@@ -1,13 +1,20 @@
 name: Pact Plugin CLI
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ${{ matrix.operating-system }}
     strategy:
+      fail-fast: false
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macos-13 ]
+        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     steps:
       - uses: actions/checkout@v3
       - uses: actions-rs/toolchain@v1
@@ -25,5 +32,5 @@ jobs:
         run: cargo test
         working-directory: cli
       - name: Test installing plugin
-        run: ./target/debug/pact-plugin-cli -y -d install csv
+        run: ./target/debug/pact-plugin -y -d install csv
         working-directory: cli

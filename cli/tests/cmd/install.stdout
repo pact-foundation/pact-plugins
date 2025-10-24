@@ -2,7 +2,7 @@ Install a plugin
 
 A plugin can be either installed from a URL, or for a known plugin, by name (and optionally version).
 
-Usage: pact-plugin-cli install [OPTIONS] <SOURCE>
+Usage: pact-plugin install [OPTIONS] <SOURCE>
 
 Arguments:
   <SOURCE>

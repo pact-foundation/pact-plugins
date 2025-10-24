@@ -1,6 +1,6 @@
 CLI utility for Pact plugins
 
-Usage: pact-plugin-cli [OPTIONS] <COMMAND>
+Usage: pact-plugin [OPTIONS] <COMMAND>
 
 Commands:
   list        List installed or available plugins

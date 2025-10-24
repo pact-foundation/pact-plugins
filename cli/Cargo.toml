@@ -50,3 +50,11 @@ lto = true
 # https://doc.rust-lang.org/stable/rustc/codegen-options/
 # https://doc.rust-lang.org/rustc/profile-guided-optimization.html
 # https://github.com/johnthagen/min-sized-rust
+
+# create bin and lib entries
+[[bin]]
+name = "pact-plugin"
+path = "src/bin.rs"
+[lib]
+name = "pact_plugin_cli"
+path = "src/lib.rs"

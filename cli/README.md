@@ -4,13 +4,13 @@ This project provides a command line interface to manage and install Pact plugin
 
 ## Command line interface
 
-Running `pact-plugin-cli` without any options displays the standard help.
+Running `pact-plugin` without any options displays the standard help.
 
 ```console,ignore
-$ pact-plugin-cli
+$ pact-plugin
 CLI utility for Pact plugins
 
-Usage: pact-plugin-cli [OPTIONS] <COMMAND>
+Usage: pact-plugin [OPTIONS] <COMMAND>
 
 Commands:
   list     List installed plugins
@@ -35,7 +35,7 @@ Options:
 The `env` command will display any environment configuration that is being used.
 
 ```console,ignore
-$ pact-plugin-cli env
+$ pact-plugin env
 ┌──────────────────┬─────────────────────┬────────────────────────────┐
 │ Configuration    ┆ Source              ┆ Value                      │
 ╞══════════════════╪═════════════════════╪════════════════════════════╡
@@ -49,7 +49,7 @@ $ pact-plugin-cli env
 Running the `list` command will list installed plugins.
 
 ```console,ignore
-$ pact-plugin-cli list
+$ pact-plugin list
 ┌──────────┬─────────┬───────────────────┬───────────────────────────────────────────┬─────────┐
 │ Name     ┆ Version ┆ Interface Version ┆ Directory                                 ┆ Status  │
 ╞══════════╪═════════╪═══════════════════╪═══════════════════════════════════════════╪═════════╡
@@ -64,10 +64,10 @@ $ pact-plugin-cli list
 The `disable` command will disable a version of a plugin, while the `enable` command will enable it again.
 
 ```console
-$ pact-plugin-cli enable --help
+$ pact-plugin enable --help
 Enable a plugin version
 
-Usage: pact-plugin-cli enable <NAME> [VERSION]
+Usage: pact-plugin enable <NAME> [VERSION]
 
 Arguments:
   <NAME>     Plugin name
@@ -86,10 +86,10 @@ A particular version of a plugin can be removed with the `remove` command. It re
 If there is only a single version, the version value can be omitted.
 
 ```console
-$ pact-plugin-cli remove --help
+$ pact-plugin remove --help
 Remove a plugin
 
-Usage: pact-plugin-cli remove [OPTIONS] <NAME> [VERSION]
+Usage: pact-plugin remove [OPTIONS] <NAME> [VERSION]
 
 Arguments:
   <NAME>     Plugin name
@@ -104,7 +104,7 @@ Options:
 This will prompt to confirm the removal of the plugin, but that can be overridden with the `-y,-yes` option.
 
 ```console,ignore
-$ pact-plugin-cli -y remove csv
+$ pact-plugin -y remove csv
 Removed plugin with name 'csv' and version '0.0.1'
 ```
 
@@ -115,12 +115,12 @@ operating system and architecture required. If there are SHA256 digests of the d
 against the downloaded one.
 
 ```console
-$ pact-plugin-cli install --help
+$ pact-plugin install --help
 Install a plugin
 
 A plugin can be either installed from a URL, or for a known plugin, by name (and optionally version).
 
-Usage: pact-plugin-cli install [OPTIONS] <SOURCE>
+Usage: pact-plugin install [OPTIONS] <SOURCE>
 
 Arguments:
   <SOURCE>
@@ -163,7 +163,7 @@ To skip installing the plugin if the version is already installed, use the `-s, 
 Example of installing the CSV plugin:
 
 ```console,ignore
-$ pact-plugin-cli -y install https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.1
+$ pact-plugin -y install https://github.com/pact-foundation/pact-plugins/releases/tag/csv-plugin-0.0.1
 Installing plugin csv version 0.0.1
 Downloaded https://github.com/pact-foundation/pact-plugins/releases/download/csv-plugin-0.0.1/pact-csv-plugin-linux-x86_64.gz to /home/ronald/.pact/plugins/csv-0.0.1/pact-csv-plugin-linux-x86_64.gz
   [00:00:03] [#######################################################################################################################################################################] 3.43MiB/3.43MiB (973.64KiB/s, 0s)
@@ -179,7 +179,7 @@ The CLI executable can be downloaded from the GitHub release page (i.e., https:/
 There will be a file for each major OS and architecture. It just needs to be unzipped (using gunzip) and made executable on Unix.
 
 ```console,ignore
-❯ wget https://github.com/pact-foundation/pact-plugins/releases/download/pact-plugin-cli-v0.0.0/pact-plugin-cli-linux-x86_64.gz
+❯ wget https://github.com/pact-foundation/pact-plugins/releases/download/pact-plugin-cli-v0.0.0/pact-plugin-linux-x86_64.gz
 --2022-06-03 13:45:17--  https://github.com/pact-foundation/pact-plugins/releases/download/pact-plugin-cli-v0.0.0/pact-plugin-cli-linux-x86_64.gz
 Resolving github.com (github.com)... 52.64.108.95
 Connecting to github.com (github.com)|52.64.108.95|:443... connected.
