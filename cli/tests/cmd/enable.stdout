@@ -1,6 +1,6 @@
 Enable a plugin version
 
-Usage: pact-plugin-cli enable <NAME> [VERSION]
+Usage: pact-plugin enable <NAME> [VERSION]
 
 Arguments:
   <NAME>     Plugin name
