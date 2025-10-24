@@ -9,7 +9,7 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macos-13 ]
+        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
       PACT_DO_NOT_TRACK: true
       RUST_LOG: trace
@@ -79,7 +79,7 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macos-13 ]
+        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
       PACT_DO_NOT_TRACK: true
       RUST_LOG: trace
@@ -171,7 +171,7 @@ jobs:
     runs-on: ${{ matrix.operating-system }}
     strategy:
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macos-13 ]
+        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
       PACT_DO_NOT_TRACK: true
       RUST_LOG: trace
