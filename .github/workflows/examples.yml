@@ -8,6 +8,7 @@ jobs:
   csv-examples:
     runs-on: ${{ matrix.operating-system }}
     strategy:
+      fail-fast: false
       matrix:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
@@ -78,6 +79,7 @@ jobs:
   protobuf-examples:
     runs-on: ${{ matrix.operating-system }}
     strategy:
+      fail-fast: false
       matrix:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
@@ -170,6 +172,7 @@ jobs:
   grpc-examples:
     runs-on: ${{ matrix.operating-system }}
     strategy:
+      fail-fast: false
       matrix:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
