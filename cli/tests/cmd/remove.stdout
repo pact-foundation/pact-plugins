@@ -1,6 +1,6 @@
 Remove a plugin
 
-Usage: pact-plugin-cli remove [OPTIONS] <NAME> [VERSION]
+Usage: pact-plugin remove [OPTIONS] <NAME> [VERSION]
 
 Arguments:
   <NAME>     Plugin name

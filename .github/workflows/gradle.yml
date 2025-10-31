@@ -1,15 +1,20 @@
 name: Pact Plugin Driver (Gradle)
 
 on:
-  - push
-  - pull_request
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   latest_jdk:
     runs-on: ${{ matrix.operating-system }}
     strategy:
+      fail-fast: false
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macos-13 ]
+        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     steps:
     - uses: actions/checkout@v4
     - name: Set up JDK 21

@@ -140,7 +140,7 @@ mod tests {
         interaction
       })
       .await
-      .start_mock_server(None);
+      .start_mock_server(None, None);
 
     let mock_url = mock_service.url();
 

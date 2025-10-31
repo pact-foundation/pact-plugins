@@ -4,7 +4,7 @@ use std::process::ExitCode;
 use std::str::FromStr;
 
 use anyhow::anyhow;
-use clap::{Parser, Subcommand};
+use clap::{ArgMatches, FromArgMatches, Parser, Subcommand};
 use comfy_table::presets::UTF8_FULL;
 use comfy_table::Table;
 use itertools::Itertools;
@@ -22,18 +22,18 @@ mod list;
 #[derive(Parser, Debug)]
 #[clap(about, version)]
 #[command(disable_version_flag(true))]
-struct Cli {
+pub struct Cli {
   #[clap(short, long)]
   /// Automatically answer Yes for all prompts
   yes: bool,
 
   #[clap(short, long)]
   /// Enable debug level logs
-  debug: bool,
+  pub debug: bool,
 
   #[clap(short, long)]
   /// Enable trace level logs
-  trace: bool,
+  pub trace: bool,
 
   #[clap(subcommand)]
   command: Commands,
@@ -215,16 +215,7 @@ impl FromStr for InstallationSource {
   }
 }
 
-fn main() -> Result<(), ExitCode> {
-  let cli = Cli::parse();
-
-  let log_level = if cli.trace {
-    Level::TRACE
-  } else if cli.debug {
-    Level::DEBUG
-  } else {
-    Level::WARN
-  };
+pub fn setup_logger(log_level: Level) {
   let subscriber = FmtSubscriber::builder()
     .with_max_level(log_level)
     .finish();
@@ -232,7 +223,21 @@ fn main() -> Result<(), ExitCode> {
   if let Err(err) = tracing::subscriber::set_global_default(subscriber) {
     eprintln!("WARN: Failed to initialise global tracing subscriber - {err}");
   };
+}
 
+pub fn process_plugin_command(matches: &ArgMatches) -> Result<(), ExitCode> {
+  // Convert ArgMatches into Cli by using Cli::from_arg_matches
+  match Cli::from_arg_matches(matches) {
+    Ok(cli) => handle_matches(&cli),
+    Err(err) => {
+      error!("Failed to parse arguments: {}", err);
+      Err(ExitCode::FAILURE)
+    }
+  }
+}
+
+
+pub fn handle_matches(cli: &Cli) -> Result<(), ExitCode> {
   let result = match &cli.command {
     Commands::List(command) => list_plugins(command),
     Commands::Env => print_env(),
@@ -250,6 +255,8 @@ fn main() -> Result<(), ExitCode> {
     ExitCode::FAILURE
   })
 }
+
+
 
 fn remove_plugin(name: &String, version: &Option<String>, override_prompt: bool) -> anyhow::Result<()> {
   let matches = find_plugin(name, version)?;

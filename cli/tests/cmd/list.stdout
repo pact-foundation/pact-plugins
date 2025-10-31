@@ -1,6 +1,6 @@
 List installed or available plugins
 
-Usage: pact-plugin-cli list <COMMAND>
+Usage: pact-plugin list <COMMAND>
 
 Commands:
   installed  List installed plugins

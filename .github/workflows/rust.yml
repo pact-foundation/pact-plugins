@@ -1,13 +1,20 @@
 name: Pact Plugin Driver (Rust)
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ${{ matrix.operating-system }}
     strategy:
+      fail-fast: false
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macos-13 ]
+        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
       pact_do_not_track: true
     steps:
