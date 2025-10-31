@@ -1,8 +1,12 @@
 name: Pact Plugin Examples
 
 on:
-  - push
-  - pull_request
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   csv-examples:
@@ -102,7 +106,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.19.x
+          go-version: 1.23.x
       - name: Install plugin cli
         run: scripts/install-plugin-cli.sh
         shell: bash
@@ -174,7 +178,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
+        operating-system: [ ubuntu-latest, windows-latest, macos-15-intel ]
     env:
       PACT_DO_NOT_TRACK: true
       RUST_LOG: trace
@@ -195,7 +199,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v2
         with:
-          go-version: 1.19.x
+          go-version: 1.23.x
       - name: Install plugin cli
         run: scripts/install-plugin-cli.sh
         shell: bash
@@ -212,7 +216,7 @@ jobs:
         if: runner.os == 'macOS'
       - name: Install Pact Go (Linux)
         run: |
-          go install github.com/pact-foundation/pact-go/v2@2.x.x
+          go install github.com/pact-foundation/pact-go/v2@latest
           sudo $HOME/go/bin/pact-go -l DEBUG install
           sudo chmod 644 /usr/local/lib/libpact_ffi.so
           ls -la /usr/local/lib/
@@ -220,15 +224,15 @@ jobs:
         if: runner.os == 'Linux'
       - name: Install Pact Go (OSX)
         run: |
-          go install github.com/pact-foundation/pact-go/v2@2.x.x
-          $HOME/go/bin/pact-go -l DEBUG install
+          go install github.com/pact-foundation/pact-go/v2@latest
+          sudo $HOME/go/bin/pact-go -l DEBUG install
         shell: bash
         if: runner.os == 'macOS'
       - name: Install Pact Go (Windows)
         run: |
-          go install github.com/pact-foundation/pact-go/v2@2.x.x
+          go install github.com/pact-foundation/pact-go/v2@latest
           #$HOME/go/bin/pact-go -l DEBUG install
-          curl -L -o ~/.pact/pact_ffi.dll.gz https://github.com/pact-foundation/pact-reference/releases/download/libpact_ffi-v0.4.5/pact_ffi-windows-x86_64.dll.gz
+          curl -L -o ~/.pact/pact_ffi.dll.gz https://github.com/pact-foundation/pact-reference/releases/download/libpact_ffi-v0.4.28/pact_ffi-windows-x86_64.dll.gz
           gunzip -N -f ~/.pact/pact_ffi.dll.gz
           cp ~/.pact/pact_ffi.dll examples/gRPC/area_calculator/consumer-go
         shell: bash

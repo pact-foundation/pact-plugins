@@ -1,8 +1,12 @@
 name: Pact Plugin Driver (Gradle)
 
 on:
-  - push
-  - pull_request
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
 
 jobs:
   latest_jdk:
