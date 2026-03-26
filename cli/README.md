@@ -239,7 +239,9 @@ Requires Rust 1.61 or later.
 
 ## Compatibility
 
-<details><summary>Supported Platforms</summary>
+<details>
+
+<summary>Supported Platforms</summary>
 
 | OS      | Architecture | Supported  | Pact Plugin CLI Version |
 | ------- | ------------ | ---------  | ---------------- |
