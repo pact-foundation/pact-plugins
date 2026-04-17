@@ -85,6 +85,25 @@ If an expression is provided, that will be used instead of the type matching rul
 
 For example: `atMost(2)`
 
+### arrayContains(EXPRESSION [, EXPRESSION, ...])
+
+Configures an array-contains matching rule. Each expression defines a variant
+that must be found in the array. Matching is successful if each variant matches
+at least one item in the array. Order does not matter, and extra items are allowed.
+
+For example: `arrayContains(matching(equalTo, 'PUBLIC'))`
+
+Multiple required values: `arrayContains(matching(equalTo, 'PUBLIC'), matching(regex, 'PRIVATE.*', 'PRIVATE_LINK'))`
+
+With references (for complex object variants):
+`arrayContains(matching($'variant1'), matching($'variant2'))`
+
+Mixed inline and reference variants:
+`arrayContains(matching(equalTo, 'PUBLIC'), matching($'complexVariant'))`
+
+Can be composed with other expressions:
+`atLeast(2), eachValue(matching(type, 'example')), arrayContains(matching(equalTo, 'PUBLIC'))`
+
 ## Composing expressions
 
 Expressions can be composed by separating them with a comma. For example
