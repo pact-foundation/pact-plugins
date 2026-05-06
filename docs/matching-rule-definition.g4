@@ -17,6 +17,7 @@ matchingDefinitionExp :
       | 'notEmpty' LEFT_BRACKET primitiveValue RIGHT_BRACKET
       | 'eachKey' LEFT_BRACKET matchingDefinitionExp RIGHT_BRACKET
       | 'eachValue' LEFT_BRACKET matchingDefinitionExp RIGHT_BRACKET
+      | 'arrayContains' LEFT_BRACKET matchingDefinitionExp ( COMMA matchingDefinitionExp )* RIGHT_BRACKET
       | 'atLeast' LEFT_BRACKET DIGIT+ RIGHT_BRACKET
       | 'atMost' LEFT_BRACKET DIGIT+ RIGHT_BRACKET
     )
