@@ -20,46 +20,46 @@ datetime = ["pact_models/datetime"] # Support for date/time matchers and express
 xml = ["pact_models/xml"] # support for matching XML documents
 
 [dependencies]
-anyhow = "1.0.96"
-async-trait = "0.1.86"
-backtrace = "0.3.74"
-bytes = "1.10.0"
-chrono = { version = "0.4.39", features = ["serde"], default-features = false }
-flate2 = "1.0.35"
-futures-util = "0.3.31"
-home = "0.5.11"
-indicatif = "0.17.11"
+anyhow = "1.0.102"
+async-trait = "0.1.89"
+backtrace = "0.3.76"
+bytes = "1.11.1"
+chrono = { version = "0.4.44", features = ["serde"], default-features = false }
+flate2 = "1.1.9"
+futures-util = "0.3.32"
+home = "0.5.12"
+indicatif = "0.18.4"
 itertools = "0.14.0"
 lazy_static = "1.5.0"
-log = "0.4.26"
+log = "0.4.29"
 maplit = "1.0.2"
-md5 = "0.7.0"
-os_info = "3.10.0"
-pact_models = { version = "~1.3.3", default-features = false }
+md5 = "0.8.0"
+os_info = "3.14.0"
+pact_models = { version = "~1.3.10", default-features = false }
 prost = "0.13.5"
 prost-types = "0.13.5"
-regex = "1.11.1"
-reqwest = { version = "0.12.20", default-features = false, features = ["rustls-tls-native-roots", "json", "gzip", "deflate", "stream"] }
-semver = "1.0.25"
-serde_json = "1.0.139"
-serde = { version = "1.0.218",  features = ["derive"] }
-sha2 = "0.10.8"
+regex = "1.12.3"
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls-native-roots", "json", "gzip", "deflate", "stream"] }
+semver = "1.0.28"
+serde_json = "1.0.149"
+serde = { version = "1.0.228",  features = ["derive"] }
+sha2 = "0.10.9"
 sysinfo = "0.30.13"
-tar = "0.4.43"
-toml = "0.8.20"
-tokio = { version = "1.45.1", features = ["full"] }
+tar = "0.4.45"
+toml = "0.8.23"
+tokio = { version = "1.52.3", features = ["full"] }
 tonic = "0.13.1"
-tracing = { version = "0.1.41", features = [ "log" ] }
-tracing-core = "0.1.33"
-uuid = { version = "1.16.0", features = ["v4"] }
-zip = "2.4.1"
+tracing = { version = "0.1.44", features = [ "log" ] }
+tracing-core = "0.1.36"
+uuid = { version = "1.23.1", features = ["v4"] }
+zip = "8.6.0"
 
 [dev-dependencies]
-env_logger = "0.11.6"
+env_logger = "0.11.10"
 expectest = "0.12.0"
 pretty_assertions = "1.4.1"
 tempdir = "0.3.7"
-test-log = "0.2.17"
+test-log = "0.2.20"
 
 [build-dependencies]
 tonic-build = "0.13.1"
