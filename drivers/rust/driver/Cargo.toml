@@ -36,8 +36,8 @@ maplit = "1.0.2"
 md5 = "0.8.0"
 os_info = "3.14.0"
 pact_models = { version = "~1.3.10", default-features = false }
-prost = "0.13.5"
-prost-types = "0.13.5"
+prost = "0.14.3"
+prost-types = "0.14.3"
 regex = "1.12.3"
 reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls-native-roots", "json", "gzip", "deflate", "stream"] }
 semver = "1.0.28"
@@ -48,7 +48,8 @@ sysinfo = "0.30.13"
 tar = "0.4.45"
 toml = "0.8.23"
 tokio = { version = "1.52.3", features = ["full"] }
-tonic = "0.13.1"
+tonic = "0.14.6"
+tonic-prost = "0.14.6"
 tracing = { version = "0.1.44", features = [ "log" ] }
 tracing-core = "0.1.36"
 uuid = { version = "1.23.1", features = ["v4"] }
@@ -62,4 +63,4 @@ tempdir = "0.3.7"
 test-log = "0.2.20"
 
 [build-dependencies]
-tonic-build = "0.13.1"
+tonic-prost-build = "0.14.6"
