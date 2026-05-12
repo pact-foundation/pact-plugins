@@ -6,11 +6,11 @@ mod tests {
   use std::panic::catch_unwind;
   use std::path::Path;
   use std::ptr::null;
-
+  use std::thread::sleep;
+  use std::time::Duration;
   use expectest::prelude::*;
   use pact_ffi::mock_server::{
     pactffi_cleanup_mock_server,
-    pactffi_create_mock_server_for_pact,
     pactffi_create_mock_server_for_transport,
     pactffi_mock_server_matched,
     pactffi_mock_server_mismatches,
@@ -59,8 +59,10 @@ mod tests {
     pactffi_response_status(interaction, 200);
     pactffi_interaction_contents(interaction, InteractionPart::Response, content_type.as_ptr(), contents.as_ptr());
 
-    let address = CString::new("127.0.0.1:0").unwrap();
-    let port = pactffi_create_mock_server_for_pact(pact_handle, address.as_ptr(), false);
+    let address = CString::new("127.0.0.1").unwrap();
+    let transport = CString::new("http").unwrap();
+    let port = pactffi_create_mock_server_for_transport(pact_handle, address.as_ptr(), 0,
+      transport.as_ptr(), null());
 
     let test = catch_unwind(|| {
         let client = Client::default();
@@ -75,9 +77,15 @@ mod tests {
           Err(err) => panic!("expected 200 response but request failed - {}", err)
         };
     });
+    sleep(Duration::from_millis(100));
 
     let mismatches = unsafe {
-      CStr::from_ptr(pactffi_mock_server_mismatches(port)).to_string_lossy().into_owned()
+      let ptr = pactffi_mock_server_mismatches(port);
+      if ptr.is_null() {
+        "[]".to_string()
+      } else {
+        CStr::from_ptr(ptr).to_string_lossy().into_owned()
+      }
     };
 
     let file_path = CString::new("/tmp/test_csv_client").unwrap();
