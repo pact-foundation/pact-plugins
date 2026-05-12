@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - upgrade-prost
   pull_request:
     branches:
       - main
