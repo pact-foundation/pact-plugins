@@ -1,5 +1,12 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.7.6 - Maintenance Release
+
+* 772347c - chore: update repository.index (Ronald Holshausen, Tue May 12 17:19:33 2026 +1000)
+* 90c2c17 - chore(rust-driver): Upgrade Prost to 0.14.3 and Tonic to 0.14.6 (Ronald Holshausen, Tue May 12 15:56:30 2026 +1000)
+* 8a51794 - chore: Update dependencies (Ronald Holshausen, Tue May 12 15:17:58 2026 +1000)
+* e38d7fb - bump version to 0.7.6 (Ronald Holshausen, Tue Jun 24 09:52:56 2025 +1000)
+
 # 0.7.5 - Maintenance Release
 
 * 289e919 - chore: Upgrade tonic to 0.13.1 (Ronald Holshausen, Mon Jun 23 16:23:19 2025 +1000)
