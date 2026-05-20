@@ -1,5 +1,18 @@
 # V2 Plugin Interface (Draft)
 
+> [!NOTE]
+> This proposal is now treated as a historical umbrella draft rather than the recommended implementation plan.
+> The problem areas identified here are being split into smaller proposals so they can be discussed and delivered
+> independently:
+> - [004 Verification contract cleanup](./004_Verification_contract_cleanup.md)
+> - [005 Plugin capability negotiation and versioning](./005_Plugin_capability_negotiation_and_versioning.md)
+> - [006 Field-level matchers and generators](./006_Field_level_matchers_and_generators.md)
+> - [007 Driver-plugin callback model](./007_Driver_plugin_callback_model.md)
+> - [008 Plugin observability and logging](./008_Plugin_observability_and_logging.md)
+> - [009 Host-provided core matching and generation](./009_Host_provided_core_matching_and_generation.md)
+>
+> This document should not be implemented verbatim without first reconciling it with those later proposals.
+
 Discussion for this proposal: https://github.com/pact-foundation/pact-plugins/discussions/83
 
 ## Summary
