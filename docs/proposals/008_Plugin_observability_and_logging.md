@@ -30,6 +30,15 @@ effect of process stdout.
   - user-facing verification/output messages.
 - Ensure the design works for both external gRPC plugins and in-process runtimes.
 
+### Correlation IDs
+
+Two correlation IDs are needed to make log output traceable across a driver and its plugins:
+
+- **Plugin instance ID** — assigned by the driver when the plugin process is started and passed to the plugin in `InitPlugin`. All log output from that plugin instance carries this ID, making it possible to separate logs from multiple concurrently running instances of the same plugin.
+- **Test run ID** — supplied by the test framework and passed into each plugin call (via `testContext` or an equivalent field). This allows all log output related to a single test or verification run to be correlated across the driver and any plugins it called, even when multiple tests are running in parallel.
+
+Both IDs must be included in every structured log record emitted by the plugin. For gRPC plugins the driver passes them as fields in the relevant request messages; for WASM plugins they are passed as arguments to the host log function.
+
 ## Non-goals for this proposal
 
 - Defining the plugin callback protocol.
