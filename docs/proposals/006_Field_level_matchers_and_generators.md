@@ -1,5 +1,8 @@
 # Field-level matchers and generators (Draft)
 
+> [!NOTE]
+> **Implementation phase:** Phase 3 (new functionality). Requires [005](./005_Plugin_capability_negotiation_and_versioning.md) to be finalised. Design in parallel with [007](./007_Driver_plugin_callback_model.md); data model decisions in these two proposals must be kept consistent. See the [proposals README](./README.md) for the full delivery order.
+
 ## Summary
 
 Add a plugin API for matching and generating data at the field or element level, instead of limiting plugins to whole
@@ -30,6 +33,15 @@ whole-content plugins that are broader and more complex than the problem require
 - Redesigning whole-content matcher/generator flows.
 - Defining a general-purpose callback bus between plugins and the host.
 - Solving plugin runtime/version negotiation on its own.
+
+## WASM compatibility
+
+For gRPC plugins, field-level matching and generation operations will be new RPCs in the plugin service. For WASM plugins, the same operations will be exported WASM functions that the host calls into. The data types used must be representable in both forms.
+
+In practice this means:
+- value types should follow the existing `oneof` pattern (see `MetadataValue` in the current proto) rather than assuming JSON encoding;
+- path expressions should use the existing Pact matching rule expression format already used throughout the interface;
+- mismatch results should reuse the existing `ContentMismatch` type rather than introducing a parallel structure.
 
 ## Open questions
 
