@@ -4,10 +4,10 @@ Here is the current list of proposed changes to the Pact Plugin architecture. Pr
 
 | Proposal | Phase | State | Discussion |
 |---|---|---|---|
-| [V2 Plugin Interface](./001_V2_Plugin_Interface.md) | Historical | Draft | https://github.com/pact-foundation/pact-plugins/discussions/83 |
+| [V2 Plugin Interface](./001_V2_Plugin_Interface.md) | Historical | Superseded | https://github.com/pact-foundation/pact-plugins/discussions/83 |
 | [Support script language plugins](./002_Support_script_language_plugins.md) | Not proceeding | Draft | https://github.com/pact-foundation/pact-plugins/discussions/84 |
 | [Support WASM plugins](./003_Support_WASM_plugins.md) | Background | Draft | https://github.com/pact-foundation/pact-plugins/discussions/85 |
-| [Verification contract cleanup](./004_Verification_contract_cleanup.md) | Phase 1 | Superseded | TBD |
+| [Verification contract cleanup](./004_Verification_contract_cleanup.md) | Phase 1 | Draft | TBD |
 | [Plugin capability negotiation and versioning](./005_Plugin_capability_negotiation_and_versioning.md) | Phase 1 | Draft | TBD |
 | [Plugin observability and logging](./008_Plugin_observability_and_logging.md) | Phase 2 | Draft | TBD |
 | [Field-level matchers and generators](./006_Field_level_matchers_and_generators.md) | Phase 3 | Draft | TBD |
