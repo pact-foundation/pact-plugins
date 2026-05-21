@@ -19,16 +19,30 @@ and makes the verification API harder to evolve.
 
 ## Recommended direction
 
-- Replace the “full pact JSON + interaction key” verification contract with a dedicated interaction-level verification model.
-- Send the interaction data in a structured form that is independent of Pact JSON parsing.
-- Keep the contract focused on the data required to prepare and execute verification, including:
-  - request/response or message payload data;
-  - transport and metadata fields;
-  - plugin-specific persisted configuration for the interaction;
-  - user-supplied verification configuration;
-  - any context required to report verification results cleanly.
-- Prefer an interface shape that can be mapped to both gRPC and future in-process plugin runtimes.
-- Complete the mock server API cleanup: replace the deprecated `ShutdownMockServerRequest` and `ShutdownMockServerResponse` types with `MockServerRequest` and `MockServerResults` respectively. These replacements already exist in the proto and the swap is marked as a TODO for the next major version.
+### Retain the two-phase split
+
+The existing split between `PrepareInteractionForVerification` and `VerifyInteraction` is correct and should be kept. The prepare step exists so that users can amend request data (for example, injecting auth tokens or overriding headers) before the request is executed. Collapsing the two phases would remove that opportunity.
+
+### Replace pact-as-JSON with a structured interaction model
+
+Replace the `pact + interactionKey` fields in both verification requests with a dedicated message carrying only the data the plugin actually needs:
+
+- **Interaction type** — the V4 interaction type (synchronous HTTP, message, synchronous message, etc.) so the plugin knows how to interpret the payload without parsing a full Pact document.
+- **Interaction-level plugin configuration** — the `interactionConfiguration` data persisted by the plugin during the consumer test (`PluginConfiguration.interactionConfiguration`). This is the plugin's own stored state and should be delivered directly rather than requiring the plugin to extract it from a Pact JSON tree.
+- **Pact-level plugin configuration** — the `pactConfiguration` data persisted in the Pact file metadata (`PluginConfiguration.pactConfiguration`), for any global plugin state needed at verification time.
+- **Consumer and provider names** — sufficient context for result reporting and log correlation without requiring the full Pact metadata.
+- **User-supplied verification configuration** — already present as `config` in the current requests; retain this field.
+- **Test context** — a `testContext` field carrying test-framework-supplied context. This field already exists in `GenerateContentRequest` and `StartMockServerRequest` but is absent from both verification requests; this inconsistency should be fixed here.
+
+The existing `InteractionData` message (body + metadata map) is already the right shape for carrying request and response body data and should be reused in the request direction rather than introducing a new type.
+
+### Apply the same fix to the mock server API
+
+`StartMockServerRequest` has the same pact-as-JSON coupling. The fix should be applied consistently so that transport plugins do not need Pact parsing in any code path.
+
+### Complete the deprecated mock server type cleanup
+
+Replace the deprecated `ShutdownMockServerRequest` and `ShutdownMockServerResponse` types with `MockServerRequest` and `MockServerResults` respectively. These replacements already exist in the proto and the swap is marked as a TODO for the next major version.
 
 ## Non-goals for this proposal
 
@@ -45,6 +59,6 @@ The same pact-as-JSON problem exists in the mock server flow: `StartMockServerRe
 
 ## Open questions
 
-- What is the smallest interaction model that still supports transport plugins cleanly?
-- Which data belongs in the “prepare verification” step versus the “execute verification” step?
-- How should plugin-specific persisted configuration be separated from generic interaction data?
+- What is the smallest interaction model that still supports transport plugins cleanly? The fields listed above are candidates; implementation experience may show some can be dropped.
+- Are consumer and provider names sufficient context, or does the plugin need additional Pact-level metadata (e.g. Pact specification version)?
+- How should the structured interaction model be represented for the mock server case, where the plugin receives all interactions upfront rather than one at a time?

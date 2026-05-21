@@ -30,6 +30,22 @@ and plugin implementations.
   - external gRPC plugins;
   - in-process WASM plugins (see [003](./003_Support_WASM_plugins.md)).
 
+### Manifest versus handshake
+
+Capabilities live at two levels with distinct roles:
+
+- **Manifest (`pluginInterfaceVersion`)** — coarse version gate, read by the driver before the plugin process starts. Determines which protocol the driver uses for all subsequent calls. No capability negotiation is needed for V1 plugins; the driver simply falls back to the existing protocol.
+- **`InitPlugin` handshake** — fine-grained, per-feature negotiation between a running V2 plugin and the driver. Both sides declare their optional capabilities here; the result determines which V2 features are active for the lifetime of this plugin instance.
+
+### Negotiation is bidirectional
+
+The plugin declares to the driver which optional capabilities it supports. The driver must also advertise to the plugin which host capabilities it exposes (for example, host-provided matching from [009](./009_Host_provided_core_matching_and_generation.md)). Both directions flow through the `InitPlugin` handshake.
+
+### Compatibility rules
+
+- A plugin declaring a capability the driver does not recognise is silently ignored. The driver continues with the capabilities it does understand.
+- A plugin that requires a host capability the driver does not provide must fail startup with a clear error message. Proceeding without a declared required capability would produce incorrect behaviour that is harder to diagnose than an explicit failure.
+
 ### Backwards compatibility requirement
 
 The host must support both V1 and V2 plugins simultaneously. Introducing a new interface version must not break existing plugins. This is a hard requirement, not a follow-up concern.
@@ -58,6 +74,4 @@ Negotiation is bidirectional: the plugin declares what it supports, and the driv
 
 ## Open questions
 
-- Which capabilities should be mandatory versus optional?
-- Should capabilities live in the startup handshake, the manifest, or both?
-- How should drivers surface partial support or unsupported capability combinations to users?
+- Which specific capabilities should be mandatory versus optional? The compatibility rules above define how each category is handled; the open question is which capabilities belong in which category as they are defined in later proposals.
