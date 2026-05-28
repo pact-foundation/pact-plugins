@@ -18,6 +18,7 @@ jobs:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
       PACT_DO_NOT_TRACK: true
+      PACT_PLUGIN_DIR: ${{ github.workspace }}/.pact/plugins
       RUST_LOG: trace
     steps:
       - uses: actions/checkout@v4
@@ -39,8 +40,24 @@ jobs:
       - name: Install Protobuf plugin
         run: ~/.pact/bin/pact-plugin-cli -y install protobuf
         shell: bash
-      - name: Install csv plugin
-        run: ~/.pact/bin/pact-plugin-cli -y install csv
+      - name: Build and install local CSV plugin
+        run: |
+          set -e
+          MANIFEST=plugins/csv/pact-plugin.json
+          PLUGIN_NAME=$(sed -n 's/.*"name": "\(.*\)",/\1/p' "$MANIFEST")
+          PLUGIN_VERSION=$(sed -n 's/.*"version": "\(.*\)",/\1/p' "$MANIFEST")
+          PLUGIN_INSTALL_DIR="$PACT_PLUGIN_DIR/${PLUGIN_NAME}-${PLUGIN_VERSION}"
+          mkdir -p "$PLUGIN_INSTALL_DIR"
+
+          cargo build --release --manifest-path plugins/csv/Cargo.toml
+          cp "$MANIFEST" "$PLUGIN_INSTALL_DIR/pact-plugin.json"
+
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            cp plugins/csv/target/release/pact-csv-plugin.exe "$PLUGIN_INSTALL_DIR/pact-csv-plugin"
+          else
+            cp plugins/csv/target/release/pact-csv-plugin "$PLUGIN_INSTALL_DIR/pact-csv-plugin"
+            chmod +x "$PLUGIN_INSTALL_DIR/pact-csv-plugin"
+          fi
         shell: bash
       - name: Install Pact verifier
         run: scripts/install-verifier-cli.sh
