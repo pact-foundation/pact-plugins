@@ -35,6 +35,7 @@ import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
 import io.grpc.Metadata
 import io.pact.plugin.PactPluginGrpc.newBlockingStub
+import io.pact.plugin.v2.PactPluginGrpc.newBlockingStub as newV2BlockingStub
 import io.pact.plugin.Plugin
 import io.pact.plugins.jvm.core.Utils.fromProtoValue
 import io.pact.plugins.jvm.core.Utils.jsonToValue
@@ -856,8 +857,7 @@ object DefaultPluginManager: PluginManager {
 
     val result = when (manifest.executableType) {
       "exec" -> when (interfaceVersion) {
-        PluginInterfaceVersion.V1 -> startPluginProcess(manifest)
-        PluginInterfaceVersion.V2 -> Result.Err("Plugin interface version 2 is not yet supported by the JVM driver")
+        PluginInterfaceVersion.V1, PluginInterfaceVersion.V2 -> startPluginProcess(manifest)
       }
       else -> Result.Err("Plugin executable type of ${manifest.executableType} is not supported")
     }
@@ -892,10 +892,9 @@ object DefaultPluginManager: PluginManager {
         PluginInterfaceVersion.V1 -> PactPluginV1RpcClient(
           newBlockingStub(channel).withCallCredentials(BearerCredentials(plugin.serverKey))
         )
-        PluginInterfaceVersion.V2 -> {
-          channel.shutdownNow()
-          return Result.Err(IllegalStateException("Plugin interface version 2 is not yet supported by the JVM driver"))
-        }
+        PluginInterfaceVersion.V2 -> PactPluginV2RpcClient(
+          newV2BlockingStub(channel).withCallCredentials(BearerCredentials(plugin.serverKey))
+        )
         null -> {
           channel.shutdownNow()
           return Result.Err(IllegalArgumentException(

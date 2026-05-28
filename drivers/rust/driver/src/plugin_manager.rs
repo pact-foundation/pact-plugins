@@ -255,32 +255,31 @@ async fn initialise_plugin(
     })?;
 
   match interface_version {
-    PluginInterfaceVersion::V1 => match manifest.executable_type.as_str() {
-      "exec" => {
-        let mut plugin = start_plugin_process(manifest).await?;
-        debug!(
-          "Plugin process started OK (port = {}), sending init message",
-          plugin.port()
-        );
+    PluginInterfaceVersion::V1 | PluginInterfaceVersion::V2 => {
+      match manifest.executable_type.as_str() {
+        "exec" => {
+          let mut plugin = start_plugin_process(manifest).await?;
+          debug!(
+            "Plugin process started OK (port = {}), sending init message",
+            plugin.port()
+          );
 
-        init_handshake(manifest, &mut plugin).await.map_err(|err| {
-          plugin.kill();
-          anyhow!("Failed to send init request to the plugin - {}", err)
-        })?;
+          init_handshake(manifest, &mut plugin).await.map_err(|err| {
+            plugin.kill();
+            anyhow!("Failed to send init request to the plugin - {}", err)
+          })?;
 
-        let key = format!("{}/{}", manifest.name, manifest.version);
-        plugin_register.insert(key, plugin.clone());
+          let key = format!("{}/{}", manifest.name, manifest.version);
+          plugin_register.insert(key, plugin.clone());
 
-        Ok(plugin)
+          Ok(plugin)
+        }
+        _ => Err(anyhow!(
+          "Plugin executable type of {} is not supported",
+          manifest.executable_type
+        )),
       }
-      _ => Err(anyhow!(
-        "Plugin executable type of {} is not supported",
-        manifest.executable_type
-      )),
-    },
-    PluginInterfaceVersion::V2 => Err(anyhow!(
-      "Plugin interface version 2 is not yet supported by the Rust driver"
-    )),
+    }
   }
 }
 
@@ -994,12 +993,12 @@ mod tests {
   }
 
   #[test_log::test(tokio::test)]
-  async fn initialise_plugin_rejects_v2_plugins_until_v2_rpc_support_exists() {
+  async fn initialise_plugin_rejects_unsupported_interface_versions() {
     let manifest = PactPluginManifest {
       name: "test-plugin".to_string(),
       version: "0.0.0".to_string(),
       executable_type: "exec".to_string(),
-      plugin_interface_version: 2,
+      plugin_interface_version: 3,
       ..PactPluginManifest::default()
     };
 
@@ -1009,7 +1008,7 @@ mod tests {
       .unwrap_err();
 
     expect!(err.to_string()).to(be_equal_to(
-      "Plugin interface version 2 is not yet supported by the Rust driver".to_string(),
+      "Plugin test-plugin:0.0.0 declared an invalid interface version".to_string(),
     ));
   }
 

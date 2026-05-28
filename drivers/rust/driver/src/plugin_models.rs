@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
+use prost::Message;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tonic::codegen::InterceptedService;
@@ -19,6 +20,7 @@ use tracing::{debug, trace};
 use crate::child_process::ChildPluginProcess;
 use crate::proto::pact_plugin_client::PactPluginClient as PactPluginClientV1;
 use crate::proto::*;
+use crate::proto_v2::{self, pact_plugin_client::PactPluginClient as PactPluginClientV2};
 
 /// Type of plugin dependencies
 #[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, Hash)]
@@ -151,9 +153,23 @@ impl TryFrom<u8> for PluginInterfaceVersion {
 
 enum PluginClient {
   V1(PactPluginClientV1<InterceptedService<Channel, PactPluginInterceptor>>),
+  V2(PactPluginClientV2<InterceptedService<Channel, PactPluginInterceptor>>),
 }
 
 impl PluginClient {
+  fn convert_message<T, U>(message: T) -> Result<U, Status>
+  where
+    T: Message,
+    U: Message + Default,
+  {
+    U::decode(message.encode_to_vec().as_slice()).map_err(|err| {
+      Status::internal(format!(
+        "Failed to convert between plugin interface message versions: {}",
+        err
+      ))
+    })
+  }
+
   async fn init_plugin(
     &mut self,
     request: InitPluginRequest,
@@ -163,6 +179,13 @@ impl PluginClient {
         .init_plugin(Request::new(request))
         .await
         .map(|response| response.into_inner()),
+      PluginClient::V2(client) => client
+        .init_plugin(Request::new(Self::convert_message::<
+          _,
+          proto_v2::InitPluginRequest,
+        >(request)?))
+        .await
+        .and_then(|response| Self::convert_message(response.into_inner())),
     }
   }
 
@@ -175,6 +198,13 @@ impl PluginClient {
         .compare_contents(Request::new(request))
         .await
         .map(|response| response.into_inner()),
+      PluginClient::V2(client) => client
+        .compare_contents(Request::new(Self::convert_message::<
+          _,
+          proto_v2::CompareContentsRequest,
+        >(request)?))
+        .await
+        .and_then(|response| Self::convert_message(response.into_inner())),
     }
   }
 
@@ -187,6 +217,13 @@ impl PluginClient {
         .configure_interaction(Request::new(request))
         .await
         .map(|response| response.into_inner()),
+      PluginClient::V2(client) => client
+        .configure_interaction(Request::new(Self::convert_message::<
+          _,
+          proto_v2::ConfigureInteractionRequest,
+        >(request)?))
+        .await
+        .and_then(|response| Self::convert_message(response.into_inner())),
     }
   }
 
@@ -199,6 +236,13 @@ impl PluginClient {
         .generate_content(Request::new(request))
         .await
         .map(|response| response.into_inner()),
+      PluginClient::V2(client) => client
+        .generate_content(Request::new(Self::convert_message::<
+          _,
+          proto_v2::GenerateContentRequest,
+        >(request)?))
+        .await
+        .and_then(|response| Self::convert_message(response.into_inner())),
     }
   }
 
@@ -211,6 +255,13 @@ impl PluginClient {
         .start_mock_server(Request::new(request))
         .await
         .map(|response| response.into_inner()),
+      PluginClient::V2(client) => client
+        .start_mock_server(Request::new(Self::convert_message::<
+          _,
+          proto_v2::StartMockServerRequest,
+        >(request)?))
+        .await
+        .and_then(|response| Self::convert_message(response.into_inner())),
     }
   }
 
@@ -223,6 +274,13 @@ impl PluginClient {
         .shutdown_mock_server(Request::new(request))
         .await
         .map(|response| response.into_inner()),
+      PluginClient::V2(client) => client
+        .shutdown_mock_server(Request::new(Self::convert_message::<
+          _,
+          proto_v2::ShutdownMockServerRequest,
+        >(request)?))
+        .await
+        .and_then(|response| Self::convert_message(response.into_inner())),
     }
   }
 
@@ -235,6 +293,13 @@ impl PluginClient {
         .get_mock_server_results(Request::new(request))
         .await
         .map(|response| response.into_inner()),
+      PluginClient::V2(client) => client
+        .get_mock_server_results(Request::new(Self::convert_message::<
+          _,
+          proto_v2::MockServerRequest,
+        >(request)?))
+        .await
+        .and_then(|response| Self::convert_message(response.into_inner())),
     }
   }
 
@@ -247,6 +312,13 @@ impl PluginClient {
         .prepare_interaction_for_verification(Request::new(request))
         .await
         .map(|response| response.into_inner()),
+      PluginClient::V2(client) => client
+        .prepare_interaction_for_verification(Request::new(Self::convert_message::<
+          _,
+          proto_v2::VerificationPreparationRequest,
+        >(request)?))
+        .await
+        .and_then(|response| Self::convert_message(response.into_inner())),
     }
   }
 
@@ -259,6 +331,13 @@ impl PluginClient {
         .verify_interaction(Request::new(request))
         .await
         .map(|response| response.into_inner()),
+      PluginClient::V2(client) => client
+        .verify_interaction(Request::new(Self::convert_message::<
+          _,
+          proto_v2::VerifyInteractionRequest,
+        >(request)?))
+        .await
+        .and_then(|response| Self::convert_message(response.into_inner())),
     }
   }
 
@@ -266,6 +345,12 @@ impl PluginClient {
     match self {
       PluginClient::V1(client) => client
         .update_catalogue(Request::new(request))
+        .await
+        .map(|_| ()),
+      PluginClient::V2(client) => client
+        .update_catalogue(Request::new(
+          Self::convert_message::<_, proto_v2::Catalogue>(request)?,
+        ))
         .await
         .map(|_| ()),
     }
@@ -538,9 +623,10 @@ impl PactPlugin {
         channel,
         interceptor,
       ))),
-      PluginInterfaceVersion::V2 => Err(anyhow!(
-        "Plugin interface version 2 is not yet supported by the Rust driver"
-      )),
+      PluginInterfaceVersion::V2 => Ok(PluginClient::V2(PactPluginClientV2::with_interceptor(
+        channel,
+        interceptor,
+      ))),
     }
   }
 }
@@ -579,13 +665,15 @@ pub struct PluginInteractionConfig {
 
 #[cfg(test)]
 pub(crate) mod tests {
+  use std::collections::HashMap;
   use std::sync::RwLock;
 
   use async_trait::async_trait;
 
-  use crate::plugin_models::PactPluginRpc;
+  use crate::plugin_models::{PactPluginRpc, PluginClient};
   use crate::proto::verification_preparation_response::Response;
   use crate::proto::*;
+  use crate::proto_v2;
 
   pub(crate) struct MockPlugin {
     pub prepare_request: RwLock<VerificationPreparationRequest>,
@@ -599,6 +687,36 @@ pub(crate) mod tests {
         verify_request: RwLock::new(VerifyInteractionRequest::default()),
       }
     }
+  }
+
+  #[test]
+  fn converts_between_v1_and_v2_messages() {
+    let request = InitPluginRequest {
+      implementation: "plugin-driver-rust".to_string(),
+      version: "1.0.0-beta.1".to_string(),
+    };
+
+    let converted_request =
+      PluginClient::convert_message::<_, proto_v2::InitPluginRequest>(request).unwrap();
+    assert_eq!(converted_request.implementation, "plugin-driver-rust");
+    assert_eq!(converted_request.version, "1.0.0-beta.1");
+
+    let response = proto_v2::InitPluginResponse {
+      catalogue: vec![proto_v2::CatalogueEntry {
+        r#type: proto_v2::catalogue_entry::EntryType::ContentMatcher as i32,
+        key: "test".to_string(),
+        values: HashMap::new(),
+      }],
+    };
+
+    let converted_response =
+      PluginClient::convert_message::<_, InitPluginResponse>(response).unwrap();
+    assert_eq!(converted_response.catalogue.len(), 1);
+    assert_eq!(converted_response.catalogue[0].key, "test");
+    assert_eq!(
+      converted_response.catalogue[0].r#type,
+      catalogue_entry::EntryType::ContentMatcher as i32
+    );
   }
 
   #[async_trait]
