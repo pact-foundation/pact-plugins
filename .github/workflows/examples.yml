@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - plugin-v2-interface
   pull_request:
     branches:
       - main
