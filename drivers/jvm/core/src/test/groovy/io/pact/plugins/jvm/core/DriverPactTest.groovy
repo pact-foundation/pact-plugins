@@ -9,8 +9,6 @@ import au.com.dius.pact.core.model.V4Interaction
 import au.com.dius.pact.core.model.V4Pact
 import au.com.dius.pact.core.model.annotations.Pact
 import io.grpc.ManagedChannel
-import io.grpc.stub.AbstractBlockingStub
-import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.Plugin
 import org.jetbrains.annotations.Nullable
 import org.junit.jupiter.api.Test
@@ -58,12 +56,12 @@ class DriverPactTest {
     }
 
     @Override
-    AbstractBlockingStub<PactPluginGrpc.PactPluginBlockingStub> getStub() {
-      Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
+    PactPluginRpcClient getRpcClient() {
+      Mockito.mock(PactPluginRpcClient)
     }
 
     @Override
-    void setStub(@Nullable AbstractBlockingStub<PactPluginGrpc.PactPluginBlockingStub> stub) {
+    void setRpcClient(@Nullable PactPluginRpcClient rpcClient) {
 
     }
 
@@ -93,11 +91,11 @@ class DriverPactTest {
     }
 
     /*
-     * This is the method that the Plugin Manager will use to make the gRPC call. We can mock out that gRPC stub here
+     * This is the method that the Plugin Manager will use to make the RPC call. We can mock out that client here.
      */
     @Override
-    <T> T withGrpcStub(Function<PactPluginGrpc.PactPluginBlockingStub, T> callback) {
-      def mock = Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
+    <T> T withRpcClient(Function<PactPluginRpcClient, T> callback) {
+      def mock = Mockito.mock(PactPluginRpcClient)
       ArgumentCaptor<Plugin.InitPluginRequest> argument = ArgumentCaptor.forClass(Plugin.InitPluginRequest.class)
       doReturn(response).when(mock).initPlugin(argument.capture())
       def result = callback(mock)
