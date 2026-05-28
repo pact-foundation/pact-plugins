@@ -18,7 +18,6 @@ jobs:
         operating-system: [ ubuntu-latest, windows-latest, macos-latest ]
     env:
       PACT_DO_NOT_TRACK: true
-      PACT_PLUGIN_DIR: ${{ github.workspace }}/.pact/plugins
       RUST_LOG: trace
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +45,7 @@ jobs:
           MANIFEST=plugins/csv/pact-plugin.json
           PLUGIN_NAME=$(sed -n 's/.*"name": "\(.*\)",/\1/p' "$MANIFEST")
           PLUGIN_VERSION=$(sed -n 's/.*"version": "\(.*\)",/\1/p' "$MANIFEST")
-          PLUGIN_INSTALL_DIR="$PACT_PLUGIN_DIR/${PLUGIN_NAME}-${PLUGIN_VERSION}"
+          PLUGIN_INSTALL_DIR="$HOME/.pact/plugins/${PLUGIN_NAME}-${PLUGIN_VERSION}"
           mkdir -p "$PLUGIN_INSTALL_DIR"
 
           cargo build --release --manifest-path plugins/csv/Cargo.toml
