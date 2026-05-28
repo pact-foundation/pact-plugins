@@ -1,7 +1,7 @@
 use prost_types::value::Kind;
 use serde_json::{json, Value};
 
-tonic::include_proto!("io.pact.plugin");
+tonic::include_proto!("io.pact.plugin.v2");
 
 pub fn to_object(s: &prost_types::Struct) -> Value {
   Value::Object(

@@ -42,26 +42,31 @@ impl PactPlugin for CsvPactPlugin {
   ) -> Result<tonic::Response<proto::InitPluginResponse>, tonic::Status> {
     let message = request.get_ref();
     debug!(
-      "Init request from {}/{}",
-      message.implementation, message.version
+      "Init request from {}/{} with host capabilities {:?}",
+      message.implementation, message.version, message.host_capabilities
     );
     Ok(Response::new(proto::InitPluginResponse {
-      catalogue: vec![
-        proto::CatalogueEntry {
-          r#type: EntryType::ContentMatcher as i32,
-          key: "csv".to_string(),
-          values: hashmap! {
-            "content-types".to_string() => "text/csv;application/csv".to_string()
-          },
+      response: Some(proto::init_plugin_response::Response::Success(
+        proto::InitPluginSuccess {
+          catalogue: vec![
+            proto::CatalogueEntry {
+              r#type: EntryType::ContentMatcher as i32,
+              key: "csv".to_string(),
+              values: hashmap! {
+                "content-types".to_string() => "text/csv;application/csv".to_string()
+              },
+            },
+            proto::CatalogueEntry {
+              r#type: EntryType::ContentGenerator as i32,
+              key: "csv".to_string(),
+              values: hashmap! {
+                "content-types".to_string() => "text/csv;application/csv".to_string()
+              },
+            },
+          ],
+          plugin_capabilities: vec![],
         },
-        proto::CatalogueEntry {
-          r#type: EntryType::ContentGenerator as i32,
-          key: "csv".to_string(),
-          values: hashmap! {
-            "content-types".to_string() => "text/csv;application/csv".to_string()
-          },
-        },
-      ],
+      )),
     }))
   }
 
@@ -142,7 +147,8 @@ impl PactPlugin for CsvPactPlugin {
                   actual: Some(contents.clone()),
                   mismatch: format!("Expected no CSV content, but got {} bytes", contents.len()),
                   path: "".to_string(),
-                  diff: "".to_string()
+                  diff: "".to_string(),
+                  mismatch_type: String::default(),
                 }
               ]
             }
@@ -162,7 +168,8 @@ impl PactPlugin for CsvPactPlugin {
                   actual: None,
                   mismatch: format!("Expected CSV content, but did not get any"),
                   path: "".to_string(),
-                  diff: "".to_string()
+                  diff: "".to_string(),
+                  mismatch_type: String::default(),
                 }
               ]
             }
@@ -269,6 +276,7 @@ fn compare_contents<R: Read>(
           mismatch: format!("Expected columns '{}', but was missing", header),
           path: String::default(),
           diff: String::default(),
+          mismatch_type: String::default(),
         });
       }
     }
@@ -300,6 +308,7 @@ fn compare_contents<R: Read>(
         ),
         path: String::default(),
         diff: String::default(),
+        mismatch_type: String::default(),
       });
     } else if actual_row.len() > expected_row.len() && !allow_unexpected_keys {
       results.push(proto::ContentMismatch {
@@ -316,6 +325,7 @@ fn compare_contents<R: Read>(
         ),
         path: String::default(),
         diff: String::default(),
+        mismatch_type: String::default(),
       });
     }
   }
@@ -388,6 +398,7 @@ fn compare_row(
               index
             ),
             diff: String::default(),
+            mismatch_type: String::default(),
           });
         }
       }
@@ -405,6 +416,7 @@ fn compare_row(
           index
         ),
         diff: String::default(),
+        mismatch_type: String::default(),
       });
     }
   }
