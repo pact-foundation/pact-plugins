@@ -12,7 +12,7 @@ enum class PluginInterfaceVersion(val value: Int) {
   V2(2);
 
   companion object {
-    fun from(value: Int): PluginInterfaceVersion? = values().find { it.value == value }
+    fun from(value: Int): PluginInterfaceVersion? = entries.find { it.value == value }
   }
 }
 
