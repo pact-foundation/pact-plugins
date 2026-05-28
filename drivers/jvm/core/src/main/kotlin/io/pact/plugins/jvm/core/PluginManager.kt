@@ -860,9 +860,7 @@ object DefaultPluginManager: PluginManager {
       ?: return Result.Err("Unsupported plugin interface version ${manifest.pluginInterfaceVersion} for ${manifest.name}")
 
     val result = when (manifest.executableType) {
-      "exec" -> when (interfaceVersion) {
-        PluginInterfaceVersion.V1, PluginInterfaceVersion.V2 -> startPluginProcess(manifest)
-      }
+      "exec" -> startPluginProcess(manifest)
       else -> Result.Err("Plugin executable type of ${manifest.executableType} is not supported")
     }
     return when (result) {
@@ -892,19 +890,17 @@ object DefaultPluginManager: PluginManager {
       val channel = ManagedChannelBuilder.forTarget(address)
         .usePlaintext()
         .build()
-      val rpcClient = when (PluginInterfaceVersion.from(plugin.manifest.pluginInterfaceVersion)) {
+      val interfaceVersion = requireNotNull(PluginInterfaceVersion.from(plugin.manifest.pluginInterfaceVersion)) {
+        "Plugin ${plugin.manifest.name} has unsupported interface version " +
+          "${plugin.manifest.pluginInterfaceVersion} — should have been caught in initialisePlugin"
+      }
+      val rpcClient = when (interfaceVersion) {
         PluginInterfaceVersion.V1 -> PactPluginV1RpcClient(
           newBlockingStub(channel).withCallCredentials(BearerCredentials(plugin.serverKey))
         )
         PluginInterfaceVersion.V2 -> PactPluginV2RpcClient(
           newV2BlockingStub(channel).withCallCredentials(BearerCredentials(plugin.serverKey))
         )
-        null -> {
-          channel.shutdownNow()
-          return Result.Err(IllegalArgumentException(
-            "Unsupported plugin interface version ${plugin.manifest.pluginInterfaceVersion} for ${plugin.manifest.name}"
-          ))
-        }
       }
       plugin.rpcClient = rpcClient
       plugin.channel = channel

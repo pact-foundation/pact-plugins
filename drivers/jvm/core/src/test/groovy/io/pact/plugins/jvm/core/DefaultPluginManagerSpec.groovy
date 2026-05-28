@@ -204,6 +204,26 @@ class DefaultPluginManagerSpec extends Specification {
     }
   }
 
+  @RestoreSystemProperties
+  def 'loadPlugin - rejects plugins with an unsupported interface version'() {
+    given:
+    System.setProperty('pact_do_not_track', 'true')
+    def manager = DefaultPluginManager.INSTANCE
+    def manifest = new DefaultPactPluginManifest('/tmp' as File, 99, 'invalid-version-plugin', '0.0.0',
+      'exec', null, '', [:], [], [])
+    manager.PLUGIN_MANIFEST_REGISTER['invalid-version-plugin/0.0.0'] = manifest
+
+    when:
+    def result = manager.loadPlugin('invalid-version-plugin', '0.0.0')
+
+    then:
+    result instanceof Result.Err
+    result.error.contains('Unsupported plugin interface version 99')
+
+    cleanup:
+    manager.PLUGIN_MANIFEST_REGISTER.remove('invalid-version-plugin/0.0.0')
+  }
+
   def 'startMockServer - passes the mock server config on to the plugin'() {
     given:
     def manifest = Mock(PactPluginManifest) {

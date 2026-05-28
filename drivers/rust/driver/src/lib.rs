@@ -9,7 +9,7 @@ pub mod mock_server;
 pub mod plugin_manager;
 pub mod plugin_models;
 pub mod proto;
-pub mod proto_v2;
+pub(crate) mod proto_v2;
 pub mod repository;
 pub mod utils;
 pub mod verification;

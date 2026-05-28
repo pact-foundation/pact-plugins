@@ -944,6 +944,80 @@ mod tests {
     initialise_plugin, load_manifest_from_dir,
   };
 
+  struct FailingInitPlugin {
+    error: String,
+  }
+
+  #[async_trait]
+  impl crate::plugin_models::PactPluginRpc for FailingInitPlugin {
+    async fn init_plugin(
+      &mut self,
+      _request: crate::plugin_models::PluginInitRequest,
+    ) -> anyhow::Result<crate::plugin_models::PluginInitResponse> {
+      Err(anyhow::anyhow!("{}", self.error))
+    }
+
+    async fn compare_contents(
+      &self,
+      _request: CompareContentsRequest,
+    ) -> anyhow::Result<CompareContentsResponse> {
+      unimplemented!()
+    }
+
+    async fn configure_interaction(
+      &self,
+      _request: ConfigureInteractionRequest,
+    ) -> anyhow::Result<ConfigureInteractionResponse> {
+      unimplemented!()
+    }
+
+    async fn generate_content(
+      &self,
+      _request: GenerateContentRequest,
+    ) -> anyhow::Result<GenerateContentResponse> {
+      unimplemented!()
+    }
+
+    async fn start_mock_server(
+      &self,
+      _request: StartMockServerRequest,
+    ) -> anyhow::Result<StartMockServerResponse> {
+      unimplemented!()
+    }
+
+    async fn shutdown_mock_server(
+      &self,
+      _request: ShutdownMockServerRequest,
+    ) -> anyhow::Result<ShutdownMockServerResponse> {
+      unimplemented!()
+    }
+
+    async fn get_mock_server_results(
+      &self,
+      _request: MockServerRequest,
+    ) -> anyhow::Result<MockServerResults> {
+      unimplemented!()
+    }
+
+    async fn prepare_interaction_for_verification(
+      &self,
+      _request: VerificationPreparationRequest,
+    ) -> anyhow::Result<VerificationPreparationResponse> {
+      unimplemented!()
+    }
+
+    async fn verify_interaction(
+      &self,
+      _request: VerifyInteractionRequest,
+    ) -> anyhow::Result<VerifyInteractionResponse> {
+      unimplemented!()
+    }
+
+    async fn update_catalogue(&self, _request: Catalogue) -> anyhow::Result<()> {
+      unimplemented!()
+    }
+  }
+
   struct InitRecordingPlugin {
     request: RwLock<Option<crate::plugin_models::PluginInitRequest>>,
   }
@@ -1132,6 +1206,22 @@ mod tests {
     expect!(response.plugin_capabilities).to(be_equal_to(vec![
       "plugin/interaction/request-response".to_string(),
     ]));
+  }
+
+  #[test_log::test(tokio::test)]
+  async fn init_handshake_propagates_plugin_init_failure() {
+    let manifest = PactPluginManifest {
+      name: "test-plugin".to_string(),
+      version: "0.0.0".to_string(),
+      ..PactPluginManifest::default()
+    };
+    let expected_error = "CSV plugin requires request/response-scoped interaction support \
+      (missing host capabilities: host/interaction/request-response)";
+    let mut plugin = FailingInitPlugin { error: expected_error.to_string() };
+
+    let err = init_handshake(&manifest, &mut plugin).await.unwrap_err();
+
+    expect!(err.to_string()).to(be_equal_to(expected_error.to_string()));
   }
 
   #[test_log::test(tokio::test)]
