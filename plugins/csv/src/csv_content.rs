@@ -255,17 +255,68 @@ pub fn generate_csv_content(
 }
 
 pub fn has_headers(plugin_config: &Option<proto::PluginConfiguration>) -> bool {
+  fn value_to_bool(value: &Value) -> Option<bool> {
+    match value {
+      Value::Bool(b) => Some(*b),
+      _ => None,
+    }
+  }
+
+  fn value_has_headers(value: &Value) -> Option<bool> {
+    match value {
+      Value::Object(map) => map
+        .get("csvHeaders")
+        .and_then(value_to_bool)
+        .or_else(|| map.get("request").and_then(value_has_headers))
+        .or_else(|| map.get("response").and_then(value_has_headers)),
+      _ => None,
+    }
+  }
+
+  fn config_has_headers(config: &std::collections::BTreeMap<String, Value>) -> Option<bool> {
+    config
+      .get("csvHeaders")
+      .and_then(value_to_bool)
+      .or_else(|| config.get("request").and_then(value_has_headers))
+      .or_else(|| config.get("response").and_then(value_has_headers))
+  }
+
   match &plugin_config {
     Some(config) => match &config.interaction_configuration {
-      Some(i_config) => proto_struct_to_map(&i_config)
-        .get("csvHeaders")
-        .map(|val| match val {
-          Value::Bool(b) => *b,
-          _ => true,
-        })
-        .unwrap_or(true),
+      Some(i_config) => config_has_headers(&proto_struct_to_map(i_config)).unwrap_or(true),
       None => true,
     },
     None => true,
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn has_headers_reads_top_level_csv_headers_flag() {
+    let config = Some(proto::PluginConfiguration {
+      interaction_configuration: Some(to_proto_struct(&hashmap! {
+        "csvHeaders".to_string() => json!(false)
+      })),
+      pact_configuration: None,
+    });
+
+    assert!(!has_headers(&config));
+  }
+
+  #[test]
+  fn has_headers_reads_nested_request_csv_headers_flag() {
+    let config = Some(proto::PluginConfiguration {
+      interaction_configuration: Some(to_proto_struct(&hashmap! {
+        "request".to_string() => json!({
+          "csvHeaders": false
+        })
+      })),
+      pact_configuration: None,
+    });
+
+    assert!(!has_headers(&config));
   }
 }

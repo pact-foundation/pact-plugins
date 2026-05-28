@@ -472,6 +472,9 @@ pub struct PactPlugin {
   /// Running child process
   pub child: Arc<ChildPluginProcess>,
 
+  /// Optional capabilities negotiated for this plugin instance
+  pub plugin_capabilities: Vec<String>,
+
   /// Count of access to the plugin. If this is ever zero, the plugin process will be shutdown
   access_count: Arc<AtomicUsize>,
 }
@@ -597,8 +600,13 @@ impl PactPlugin {
       manifest: manifest.clone(),
       interface_version: PluginInterfaceVersion::try_from(manifest.plugin_interface_version)?,
       child: Arc::new(child),
+      plugin_capabilities: vec![],
       access_count: Arc::new(AtomicUsize::new(1)),
     })
+  }
+
+  pub fn has_plugin_capability(&self, capability: &str) -> bool {
+    self.plugin_capabilities.iter().any(|value| value == capability)
   }
 
   /// Port the plugin is running on
@@ -740,7 +748,7 @@ pub(crate) mod tests {
     let request = PluginInitRequest {
       implementation: "plugin-driver-rust".to_string(),
       version: "1.0.0-beta.1".to_string(),
-      host_capabilities: vec![],
+      host_capabilities: vec!["host/interaction/request-response".to_string()],
     };
 
     let converted_request = proto_v2::InitPluginRequest {
@@ -750,7 +758,10 @@ pub(crate) mod tests {
     };
     assert_eq!(converted_request.implementation, "plugin-driver-rust");
     assert_eq!(converted_request.version, "1.0.0-beta.1");
-    assert!(converted_request.host_capabilities.is_empty());
+    assert_eq!(
+      converted_request.host_capabilities,
+      vec!["host/interaction/request-response"]
+    );
 
     let response = proto_v2::InitPluginResponse {
       response: Some(proto_v2::init_plugin_response::Response::Success(

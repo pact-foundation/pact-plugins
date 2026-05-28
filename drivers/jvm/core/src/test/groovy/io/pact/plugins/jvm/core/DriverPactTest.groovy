@@ -34,6 +34,7 @@ class DriverPactTest {
     PluginInitRequest request
     PluginInitResponse response
     PactPluginManifest manifest = [getName: () -> 'test-plugin'] as PactPluginManifest
+    List<String> pluginCapabilities = []
 
     @Override
     PactPluginManifest getManifest() {
@@ -71,6 +72,16 @@ class DriverPactTest {
     }
 
     @Override
+    List<String> getPluginCapabilities() {
+      pluginCapabilities
+    }
+
+    @Override
+    void setPluginCapabilities(List<String> pluginCapabilities) {
+      this.pluginCapabilities = pluginCapabilities
+    }
+
+    @Override
     void setCatalogueEntries(@Nullable List<Plugin.CatalogueEntry> catalogueEntries) {
 
     }
@@ -101,7 +112,7 @@ class DriverPactTest {
       def result = callback(mock)
 
       assert argument.value.implementation == request.implementation
-      assert argument.value.hostCapabilities.isEmpty()
+      assert argument.value.hostCapabilities == ['host/interaction/request-response']
 
       result
     }
@@ -146,8 +157,8 @@ class DriverPactTest {
     Plugin.InitPluginRequest requestMessage = Plugin.InitPluginRequest.parseFrom(message.request.contents.value)
     Plugin.InitPluginResponse responseMessage = Plugin.InitPluginResponse.parseFrom(message.response.first().contents.value)
     def plugin = new MockPlugin(
-      request: new PluginInitRequest(requestMessage.implementation, requestMessage.version, []),
-      response: new PluginInitResponse(responseMessage.catalogueList, [])
+      request: new PluginInitRequest(requestMessage.implementation, requestMessage.version, ['host/interaction/request-response']),
+      response: new PluginInitResponse(responseMessage.catalogueList, ['plugin/interaction/request-response'])
     )
 
     // Init plugin call
@@ -155,5 +166,6 @@ class DriverPactTest {
 
     // Check that the catalogue was updated with the entry from the test
     assert CatalogueManager.INSTANCE.lookupEntry('plugin/test-plugin/content-matcher/test') != null
+    assert plugin.pluginCapabilities == ['plugin/interaction/request-response']
   }
 }

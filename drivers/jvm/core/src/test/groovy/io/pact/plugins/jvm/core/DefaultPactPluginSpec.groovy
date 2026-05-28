@@ -30,6 +30,7 @@ class DefaultPactPluginSpec extends Specification {
       '1234',
       null,
       null,
+      [],
       null
     )
 
@@ -63,6 +64,7 @@ class DefaultPactPluginSpec extends Specification {
       '1234',
       null,
       null,
+      [],
       channel
     )
 

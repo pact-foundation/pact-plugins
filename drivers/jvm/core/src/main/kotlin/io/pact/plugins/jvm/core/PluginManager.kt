@@ -55,6 +55,8 @@ import java.util.concurrent.TimeUnit
 
 private val logger = KotlinLogging.logger {}
 
+const val HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE = "host/interaction/request-response"
+
 /**
  * Type of plugin dependency
  */
@@ -227,6 +229,7 @@ interface PactPlugin {
   val processPid: Long?
   var rpcClient: PactPluginRpcClient?
   var catalogueEntries: List<Plugin.CatalogueEntry>?
+  var pluginCapabilities: List<String>
   var channel: ManagedChannel?
 
   /**
@@ -250,6 +253,7 @@ data class DefaultPactPlugin(
   override val serverKey: String,
   override var rpcClient: PactPluginRpcClient? = null,
   override var catalogueEntries: List<Plugin.CatalogueEntry>? = null,
+  override var pluginCapabilities: List<String> = emptyList(),
   override var channel: ManagedChannel? = null
 ) : PactPlugin {
   override val processPid: Long
@@ -925,13 +929,14 @@ object DefaultPluginManager: PluginManager {
     val request = PluginInitRequest(
       implementation = "plugin-driver-jvm",
       version = Utils.lookupVersion(PluginManager::class.java),
-      hostCapabilities = emptyList()
+      hostCapabilities = listOf(HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE)
     )
 
     val response =  plugin.withRpcClient { client -> client.initPlugin(request) }
-    logger.debug { "Got init response ${response.catalogueEntries} from plugin ${plugin.manifest.name}" }
+    logger.debug { "Got init response $response from plugin ${plugin.manifest.name}" }
     CatalogueManager.registerPluginEntries(plugin.manifest.name, response.catalogueEntries)
     plugin.catalogueEntries = response.catalogueEntries
+    plugin.pluginCapabilities = response.pluginCapabilities
 
     Thread {
       publishUpdatedCatalogue()

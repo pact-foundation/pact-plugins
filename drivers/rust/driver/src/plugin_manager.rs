@@ -56,6 +56,13 @@ lazy_static! {
   static ref PLUGIN_REGISTER: Mutex<HashMap<String, PactPlugin>> = Mutex::new(HashMap::new());
 }
 
+pub(crate) const HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE: &str =
+  "host/interaction/request-response";
+
+fn host_capabilities() -> Vec<String> {
+  vec![HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE.to_string()]
+}
+
 /// Load the plugin defined by the dependency information. Will first look in the global
 /// plugin registry.
 pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<PactPlugin> {
@@ -265,10 +272,11 @@ async fn initialise_plugin(
             plugin.port()
           );
 
-          init_handshake(manifest, &mut plugin).await.map_err(|err| {
+          let response = init_handshake(manifest, &mut plugin).await.map_err(|err| {
             plugin.kill();
             anyhow!("Failed to send init request to the plugin - {}", err)
           })?;
+          plugin.plugin_capabilities = response.plugin_capabilities;
 
           let key = format!("{}/{}", manifest.name, manifest.version);
           plugin_register.insert(key, plugin.clone());
@@ -288,11 +296,11 @@ async fn initialise_plugin(
 pub async fn init_handshake(
   manifest: &PactPluginManifest,
   plugin: &mut (dyn PactPluginRpc + Send + Sync),
-) -> anyhow::Result<()> {
+) -> anyhow::Result<crate::plugin_models::PluginInitResponse> {
   let request = PluginInitRequest {
     implementation: "plugin-driver-rust".to_string(),
     version: option_env!("CARGO_PKG_VERSION").unwrap_or("0").to_string(),
-    host_capabilities: vec![],
+    host_capabilities: host_capabilities(),
   };
   let response = plugin.init_plugin(request).await?;
   debug!(
@@ -301,7 +309,7 @@ pub async fn init_handshake(
   );
   register_plugin_entries(manifest, &response.catalogue);
   tokio::task::spawn(publish_updated_catalogue());
-  Ok(())
+  Ok(response)
 }
 
 async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<PactPlugin> {
@@ -913,7 +921,9 @@ fn create_plugin_dir(manifest: &PactPluginManifest) -> anyhow::Result<PathBuf> {
 mod tests {
   use std::collections::HashMap;
   use std::fs::{self, File};
+  use std::sync::RwLock;
 
+  use async_trait::async_trait;
   use maplit::hashmap;
   use pact_models::prelude::v4::V4Pact;
   use pact_models::v4::interaction::V4Interaction;
@@ -926,9 +936,99 @@ mod tests {
   use crate::plugin_manager::verify_interaction_inner;
   use crate::plugin_models::PluginDependency;
   use crate::plugin_models::tests::MockPlugin;
+  use crate::proto::*;
   use crate::verification::InteractionVerificationData;
 
-  use super::{PactPluginManifest, initialise_plugin, load_manifest_from_dir};
+  use super::{
+    HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE, PactPluginManifest, init_handshake,
+    initialise_plugin, load_manifest_from_dir,
+  };
+
+  struct InitRecordingPlugin {
+    request: RwLock<Option<crate::plugin_models::PluginInitRequest>>,
+  }
+
+  impl Default for InitRecordingPlugin {
+    fn default() -> Self {
+      Self {
+        request: RwLock::new(None),
+      }
+    }
+  }
+
+  #[async_trait]
+  impl crate::plugin_models::PactPluginRpc for InitRecordingPlugin {
+    async fn init_plugin(
+      &mut self,
+      request: crate::plugin_models::PluginInitRequest,
+    ) -> anyhow::Result<crate::plugin_models::PluginInitResponse> {
+      *self.request.write().unwrap() = Some(request);
+      Ok(crate::plugin_models::PluginInitResponse {
+        catalogue: vec![],
+        plugin_capabilities: vec!["plugin/interaction/request-response".to_string()],
+      })
+    }
+
+    async fn compare_contents(
+      &self,
+      _request: CompareContentsRequest,
+    ) -> anyhow::Result<CompareContentsResponse> {
+      unimplemented!()
+    }
+
+    async fn configure_interaction(
+      &self,
+      _request: ConfigureInteractionRequest,
+    ) -> anyhow::Result<ConfigureInteractionResponse> {
+      unimplemented!()
+    }
+
+    async fn generate_content(
+      &self,
+      _request: GenerateContentRequest,
+    ) -> anyhow::Result<GenerateContentResponse> {
+      unimplemented!()
+    }
+
+    async fn start_mock_server(
+      &self,
+      _request: StartMockServerRequest,
+    ) -> anyhow::Result<StartMockServerResponse> {
+      unimplemented!()
+    }
+
+    async fn shutdown_mock_server(
+      &self,
+      _request: ShutdownMockServerRequest,
+    ) -> anyhow::Result<ShutdownMockServerResponse> {
+      unimplemented!()
+    }
+
+    async fn get_mock_server_results(
+      &self,
+      _request: MockServerRequest,
+    ) -> anyhow::Result<MockServerResults> {
+      unimplemented!()
+    }
+
+    async fn prepare_interaction_for_verification(
+      &self,
+      _request: VerificationPreparationRequest,
+    ) -> anyhow::Result<VerificationPreparationResponse> {
+      unimplemented!()
+    }
+
+    async fn verify_interaction(
+      &self,
+      _request: VerifyInteractionRequest,
+    ) -> anyhow::Result<VerifyInteractionResponse> {
+      unimplemented!()
+    }
+
+    async fn update_catalogue(&self, _request: Catalogue) -> anyhow::Result<()> {
+      Ok(())
+    }
+  }
 
   #[test]
   fn load_manifest_from_dir_test() {
@@ -1012,6 +1112,26 @@ mod tests {
     expect!(err.to_string()).to(be_equal_to(
       "Plugin test-plugin:0.0.0 declared an invalid interface version".to_string(),
     ));
+  }
+
+  #[test_log::test(tokio::test)]
+  async fn init_handshake_sends_host_capabilities_and_returns_plugin_capabilities() {
+    let manifest = PactPluginManifest {
+      name: "test-plugin".to_string(),
+      version: "0.0.0".to_string(),
+      ..PactPluginManifest::default()
+    };
+    let mut plugin = InitRecordingPlugin::default();
+
+    let response = init_handshake(&manifest, &mut plugin).await.unwrap();
+    let request = plugin.request.read().unwrap().clone().unwrap();
+
+    expect!(request.host_capabilities).to(be_equal_to(vec![
+      HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE.to_string(),
+    ]));
+    expect!(response.plugin_capabilities).to(be_equal_to(vec![
+      "plugin/interaction/request-response".to_string(),
+    ]));
   }
 
   #[test_log::test(tokio::test)]

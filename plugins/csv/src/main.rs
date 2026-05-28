@@ -30,6 +30,9 @@ mod parser;
 mod proto;
 mod utils;
 
+const HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE: &str = "host/interaction/request-response";
+const PLUGIN_CAPABILITY_INTERACTION_REQUEST_RESPONSE: &str = "plugin/interaction/request-response";
+
 #[derive(Debug, Default)]
 pub struct CsvPactPlugin {}
 
@@ -45,6 +48,22 @@ impl PactPlugin for CsvPactPlugin {
       "Init request from {}/{} with host capabilities {:?}",
       message.implementation, message.version, message.host_capabilities
     );
+    if !message
+      .host_capabilities
+      .iter()
+      .any(|capability| capability == HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE)
+    {
+      return Ok(Response::new(proto::InitPluginResponse {
+        response: Some(proto::init_plugin_response::Response::Failure(
+          proto::InitPluginFailure {
+            error: "CSV plugin requires request/response-scoped interaction support".to_string(),
+            missing_host_capabilities: vec![
+              HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE.to_string(),
+            ],
+          },
+        )),
+      }));
+    }
     Ok(Response::new(proto::InitPluginResponse {
       response: Some(proto::init_plugin_response::Response::Success(
         proto::InitPluginSuccess {
@@ -64,7 +83,9 @@ impl PactPlugin for CsvPactPlugin {
               },
             },
           ],
-          plugin_capabilities: vec![],
+          plugin_capabilities: vec![
+            PLUGIN_CAPABILITY_INTERACTION_REQUEST_RESPONSE.to_string(),
+          ],
         },
       )),
     }))
@@ -239,27 +260,21 @@ fn compare_contents<R: Read>(
 
   let mut results = vec![];
 
-  let expected_headers = match expected.headers() {
-    Ok(headers) => headers.clone(),
-    Err(err) => {
-      if has_headers {
-        return Err(anyhow!("Failed to read the expected headers: {}", err));
-      } else {
-        debug!("Failed to read the expected headers: {}", err);
-        StringRecord::default()
-      }
+  let expected_headers = if has_headers {
+    match expected.headers() {
+      Ok(headers) => headers.clone(),
+      Err(err) => return Err(anyhow!("Failed to read the expected headers: {}", err)),
     }
+  } else {
+    StringRecord::default()
   };
-  let actual_headers = match actual.headers() {
-    Ok(headers) => headers.clone(),
-    Err(err) => {
-      if has_headers {
-        return Err(anyhow!("Failed to read the actual headers: {}", err));
-      } else {
-        debug!("Failed to read the actual headers: {}", err);
-        StringRecord::default()
-      }
+  let actual_headers = if has_headers {
+    match actual.headers() {
+      Ok(headers) => headers.clone(),
+      Err(err) => return Err(anyhow!("Failed to read the actual headers: {}", err)),
     }
+  } else {
+    StringRecord::default()
   };
   let actual_headers: HashMap<&str, usize> = actual_headers
     .iter()
@@ -418,6 +433,77 @@ fn compare_row(
         diff: String::default(),
         mismatch_type: String::default(),
       });
+    }
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+  use tonic::Request;
+
+  #[test]
+  fn compare_contents_handles_single_row_without_headers() {
+    let mut expected = ReaderBuilder::new()
+      .has_headers(false)
+      .from_reader("Name,100,2000-01-01\n".as_bytes());
+    let mut actual = ReaderBuilder::new()
+      .has_headers(false)
+      .from_reader("Alice,123,2001-02-03\n".as_bytes());
+
+    let response = compare_contents(false, &mut expected, &mut actual, false, HashMap::new())
+      .expect("compare_contents should succeed");
+
+    assert!(response.get_ref().error.is_empty());
+  }
+
+  #[tokio::test]
+  async fn init_plugin_requires_request_response_host_capability() {
+    let plugin = CsvPactPlugin::default();
+
+    let response = plugin
+      .init_plugin(Request::new(proto::InitPluginRequest {
+        implementation: "plugin-driver-rust".to_string(),
+        version: "1.0.0-beta.1".to_string(),
+        host_capabilities: vec![],
+      }))
+      .await
+      .unwrap()
+      .into_inner();
+
+    match response.response.unwrap() {
+      proto::init_plugin_response::Response::Failure(failure) => {
+        assert_eq!(
+          failure.missing_host_capabilities,
+          vec![HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE.to_string()]
+        );
+      }
+      _ => panic!("expected init failure"),
+    }
+  }
+
+  #[tokio::test]
+  async fn init_plugin_returns_request_response_capability_when_host_supports_it() {
+    let plugin = CsvPactPlugin::default();
+
+    let response = plugin
+      .init_plugin(Request::new(proto::InitPluginRequest {
+        implementation: "plugin-driver-rust".to_string(),
+        version: "1.0.0-beta.1".to_string(),
+        host_capabilities: vec![HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE.to_string()],
+      }))
+      .await
+      .unwrap()
+      .into_inner();
+
+    match response.response.unwrap() {
+      proto::init_plugin_response::Response::Success(success) => {
+        assert_eq!(
+          success.plugin_capabilities,
+          vec![PLUGIN_CAPABILITY_INTERACTION_REQUEST_RESPONSE.to_string()]
+        );
+      }
+      _ => panic!("expected init success"),
     }
   }
 }
