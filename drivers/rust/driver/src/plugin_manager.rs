@@ -40,7 +40,8 @@ use crate::download::{download_json_from_github, download_plugin_executable, fet
 use crate::metrics::send_metrics;
 use crate::mock_server::{MockServerConfig, MockServerDetails, MockServerResults};
 use crate::plugin_models::{
-  PactPlugin, PactPluginManifest, PactPluginRpc, PluginDependency, PluginInterfaceVersion,
+  PactPlugin, PactPluginManifest, PactPluginRpc, PluginDependency, PluginInitRequest,
+  PluginInterfaceVersion,
 };
 use crate::proto::*;
 use crate::repository::{USER_AGENT, fetch_repository_index};
@@ -288,9 +289,10 @@ pub async fn init_handshake(
   manifest: &PactPluginManifest,
   plugin: &mut (dyn PactPluginRpc + Send + Sync),
 ) -> anyhow::Result<()> {
-  let request = InitPluginRequest {
+  let request = PluginInitRequest {
     implementation: "plugin-driver-rust".to_string(),
     version: option_env!("CARGO_PKG_VERSION").unwrap_or("0").to_string(),
+    host_capabilities: vec![],
   };
   let response = plugin.init_plugin(request).await?;
   debug!(

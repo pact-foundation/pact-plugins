@@ -15,14 +15,13 @@ class PluginRpcClientSpec extends Specification {
     given:
     def stub = Mockito.mock(PactPluginGrpcV2.PactPluginBlockingStub)
     def client = new PactPluginV2RpcClient(stub)
-    def request = Plugin.InitPluginRequest.newBuilder()
-      .setImplementation('plugin-driver-jvm')
-      .setVersion('1.0.0-beta.1')
-      .build()
+    def request = new PluginInitRequest('plugin-driver-jvm', '1.0.0-beta.1', ['host/matching'])
     def response = PluginV2.InitPluginResponse.newBuilder()
-      .addCatalogue(PluginV2.CatalogueEntry.newBuilder()
-        .setType(PluginV2.CatalogueEntry.EntryType.CONTENT_MATCHER)
-        .setKey('test'))
+      .setSuccess(PluginV2.InitPluginSuccess.newBuilder()
+        .addCatalogue(PluginV2.CatalogueEntry.newBuilder()
+          .setType(PluginV2.CatalogueEntry.EntryType.CONTENT_MATCHER)
+          .setKey('test'))
+        .addPluginCapabilities('plugin/verification'))
       .build()
     ArgumentCaptor<PluginV2.InitPluginRequest> argument = ArgumentCaptor.forClass(PluginV2.InitPluginRequest)
     doReturn(response).when(stub).initPlugin(argument.capture())
@@ -33,8 +32,30 @@ class PluginRpcClientSpec extends Specification {
     then:
     argument.value.implementation == 'plugin-driver-jvm'
     argument.value.version == '1.0.0-beta.1'
-    result.catalogueCount == 1
-    result.catalogueList[0].key == 'test'
-    result.catalogueList[0].type == Plugin.CatalogueEntry.EntryType.CONTENT_MATCHER
+    argument.value.hostCapabilitiesList == ['host/matching']
+    result.catalogueEntries.size() == 1
+    result.catalogueEntries[0].key == 'test'
+    result.catalogueEntries[0].type == Plugin.CatalogueEntry.EntryType.CONTENT_MATCHER
+    result.pluginCapabilities == ['plugin/verification']
+  }
+
+  def 'v2 rpc client raises an error for missing host capabilities'() {
+    given:
+    def stub = Mockito.mock(PactPluginGrpcV2.PactPluginBlockingStub)
+    def client = new PactPluginV2RpcClient(stub)
+    def request = new PluginInitRequest('plugin-driver-jvm', '1.0.0-beta.1', [])
+    def response = PluginV2.InitPluginResponse.newBuilder()
+      .setFailure(PluginV2.InitPluginFailure.newBuilder()
+        .setError('Missing required host capabilities')
+        .addMissingHostCapabilities('host/core-matching'))
+      .build()
+    doReturn(response).when(stub).initPlugin(Mockito.any())
+
+    when:
+    client.initPlugin(request)
+
+    then:
+    def ex = thrown(IllegalStateException)
+    ex.message == 'Missing required host capabilities (missing host capabilities: host/core-matching)'
   }
 }

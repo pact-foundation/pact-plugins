@@ -139,6 +139,19 @@ pub enum PluginInterfaceVersion {
   V2,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PluginInitRequest {
+  pub implementation: String,
+  pub version: String,
+  pub host_capabilities: Vec<String>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PluginInitResponse {
+  pub catalogue: Vec<CatalogueEntry>,
+  pub plugin_capabilities: Vec<String>,
+}
+
 impl TryFrom<u8> for PluginInterfaceVersion {
   type Error = anyhow::Error;
 
@@ -172,20 +185,50 @@ impl PluginClient {
 
   async fn init_plugin(
     &mut self,
-    request: InitPluginRequest,
-  ) -> Result<InitPluginResponse, Status> {
+    request: PluginInitRequest,
+  ) -> Result<PluginInitResponse, Status> {
     match self {
       PluginClient::V1(client) => client
-        .init_plugin(Request::new(request))
+        .init_plugin(Request::new(InitPluginRequest {
+          implementation: request.implementation,
+          version: request.version,
+        }))
         .await
-        .map(|response| response.into_inner()),
+        .map(|response| PluginInitResponse {
+          catalogue: response.into_inner().catalogue,
+          plugin_capabilities: vec![],
+        }),
       PluginClient::V2(client) => client
-        .init_plugin(Request::new(Self::convert_message::<
-          _,
-          proto_v2::InitPluginRequest,
-        >(request)?))
+        .init_plugin(Request::new(proto_v2::InitPluginRequest {
+          implementation: request.implementation,
+          version: request.version,
+          host_capabilities: request.host_capabilities,
+        }))
         .await
-        .and_then(|response| Self::convert_message(response.into_inner())),
+        .and_then(|response| match response.into_inner().response {
+          Some(proto_v2::init_plugin_response::Response::Success(success)) => {
+            Ok(PluginInitResponse {
+              catalogue: success
+                .catalogue
+                .into_iter()
+                .map(Self::convert_message)
+                .collect::<Result<Vec<CatalogueEntry>, Status>>()?,
+              plugin_capabilities: success.plugin_capabilities,
+            })
+          }
+          Some(proto_v2::init_plugin_response::Response::Failure(failure)) => {
+            let mut error = failure.error;
+            if !failure.missing_host_capabilities.is_empty() {
+              error.push_str(" (missing host capabilities: ");
+              error.push_str(failure.missing_host_capabilities.join(", ").as_str());
+              error.push(')');
+            }
+            Err(Status::failed_precondition(error))
+          }
+          None => Err(Status::internal(
+            "Plugin returned an invalid V2 InitPlugin response",
+          )),
+        }),
     }
   }
 
@@ -361,8 +404,8 @@ impl PluginClient {
 #[async_trait]
 pub trait PactPluginRpc {
   /// Send an init request to the plugin process
-  async fn init_plugin(&mut self, request: InitPluginRequest)
-  -> anyhow::Result<InitPluginResponse>;
+  async fn init_plugin(&mut self, request: PluginInitRequest)
+    -> anyhow::Result<PluginInitResponse>;
 
   /// Send a compare contents request to the plugin process
   async fn compare_contents(
@@ -438,8 +481,8 @@ impl PactPluginRpc for PactPlugin {
   /// Send an init request to the plugin process
   async fn init_plugin(
     &mut self,
-    request: InitPluginRequest,
-  ) -> anyhow::Result<InitPluginResponse> {
+    request: PluginInitRequest,
+  ) -> anyhow::Result<PluginInitResponse> {
     let mut client = self.get_plugin_client().await?;
     client
       .init_plugin(request)
@@ -669,8 +712,11 @@ pub(crate) mod tests {
   use std::sync::RwLock;
 
   use async_trait::async_trait;
+  use tonic::Status;
 
-  use crate::plugin_models::{PactPluginRpc, PluginClient};
+  use crate::plugin_models::{
+    PactPluginRpc, PluginClient, PluginInitRequest, PluginInitResponse,
+  };
   use crate::proto::verification_preparation_response::Response;
   use crate::proto::*;
   use crate::proto_v2;
@@ -691,40 +737,61 @@ pub(crate) mod tests {
 
   #[test]
   fn converts_between_v1_and_v2_messages() {
-    let request = InitPluginRequest {
+    let request = PluginInitRequest {
       implementation: "plugin-driver-rust".to_string(),
       version: "1.0.0-beta.1".to_string(),
+      host_capabilities: vec![],
     };
 
-    let converted_request =
-      PluginClient::convert_message::<_, proto_v2::InitPluginRequest>(request).unwrap();
+    let converted_request = proto_v2::InitPluginRequest {
+      implementation: request.implementation,
+      version: request.version,
+      host_capabilities: request.host_capabilities,
+    };
     assert_eq!(converted_request.implementation, "plugin-driver-rust");
     assert_eq!(converted_request.version, "1.0.0-beta.1");
+    assert!(converted_request.host_capabilities.is_empty());
 
     let response = proto_v2::InitPluginResponse {
-      catalogue: vec![proto_v2::CatalogueEntry {
-        r#type: proto_v2::catalogue_entry::EntryType::ContentMatcher as i32,
-        key: "test".to_string(),
-        values: HashMap::new(),
-      }],
+      response: Some(proto_v2::init_plugin_response::Response::Success(
+        proto_v2::InitPluginSuccess {
+          catalogue: vec![proto_v2::CatalogueEntry {
+            r#type: proto_v2::catalogue_entry::EntryType::ContentMatcher as i32,
+            key: "test".to_string(),
+            values: HashMap::new(),
+          }],
+          plugin_capabilities: vec!["plugin/verification".to_string()],
+        },
+      )),
     };
 
-    let converted_response =
-      PluginClient::convert_message::<_, InitPluginResponse>(response).unwrap();
+    let converted_response = match response.response.unwrap() {
+      proto_v2::init_plugin_response::Response::Success(success) => PluginInitResponse {
+        catalogue: success
+          .catalogue
+          .into_iter()
+          .map(PluginClient::convert_message)
+          .collect::<Result<Vec<CatalogueEntry>, Status>>()
+          .unwrap(),
+        plugin_capabilities: success.plugin_capabilities,
+      },
+      _ => unreachable!(),
+    };
     assert_eq!(converted_response.catalogue.len(), 1);
     assert_eq!(converted_response.catalogue[0].key, "test");
     assert_eq!(
       converted_response.catalogue[0].r#type,
       catalogue_entry::EntryType::ContentMatcher as i32
     );
+    assert_eq!(converted_response.plugin_capabilities, vec!["plugin/verification"]);
   }
 
   #[async_trait]
   impl PactPluginRpc for MockPlugin {
     async fn init_plugin(
       &mut self,
-      _request: InitPluginRequest,
-    ) -> anyhow::Result<InitPluginResponse> {
+      _request: PluginInitRequest,
+    ) -> anyhow::Result<PluginInitResponse> {
       unimplemented!()
     }
 

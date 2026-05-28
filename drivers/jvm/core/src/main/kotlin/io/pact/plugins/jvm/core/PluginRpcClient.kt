@@ -16,8 +16,19 @@ enum class PluginInterfaceVersion(val value: Int) {
   }
 }
 
+data class PluginInitRequest(
+  val implementation: String,
+  val version: String,
+  val hostCapabilities: List<String> = emptyList()
+)
+
+data class PluginInitResponse(
+  val catalogueEntries: List<Plugin.CatalogueEntry>,
+  val pluginCapabilities: List<String> = emptyList()
+)
+
 interface PactPluginRpcClient {
-  fun initPlugin(request: Plugin.InitPluginRequest): Plugin.InitPluginResponse
+  fun initPlugin(request: PluginInitRequest): PluginInitResponse
   fun updateCatalogue(request: Plugin.Catalogue)
   fun compareContents(request: Plugin.CompareContentsRequest): Plugin.CompareContentsResponse
   fun configureInteraction(request: Plugin.ConfigureInteractionRequest): Plugin.ConfigureInteractionResponse
@@ -34,7 +45,13 @@ interface PactPluginRpcClient {
 class PactPluginV1RpcClient(
   private val stub: PactPluginGrpc.PactPluginBlockingStub
 ) : PactPluginRpcClient {
-  override fun initPlugin(request: Plugin.InitPluginRequest): Plugin.InitPluginResponse = stub.initPlugin(request)
+  override fun initPlugin(request: PluginInitRequest): PluginInitResponse {
+    val response = stub.initPlugin(Plugin.InitPluginRequest.newBuilder()
+      .setImplementation(request.implementation)
+      .setVersion(request.version)
+      .build())
+    return PluginInitResponse(response.catalogueList)
+  }
 
   override fun updateCatalogue(request: Plugin.Catalogue) {
     stub.updateCatalogue(request)
@@ -71,11 +88,36 @@ class PactPluginV1RpcClient(
 class PactPluginV2RpcClient(
   private val stub: PactPluginGrpcV2.PactPluginBlockingStub
 ) : PactPluginRpcClient {
-  override fun initPlugin(request: Plugin.InitPluginRequest): Plugin.InitPluginResponse =
-    convert(
-      stub.initPlugin(convert(request, PluginV2.InitPluginRequest.parser())),
-      Plugin.InitPluginResponse.parser()
-    )
+  override fun initPlugin(request: PluginInitRequest): PluginInitResponse {
+    val response = stub.initPlugin(PluginV2.InitPluginRequest.newBuilder()
+      .setImplementation(request.implementation)
+      .setVersion(request.version)
+      .addAllHostCapabilities(request.hostCapabilities)
+      .build())
+
+    return when (response.responseCase) {
+      PluginV2.InitPluginResponse.ResponseCase.SUCCESS -> PluginInitResponse(
+        response.success.catalogueList.map {
+          convert(it, Plugin.CatalogueEntry.parser())
+        },
+        response.success.pluginCapabilitiesList
+      )
+      PluginV2.InitPluginResponse.ResponseCase.FAILURE -> {
+        val error = buildString {
+          append(response.failure.error)
+          if (response.failure.missingHostCapabilitiesCount > 0) {
+            append(" (missing host capabilities: ")
+            append(response.failure.missingHostCapabilitiesList.joinToString(", "))
+            append(')')
+          }
+        }
+        throw IllegalStateException(error)
+      }
+      PluginV2.InitPluginResponse.ResponseCase.RESPONSE_NOT_SET ->
+        throw IllegalStateException("Plugin returned an invalid V2 InitPlugin response")
+      null -> throw IllegalStateException("Plugin returned an invalid V2 InitPlugin response")
+    }
+  }
 
   override fun updateCatalogue(request: Plugin.Catalogue) {
     stub.updateCatalogue(convert(request, PluginV2.Catalogue.parser()))

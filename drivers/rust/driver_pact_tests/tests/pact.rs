@@ -8,7 +8,9 @@ use prost::Message;
 use serde_json::json;
 
 use pact_plugin_driver::plugin_manager::init_handshake;
-use pact_plugin_driver::plugin_models::{PactPluginManifest, PactPluginRpc};
+use pact_plugin_driver::plugin_models::{
+  PactPluginManifest, PactPluginRpc, PluginInitRequest, PluginInitResponse
+};
 use pact_plugin_driver::proto::*;
 
 struct MockPlugin {
@@ -18,9 +20,12 @@ struct MockPlugin {
 
 #[async_trait]
 impl PactPluginRpc for MockPlugin {
-  async fn init_plugin(&mut self, request: InitPluginRequest) -> anyhow::Result<InitPluginResponse> {
+  async fn init_plugin(&mut self, request: PluginInitRequest) -> anyhow::Result<PluginInitResponse> {
     if self.request.implementation == request.implementation {
-      Ok(self.response.clone())
+      Ok(PluginInitResponse {
+        catalogue: self.response.catalogue.clone(),
+        plugin_capabilities: vec![]
+      })
     } else {
       Err(anyhow!("Received incorrect request, expected {:?} but got {:?}", self.request, request))
     }

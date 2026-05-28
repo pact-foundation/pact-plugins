@@ -31,8 +31,8 @@ class DriverPactTest {
    * Mock plugin to mock out the gRPC details for the test
    */
   static class MockPlugin implements PactPlugin {
-    Plugin.InitPluginRequest request
-    Plugin.InitPluginResponse response
+    PluginInitRequest request
+    PluginInitResponse response
     PactPluginManifest manifest = [getName: () -> 'test-plugin'] as PactPluginManifest
 
     @Override
@@ -96,11 +96,12 @@ class DriverPactTest {
     @Override
     <T> T withRpcClient(Function<PactPluginRpcClient, T> callback) {
       def mock = Mockito.mock(PactPluginRpcClient)
-      ArgumentCaptor<Plugin.InitPluginRequest> argument = ArgumentCaptor.forClass(Plugin.InitPluginRequest.class)
+      ArgumentCaptor<PluginInitRequest> argument = ArgumentCaptor.forClass(PluginInitRequest.class)
       doReturn(response).when(mock).initPlugin(argument.capture())
       def result = callback(mock)
 
       assert argument.value.implementation == request.implementation
+      assert argument.value.hostCapabilities.isEmpty()
 
       result
     }
@@ -144,7 +145,10 @@ class DriverPactTest {
     // Get the request and response from the Pact, and use that to setup the mock gRPC call
     Plugin.InitPluginRequest requestMessage = Plugin.InitPluginRequest.parseFrom(message.request.contents.value)
     Plugin.InitPluginResponse responseMessage = Plugin.InitPluginResponse.parseFrom(message.response.first().contents.value)
-    def plugin = new MockPlugin(request: requestMessage, response: responseMessage)
+    def plugin = new MockPlugin(
+      request: new PluginInitRequest(requestMessage.implementation, requestMessage.version, []),
+      response: new PluginInitResponse(responseMessage.catalogueList, [])
+    )
 
     // Init plugin call
     DefaultPluginManager.INSTANCE.initPlugin(plugin)

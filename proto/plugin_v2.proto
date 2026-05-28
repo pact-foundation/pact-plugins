@@ -18,6 +18,8 @@ message InitPluginRequest {
   string implementation = 1;
   // Version of the implementation
   string version = 2;
+  // Host capabilities provided by the driver and available to the plugin
+  repeated string hostCapabilities = 3;
 }
 
 // Entry to be added to the core catalogue. Each entry describes one of the features the plugin provides.
@@ -44,10 +46,28 @@ message CatalogueEntry {
   map<string, string> values = 3;
 }
 
-// Response to init plugin, providing the catalogue entries the plugin provides
-message InitPluginResponse {
+// Successful result of initialising the plugin
+message InitPluginSuccess {
   // List of entries the plugin supports
   repeated CatalogueEntry catalogue = 1;
+  // Optional capabilities negotiated for this plugin instance
+  repeated string pluginCapabilities = 2;
+}
+
+// Failure result of initialising the plugin
+message InitPluginFailure {
+  // Error explaining why initialisation failed
+  string error = 1;
+  // Host capabilities the plugin requires but were not provided by the driver
+  repeated string missingHostCapabilities = 2;
+}
+
+// Response to init plugin, providing either the negotiated success response or a structured failure
+message InitPluginResponse {
+  oneof response {
+    InitPluginSuccess success = 1;
+    InitPluginFailure failure = 2;
+  }
 }
 
 // Catalogue of Core Pact + Plugin features

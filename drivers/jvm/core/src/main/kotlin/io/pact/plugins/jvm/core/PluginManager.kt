@@ -922,15 +922,16 @@ object DefaultPluginManager: PluginManager {
   }
 
   fun initPlugin(plugin: PactPlugin) {
-    val request = Plugin.InitPluginRequest.newBuilder()
-      .setImplementation("plugin-driver-jvm")
-      .setVersion(Utils.lookupVersion(PluginManager::class.java))
-      .build()
+    val request = PluginInitRequest(
+      implementation = "plugin-driver-jvm",
+      version = Utils.lookupVersion(PluginManager::class.java),
+      hostCapabilities = emptyList()
+    )
 
     val response =  plugin.withRpcClient { client -> client.initPlugin(request) }
-    logger.debug { "Got init response ${response.catalogueList} from plugin ${plugin.manifest.name}" }
-    CatalogueManager.registerPluginEntries(plugin.manifest.name, response.catalogueList)
-    plugin.catalogueEntries = response.catalogueList
+    logger.debug { "Got init response ${response.catalogueEntries} from plugin ${plugin.manifest.name}" }
+    CatalogueManager.registerPluginEntries(plugin.manifest.name, response.catalogueEntries)
+    plugin.catalogueEntries = response.catalogueEntries
 
     Thread {
       publishUpdatedCatalogue()
