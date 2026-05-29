@@ -41,19 +41,19 @@ jobs:
         run: cargo test
         working-directory: drivers/rust/driver
         env:
-          RUST_LOG: trace
+          RUST_LOG: debug
           RUST_BACKTRACE: 1
       - name: FFI Tests
         run: cargo test
         working-directory: drivers/rust/driver_ffi
         env:
-          RUST_LOG: trace
+          RUST_LOG: debug
           RUST_BACKTRACE: 1
       - name: Pact Tests
         run: cargo test
         working-directory: drivers/rust/driver_pact_tests
         env:
-          RUST_LOG: trace
+          RUST_LOG: debug
           RUST_BACKTRACE: 1
       - name: Build Components
         uses: marcopolo/cargo@master
@@ -81,5 +81,5 @@ jobs:
       - uses: actions/checkout@v3
       - run: |
          docker run --rm -v $(pwd):/workspace -w /workspace/drivers/rust/driver -t  \
-           -e 'RUST_LOG=trace' -e 'pact_do_not_track=true' pactfoundation/rust-musl-build \
+           -e 'RUST_LOG=debug' -e 'pact_do_not_track=true' pactfoundation/rust-musl-build \
            -c ./musl-build.sh
