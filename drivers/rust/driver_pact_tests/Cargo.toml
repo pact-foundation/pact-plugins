@@ -11,9 +11,14 @@ prost = "0.14.3"
 prost-types = "0.14.3"
 
 [dev-dependencies]
-pact-plugin-driver = { version = "=1.0.0-beta.1", path = "../driver" }
+pact-plugin-driver = { version = "~1.0.0-beta.1", path = "../driver" }
 expectest = "0.12.0"
 env_logger = "0.11.10"
 pact_consumer = "~1.4.3"
 async-trait = "0.1.89"
 test-log = "0.2.20"
+
+[patch.crates-io]
+pact_consumer = { git = "https://github.com/pact-foundation/pact-reference.git" }
+pact_matching = { git = "https://github.com/pact-foundation/pact-reference.git" }
+pact_mock_server = { git = "https://github.com/pact-foundation/pact-core-mock-server.git" }

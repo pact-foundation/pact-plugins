@@ -4,7 +4,7 @@ version = "0.0.0"
 edition = "2018"
 
 [dev-dependencies]
-pact-plugin-driver = { version = "=1.0.0-beta.1", path = "../driver" }
+pact-plugin-driver = { version = "~1.0.0-beta.1", path = "../driver" }
 pact_ffi = "~0.5.4"
 env_logger = "0.11.10"
 expectest = "0.12.0"
@@ -14,3 +14,7 @@ prost = "0.14.3"
 test-log = "0.2.20"
 tokio = { version = "1.52.3", features = ["full"] }
 tonic = "0.14.6"
+
+[patch.crates-io]
+pact_ffi = { git = "https://github.com/pact-foundation/pact-reference.git" }
+pact_matching = { git = "https://github.com/pact-foundation/pact-reference.git" }
