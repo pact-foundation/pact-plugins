@@ -121,11 +121,14 @@ class CsvClientTest {
     Random random = new Random();
     CsvClient client = new CsvClient(mockServer.getUrl());
     List<String[]> data = new ArrayList<>();
-    data.add(new String[]{
-      faker.name().fullName(),
-      String.valueOf(Math.abs(random.nextInt())),
-      DateTimeFormatter.ISO_LOCAL_DATE.format(faker.date().birthday().toInstant().atOffset(ZoneOffset.UTC))
-    });
+    int rows = random.nextInt(100);
+    for (int i = 0; i < rows; i++) {
+        data.add(new String[]{
+          faker.name().fullName(),
+          String.valueOf(Math.abs(random.nextInt())),
+          DateTimeFormatter.ISO_LOCAL_DATE.format(faker.date().birthday().toInstant().atOffset(ZoneOffset.UTC))
+        });
+    }
     assertThat(client.save("report001.csv", data), is(true));
   }
 }

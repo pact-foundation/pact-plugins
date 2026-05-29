@@ -8,22 +8,27 @@ repositories {
 }
 
 dependencies {
-  implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.1.3'
+  implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.4.4'
+  implementation 'org.yaml:snakeyaml:2.2'
+  implementation 'org.apache.commons:commons-csv:1.10.0'
 
-  testImplementation 'org.junit.jupiter:junit-jupiter-api:5.9.0'
-  testImplementation 'au.com.dius.pact.consumer:junit5:4.4.2'
-  testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.0'
-  testImplementation 'ch.qos.logback:logback-classic:1.2.11'
+  testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
+  testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+  testImplementation 'au.com.dius.pact.consumer:junit5:4.7.1'
+  testImplementation 'io.pact.plugin.driver:core:1.0.0-beta.1'
+  testImplementation 'ch.qos.logback:logback-classic:1.4.11'
   testImplementation 'org.hamcrest:hamcrest:2.2'
   testImplementation('com.github.javafaker:javafaker:1.0.2') {
     exclude group: 'org.yaml'
   }
-  implementation 'org.yaml:snakeyaml:1.30'
-  implementation 'org.apache.commons:commons-csv:1.9.0'
+
+  testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
 }
 
 test {
   useJUnitPlatform()
   systemProperty('pact.mockserver.addCloseHeader', 'true')
   systemProperty('http.keepAlive', 'false')
+  systemProperty('pact_do_not_track', 'true')
 }
