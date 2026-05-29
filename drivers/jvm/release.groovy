@@ -117,7 +117,7 @@ ask('Publish artifacts to maven central?: [Y]') {
   executeOnShell 'cd core && jreleaser deploy --git-root-search'
 }
 
-def nextVer = Version.valueOf(releaseVer).incrementPatchVersion()
+def nextVer = Version.valueOf(releaseVer).incrementPreReleaseVersion()
 ask("Bump version to $nextVer?: [Y]") {
   executeOnShell "sed -i -e \"s/version = '${releaseVer}'/version = '${nextVer}'/\" build.gradle"
   executeOnShell("git add build.gradle")

@@ -45,6 +45,11 @@ object CatalogueManager {
   fun entries() = catalogue.entries
 
   /**
+   * Return entries provided by the core framework (excludes plugin entries)
+   */
+  fun coreEntries() = catalogue.values.filter { it.providerType == CatalogueEntryProviderType.CORE }
+
+  /**
    * Lookup entry by key. Entries are keyed by <core|plugin>/<plugin-name>?/<entry-type>/<entry-key>
    */
   fun lookupEntry(key: String): CatalogueEntry? {

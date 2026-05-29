@@ -55,7 +55,6 @@ import java.util.concurrent.TimeUnit
 
 private val logger = KotlinLogging.logger {}
 
-const val HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE = "host/interaction/request-response"
 
 /**
  * Type of plugin dependency
@@ -925,7 +924,7 @@ object DefaultPluginManager: PluginManager {
     val request = PluginInitRequest(
       implementation = "plugin-driver-jvm",
       version = Utils.lookupVersion(PluginManager::class.java),
-      hostCapabilities = listOf(HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE)
+      hostCapabilities = CatalogueManager.coreEntries().map { "${it.type}/${it.key}" }
     )
 
     val response =  plugin.withRpcClient { client -> client.initPlugin(request) }

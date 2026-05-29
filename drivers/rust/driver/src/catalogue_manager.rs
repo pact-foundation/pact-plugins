@@ -257,6 +257,15 @@ pub fn all_entries() -> Vec<CatalogueEntry> {
   guard.values().cloned().collect()
 }
 
+/// Returns catalogue entries provided by the core host framework (excludes plugin entries)
+pub fn core_entries() -> Vec<CatalogueEntry> {
+  let guard = CATALOGUE_REGISTER.lock().unwrap();
+  guard.values()
+    .filter(|entry| entry.provider_type == CatalogueEntryProviderType::CORE)
+    .cloned()
+    .collect()
+}
+
 #[cfg(test)]
 mod tests {
   use expectest::prelude::*;

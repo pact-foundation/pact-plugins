@@ -107,7 +107,7 @@ ask('Publish library to crates.io?: [Y]') {
   executeOnShell 'cargo publish'
 }
 
-def nextVer = Version.valueOf(releaseVer).incrementPatchVersion()
+def nextVer = Version.valueOf(releaseVer).incrementPreReleaseVersion()
 ask("Bump version to $nextVer?: [Y]") {
   executeOnShell "sed -i -e 's/version = \"${releaseVer}\"/version = \"${nextVer}\"/' Cargo.toml"
   executeOnShell "sed -i -e 's/documentation = \"https:\\/\\/docs\\.rs\\/pact-plugin-driver\\/${releaseVer}\\/pact-plugin-driver\\/\"/documentation = \"https:\\/\\/docs\\.rs\\/pact-plugin-driver\\/${nextVer}\\/pact-plugin-driver\\/\"/' Cargo.toml"

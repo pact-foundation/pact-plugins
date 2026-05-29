@@ -72,9 +72,16 @@ The capability model — what capabilities exist, what declaring them means, and
 
 Negotiation is bidirectional: the plugin declares what it supports, and the driver must also advertise which host capabilities it exposes (for example, host-provided matching from [009](./009_Host_provided_core_matching_and_generation.md)). This is particularly important for WASM plugins, which cannot link to native Pact libraries and may depend entirely on host-provided capabilities to function.
 
-## Open questions
+## Capability categories
 
-- Which specific capabilities should be mandatory versus optional? The compatibility rules above define how each category is handled; the open question is which capabilities belong in which category as they are defined in later proposals.
+Capabilities fall into two categories:
+
+- **Baseline V2**: Every correctly-implementing V2 driver MUST advertise these. A plugin that requires a baseline capability can safely fail startup if the driver does not declare it, because any conformant V2 driver will. A V2 driver that omits a baseline capability is broken, not just limited.
+- **Optional**: A V2 driver may or may not provide these. Plugins that need an optional capability should either fail gracefully with a clear error, or operate in a degraded mode without it.
+
+The rule for classifying a new capability: it is **baseline** if its absence would cause silently incorrect behaviour in any V2 interaction (i.e., it describes the protocol structure itself). It is **optional** if its absence means a feature is unavailable but the protocol still operates correctly.
+
+Future proposals must state which category each new capability belongs to.
 
 ## Initial capability set for Phase 1
 
@@ -82,16 +89,12 @@ Phase 1 needs one real capability pair so the negotiation path is exercised end 
 behaviour. The first capability set is intentionally small and based on behaviour the current drivers and CSV plugin
 already rely on.
 
-- **Host capability: `host/interaction/request-response`**
+- **Host capability: `interaction/request-response`**
   - Meaning: the driver provides request/response-scoped interaction sections to V2 plugins where appropriate, instead
     of flattening everything into one unscoped interaction block.
   - Why first: the local CSV V2 plugin already relies on this shape for request-body matching and generation.
-- **Plugin capability: `plugin/interaction/request-response`**
+- **Plugin capability: `interaction/request-response`**
   - Meaning: the plugin understands request/response-scoped interaction sections and can safely consume them for its
     V2 interaction and content APIs.
   - Why first: it is a genuine plugin-side optional feature that can be exercised today without waiting for the later
     callback proposals.
-
-For this initial phase, the CSV plugin should require `host/interaction/request-response` during `InitPlugin`
-startup. That gives us a concrete failure mode if a V2 driver does not advertise the capability it actually needs to
-provide.
