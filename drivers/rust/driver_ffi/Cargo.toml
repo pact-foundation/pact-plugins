@@ -18,3 +18,4 @@ tonic = "0.14.6"
 [patch.crates-io]
 pact_ffi = { git = "https://github.com/pact-foundation/pact-reference.git" }
 pact_matching = { git = "https://github.com/pact-foundation/pact-reference.git" }
+pact_mock_server = { git = "https://github.com/pact-foundation/pact-core-mock-server.git" }
