@@ -5,6 +5,8 @@ use axum::{extract::Json, routing::post, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tokio::net::TcpListener;
+use tracing::{debug, info, warn};
+use tracing_subscriber::{EnvFilter, FmtSubscriber};
 
 #[derive(Debug, Deserialize)]
 struct JsonRpcRequest {
@@ -28,6 +30,8 @@ struct JsonRpcResponse {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+  init_tracing();
+
   let listener = TcpListener::bind("127.0.0.1:9292")
     .await
     .context("failed to bind provider")?;
@@ -35,32 +39,53 @@ async fn main() -> Result<()> {
 }
 
 async fn serve(listener: TcpListener) -> Result<()> {
+  let addr = listener
+    .local_addr()
+    .context("failed to read provider listener address")?;
   let app = Router::new().route("/rpc", post(sum_handler));
+  info!(%addr, "JSON-RPC sum provider listening");
   axum::serve(listener, app)
     .await
     .context("provider server failed")
 }
 
 async fn sum_handler(Json(request): Json<JsonRpcRequest>) -> Json<JsonRpcResponse> {
+  debug!(
+    jsonrpc = %request.jsonrpc,
+    method = %request.method,
+    id = %request.id,
+    params = %request.params,
+    "Received JSON-RPC request"
+  );
+
   match sum_from_params(&request.params) {
-    Ok(result) if request.method == "sum" => Json(JsonRpcResponse {
-      jsonrpc: "2.0",
-      result: Some(result),
-      error: None,
-      id: request.id,
-    }),
-    Ok(_) => Json(JsonRpcResponse {
-      jsonrpc: "2.0",
-      result: None,
-      error: Some(json!({ "code": -32601, "message": "Unknown method" })),
-      id: request.id,
-    }),
-    Err(error) => Json(JsonRpcResponse {
-      jsonrpc: "2.0",
-      result: None,
-      error: Some(json!({ "code": -32602, "message": error.to_string() })),
-      id: request.id,
-    }),
+    Ok(result) if request.method == "sum" => {
+      debug!(result, "Returning successful JSON-RPC response");
+      Json(JsonRpcResponse {
+        jsonrpc: "2.0",
+        result: Some(result),
+        error: None,
+        id: request.id,
+      })
+    }
+    Ok(_) => {
+      warn!(method = %request.method, "Received unsupported JSON-RPC method");
+      Json(JsonRpcResponse {
+        jsonrpc: "2.0",
+        result: None,
+        error: Some(json!({ "code": -32601, "message": "Unknown method" })),
+        id: request.id,
+      })
+    }
+    Err(error) => {
+      warn!(error = %error, params = %request.params, "Received invalid JSON-RPC params");
+      Json(JsonRpcResponse {
+        jsonrpc: "2.0",
+        result: None,
+        error: Some(json!({ "code": -32602, "message": error.to_string() })),
+        id: request.id,
+      })
+    }
   }
 }
 
@@ -88,6 +113,20 @@ fn consumer_pact_path() -> PathBuf {
     .join("../consumer-rust/pacts/jsonrpc-consumer-rust-sum-provider.json")
 }
 
+fn init_tracing() {
+  let subscriber = FmtSubscriber::builder()
+    .with_env_filter(
+      EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("provider_rust=debug,info")),
+    )
+    .pretty()
+    .finish();
+
+  if let Err(err) = tracing::subscriber::set_global_default(subscriber) {
+    eprintln!("WARN: Failed to initialise global tracing subscriber - {err}");
+  }
+}
+
 #[cfg(test)]
 mod tests {
   use std::process::Command;
@@ -103,7 +142,7 @@ mod tests {
   #[tokio::test(flavor = "multi_thread", worker_threads = 1)]
   #[ignore = "requires a generated pact file, a locally installed jsonrpc plugin, and a verifier build with v2 plugin support"]
   async fn verify_jsonrpc_provider() {
-    let _ = env_logger::builder().is_test(true).try_init();
+    init_tracing();
 
     let pact_path = consumer_pact_path();
     assert!(
@@ -126,6 +165,7 @@ mod tests {
 
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let port = listener.local_addr().unwrap().port();
+    info!(%port, pact = %pact_path.display(), "Starting provider for verifier run");
     let server = tokio::spawn(async move {
       serve(listener).await.unwrap();
     });

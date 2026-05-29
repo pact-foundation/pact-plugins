@@ -34,7 +34,16 @@ That writes a Pact file to `consumer-rust/pacts/`.
 
 ```sh
 cd provider-rust
+RUST_LOG=provider_rust=debug cargo run
+```
+
+Then in another terminal:
+
+```sh
+cd provider-rust
 cargo test -- --ignored verify_jsonrpc_provider
 ```
 
 The provider verification test is intentionally ignored by default until the verifier used in your environment supports the v2 plugin gRPC interface.
+
+Set `RUST_LOG=provider_rust=debug` when starting the provider to see the request, params, result, and validation logs while the verifier exercises it.
