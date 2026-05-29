@@ -1,0 +1,9 @@
+{
+  "name": "jsonrpc",
+  "version": "0.1.0-beta.1",
+  "minimumRequiredVersion": "2.0.0",
+  "manifestVersion": 1,
+  "pluginInterfaceVersion": 2,
+  "executableType": "exec",
+  "entryPoint": "pact-jsonrpc-plugin"
+}

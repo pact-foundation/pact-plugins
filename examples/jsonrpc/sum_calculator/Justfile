@@ -1,0 +1,7 @@
+consumer:
+  cd consumer-rust && cargo test
+
+provider:
+  cd provider-rust && cargo test -- --ignored verify_jsonrpc_provider
+
+all: consumer provider

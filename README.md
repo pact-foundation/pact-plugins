@@ -58,8 +58,8 @@ with existing protocol implementations.
 
 See [Content matcher design docs](docs/content-matcher-design.md).
 
-There are two example prototype plugins that support matching different types of content: [Protobuf](plugins/protobuf) and 
-[CSV](plugins/csv).
+There are two example prototype plugins that support matching different types of content: [Protobuf](plugins/protobuf) and
+[CSV](plugins/csv). There is also a transport example plugin for [JSON-RPC](plugins/jsonrpc).
 
 See [PactFlow Protobuf/gRPC plugin](https://github.com/pactflow/pact-protobuf-plugin) for a PactFlow supported plugin.
 
