@@ -65,7 +65,7 @@ mod tests {
         i
       })
       .await;
-    let csv_service = builder.start_mock_server_async(None)
+    let csv_service = builder.start_mock_server_async(None, None)
       .await;
 
     let client = CsvClient::new(csv_service.url().clone());
@@ -100,7 +100,7 @@ mod tests {
         i
       })
       .await;
-    let csv_service = builder.start_mock_server_async(None)
+    let csv_service = builder.start_mock_server_async(None, None)
       .await;
 
     let client = CsvClient::new(csv_service.url().clone());
