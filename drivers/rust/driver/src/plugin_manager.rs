@@ -32,7 +32,7 @@ use sysinfo::{Pid, System};
 use tracing::{debug, info, trace, warn};
 
 use crate::catalogue_manager::{
-  CatalogueEntry, all_entries, register_plugin_entries, remove_plugin_entries,
+  CatalogueEntry, all_entries, core_entries, register_plugin_entries, remove_plugin_entries,
 };
 use crate::child_process::ChildPluginProcess;
 use crate::content::ContentMismatch;
@@ -56,11 +56,11 @@ lazy_static! {
   static ref PLUGIN_REGISTER: Mutex<HashMap<String, PactPlugin>> = Mutex::new(HashMap::new());
 }
 
-pub(crate) const HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE: &str =
-  "host/interaction/request-response";
-
 fn host_capabilities() -> Vec<String> {
-  vec![HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE.to_string()]
+  core_entries()
+    .into_iter()
+    .map(|entry| format!("{}/{}", entry.entry_type, entry.key))
+    .collect()
 }
 
 /// Load the plugin defined by the dependency information. Will first look in the global
@@ -939,10 +939,11 @@ mod tests {
   use crate::proto::*;
   use crate::verification::InteractionVerificationData;
 
-  use super::{
-    HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE, PactPluginManifest, init_handshake,
-    initialise_plugin, load_manifest_from_dir,
+  use crate::catalogue_manager::{
+    CatalogueEntry, CatalogueEntryProviderType, CatalogueEntryType, register_core_entries,
   };
+
+  use super::{PactPluginManifest, init_handshake, initialise_plugin, load_manifest_from_dir};
 
   struct FailingInitPlugin {
     error: String,
@@ -1039,7 +1040,7 @@ mod tests {
       *self.request.write().unwrap() = Some(request);
       Ok(crate::plugin_models::PluginInitResponse {
         catalogue: vec![],
-        plugin_capabilities: vec!["plugin/interaction/request-response".to_string()],
+        plugin_capabilities: vec!["interaction/request-response".to_string()],
       })
     }
 
@@ -1190,6 +1191,14 @@ mod tests {
 
   #[test_log::test(tokio::test)]
   async fn init_handshake_sends_host_capabilities_and_returns_plugin_capabilities() {
+    register_core_entries(&vec![CatalogueEntry {
+      entry_type: CatalogueEntryType::CONTENT_MATCHER,
+      provider_type: CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: "test-content-type".to_string(),
+      values: Default::default(),
+    }]);
+
     let manifest = PactPluginManifest {
       name: "test-plugin".to_string(),
       version: "0.0.0".to_string(),
@@ -1200,11 +1209,13 @@ mod tests {
     let response = init_handshake(&manifest, &mut plugin).await.unwrap();
     let request = plugin.request.read().unwrap().clone().unwrap();
 
-    expect!(request.host_capabilities).to(be_equal_to(vec![
-      HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE.to_string(),
-    ]));
+    assert!(
+      request.host_capabilities.contains(&"content-matcher/test-content-type".to_string()),
+      "expected host_capabilities to contain 'content-matcher/test-content-type', got: {:?}",
+      request.host_capabilities
+    );
     expect!(response.plugin_capabilities).to(be_equal_to(vec![
-      "plugin/interaction/request-response".to_string(),
+      "interaction/request-response".to_string(),
     ]));
   }
 
@@ -1216,7 +1227,7 @@ mod tests {
       ..PactPluginManifest::default()
     };
     let expected_error = "CSV plugin requires request/response-scoped interaction support \
-      (missing host capabilities: host/interaction/request-response)";
+      (missing host capabilities: interaction/request-response)";
     let mut plugin = FailingInitPlugin { error: expected_error.to_string() };
 
     let err = init_handshake(&manifest, &mut plugin).await.unwrap_err();

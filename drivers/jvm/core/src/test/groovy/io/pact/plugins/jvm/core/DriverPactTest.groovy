@@ -18,6 +18,8 @@ import org.mockito.Mockito
 
 import java.util.function.Function
 
+import org.junit.jupiter.api.BeforeEach
+
 import static org.mockito.Mockito.doReturn
 
 /**
@@ -26,6 +28,13 @@ import static org.mockito.Mockito.doReturn
 @ExtendWith(PactConsumerTestExt.class)
 @PactTestFor(providerName = 'plugin', pactVersion = PactSpecVersion.V4, providerType = ProviderType.SYNCH_MESSAGE)
 class DriverPactTest {
+
+  @BeforeEach
+  void setup() {
+    CatalogueManager.INSTANCE.registerCoreEntries([
+      new CatalogueEntry(CatalogueEntryType.CONTENT_MATCHER, CatalogueEntryProviderType.CORE, '', 'test-content-type', [:])
+    ])
+  }
 
   /*
    * Mock plugin to mock out the gRPC details for the test
@@ -112,7 +121,7 @@ class DriverPactTest {
       def result = callback(mock)
 
       assert argument.value.implementation == request.implementation
-      assert argument.value.hostCapabilities == ['host/interaction/request-response']
+      assert argument.value.hostCapabilities.contains('content-matcher/test-content-type')
 
       result
     }
@@ -157,8 +166,8 @@ class DriverPactTest {
     Plugin.InitPluginRequest requestMessage = Plugin.InitPluginRequest.parseFrom(message.request.contents.value)
     Plugin.InitPluginResponse responseMessage = Plugin.InitPluginResponse.parseFrom(message.response.first().contents.value)
     def plugin = new MockPlugin(
-      request: new PluginInitRequest(requestMessage.implementation, requestMessage.version, ['host/interaction/request-response']),
-      response: new PluginInitResponse(responseMessage.catalogueList, ['plugin/interaction/request-response'])
+      request: new PluginInitRequest(requestMessage.implementation, requestMessage.version, []),
+      response: new PluginInitResponse(responseMessage.catalogueList, [])
     )
 
     // Init plugin call
@@ -166,6 +175,6 @@ class DriverPactTest {
 
     // Check that the catalogue was updated with the entry from the test
     assert CatalogueManager.INSTANCE.lookupEntry('plugin/test-plugin/content-matcher/test') != null
-    assert plugin.pluginCapabilities == ['plugin/interaction/request-response']
+    assert plugin.pluginCapabilities == []
   }
 }

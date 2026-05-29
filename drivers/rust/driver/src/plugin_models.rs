@@ -748,7 +748,7 @@ pub(crate) mod tests {
     let request = PluginInitRequest {
       implementation: "plugin-driver-rust".to_string(),
       version: "1.0.0-beta.1".to_string(),
-      host_capabilities: vec!["host/interaction/request-response".to_string()],
+      host_capabilities: vec!["interaction/request-response".to_string()],
     };
 
     let converted_request = proto_v2::InitPluginRequest {
@@ -760,7 +760,7 @@ pub(crate) mod tests {
     assert_eq!(converted_request.version, "1.0.0-beta.1");
     assert_eq!(
       converted_request.host_capabilities,
-      vec!["host/interaction/request-response"]
+      vec!["interaction/request-response"]
     );
 
     let response = proto_v2::InitPluginResponse {
