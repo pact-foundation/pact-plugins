@@ -21,3 +21,4 @@ test-log = "0.2.20"
 [patch.crates-io]
 pact_consumer = { git = "https://github.com/pact-foundation/pact-reference.git" }
 pact_matching = { git = "https://github.com/pact-foundation/pact-reference.git" }
+pact_mock_server = { git = "https://github.com/pact-foundation/pact-core-mock-server.git" }
