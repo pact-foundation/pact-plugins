@@ -72,6 +72,7 @@ impl ChildPluginProcess {
           trace!("0 bytes read from STDOUT, this indicates EOF");
           break;
         }
+        line.clear();
       }
       trace!("Thread to poll plugin STDOUT done");
     });
@@ -88,6 +89,7 @@ impl ChildPluginProcess {
           trace!("0 bytes read from STDERR, this indicates EOF");
           break;
         }
+        line.clear();
       }
       trace!("Thread to poll plugin STDERR done");
     });
