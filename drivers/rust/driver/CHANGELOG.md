@@ -1,5 +1,17 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.0.0-beta.1 - First phase of the V2 plugin interface
+
+* 45411e8 - chore: update repository.index (Ronald Holshausen, Fri May 29 11:43:42 2026 +1000)
+* 44cec95 - chore: update release scripts to set beta flag correctly (Ronald Holshausen, Fri May 29 11:34:15 2026 +1000)
+* 90cae6a - feat(v2-plugins): Set the core catalogue entries as the initial host capabilties (Ronald Holshausen, Fri May 29 11:10:31 2026 +1000)
+* 637c712 - fix: address review gaps from Phase 1 capability negotiation (Ronald Holshausen, Thu May 28 17:17:42 2026 +1000)
+* 7399889 - feat: negotiate initial v2 plugin capabilities (Ronald Holshausen, Thu May 28 15:22:06 2026 +1000)
+* f3ddee8 - feat: add v2 init capability negotiation (Ronald Holshausen, Thu May 28 11:09:48 2026 +1000)
+* 7fa5492 - feat: add v2 plugin protocol adapters (Ronald Holshausen, Thu May 28 10:43:37 2026 +1000)
+* 0759102 - feat: prepare drivers for plugin interface versioning (Ronald Holshausen, Thu May 28 10:04:59 2026 +1000)
+* 6b6ff28 - bump version to 0.7.7 (Ronald Holshausen, Tue May 12 17:20:28 2026 +1000)
+
 # 0.7.6 - Maintenance Release
 
 * 772347c - chore: update repository.index (Ronald Holshausen, Tue May 12 17:19:33 2026 +1000)
