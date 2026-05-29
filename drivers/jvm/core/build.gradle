@@ -8,6 +8,9 @@ plugins {
 ext {
     description = "Pact Plugin Driver core implementation"
     gitSha = System.getenv("GIT_SHA") ?: '0'
+    protobufJavaVersion = '4.26.1'
+    protocVersion = protobufJavaVersion
+    grpcJavaVersion = '1.72.0'
 }
 
 dependencies {
@@ -24,12 +27,13 @@ dependencies {
     implementation 'io.grpc:grpc-netty:1.72.0'
     implementation 'io.grpc:grpc-protobuf:1.72.0'
     implementation 'io.grpc:grpc-stub:1.72.0'
+    implementation "com.google.protobuf:protobuf-java:${protobufJavaVersion}"
     implementation 'io.hotmoka:toml4j:0.7.3'
     implementation 'org.apache.commons:commons-lang3:3.17.0'
     implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.5'
     implementation 'org.apache.tika:tika-core:2.9.4'
-    implementation 'org.jetbrains.kotlin:kotlin-reflect:1.8.22'
-    implementation 'org.jetbrains.kotlin:kotlin-stdlib:1.8.22'
+    implementation 'org.jetbrains.kotlin:kotlin-reflect:2.3.10'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.3.10'
     implementation 'io.github.compress4j:compress4j:2.1.2'
     implementation 'org.apache.commons:commons-compress:1.27.1'
 
@@ -59,9 +63,9 @@ dependencies {
 }
 
 protobuf {
-    protoc { artifact = "com.google.protobuf:protoc:3.25.7" }
+    protoc { artifact = "com.google.protobuf:protoc:${protocVersion}" }
     plugins {
-        grpc { artifact = "io.grpc:protoc-gen-grpc-java:1.72.0" }
+        grpc { artifact = "io.grpc:protoc-gen-grpc-java:${grpcJavaVersion}" }
     }
     generateProtoTasks {
         all()*.plugins { grpc {} }

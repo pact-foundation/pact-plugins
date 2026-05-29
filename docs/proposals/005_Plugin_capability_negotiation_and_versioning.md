@@ -75,3 +75,23 @@ Negotiation is bidirectional: the plugin declares what it supports, and the driv
 ## Open questions
 
 - Which specific capabilities should be mandatory versus optional? The compatibility rules above define how each category is handled; the open question is which capabilities belong in which category as they are defined in later proposals.
+
+## Initial capability set for Phase 1
+
+Phase 1 needs one real capability pair so the negotiation path is exercised end to end before later proposals add more
+behaviour. The first capability set is intentionally small and based on behaviour the current drivers and CSV plugin
+already rely on.
+
+- **Host capability: `host/interaction/request-response`**
+  - Meaning: the driver provides request/response-scoped interaction sections to V2 plugins where appropriate, instead
+    of flattening everything into one unscoped interaction block.
+  - Why first: the local CSV V2 plugin already relies on this shape for request-body matching and generation.
+- **Plugin capability: `plugin/interaction/request-response`**
+  - Meaning: the plugin understands request/response-scoped interaction sections and can safely consume them for its
+    V2 interaction and content APIs.
+  - Why first: it is a genuine plugin-side optional feature that can be exercised today without waiting for the later
+    callback proposals.
+
+For this initial phase, the CSV plugin should require `host/interaction/request-response` during `InitPlugin`
+startup. That gives us a concrete failure mode if a V2 driver does not advertise the capability it actually needs to
+provide.

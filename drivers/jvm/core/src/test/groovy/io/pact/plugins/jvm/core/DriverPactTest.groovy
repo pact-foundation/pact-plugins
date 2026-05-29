@@ -9,8 +9,6 @@ import au.com.dius.pact.core.model.V4Interaction
 import au.com.dius.pact.core.model.V4Pact
 import au.com.dius.pact.core.model.annotations.Pact
 import io.grpc.ManagedChannel
-import io.grpc.stub.AbstractBlockingStub
-import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.Plugin
 import org.jetbrains.annotations.Nullable
 import org.junit.jupiter.api.Test
@@ -33,9 +31,10 @@ class DriverPactTest {
    * Mock plugin to mock out the gRPC details for the test
    */
   static class MockPlugin implements PactPlugin {
-    Plugin.InitPluginRequest request
-    Plugin.InitPluginResponse response
+    PluginInitRequest request
+    PluginInitResponse response
     PactPluginManifest manifest = [getName: () -> 'test-plugin'] as PactPluginManifest
+    List<String> pluginCapabilities = []
 
     @Override
     PactPluginManifest getManifest() {
@@ -58,18 +57,28 @@ class DriverPactTest {
     }
 
     @Override
-    AbstractBlockingStub<PactPluginGrpc.PactPluginBlockingStub> getStub() {
-      Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
+    PactPluginRpcClient getRpcClient() {
+      Mockito.mock(PactPluginRpcClient)
     }
 
     @Override
-    void setStub(@Nullable AbstractBlockingStub<PactPluginGrpc.PactPluginBlockingStub> stub) {
+    void setRpcClient(@Nullable PactPluginRpcClient rpcClient) {
 
     }
 
     @Override
     List<Plugin.CatalogueEntry> getCatalogueEntries() {
       null
+    }
+
+    @Override
+    List<String> getPluginCapabilities() {
+      pluginCapabilities
+    }
+
+    @Override
+    void setPluginCapabilities(List<String> pluginCapabilities) {
+      this.pluginCapabilities = pluginCapabilities
     }
 
     @Override
@@ -93,16 +102,17 @@ class DriverPactTest {
     }
 
     /*
-     * This is the method that the Plugin Manager will use to make the gRPC call. We can mock out that gRPC stub here
+     * This is the method that the Plugin Manager will use to make the RPC call. We can mock out that client here.
      */
     @Override
-    <T> T withGrpcStub(Function<PactPluginGrpc.PactPluginBlockingStub, T> callback) {
-      def mock = Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
-      ArgumentCaptor<Plugin.InitPluginRequest> argument = ArgumentCaptor.forClass(Plugin.InitPluginRequest.class)
+    <T> T withRpcClient(Function<PactPluginRpcClient, T> callback) {
+      def mock = Mockito.mock(PactPluginRpcClient)
+      ArgumentCaptor<PluginInitRequest> argument = ArgumentCaptor.forClass(PluginInitRequest.class)
       doReturn(response).when(mock).initPlugin(argument.capture())
       def result = callback(mock)
 
       assert argument.value.implementation == request.implementation
+      assert argument.value.hostCapabilities == ['host/interaction/request-response']
 
       result
     }
@@ -146,12 +156,16 @@ class DriverPactTest {
     // Get the request and response from the Pact, and use that to setup the mock gRPC call
     Plugin.InitPluginRequest requestMessage = Plugin.InitPluginRequest.parseFrom(message.request.contents.value)
     Plugin.InitPluginResponse responseMessage = Plugin.InitPluginResponse.parseFrom(message.response.first().contents.value)
-    def plugin = new MockPlugin(request: requestMessage, response: responseMessage)
+    def plugin = new MockPlugin(
+      request: new PluginInitRequest(requestMessage.implementation, requestMessage.version, ['host/interaction/request-response']),
+      response: new PluginInitResponse(responseMessage.catalogueList, ['plugin/interaction/request-response'])
+    )
 
     // Init plugin call
     DefaultPluginManager.INSTANCE.initPlugin(plugin)
 
     // Check that the catalogue was updated with the entry from the test
     assert CatalogueManager.INSTANCE.lookupEntry('plugin/test-plugin/content-matcher/test') != null
+    assert plugin.pluginCapabilities == ['plugin/interaction/request-response']
   }
 }

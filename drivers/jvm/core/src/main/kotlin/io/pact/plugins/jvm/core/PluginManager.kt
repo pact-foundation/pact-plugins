@@ -34,9 +34,8 @@ import io.grpc.CallCredentials
 import io.grpc.ManagedChannel
 import io.grpc.ManagedChannelBuilder
 import io.grpc.Metadata
-import io.grpc.stub.AbstractBlockingStub
-import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.PactPluginGrpc.newBlockingStub
+import io.pact.plugin.v2.PactPluginGrpc.newBlockingStub as newV2BlockingStub
 import io.pact.plugin.Plugin
 import io.pact.plugins.jvm.core.Utils.fromProtoValue
 import io.pact.plugins.jvm.core.Utils.jsonToValue
@@ -55,6 +54,8 @@ import java.util.concurrent.Executor
 import java.util.concurrent.TimeUnit
 
 private val logger = KotlinLogging.logger {}
+
+const val HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE = "host/interaction/request-response"
 
 /**
  * Type of plugin dependency
@@ -226,8 +227,9 @@ interface PactPlugin {
   val port: Int?
   val serverKey: String?
   val processPid: Long?
-  var stub: AbstractBlockingStub<PactPluginGrpc.PactPluginBlockingStub>?
+  var rpcClient: PactPluginRpcClient?
   var catalogueEntries: List<Plugin.CatalogueEntry>?
+  var pluginCapabilities: List<String>
   var channel: ManagedChannel?
 
   /**
@@ -236,9 +238,9 @@ interface PactPlugin {
   fun shutdown()
 
   /**
-   * Invoke the callback with a gRPC stub connected to the running plugin
+   * Invoke the callback with the version-specific RPC client connected to the running plugin.
    */
-  fun <T> withGrpcStub(callback: java.util.function.Function<PactPluginGrpc.PactPluginBlockingStub, T>): T
+  fun <T> withRpcClient(callback: java.util.function.Function<PactPluginRpcClient, T>): T
 }
 
 /**
@@ -249,8 +251,9 @@ data class DefaultPactPlugin(
   override val manifest: PactPluginManifest,
   override val port: Int?,
   override val serverKey: String,
-  override var stub: AbstractBlockingStub<PactPluginGrpc.PactPluginBlockingStub>? = null,
+  override var rpcClient: PactPluginRpcClient? = null,
   override var catalogueEntries: List<Plugin.CatalogueEntry>? = null,
+  override var pluginCapabilities: List<String> = emptyList(),
   override var channel: ManagedChannel? = null
 ) : PactPlugin {
   override val processPid: Long
@@ -263,8 +266,8 @@ data class DefaultPactPlugin(
     }
   }
 
-  override fun <T> withGrpcStub(callback: java.util.function.Function<PactPluginGrpc.PactPluginBlockingStub, T>): T {
-    return callback.apply(stub as PactPluginGrpc.PactPluginBlockingStub)
+  override fun <T> withRpcClient(callback: java.util.function.Function<PactPluginRpcClient, T>): T {
+    return callback.apply(requireNotNull(rpcClient) { "Plugin RPC client has not been initialised" })
   }
 }
 
@@ -487,7 +490,7 @@ object DefaultPluginManager: PluginManager {
           .build()
         val plugin = lookupPlugin(matcher.pluginName, null) ?:
           throw PactPluginNotFoundException(matcher.pluginName, null)
-        plugin.withGrpcStub { stub -> stub.compareContents(request) }
+        plugin.withRpcClient { client -> client.compareContents(request) }
       }
       else -> throw RuntimeException("Mis-configured content type matcher $matcher")
     }
@@ -518,7 +521,7 @@ object DefaultPluginManager: PluginManager {
       throw PactPluginNotFoundException(matcher.pluginName, null)
 
     logger.debug { "Sending configureInteraction request to plugin ${plugin.manifest}" }
-    val response = plugin.withGrpcStub { stub -> stub.configureInteraction(request) }
+    val response = plugin.withRpcClient { client -> client.configureInteraction(request) }
     logger.debug { "Got response: $response" }
 
     return if (response.error.isNotEmpty()) {
@@ -684,7 +687,7 @@ object DefaultPluginManager: PluginManager {
       request.putGenerators(key, gen)
     }
     logger.debug { "Sending generateContent request to plugin ${plugin.manifest}" }
-    val response = plugin.withGrpcStub { stub -> stub.generateContent(request.build()) }
+    val response = plugin.withRpcClient { client -> client.generateContent(request.build()) }
     logger.debug { "Got response: $response" }
     val returnedContentType = ContentType(response.contents.contentType)
     return OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType)
@@ -719,7 +722,7 @@ object DefaultPluginManager: PluginManager {
     request.tls = config.tls
 
     logger.debug { "Sending startMockServer request to plugin ${plugin.manifest}" }
-    val response = plugin.withGrpcStub { stub -> stub.startMockServer(request.build()) }
+    val response = plugin.withRpcClient { client -> client.startMockServer(request.build()) }
     logger.debug { "Got response: $response" }
 
     if (response.hasError()) {
@@ -734,7 +737,7 @@ object DefaultPluginManager: PluginManager {
       .setServerKey(mockServer.key)
 
     logger.debug { "Sending shutdownMockServer request to plugin ${mockServer.plugin.manifest}" }
-    val response = mockServer.plugin.withGrpcStub { stub -> stub.shutdownMockServer(request.build()) }
+    val response = mockServer.plugin.withRpcClient { client -> client.shutdownMockServer(request.build()) }
     logger.debug { "Got response: $response" }
 
     return if (response.ok) null else response.resultsList.map { result ->
@@ -751,7 +754,7 @@ object DefaultPluginManager: PluginManager {
             .setServerKey(mockServer.key)
 
     logger.debug { "Sending getMockServerResults request to plugin ${mockServer.plugin.manifest}" }
-    val response = mockServer.plugin.withGrpcStub { stub -> stub.getMockServerResults(request.build()) }
+    val response = mockServer.plugin.withRpcClient { client -> client.getMockServerResults(request.build()) }
     logger.debug { "Got response: $response" }
 
     return if (response.ok) null else response.resultsList.map { result ->
@@ -781,7 +784,7 @@ object DefaultPluginManager: PluginManager {
       .setConfig(mapToProtoStruct(config))
 
     logger.debug { "Sending prepareValidationForInteraction request to plugin ${plugin.manifest}" }
-    val response = plugin.withGrpcStub { stub -> stub.prepareInteractionForVerification(request.build()) }
+    val response = plugin.withRpcClient { client -> client.prepareInteractionForVerification(request.build()) }
     logger.debug { "Got response: $response" }
 
     if (response.hasError()) {
@@ -835,7 +838,7 @@ object DefaultPluginManager: PluginManager {
       .setInteractionKey(interaction.uniqueKey())
 
     logger.debug { "Sending verifyInteraction request to plugin ${plugin.manifest}" }
-    val response = plugin.withGrpcStub { stub -> stub.verifyInteraction(request.build()) }
+    val response = plugin.withRpcClient { client -> client.verifyInteraction(request.build()) }
     logger.debug { "Got response: $response" }
 
     return if (response.hasError()) {
@@ -853,6 +856,9 @@ object DefaultPluginManager: PluginManager {
   }
 
   private fun initialisePlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
+    val interfaceVersion = PluginInterfaceVersion.from(manifest.pluginInterfaceVersion)
+      ?: return Result.Err("Unsupported plugin interface version ${manifest.pluginInterfaceVersion} for ${manifest.name}")
+
     val result = when (manifest.executableType) {
       "exec" -> startPluginProcess(manifest)
       else -> Result.Err("Plugin executable type of ${manifest.executableType} is not supported")
@@ -884,14 +890,25 @@ object DefaultPluginManager: PluginManager {
       val channel = ManagedChannelBuilder.forTarget(address)
         .usePlaintext()
         .build()
-      val stub = newBlockingStub(channel).withCallCredentials(BearerCredentials(plugin.serverKey))
-      plugin.stub = stub
+      val interfaceVersion = requireNotNull(PluginInterfaceVersion.from(plugin.manifest.pluginInterfaceVersion)) {
+        "Plugin ${plugin.manifest.name} has unsupported interface version " +
+          "${plugin.manifest.pluginInterfaceVersion} — should have been caught in initialisePlugin"
+      }
+      val rpcClient = when (interfaceVersion) {
+        PluginInterfaceVersion.V1 -> PactPluginV1RpcClient(
+          newBlockingStub(channel).withCallCredentials(BearerCredentials(plugin.serverKey))
+        )
+        PluginInterfaceVersion.V2 -> PactPluginV2RpcClient(
+          newV2BlockingStub(channel).withCallCredentials(BearerCredentials(plugin.serverKey))
+        )
+      }
+      plugin.rpcClient = rpcClient
       plugin.channel = channel
 
       try {
         initPlugin(plugin)
       } catch (e: Exception) {
-        plugin.stub = null
+        plugin.rpcClient = null
         plugin.channel = null
         channel.shutdownNow()
         throw e
@@ -905,15 +922,17 @@ object DefaultPluginManager: PluginManager {
   }
 
   fun initPlugin(plugin: PactPlugin) {
-    val request = Plugin.InitPluginRequest.newBuilder()
-      .setImplementation("plugin-driver-jvm")
-      .setVersion(Utils.lookupVersion(PluginManager::class.java))
-      .build()
+    val request = PluginInitRequest(
+      implementation = "plugin-driver-jvm",
+      version = Utils.lookupVersion(PluginManager::class.java),
+      hostCapabilities = listOf(HOST_CAPABILITY_INTERACTION_REQUEST_RESPONSE)
+    )
 
-    val response =  plugin.withGrpcStub { stub -> stub.initPlugin(request) }
-    logger.debug { "Got init response ${response.catalogueList} from plugin ${plugin.manifest.name}" }
-    CatalogueManager.registerPluginEntries(plugin.manifest.name, response.catalogueList)
-    plugin.catalogueEntries = response.catalogueList
+    val response =  plugin.withRpcClient { client -> client.initPlugin(request) }
+    logger.debug { "Got init response $response from plugin ${plugin.manifest.name}" }
+    CatalogueManager.registerPluginEntries(plugin.manifest.name, response.catalogueEntries)
+    plugin.catalogueEntries = response.catalogueEntries
+    plugin.pluginCapabilities = response.pluginCapabilities
 
     Thread {
       publishUpdatedCatalogue()
@@ -932,7 +951,7 @@ object DefaultPluginManager: PluginManager {
     val request = requestBuilder.build()
 
     PLUGIN_REGISTER.forEach { (_, plugin) ->
-      plugin.withGrpcStub { stub -> stub.updateCatalogue(request) }
+      plugin.withRpcClient { client -> client.updateCatalogue(request) }
     }
   }
 

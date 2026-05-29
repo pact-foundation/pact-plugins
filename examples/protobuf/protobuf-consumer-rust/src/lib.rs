@@ -9,11 +9,17 @@ mod tests {
   use maplit::hashset;
   use pact_consumer::prelude::*;
   use prost::Message;
+  use prost_types::value::Kind;
   use serde_json::json;
 
-  use pact_plugin_driver::utils::proto_value_to_string;
-
   use super::*;
+
+  fn proto_value_to_string(val: &prost_types::Value) -> Option<String> {
+    match &val.kind {
+      Some(Kind::StringValue(value)) => Some(value.clone()),
+      _ => None
+    }
+  }
 
   #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 2))]
   async fn test_proto_client() {

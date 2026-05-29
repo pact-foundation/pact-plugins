@@ -10,7 +10,6 @@ import au.com.dius.pact.core.model.V4Pact
 import au.com.dius.pact.core.support.Result
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
-import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.Plugin
 import org.mockito.ArgumentCaptor
 import org.mockito.Mockito
@@ -205,6 +204,26 @@ class DefaultPluginManagerSpec extends Specification {
     }
   }
 
+  @RestoreSystemProperties
+  def 'loadPlugin - rejects plugins with an unsupported interface version'() {
+    given:
+    System.setProperty('pact_do_not_track', 'true')
+    def manager = DefaultPluginManager.INSTANCE
+    def manifest = new DefaultPactPluginManifest('/tmp' as File, 99, 'invalid-version-plugin', '0.0.0',
+      'exec', null, '', [:], [], [])
+    manager.PLUGIN_MANIFEST_REGISTER['invalid-version-plugin/0.0.0'] = manifest
+
+    when:
+    def result = manager.loadPlugin('invalid-version-plugin', '0.0.0')
+
+    then:
+    result instanceof Result.Err
+    result.error.contains('Unsupported plugin interface version 99')
+
+    cleanup:
+    manager.PLUGIN_MANIFEST_REGISTER.remove('invalid-version-plugin/0.0.0')
+  }
+
   def 'startMockServer - passes the mock server config on to the plugin'() {
     given:
     def manifest = Mock(PactPluginManifest) {
@@ -225,15 +244,15 @@ class DefaultPluginManagerSpec extends Specification {
       .setDetails(Plugin.MockServerDetails.newBuilder().setKey('123abc').build())
       .build()
 
-    def mockStub = Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
+    def mockClient = Mockito.mock(PactPluginRpcClient)
     ArgumentCaptor<Plugin.StartMockServerRequest> argument = ArgumentCaptor.forClass(Plugin.StartMockServerRequest)
-    doReturn(response).when(mockStub).startMockServer(argument.capture())
+    doReturn(response).when(mockClient).startMockServer(argument.capture())
 
     when:
     def result = manager.startMockServer(entry, config, pact)
 
     then:
-    1 * mockPlugin.withGrpcStub(_) >> { args -> args[0].apply(mockStub) }
+    1 * mockPlugin.withRpcClient(_) >> { args -> args[0].apply(mockClient) }
     result.key == '123abc'
     argument.value.hostInterface == '10.0.1.2'
     argument.value.port == 11223
@@ -260,15 +279,15 @@ class DefaultPluginManagerSpec extends Specification {
       ContentTypeHint.BINARY)
 
     def response = Plugin.CompareContentsResponse.newBuilder().build()
-    def mockStub = Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
+    def mockClient = Mockito.mock(PactPluginRpcClient)
     ArgumentCaptor<Plugin.CompareContentsRequest> argument = ArgumentCaptor.forClass(Plugin.CompareContentsRequest)
-    doReturn(response).when(mockStub).compareContents(argument.capture())
+    doReturn(response).when(mockClient).compareContents(argument.capture())
 
     when:
     manager.invokeContentMatcher(matcher, expected, actual, false, [:], [:])
 
     then:
-    1 * mockPlugin.withGrpcStub(_) >> { args -> args[0].apply(mockStub) }
+    1 * mockPlugin.withRpcClient(_) >> { args -> args[0].apply(mockClient) }
     argument.value.actual.contentType == 'application/x-stuff'
     argument.value.actual.contentTypeHint == Plugin.Body.ContentTypeHint.BINARY
     argument.value.expected.contentType == 'application/stuff'
@@ -318,9 +337,9 @@ class DefaultPluginManagerSpec extends Specification {
     def pact = new V4Pact(new Consumer(), new Provider(), [ interaction ])
 
     def response = Plugin.VerificationPreparationResponse.newBuilder().build()
-    def mockStub = Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
+    def mockClient = Mockito.mock(PactPluginRpcClient)
     ArgumentCaptor<Plugin.VerificationPreparationRequest> argument = ArgumentCaptor.forClass(Plugin.VerificationPreparationRequest)
-    doReturn(response).when(mockStub).prepareInteractionForVerification(argument.capture())
+    doReturn(response).when(mockClient).prepareInteractionForVerification(argument.capture())
 
     when:
     def result = manager.prepareValidationForInteraction(
@@ -333,7 +352,7 @@ class DefaultPluginManagerSpec extends Specification {
     def interactionIn = pactIn.interactions[0]
 
     then:
-    1 * mockPlugin.withGrpcStub(_) >> { args -> args[0].apply(mockStub) }
+    1 * mockPlugin.withRpcClient(_) >> { args -> args[0].apply(mockClient) }
     result instanceof Result.Ok
     interactionIn.key == argument.value.interactionKey
 
@@ -359,9 +378,9 @@ class DefaultPluginManagerSpec extends Specification {
     def pact = new V4Pact(new Consumer(), new Provider(), [ interaction ])
 
     def response = Plugin.VerifyInteractionResponse.newBuilder().build()
-    def mockStub = Mockito.mock(PactPluginGrpc.PactPluginBlockingStub)
+    def mockClient = Mockito.mock(PactPluginRpcClient)
     ArgumentCaptor<Plugin.VerifyInteractionRequest> argument = ArgumentCaptor.forClass(Plugin.VerifyInteractionRequest)
-    doReturn(response).when(mockStub).verifyInteraction(argument.capture())
+    doReturn(response).when(mockClient).verifyInteraction(argument.capture())
 
     when:
     def result = manager.verifyInteraction(
@@ -375,7 +394,7 @@ class DefaultPluginManagerSpec extends Specification {
     def interactionIn = pactIn.interactions[0]
 
     then:
-    1 * mockPlugin.withGrpcStub(_) >> { args -> args[0].apply(mockStub) }
+    1 * mockPlugin.withRpcClient(_) >> { args -> args[0].apply(mockClient) }
     result instanceof Result.Ok
     interactionIn.key == argument.value.interactionKey
 
