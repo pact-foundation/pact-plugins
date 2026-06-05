@@ -44,6 +44,17 @@ class DefaultPluginManagerSpec extends Specification {
     "0.1.0"       | "0.0.3"  || true
   }
 
+  @Unroll
+    def 'plugin version compatibility check supports pre-release versions'() {
+      expect:
+      DefaultPluginManager.INSTANCE.versionsCompatible(actualVersion, required) == result
+
+      where:
+
+      actualVersion | required        || result
+      "0.1"         | "0.1.0-beta.1"  || true
+    }
+
   def 'when loading manifests - will return any previously loaded manifest from the internal cache'() {
     given:
     def manifest = Mock(PactPluginManifest)

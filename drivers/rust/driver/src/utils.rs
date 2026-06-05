@@ -100,17 +100,25 @@ pub fn versions_compatible(version: &str, required: &Option<String>) -> bool {
     Some(required) => {
       if required == version {
         true
-      } else if let Ok(version) = Version::parse(version) {
-        if let Ok(req) = VersionReq::parse(format!(">={}", required).as_str()) {
-          req.matches(&version)
+      } else if let Ok(version) = lenient_semver::parse(version) {
+        if let Ok(required) = lenient_semver::parse(required) {
+          version >= drop_pre_release(required)
         } else {
-          false
+          if let Ok(req) = VersionReq::parse(format!(">={}", required).as_str()) {
+            req.matches(&version)
+          } else {
+            false
+          }
         }
       } else {
         false
       }
     }
   }
+}
+
+fn drop_pre_release(version: Version) -> Version {
+  Version::new(version.major, version.minor, version.patch)
 }
 
 pub fn optional_string<S: Into<String>>(string: S) -> Option<String> {
@@ -157,5 +165,10 @@ mod tests {
     expect!(versions_compatible("2.0.1", &Some("1.1.0".to_string()))).to(be_true());
     expect!(versions_compatible("1.0.1", &Some("2.1.0".to_string()))).to(be_false());
     expect!(versions_compatible("0.1.0", &Some("0.0.3".to_string()))).to(be_true());
+  }
+
+  #[test]
+  fn versions_compatible_accepts_future_dev_versions() {
+    expect!(versions_compatible("0.1", &Some("0.1.0-beta.1".to_string()))).to(be_true());
   }
 }

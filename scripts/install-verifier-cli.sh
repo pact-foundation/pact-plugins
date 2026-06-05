@@ -3,7 +3,7 @@
 set -e
 set -x
 
-VERSION="0.9.20"
+VERSION="1.3.2"
 
 mkdir -p ~/.pact/bin
 case "$(uname -s)" in
@@ -11,9 +11,9 @@ case "$(uname -s)" in
    Darwin)
      echo '== Installing pact verifier CLI for Mac OSX =='
      if [ "$(uname -m)" = "arm64" ]; then
-        curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact_verifier_cli-osx-aarch64.gz
+        curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-osx-aarch64.gz
      else
-        curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact_verifier_cli-osx-x86_64.gz
+        curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-osx-x86_64.gz
      fi
      gunzip -N -f ~/.pact/bin/pact_verifier_cli.gz
      chmod +x ~/.pact/bin/pact_verifier_cli
@@ -22,9 +22,9 @@ case "$(uname -s)" in
    Linux)
      echo '== Installing pact verifier CLI for Linux =='
      if [ "$(uname -m)" = "aarch64" ]; then
-      curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact_verifier_cli-linux-aarch64.gz
+      curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-linux-aarch64.gz
      else
-      curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact_verifier_cli-linux-x86_64.gz
+      curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-linux-x86_64.gz
      fi
      gunzip -N -f ~/.pact/bin/pact_verifier_cli.gz
      chmod +x ~/.pact/bin/pact_verifier_cli
@@ -33,9 +33,9 @@ case "$(uname -s)" in
    CYGWIN*|MINGW32*|MSYS*|MINGW*)
      echo '== Installing pact verifier CLI for MS Windows =='
      if [ "$(uname -m)" = "aarch64" ]; then
-      curl -L -o ~/.pact/bin/pact_verifier_cli.exe.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact_verifier_cli-windows-aarch64.exe.gz
+      curl -L -o ~/.pact/bin/pact_verifier_cli.exe.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-windows-aarch64.exe.gz
      else
-      curl -L -o ~/.pact/bin/pact_verifier_cli.exe.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact_verifier_cli-windows-x86_64.exe.gz
+      curl -L -o ~/.pact/bin/pact_verifier_cli.exe.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-windows-x86_64.exe.gz
      fi
      gunzip -N -f ~/.pact/bin/pact_verifier_cli.exe.gz
      chmod +x ~/.pact/bin/pact_verifier_cli.exe
