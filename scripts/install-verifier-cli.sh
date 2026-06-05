@@ -9,11 +9,11 @@ mkdir -p ~/.pact/bin
 case "$(uname -s)" in
 
    Darwin)
-     echo '== Installing pact verifier CLI for Mac OSX =='
+     echo '== Installing pact verifier CLI for Mac OS =='
      if [ "$(uname -m)" = "arm64" ]; then
-        curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-osx-aarch64.gz
+        curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-macos-aarch64.gz
      else
-        curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-osx-x86_64.gz
+        curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-macos-x86_64.gz
      fi
      gunzip -N -f ~/.pact/bin/pact_verifier_cli.gz
      chmod +x ~/.pact/bin/pact-verifier
