@@ -317,6 +317,24 @@ pub struct PluginConfiguration {
     #[prost(message, optional, tag = "2")]
     pub pact_configuration: ::core::option::Option<::prost_types::Struct>,
 }
+/// Structured interaction data sent to V2 plugins in place of raw pact JSON.
+/// Contains only the data the plugin needs, eliminating the need for plugins
+/// to parse full Pact documents.
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct InteractionContents {
+    /// The V4 interaction type (e.g. "Synchronous/HTTP", "Synchronous/Messages")
+    #[prost(string, tag = "1")]
+    pub interaction_type: ::prost::alloc::string::String,
+    /// Plugin configuration stored by the plugin during the consumer test
+    #[prost(message, optional, tag = "2")]
+    pub plugin_configuration: ::core::option::Option<PluginConfiguration>,
+    /// Consumer name, for result reporting and log correlation
+    #[prost(string, tag = "3")]
+    pub consumer: ::prost::alloc::string::String,
+    /// Provider name, for result reporting and log correlation
+    #[prost(string, tag = "4")]
+    pub provider: ::prost::alloc::string::String,
+}
 /// Response to the configure/setup an interaction request
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct InteractionResponse {
@@ -541,9 +559,9 @@ pub struct StartMockServerRequest {
     /// If TLS should be used (if supported by the mock server)
     #[prost(bool, tag = "3")]
     pub tls: bool,
-    /// Pact as JSON to use for the mock server behaviour
-    #[prost(string, tag = "4")]
-    pub pact: ::prost::alloc::string::String,
+    /// Structured interaction data (replaces the pact JSON string from V1)
+    #[prost(message, repeated, tag = "4")]
+    pub interactions: ::prost::alloc::vec::Vec<InteractionContents>,
     /// Context data provided by the test framework
     #[prost(message, optional, tag = "5")]
     pub test_context: ::core::option::Option<::prost_types::Struct>,
@@ -579,8 +597,7 @@ pub struct MockServerDetails {
     #[prost(string, tag = "3")]
     pub address: ::prost::alloc::string::String,
 }
-/// Request to shut down a running mock server
-/// TODO: replace this with MockServerRequest in the next major version
+/// Request to shut down a running mock server (deprecated in V2; use MockServerRequest)
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct ShutdownMockServerRequest {
     /// The server ID to shutdown
@@ -607,8 +624,7 @@ pub struct MockServerResult {
     #[prost(message, repeated, tag = "3")]
     pub mismatches: ::prost::alloc::vec::Vec<ContentMismatch>,
 }
-/// Response to the shut down mock server request
-/// TODO: replace this with MockServerResults in the next major version
+/// Response to the shut down mock server request (deprecated in V2; use MockServerResults)
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct ShutdownMockServerResponse {
     /// If the mock status is all ok
@@ -631,15 +647,15 @@ pub struct MockServerResults {
 /// Request to prepare an interaction for verification
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct VerificationPreparationRequest {
-    /// Pact as JSON to use for the verification
-    #[prost(string, tag = "1")]
-    pub pact: ::prost::alloc::string::String,
-    /// Interaction key for the interaction from the Pact that is being verified
-    #[prost(string, tag = "2")]
-    pub interaction_key: ::prost::alloc::string::String,
+    /// Structured interaction data (replaces pact JSON + interactionKey from V1)
+    #[prost(message, optional, tag = "1")]
+    pub interaction_contents: ::core::option::Option<InteractionContents>,
     /// Any data supplied by the user to verify the interaction
-    #[prost(message, optional, tag = "3")]
+    #[prost(message, optional, tag = "2")]
     pub config: ::core::option::Option<::prost_types::Struct>,
+    /// Context data provided by the test framework
+    #[prost(message, optional, tag = "3")]
+    pub test_context: ::core::option::Option<::prost_types::Struct>,
 }
 /// Request metadata value. Will either be a JSON-like value, or binary data
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -697,12 +713,12 @@ pub struct VerifyInteractionRequest {
     /// Any data supplied by the user to verify the interaction
     #[prost(message, optional, tag = "2")]
     pub config: ::core::option::Option<::prost_types::Struct>,
-    /// Pact as JSON to use for the verification
-    #[prost(string, tag = "3")]
-    pub pact: ::prost::alloc::string::String,
-    /// Interaction key for the interaction from the Pact that is being verified
-    #[prost(string, tag = "4")]
-    pub interaction_key: ::prost::alloc::string::String,
+    /// Structured interaction data (replaces pact JSON + interactionKey from V1)
+    #[prost(message, optional, tag = "3")]
+    pub interaction_contents: ::core::option::Option<InteractionContents>,
+    /// Context data provided by the test framework
+    #[prost(message, optional, tag = "4")]
+    pub test_context: ::core::option::Option<::prost_types::Struct>,
 }
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct VerificationResultItem {
@@ -1004,12 +1020,11 @@ pub mod pact_plugin_client {
             self.inner.unary(req, path, codec).await
         }
         /// Shutdown a running mock server
-        /// TODO: Replace the message types with MockServerRequest and MockServerResults in the next major version
         pub async fn shutdown_mock_server(
             &mut self,
-            request: impl tonic::IntoRequest<super::ShutdownMockServerRequest>,
+            request: impl tonic::IntoRequest<super::MockServerRequest>,
         ) -> std::result::Result<
-            tonic::Response<super::ShutdownMockServerResponse>,
+            tonic::Response<super::MockServerResults>,
             tonic::Status,
         > {
             self.inner
@@ -1180,12 +1195,11 @@ pub mod pact_plugin_server {
             tonic::Status,
         >;
         /// Shutdown a running mock server
-        /// TODO: Replace the message types with MockServerRequest and MockServerResults in the next major version
         async fn shutdown_mock_server(
             &self,
-            request: tonic::Request<super::ShutdownMockServerRequest>,
+            request: tonic::Request<super::MockServerRequest>,
         ) -> std::result::Result<
-            tonic::Response<super::ShutdownMockServerResponse>,
+            tonic::Response<super::MockServerResults>,
             tonic::Status,
         >;
         /// Get the matching results from a running mock server
@@ -1564,16 +1578,16 @@ pub mod pact_plugin_server {
                     struct ShutdownMockServerSvc<T: PactPlugin>(pub Arc<T>);
                     impl<
                         T: PactPlugin,
-                    > tonic::server::UnaryService<super::ShutdownMockServerRequest>
+                    > tonic::server::UnaryService<super::MockServerRequest>
                     for ShutdownMockServerSvc<T> {
-                        type Response = super::ShutdownMockServerResponse;
+                        type Response = super::MockServerResults;
                         type Future = BoxFuture<
                             tonic::Response<Self::Response>,
                             tonic::Status,
                         >;
                         fn call(
                             &mut self,
-                            request: tonic::Request<super::ShutdownMockServerRequest>,
+                            request: tonic::Request<super::MockServerRequest>,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {

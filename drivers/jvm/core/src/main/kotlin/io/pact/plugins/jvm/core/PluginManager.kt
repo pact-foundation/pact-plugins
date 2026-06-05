@@ -9,6 +9,7 @@ import au.com.dius.pact.core.model.PactSpecVersion
 import au.com.dius.pact.core.model.PluginData
 import au.com.dius.pact.core.model.V4Interaction
 import au.com.dius.pact.core.model.V4Pact
+import au.com.dius.pact.core.model.v4.V4InteractionType
 import au.com.dius.pact.core.model.generators.Category
 import au.com.dius.pact.core.model.generators.Generator
 import au.com.dius.pact.core.model.generators.GeneratorTestMode
@@ -37,6 +38,7 @@ import io.grpc.Metadata
 import io.pact.plugin.PactPluginGrpc.newBlockingStub
 import io.pact.plugin.v2.PactPluginGrpc.newBlockingStub as newV2BlockingStub
 import io.pact.plugin.Plugin
+import io.pact.plugin.v2.PluginV2
 import io.pact.plugins.jvm.core.Utils.fromProtoValue
 import io.pact.plugins.jvm.core.Utils.jsonToValue
 import io.pact.plugins.jvm.core.Utils.mapToProtoStruct
@@ -692,6 +694,42 @@ object DefaultPluginManager: PluginManager {
     return OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType)
   }
 
+  private fun buildInteractionContents(
+    pluginName: String,
+    pact: V4Pact,
+    interaction: V4Interaction
+  ): PluginV2.InteractionContents {
+    val interactionType = when {
+      interaction.isInteractionType(V4InteractionType.SynchronousHTTP) -> V4InteractionType.SynchronousHTTP.toString()
+      interaction.isInteractionType(V4InteractionType.AsynchronousMessages) -> V4InteractionType.AsynchronousMessages.toString()
+      interaction.isInteractionType(V4InteractionType.SynchronousMessages) -> V4InteractionType.SynchronousMessages.toString()
+      else -> ""
+    }
+
+    val pluginConfigBuilder = PluginV2.PluginConfiguration.newBuilder()
+    val interactionConfig = interaction.pluginConfiguration[pluginName]
+    if (!interactionConfig.isNullOrEmpty()) {
+      val interactionConfiguration = interactionConfig["interactionConfiguration"]?.asObject()?.entries
+      if (!interactionConfiguration.isNullOrEmpty()) {
+        pluginConfigBuilder.interactionConfiguration = toProtoStruct(interactionConfiguration)
+      }
+    }
+    val pactConfig = pact.pluginData().find { it.name == pluginName }?.configAsJsonMap()
+    if (!pactConfig.isNullOrEmpty()) {
+      val pactConfiguration = pactConfig["pactConfiguration"]?.asObject()?.entries
+      if (!pactConfiguration.isNullOrEmpty()) {
+        pluginConfigBuilder.pactConfiguration = toProtoStruct(pactConfiguration)
+      }
+    }
+
+    return PluginV2.InteractionContents.newBuilder()
+      .setInteractionType(interactionType)
+      .setPluginConfiguration(pluginConfigBuilder.build())
+      .setConsumer(pact.consumer.name)
+      .setProvider(pact.provider.name)
+      .build()
+  }
+
   override fun startMockServer(
     catalogueEntry: CatalogueEntry,
     config: MockServerConfig,
@@ -707,21 +745,35 @@ object DefaultPluginManager: PluginManager {
     val plugin = lookupPlugin(catalogueEntry.pluginName, null) ?:
       throw PactPluginNotFoundException(catalogueEntry.pluginName, null)
 
-    val writer = StringWriter()
-    DefaultPactWriter.writePact(pact, PrintWriter(writer), PactSpecVersion.V4)
-
-    val request = Plugin.StartMockServerRequest.newBuilder()
-      .setPact(writer.toString())
-      .setTestContext(mapToProtoStruct(testContext))
-
-    if (config.hostInterface.isNotEmpty()) {
-      request.hostInterface = config.hostInterface
-    }
-    request.port = config.port
-    request.tls = config.tls
-
     logger.debug { "Sending startMockServer request to plugin ${plugin.manifest}" }
-    val response = plugin.withRpcClient { client -> client.startMockServer(request.build()) }
+    val response = if (plugin.manifest.pluginInterfaceVersion >= 2) {
+      val v4Pact = pact as? V4Pact
+        ?: throw PactPluginMockServerErrorException(catalogueEntry.pluginName, "V2 plugins require a V4 pact")
+      val interactions = v4Pact.interactions.filterIsInstance<V4Interaction>().map { interaction ->
+        buildInteractionContents(plugin.manifest.name, v4Pact, interaction)
+      }
+      val v2Request = PluginV2.StartMockServerRequest.newBuilder()
+        .addAllInteractions(interactions)
+        .setTestContext(mapToProtoStruct(testContext))
+      if (config.hostInterface.isNotEmpty()) {
+        v2Request.hostInterface = config.hostInterface
+      }
+      v2Request.port = config.port
+      v2Request.tls = config.tls
+      plugin.withRpcClient { client -> client.startMockServerV2(v2Request.build()) }
+    } else {
+      val writer = StringWriter()
+      DefaultPactWriter.writePact(pact, PrintWriter(writer), PactSpecVersion.V4)
+      val request = Plugin.StartMockServerRequest.newBuilder()
+        .setPact(writer.toString())
+        .setTestContext(mapToProtoStruct(testContext))
+      if (config.hostInterface.isNotEmpty()) {
+        request.hostInterface = config.hostInterface
+      }
+      request.port = config.port
+      request.tls = config.tls
+      plugin.withRpcClient { client -> client.startMockServer(request.build()) }
+    }
     logger.debug { "Got response: $response" }
 
     if (response.hasError()) {
@@ -774,16 +826,23 @@ object DefaultPluginManager: PluginManager {
     val plugin = lookupPlugin(transportEntry.pluginName, null) ?:
       throw PactPluginNotFoundException(transportEntry.pluginName, null)
 
-    val writer = StringWriter()
-    DefaultPactWriter.writePact(pact, PrintWriter(writer), PactSpecVersion.V4)
-
-    val request = Plugin.VerificationPreparationRequest.newBuilder()
-      .setPact(writer.toString())
-      .setInteractionKey(interaction.uniqueKey())
-      .setConfig(mapToProtoStruct(config))
-
     logger.debug { "Sending prepareValidationForInteraction request to plugin ${plugin.manifest}" }
-    val response = plugin.withRpcClient { client -> client.prepareInteractionForVerification(request.build()) }
+    val response = if (plugin.manifest.pluginInterfaceVersion >= 2) {
+      val v2Request = PluginV2.VerificationPreparationRequest.newBuilder()
+        .setInteractionContents(buildInteractionContents(plugin.manifest.name, pact, interaction))
+        .setConfig(mapToProtoStruct(config))
+        .build()
+      plugin.withRpcClient { client -> client.prepareInteractionForVerificationV2(v2Request) }
+    } else {
+      val writer = StringWriter()
+      DefaultPactWriter.writePact(pact, PrintWriter(writer), PactSpecVersion.V4)
+      val request = Plugin.VerificationPreparationRequest.newBuilder()
+        .setPact(writer.toString())
+        .setInteractionKey(interaction.uniqueKey())
+        .setConfig(mapToProtoStruct(config))
+        .build()
+      plugin.withRpcClient { client -> client.prepareInteractionForVerification(request) }
+    }
     logger.debug { "Got response: $response" }
 
     if (response.hasError()) {
@@ -812,32 +871,41 @@ object DefaultPluginManager: PluginManager {
     val plugin = lookupPlugin(transportEntry.pluginName, null) ?:
       throw PactPluginNotFoundException(transportEntry.pluginName, null)
 
-    val writer = StringWriter()
-    DefaultPactWriter.writePact(pact, PrintWriter(writer), PactSpecVersion.V4)
-
-    val request = Plugin.VerifyInteractionRequest.newBuilder()
-      .setInteractionData(Plugin.InteractionData.newBuilder()
-        .setBody(Plugin.Body.newBuilder()
-          .setContent(BytesValue.newBuilder().setValue(ByteString.copyFrom(verificationData.requestData.value)).build())
-          .setContentType(verificationData.requestData.contentType.toString())
-          .build())
-        .putAllMetadata(verificationData.metadata.mapValues {
-          val builder = Plugin.MetadataValue.newBuilder()
-
-          when (val value = it.value) {
-            is ByteArray -> builder.binaryValue = ByteString.copyFrom(value)
-            else -> builder.nonBinaryValue = toProtoValue(value)
-          }
-
-          builder.build()
-        })
+    val interactionDataV1 = Plugin.InteractionData.newBuilder()
+      .setBody(Plugin.Body.newBuilder()
+        .setContent(BytesValue.newBuilder().setValue(ByteString.copyFrom(verificationData.requestData.value)).build())
+        .setContentType(verificationData.requestData.contentType.toString())
         .build())
-      .setConfig(mapToProtoStruct(config))
-      .setPact(writer.toString())
-      .setInteractionKey(interaction.uniqueKey())
+      .putAllMetadata(verificationData.metadata.mapValues {
+        val builder = Plugin.MetadataValue.newBuilder()
+        when (val value = it.value) {
+          is ByteArray -> builder.binaryValue = ByteString.copyFrom(value)
+          else -> builder.nonBinaryValue = toProtoValue(value)
+        }
+        builder.build()
+      })
+      .build()
 
     logger.debug { "Sending verifyInteraction request to plugin ${plugin.manifest}" }
-    val response = plugin.withRpcClient { client -> client.verifyInteraction(request.build()) }
+    val response = if (plugin.manifest.pluginInterfaceVersion >= 2) {
+      val v2InteractionData = PluginV2.InteractionData.parser().parseFrom(interactionDataV1.toByteArray())
+      val v2Request = PluginV2.VerifyInteractionRequest.newBuilder()
+        .setInteractionData(v2InteractionData)
+        .setConfig(mapToProtoStruct(config))
+        .setInteractionContents(buildInteractionContents(plugin.manifest.name, pact, interaction))
+        .build()
+      plugin.withRpcClient { client -> client.verifyInteractionV2(v2Request) }
+    } else {
+      val writer = StringWriter()
+      DefaultPactWriter.writePact(pact, PrintWriter(writer), PactSpecVersion.V4)
+      val request = Plugin.VerifyInteractionRequest.newBuilder()
+        .setInteractionData(interactionDataV1)
+        .setConfig(mapToProtoStruct(config))
+        .setPact(writer.toString())
+        .setInteractionKey(interaction.uniqueKey())
+        .build()
+      plugin.withRpcClient { client -> client.verifyInteraction(request) }
+    }
     logger.debug { "Got response: $response" }
 
     return if (response.hasError()) {

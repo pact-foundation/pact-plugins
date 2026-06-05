@@ -14,7 +14,7 @@ use uuid::Uuid;
 use crate::{
   jsonrpc::{config_from_struct, override_string, parse_json_body},
   mock_server::RunningMockServer,
-  pact::find_plugin_interaction,
+  pact::PactInteraction,
   proto::{
     body::ContentTypeHint, catalogue_entry::EntryType,
     init_plugin_response::Response as InitResponse, pact_plugin_server::PactPluginServer,
@@ -23,10 +23,9 @@ use crate::{
     ConfigureInteractionRequest, ConfigureInteractionResponse, GenerateContentRequest,
     GenerateContentResponse, InitPluginRequest, InitPluginResponse, InitPluginSuccess,
     InteractionData, InteractionResponse, MockServerDetails, MockServerRequest,
-    PluginConfiguration, ShutdownMockServerRequest, ShutdownMockServerResponse,
-    StartMockServerRequest, StartMockServerResponse, VerificationPreparationRequest,
-    VerificationPreparationResponse, VerificationResult, VerificationResultItem,
-    VerifyInteractionRequest, VerifyInteractionResponse,
+    MockServerResults, PluginConfiguration, StartMockServerRequest, StartMockServerResponse,
+    VerificationPreparationRequest, VerificationPreparationResponse, VerificationResult,
+    VerificationResultItem, VerifyInteractionRequest, VerifyInteractionResponse,
   },
 };
 
@@ -184,15 +183,30 @@ impl PactPlugin for JsonRpcPlugin {
     request: Request<StartMockServerRequest>,
   ) -> Result<Response<StartMockServerResponse>, Status> {
     let request = request.get_ref();
-    let interactions = pact::parse_plugin_interactions(&request.pact, PLUGIN_NAME)
-      .map_err(|error| Status::aborted(error.to_string()))?;
-    if interactions.is_empty() {
+    if request.interactions.is_empty() {
       return Ok(Response::new(StartMockServerResponse {
         response: Some(proto::start_mock_server_response::Response::Error(
-          "The pact did not contain any JSON-RPC plugin interactions".to_string(),
+          "The request did not contain any JSON-RPC plugin interactions".to_string(),
         )),
       }));
     }
+
+    let interactions: Vec<PactInteraction> = request.interactions.iter()
+      .enumerate()
+      .map(|(index, contents)| {
+        let config_value = contents.plugin_configuration.as_ref()
+          .and_then(|pc| pc.interaction_configuration.as_ref())
+          .map(proto::proto_struct_to_json)
+          .unwrap_or_else(|| serde_json::json!({}));
+        let config = crate::jsonrpc::JsonRpcInteractionConfig::from_contents_config(config_value)
+          .map_err(|error| Status::invalid_argument(format!("interaction {index}: {error}")))?;
+        Ok(PactInteraction {
+          key: format!("interaction-{index}"),
+          description: contents.interaction_type.clone(),
+          config,
+        })
+      })
+      .collect::<Result<Vec<_>, Status>>()?;
 
     let server = RunningMockServer::start(&request.host_interface, request.port, interactions)
       .await
@@ -214,8 +228,8 @@ impl PactPlugin for JsonRpcPlugin {
 
   async fn shutdown_mock_server(
     &self,
-    request: Request<ShutdownMockServerRequest>,
-  ) -> Result<Response<ShutdownMockServerResponse>, Status> {
+    request: Request<MockServerRequest>,
+  ) -> Result<Response<MockServerResults>, Status> {
     let server_key = request.into_inner().server_key;
     let Some(server) = self.mock_servers.lock().await.remove(&server_key) else {
       return Err(Status::not_found(format!(
@@ -227,7 +241,7 @@ impl PactPlugin for JsonRpcPlugin {
       .shutdown()
       .await
       .map_err(|error| Status::aborted(error.to_string()))?;
-    Ok(Response::new(ShutdownMockServerResponse {
+    Ok(Response::new(MockServerResults {
       ok: results.ok,
       results: results.results,
     }))
@@ -253,21 +267,23 @@ impl PactPlugin for JsonRpcPlugin {
     request: Request<VerificationPreparationRequest>,
   ) -> Result<Response<VerificationPreparationResponse>, Status> {
     let request = request.get_ref();
-    let interaction = find_plugin_interaction(&request.pact, PLUGIN_NAME, &request.interaction_key)
+    let config_value = request
+      .interaction_contents
+      .as_ref()
+      .and_then(|ic| ic.plugin_configuration.as_ref())
+      .and_then(|pc| pc.interaction_configuration.as_ref())
+      .map(proto::proto_struct_to_json)
+      .unwrap_or_else(|| serde_json::json!({}));
+    let config = crate::jsonrpc::JsonRpcInteractionConfig::from_contents_config(config_value)
       .map_err(|error| Status::aborted(error.to_string()))?;
-    let request_body = interaction
-      .config
+    let request_body = config
       .request_body()
       .map_err(|error| Status::aborted(error.to_string()))?;
 
     Ok(Response::new(VerificationPreparationResponse {
       response: Some(PreparationResponse::InteractionData(InteractionData {
         body: Some(proto::json_body(request_body)),
-        metadata: interaction
-          .config
-          .interaction_metadata()
-          .into_iter()
-          .collect(),
+        metadata: config.interaction_metadata().into_iter().collect(),
       })),
     }))
   }
@@ -277,7 +293,14 @@ impl PactPlugin for JsonRpcPlugin {
     request: Request<VerifyInteractionRequest>,
   ) -> Result<Response<VerifyInteractionResponse>, Status> {
     let request = request.get_ref();
-    let interaction = find_plugin_interaction(&request.pact, PLUGIN_NAME, &request.interaction_key)
+    let config_value = request
+      .interaction_contents
+      .as_ref()
+      .and_then(|ic| ic.plugin_configuration.as_ref())
+      .and_then(|pc| pc.interaction_configuration.as_ref())
+      .map(proto::proto_struct_to_json)
+      .unwrap_or_else(|| serde_json::json!({}));
+    let interaction = crate::jsonrpc::JsonRpcInteractionConfig::from_contents_config(config_value)
       .map_err(|error| Status::aborted(error.to_string()))?;
     let Some(interaction_data) = &request.interaction_data else {
       return Ok(Response::new(VerifyInteractionResponse {
@@ -313,9 +336,7 @@ impl PactPlugin for JsonRpcPlugin {
       .unwrap_or("http");
     let override_path = override_string(&interaction_data.metadata, "request.path")
       .map_err(|error| Status::invalid_argument(error.to_string()))?;
-    let url = interaction
-      .config
-      .provider_url(scheme, host, port, override_path.as_deref());
+    let url = interaction.provider_url(scheme, host, port, override_path.as_deref());
     let body = interaction_data
       .body
       .as_ref()
@@ -370,7 +391,6 @@ impl PactPlugin for JsonRpcPlugin {
 
     mismatches.extend(
       interaction
-        .config
         .response_mismatches(&actual_json)
         .into_iter()
         .map(|mismatch| VerificationResultItem {

@@ -320,8 +320,47 @@ impl PluginClient {
       PluginClient::V2(client) => client
         .shutdown_mock_server(Request::new(Self::convert_message::<
           _,
-          proto_v2::ShutdownMockServerRequest,
+          proto_v2::MockServerRequest,
         >(request)?))
+        .await
+        .and_then(|response| Self::convert_message::<_, ShutdownMockServerResponse>(response.into_inner())),
+    }
+  }
+
+  async fn start_mock_server_v2(
+    &mut self,
+    request: proto_v2::StartMockServerRequest,
+  ) -> Result<StartMockServerResponse, Status> {
+    match self {
+      PluginClient::V1(_) => Err(Status::unimplemented("V2 interface not supported on V1 plugin")),
+      PluginClient::V2(client) => client
+        .start_mock_server(Request::new(request))
+        .await
+        .and_then(|response| Self::convert_message(response.into_inner())),
+    }
+  }
+
+  async fn prepare_interaction_for_verification_v2(
+    &mut self,
+    request: proto_v2::VerificationPreparationRequest,
+  ) -> Result<VerificationPreparationResponse, Status> {
+    match self {
+      PluginClient::V1(_) => Err(Status::unimplemented("V2 interface not supported on V1 plugin")),
+      PluginClient::V2(client) => client
+        .prepare_interaction_for_verification(Request::new(request))
+        .await
+        .and_then(|response| Self::convert_message(response.into_inner())),
+    }
+  }
+
+  async fn verify_interaction_v2(
+    &mut self,
+    request: proto_v2::VerifyInteractionRequest,
+  ) -> Result<VerifyInteractionResponse, Status> {
+    match self {
+      PluginClient::V1(_) => Err(Status::unimplemented("V2 interface not supported on V1 plugin")),
+      PluginClient::V2(client) => client
+        .verify_interaction(Request::new(request))
         .await
         .and_then(|response| Self::convert_message(response.into_inner())),
     }
@@ -458,6 +497,33 @@ pub trait PactPluginRpc {
 
   /// Updates the catalogue. This will be sent when the core catalogue has been updated (probably by a plugin loading).
   async fn update_catalogue(&self, request: Catalogue) -> anyhow::Result<()>;
+
+  /// Start a mock server using V2 structured interaction data (no pact JSON).
+  async fn start_mock_server_v2(
+    &self,
+    request: proto_v2::StartMockServerRequest,
+  ) -> anyhow::Result<StartMockServerResponse> {
+    let _ = request;
+    Err(anyhow!("V2 interface not supported by this plugin"))
+  }
+
+  /// Prepare an interaction for verification using V2 structured interaction data.
+  async fn prepare_interaction_for_verification_v2(
+    &self,
+    request: proto_v2::VerificationPreparationRequest,
+  ) -> anyhow::Result<VerificationPreparationResponse> {
+    let _ = request;
+    Err(anyhow!("V2 interface not supported by this plugin"))
+  }
+
+  /// Execute the verification for the interaction using V2 structured interaction data.
+  async fn verify_interaction_v2(
+    &self,
+    request: proto_v2::VerifyInteractionRequest,
+  ) -> anyhow::Result<VerifyInteractionResponse> {
+    let _ = request;
+    Err(anyhow!("V2 interface not supported by this plugin"))
+  }
 }
 
 /// Running plugin details
@@ -588,6 +654,39 @@ impl PactPluginRpc for PactPlugin {
     let mut client = self.get_plugin_client().await?;
     client
       .update_catalogue(request)
+      .await
+      .map_err(anyhow::Error::from)
+  }
+
+  async fn start_mock_server_v2(
+    &self,
+    request: proto_v2::StartMockServerRequest,
+  ) -> anyhow::Result<StartMockServerResponse> {
+    let mut client = self.get_plugin_client().await?;
+    client
+      .start_mock_server_v2(request)
+      .await
+      .map_err(anyhow::Error::from)
+  }
+
+  async fn prepare_interaction_for_verification_v2(
+    &self,
+    request: proto_v2::VerificationPreparationRequest,
+  ) -> anyhow::Result<VerificationPreparationResponse> {
+    let mut client = self.get_plugin_client().await?;
+    client
+      .prepare_interaction_for_verification_v2(request)
+      .await
+      .map_err(anyhow::Error::from)
+  }
+
+  async fn verify_interaction_v2(
+    &self,
+    request: proto_v2::VerifyInteractionRequest,
+  ) -> anyhow::Result<VerifyInteractionResponse> {
+    let mut client = self.get_plugin_client().await?;
+    client
+      .verify_interaction_v2(request)
       .await
       .map_err(anyhow::Error::from)
   }

@@ -44,6 +44,7 @@ use crate::plugin_models::{
   PluginInterfaceVersion,
 };
 use crate::proto::*;
+use crate::proto_v2;
 use crate::repository::{USER_AGENT, fetch_repository_index};
 use crate::utils::{
   optional_string, proto_value_to_json, to_proto_struct, to_proto_value, versions_compatible,
@@ -522,8 +523,7 @@ pub async fn start_mock_server(
 
 /// Starts a mock server given the catalog entry for it and a Pact.
 /// Any transport specific configuration must be passed in the `test_context` field under
-/// the `transport_config` key. Note that the next version of the interface will pass the
-/// transport specific configuration in its own field.
+/// the `transport_config` key.
 pub async fn start_mock_server_v2(
   catalogue_entry: &CatalogueEntry,
   pact: Box<dyn Pact + Send + Sync>,
@@ -543,14 +543,29 @@ pub async fn start_mock_server_v2(
     ?test_context,
     "Sending startMockServer request to plugin"
   );
-  let request = StartMockServerRequest {
-    host_interface: config.host_interface.unwrap_or_default(),
-    port: config.port,
-    tls: config.tls,
-    pact: pact.to_json(PactSpecification::V4)?.to_string(),
-    test_context: Some(to_proto_struct(&test_context)),
+
+  let response = if manifest.plugin_interface_version >= 2 {
+    let v4_pact = pact.as_v4_pact().map_err(|_| anyhow!("Pact must be a V4 pact for V2 plugin interface"))?;
+    let interactions = build_v2_interaction_contents(manifest, &v4_pact);
+    let request = proto_v2::StartMockServerRequest {
+      host_interface: config.host_interface.clone().unwrap_or_default(),
+      port: config.port,
+      tls: config.tls,
+      interactions,
+      test_context: Some(to_proto_struct(&test_context)),
+    };
+    plugin.start_mock_server_v2(request).await?
+  } else {
+    let request = StartMockServerRequest {
+      host_interface: config.host_interface.unwrap_or_default(),
+      port: config.port,
+      tls: config.tls,
+      pact: pact.to_json(PactSpecification::V4)?.to_string(),
+      test_context: Some(to_proto_struct(&test_context)),
+    };
+    plugin.start_mock_server(request).await?
   };
-  let response = plugin.start_mock_server(request).await?;
+
   debug!("Got response ${response:?}");
 
   let mock_server_response = response
@@ -566,6 +581,89 @@ pub async fn start_mock_server_v2(
       port: details.port,
       plugin,
     }),
+  }
+}
+
+/// Convert a V1 InteractionData to a V2 InteractionData (structurally identical; binary conversion is safe).
+fn to_proto_v2_interaction_data(data: InteractionData) -> proto_v2::InteractionData {
+  use prost::Message;
+  proto_v2::InteractionData::decode(data.encode_to_vec().as_slice())
+    .expect("V1 and V2 InteractionData have identical wire format")
+}
+
+fn value_to_proto_struct(v: Value) -> prost_types::Struct {
+  match v {
+    Value::Object(map) => {
+      let hmap: HashMap<String, Value> = map.into_iter().collect();
+      to_proto_struct(&hmap)
+    }
+    _ => prost_types::Struct::default(),
+  }
+}
+
+/// Build a list of V2 InteractionContents from a V4 pact and plugin manifest.
+fn build_v2_interaction_contents(
+  manifest: &PactPluginManifest,
+  pact: &V4Pact,
+) -> Vec<proto_v2::InteractionContents> {
+  let plugin_name = &manifest.name;
+  let consumer = pact.consumer.name.clone();
+  let provider = pact.provider.name.clone();
+  let pact_configuration = pact.plugin_data()
+    .into_iter()
+    .find(|p| p.name == *plugin_name)
+    .and_then(|p| p.configuration.get("pactConfiguration").cloned());
+  pact.interactions.iter().map(|interaction| {
+    build_interaction_contents_inner(
+      plugin_name,
+      &consumer,
+      &provider,
+      pact_configuration.clone(),
+      interaction.as_ref(),
+    )
+  }).collect()
+}
+
+/// Build V2 InteractionContents for a single interaction.
+fn build_v2_single_interaction_contents(
+  manifest: &PactPluginManifest,
+  pact: &V4Pact,
+  interaction: &(dyn V4Interaction + Send + Sync),
+) -> proto_v2::InteractionContents {
+  let plugin_name = &manifest.name;
+  let pact_configuration = pact.plugin_data()
+    .into_iter()
+    .find(|p| p.name == *plugin_name)
+    .and_then(|p| p.configuration.get("pactConfiguration").cloned());
+  build_interaction_contents_inner(
+    plugin_name,
+    &pact.consumer.name,
+    &pact.provider.name,
+    pact_configuration,
+    interaction,
+  )
+}
+
+fn build_interaction_contents_inner(
+  plugin_name: &str,
+  consumer: &str,
+  provider: &str,
+  pact_configuration: Option<Value>,
+  interaction: &(dyn V4Interaction + Send + Sync),
+) -> proto_v2::InteractionContents {
+  let plugin_config = interaction.plugin_config();
+  let interaction_configuration = plugin_config
+    .get(plugin_name)
+    .and_then(|config| config.get("interactionConfiguration"))
+    .cloned();
+  proto_v2::InteractionContents {
+    interaction_type: interaction.v4_type().to_string(),
+    plugin_configuration: Some(proto_v2::PluginConfiguration {
+      interaction_configuration: interaction_configuration.map(value_to_proto_struct),
+      pact_configuration: pact_configuration.map(value_to_proto_struct),
+    }),
+    consumer: consumer.to_string(),
+    provider: provider.to_string(),
   }
 }
 
@@ -699,30 +797,40 @@ pub(crate) async fn prepare_validation_for_interaction_inner(
   interaction: &(dyn V4Interaction + Send + Sync),
   context: &HashMap<String, Value>,
 ) -> anyhow::Result<InteractionVerificationData> {
-  let mut pact = pact.clone();
-  pact.interactions = pact
-    .interactions
-    .iter()
-    .map(|i| {
-      if i.key().is_none() {
-        i.with_unique_key()
-      } else {
-        i.boxed_v4()
-      }
-    })
-    .collect();
-  let request = VerificationPreparationRequest {
-    pact: pact.to_json(PactSpecification::V4)?.to_string(),
-    interaction_key: interaction.unique_key(),
-    config: Some(to_proto_struct(context)),
-  };
-
   debug!(
     plugin_name = manifest.name.as_str(),
     plugin_version = manifest.version.as_str(),
     "Sending prepareValidationForInteraction request to plugin"
   );
-  let response = plugin.prepare_interaction_for_verification(request).await?;
+
+  let response = if manifest.plugin_interface_version >= 2 {
+    let interaction_contents = build_v2_single_interaction_contents(manifest, pact, interaction);
+    let request = proto_v2::VerificationPreparationRequest {
+      interaction_contents: Some(interaction_contents),
+      config: Some(to_proto_struct(context)),
+      test_context: None,
+    };
+    plugin.prepare_interaction_for_verification_v2(request).await?
+  } else {
+    let mut pact = pact.clone();
+    pact.interactions = pact
+      .interactions
+      .iter()
+      .map(|i| {
+        if i.key().is_none() {
+          i.with_unique_key()
+        } else {
+          i.boxed_v4()
+        }
+      })
+      .collect();
+    let request = VerificationPreparationRequest {
+      pact: pact.to_json(PactSpecification::V4)?.to_string(),
+      interaction_key: interaction.unique_key(),
+      config: Some(to_proto_struct(context)),
+    };
+    plugin.prepare_interaction_for_verification(request).await?
+  };
   debug!("Got response: {response:?}");
 
   let validation_response = response.response.ok_or_else(|| {
@@ -796,48 +904,61 @@ pub(crate) async fn verify_interaction_inner(
   pact: &V4Pact,
   interaction: &(dyn V4Interaction + Send + Sync),
 ) -> anyhow::Result<InteractionVerificationResult> {
-  let mut pact = pact.clone();
-  pact.interactions = pact
-    .interactions
-    .iter()
-    .map(|i| {
-      if i.key().is_none() {
-        i.with_unique_key()
-      } else {
-        i.boxed_v4()
-      }
-    })
-    .collect();
-  let request = VerifyInteractionRequest {
-    pact: pact.to_json(PactSpecification::V4)?.to_string(),
-    interaction_key: interaction.unique_key(),
-    config: Some(to_proto_struct(config)),
-    interaction_data: Some(InteractionData {
-      body: Some((&verification_data.request_data).into()),
-      metadata: verification_data
-        .metadata
-        .iter()
-        .map(|(k, v)| {
-          (
-            k.clone(),
-            MetadataValue {
-              value: Some(match v {
-                Either::Left(value) => metadata_value::Value::NonBinaryValue(to_proto_value(value)),
-                Either::Right(b) => metadata_value::Value::BinaryValue(b.to_vec()),
-              }),
-            },
-          )
-        })
-        .collect(),
-    }),
-  };
-
   debug!(
     plugin_name = manifest.name.as_str(),
     plugin_version = manifest.version.as_str(),
     "Sending verifyInteraction request to plugin"
   );
-  let response = plugin.verify_interaction(request).await?;
+
+  let interaction_data = InteractionData {
+    body: Some((&verification_data.request_data).into()),
+    metadata: verification_data
+      .metadata
+      .iter()
+      .map(|(k, v)| {
+        (
+          k.clone(),
+          MetadataValue {
+            value: Some(match v {
+              Either::Left(value) => metadata_value::Value::NonBinaryValue(to_proto_value(value)),
+              Either::Right(b) => metadata_value::Value::BinaryValue(b.to_vec()),
+            }),
+          },
+        )
+      })
+      .collect(),
+  };
+
+  let response = if manifest.plugin_interface_version >= 2 {
+    let interaction_contents = build_v2_single_interaction_contents(manifest, pact, interaction);
+    let request = proto_v2::VerifyInteractionRequest {
+      interaction_data: Some(to_proto_v2_interaction_data(interaction_data)),
+      config: Some(to_proto_struct(config)),
+      interaction_contents: Some(interaction_contents),
+      test_context: None,
+    };
+    plugin.verify_interaction_v2(request).await?
+  } else {
+    let mut pact = pact.clone();
+    pact.interactions = pact
+      .interactions
+      .iter()
+      .map(|i| {
+        if i.key().is_none() {
+          i.with_unique_key()
+        } else {
+          i.boxed_v4()
+        }
+      })
+      .collect();
+    let request = VerifyInteractionRequest {
+      pact: pact.to_json(PactSpecification::V4)?.to_string(),
+      interaction_key: interaction.unique_key(),
+      config: Some(to_proto_struct(config)),
+      interaction_data: Some(interaction_data),
+    };
+    plugin.verify_interaction(request).await?
+  };
   debug!("Got response: {response:?}");
 
   let validation_response = response

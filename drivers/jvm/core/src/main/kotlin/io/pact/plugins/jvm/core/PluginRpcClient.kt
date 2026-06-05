@@ -40,6 +40,17 @@ interface PactPluginRpcClient {
     request: Plugin.VerificationPreparationRequest
   ): Plugin.VerificationPreparationResponse
   fun verifyInteraction(request: Plugin.VerifyInteractionRequest): Plugin.VerifyInteractionResponse
+
+  fun startMockServerV2(request: PluginV2.StartMockServerRequest): Plugin.StartMockServerResponse =
+    throw UnsupportedOperationException("V2 interface not supported by this plugin")
+  fun prepareInteractionForVerificationV2(
+    request: PluginV2.VerificationPreparationRequest
+  ): Plugin.VerificationPreparationResponse =
+    throw UnsupportedOperationException("V2 interface not supported by this plugin")
+  fun verifyInteractionV2(
+    request: PluginV2.VerifyInteractionRequest
+  ): Plugin.VerifyInteractionResponse =
+    throw UnsupportedOperationException("V2 interface not supported by this plugin")
 }
 
 class PactPluginV1RpcClient(
@@ -143,15 +154,12 @@ class PactPluginV2RpcClient(
     )
 
   override fun startMockServer(request: Plugin.StartMockServerRequest): Plugin.StartMockServerResponse =
-    convert(
-      stub.startMockServer(convert(request, PluginV2.StartMockServerRequest.parser())),
-      Plugin.StartMockServerResponse.parser()
-    )
+    throw UnsupportedOperationException("V2 plugins require startMockServerV2 with structured interaction data")
 
   override fun shutdownMockServer(
     request: Plugin.ShutdownMockServerRequest
   ): Plugin.ShutdownMockServerResponse = convert(
-    stub.shutdownMockServer(convert(request, PluginV2.ShutdownMockServerRequest.parser())),
+    stub.shutdownMockServer(convert(request, PluginV2.MockServerRequest.parser())),
     Plugin.ShutdownMockServerResponse.parser()
   )
 
@@ -163,16 +171,24 @@ class PactPluginV2RpcClient(
 
   override fun prepareInteractionForVerification(
     request: Plugin.VerificationPreparationRequest
-  ): Plugin.VerificationPreparationResponse = convert(
-    stub.prepareInteractionForVerification(convert(request, PluginV2.VerificationPreparationRequest.parser())),
-    Plugin.VerificationPreparationResponse.parser()
-  )
+  ): Plugin.VerificationPreparationResponse =
+    throw UnsupportedOperationException("V2 plugins require prepareInteractionForVerificationV2 with structured interaction data")
 
   override fun verifyInteraction(request: Plugin.VerifyInteractionRequest): Plugin.VerifyInteractionResponse =
-    convert(
-      stub.verifyInteraction(convert(request, PluginV2.VerifyInteractionRequest.parser())),
-      Plugin.VerifyInteractionResponse.parser()
-    )
+    throw UnsupportedOperationException("V2 plugins require verifyInteractionV2 with structured interaction data")
+
+  override fun startMockServerV2(request: PluginV2.StartMockServerRequest): Plugin.StartMockServerResponse =
+    convert(stub.startMockServer(request), Plugin.StartMockServerResponse.parser())
+
+  override fun prepareInteractionForVerificationV2(
+    request: PluginV2.VerificationPreparationRequest
+  ): Plugin.VerificationPreparationResponse =
+    convert(stub.prepareInteractionForVerification(request), Plugin.VerificationPreparationResponse.parser())
+
+  override fun verifyInteractionV2(
+    request: PluginV2.VerifyInteractionRequest
+  ): Plugin.VerifyInteractionResponse =
+    convert(stub.verifyInteraction(request), Plugin.VerifyInteractionResponse.parser())
 
   private fun <T> convert(message: MessageLite, parser: Parser<T>): T = parser.parseFrom(message.toByteArray())
 }
