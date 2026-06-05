@@ -1,8 +1,9 @@
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '1.6.21'
-    id 'org.jetbrains.kotlin.plugin.spring' version '1.6.21'
+    id 'org.jetbrains.kotlin.jvm' version '2.3.0'
+    id 'org.jetbrains.kotlin.plugin.spring' version '2.3.0'
     id 'application'
-    id 'org.springframework.boot' version '2.7.3'
+    id 'org.springframework.boot' version '3.4.5'
+    id 'io.spring.dependency-management' version '1.1.7'
 }
 
 repositories {
@@ -10,35 +11,44 @@ repositories {
     mavenLocal()
 }
 
-dependencies {
-    implementation platform('org.jetbrains.kotlin:kotlin-bom')
-    implementation 'org.jetbrains.kotlin:kotlin-stdlib-jdk8'
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.6.4'
-    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-jdk9:1.6.4'
-    implementation 'org.springframework.boot:spring-boot-starter-web:2.7.3'
-    implementation 'org.yaml:snakeyaml:1.33'
-    implementation 'com.github.javafaker:javafaker:1.0.2'
+dependencyManagement {
+    imports {
+        mavenBom "org.springframework.boot:spring-boot-dependencies:3.4.5"
+    }
+}
 
-    implementation('io.github.microutils:kotlin-logging:2.1.23') {
+dependencies {
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-jdk9:1.10.2'
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    // javafaker declares snakeyaml with 'android' classifier; exclude it and use the standard jar
+    implementation('com.github.javafaker:javafaker:1.0.2') {
+        exclude group: 'org.yaml', module: 'snakeyaml'
+    }
+    implementation 'org.yaml:snakeyaml'
+
+    implementation('io.github.oshai:kotlin-logging-jvm:6.0.9') {
         exclude group: 'org.jetbrains.kotlin'
     }
-    implementation 'ch.qos.logback:logback-classic:1.2.6'
-    implementation 'org.apache.commons:commons-csv:1.9.0'
+    implementation 'ch.qos.logback:logback-classic'
+    implementation 'org.apache.commons:commons-csv:1.14.0'
 
-    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.0'
-    testImplementation 'au.com.dius.pact.provider:junit5spring:4.5.3'
-    testImplementation 'io.pact.plugin.driver:core:0.3.1'
-    testImplementation 'org.springframework.boot:spring-boot-starter-test:2.7.3'
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testImplementation 'au.com.dius.pact.provider:junit5spring:4.7.1'
+    testImplementation 'io.pact.plugin.driver:core:1.0.0-beta.2'
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
 }
 
 tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).all {
     kotlinOptions {
-        jvmTarget = "11"
+        jvmTarget = "17"
     }
 }
 
 test {
     useJUnitPlatform()
+    systemProperty('pact_do_not_track', 'true')
 }
 
 application {

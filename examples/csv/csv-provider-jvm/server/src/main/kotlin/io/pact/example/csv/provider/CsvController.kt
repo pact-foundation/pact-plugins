@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RestController
 import java.io.StringReader
 import java.io.StringWriter
 import java.util.Random
-import javax.servlet.http.HttpServletResponse
+import jakarta.servlet.http.HttpServletResponse
 import kotlin.math.absoluteValue
 
 @RestController
