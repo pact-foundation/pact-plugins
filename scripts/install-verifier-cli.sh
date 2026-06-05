@@ -16,7 +16,7 @@ case "$(uname -s)" in
         curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-osx-x86_64.gz
      fi
      gunzip -N -f ~/.pact/bin/pact_verifier_cli.gz
-     chmod +x ~/.pact/bin/pact_verifier_cli
+     chmod +x ~/.pact/bin/pact-verifier
      ;;
 
    Linux)
@@ -27,7 +27,7 @@ case "$(uname -s)" in
       curl -L -o ~/.pact/bin/pact_verifier_cli.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-linux-x86_64.gz
      fi
      gunzip -N -f ~/.pact/bin/pact_verifier_cli.gz
-     chmod +x ~/.pact/bin/pact_verifier_cli
+     chmod +x ~/.pact/bin/pact-verifier
      ;;
 
    CYGWIN*|MINGW32*|MSYS*|MINGW*)
@@ -38,7 +38,7 @@ case "$(uname -s)" in
       curl -L -o ~/.pact/bin/pact_verifier_cli.exe.gz https://github.com/pact-foundation/pact-reference/releases/download/pact_verifier_cli-v${VERSION}/pact-verifier-windows-x86_64.exe.gz
      fi
      gunzip -N -f ~/.pact/bin/pact_verifier_cli.exe.gz
-     chmod +x ~/.pact/bin/pact_verifier_cli.exe
+     chmod +x ~/.pact/bin/pact-verifier.exe
      ;;
 
    *)
