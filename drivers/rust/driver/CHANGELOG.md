@@ -1,5 +1,13 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.0.0-beta.2 - Implement V2 plugin interface
+
+* 14f394b - fix: corrected an issue in the v2 plugin driver with interaction config (Ronald Holshausen, Tue Jun 9 12:36:59 2026 +1000)
+* 8928adb - feat: Implement the V2 plugin interface changes as per proposal 004 (Ronald Holshausen, Fri Jun 5 11:39:11 2026 +1000)
+* 5028700 - chore: Fix CI build failing due to csv plugin have a pre-release version (Ronald Holshausen, Fri Jun 5 10:22:42 2026 +1000)
+* 4b623f5 - fix(drivers/rust): avoid duplicated child process log lines (Ronald Holshausen, Fri May 29 16:53:22 2026 +1000)
+* bbf8bc3 - bump version to 1.0.0-beta.2 (Ronald Holshausen, Fri May 29 11:44:49 2026 +1000)
+
 # 1.0.0-beta.1 - First phase of the V2 plugin interface
 
 * 45411e8 - chore: update repository.index (Ronald Holshausen, Fri May 29 11:43:42 2026 +1000)
