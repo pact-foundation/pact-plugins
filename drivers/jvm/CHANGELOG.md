@@ -1,5 +1,34 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 1.0.0-beta.2 - Implement V2 plugin interface
+
+* 441ce4b - bump version to 1.0.0-beta.3 (Ronald Holshausen, Tue Jun 9 13:08:32 2026 +1000)
+* cc5633b - update changelog for release 1.0.0-beta.2 (Ronald Holshausen, Tue Jun 9 13:07:54 2026 +1000)
+* 14f394b - fix: corrected an issue in the v2 plugin driver with interaction config (Ronald Holshausen, Tue Jun 9 12:36:59 2026 +1000)
+* 4f961d2 - chore: update csv examples (Ronald Holshausen, Fri Jun 5 15:10:01 2026 +1000)
+* 8928adb - feat: Implement the V2 plugin interface changes as per proposal 004 (Ronald Holshausen, Fri Jun 5 11:39:11 2026 +1000)
+* f4bc96c - chore: fix example CI build (Ronald Holshausen, Fri Jun 5 10:58:33 2026 +1000)
+* 0216ffc - chore: Fix examples in CI build (Ronald Holshausen, Fri Jun 5 10:34:20 2026 +1000)
+* 5028700 - chore: Fix CI build failing due to csv plugin have a pre-release version (Ronald Holshausen, Fri Jun 5 10:22:42 2026 +1000)
+* 1779d0d - fix(drivers/rust): align driver_ffi mock server deps (Ronald Holshausen, Fri May 29 17:28:46 2026 +1000)
+* 4b623f5 - fix(drivers/rust): avoid duplicated child process log lines (Ronald Holshausen, Fri May 29 16:53:22 2026 +1000)
+* 0adf2f5 - feat(examples/jsonrpc): add tracing to provider example (Ronald Holshausen, Fri May 29 16:43:44 2026 +1000)
+* 41cc562 - Merge branch 'main' into plugin-v2-interface (Ronald Holshausen, Fri May 29 15:44:30 2026 +1000)
+* ba9d939 - Add JSON-RPC transport plugin example (Ronald Holshausen, Fri May 29 15:43:01 2026 +1000)
+* 1a7be5a - chore: set CI build to use debug instead of trace (Ronald Holshausen, Fri May 29 15:16:41 2026 +1000)
+* cb025b2 - chore: Example build needs to run with JDK 17 (Ronald Holshausen, Fri May 29 14:38:19 2026 +1000)
+* c1ff3ec - chore: Fix the csv consumer rust test to use the pact crates from GitHub (Ronald Holshausen, Fri May 29 14:01:31 2026 +1000)
+* 6d27344 - chore: patch the mock server crate to the GitHub version (Ronald Holshausen, Fri May 29 13:56:40 2026 +1000)
+* a713c8c - chore: update driver test crates to use latest pact crates from github (Ronald Holshausen, Fri May 29 13:50:52 2026 +1000)
+* b21face - chore: Fix the csv plugin for CI build (Ronald Holshausen, Fri May 29 13:24:47 2026 +1000)
+* bbf8bc3 - bump version to 1.0.0-beta.2 (Ronald Holshausen, Fri May 29 11:44:49 2026 +1000)
+* 5336a4f - update changelog for release 1.0.0-beta.1 (Ronald Holshausen, Fri May 29 11:44:09 2026 +1000)
+* 45411e8 - chore: update repository.index (Ronald Holshausen, Fri May 29 11:43:42 2026 +1000)
+* b71f650 - Merge pull request #98 from pact-foundation/plugin-v2-interface (Ronald Holshausen, Fri May 29 11:40:42 2026 +1000)
+* 41f14db - chore: Update csv-consumer-jvm to use the new driver (Ronald Holshausen, Fri May 29 11:35:59 2026 +1000)
+* 44cec95 - chore: update release scripts to set beta flag correctly (Ronald Holshausen, Fri May 29 11:34:15 2026 +1000)
+* 22f3913 - bump version to 1.0.0-beta.2 (Ronald Holshausen, Fri May 29 11:32:11 2026 +1000)
+
 # 1.0.0-beta.1 - First phase of the V2 plugin interface
 
 * 90cae6a - feat(v2-plugins): Set the core catalogue entries as the initial host capabilties (Ronald Holshausen, Fri May 29 11:10:31 2026 +1000)
