@@ -6,7 +6,7 @@ mod proto;
 use std::{collections::HashMap, sync::Arc};
 
 use anyhow::{anyhow, Context};
-use log::debug;
+use log::{debug, trace};
 use tokio::{net::TcpListener, sync::Mutex};
 use tonic::{transport::Server, Request, Response, Status};
 use uuid::Uuid;
@@ -109,8 +109,12 @@ impl PactPlugin for JsonRpcPlugin {
       )));
     }
 
-    let Some(config) = config_from_struct(request.contents_config.as_ref())
-      .map_err(|error| Status::invalid_argument(error.to_string()))?
+    let interaction_config = request.contents_config.as_ref();
+    trace!("Got interaction configuration: {:?}", interaction_config);
+    let Some(config) = config_from_struct(interaction_config)
+      .map_err(|error| {
+        Status::invalid_argument(format!("Failed to resolve interaction configuration: {:#}", error))
+      })?
     else {
       return Err(Status::invalid_argument(
         "missing JSON-RPC interaction configuration",

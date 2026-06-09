@@ -1,4 +1,5 @@
 use anyhow::{anyhow, bail, Context, Result};
+use log::trace;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Number, Value};
 
@@ -45,6 +46,7 @@ pub struct JsonRpcInteractionConfig {
 
 impl JsonRpcInteractionConfig {
   pub fn from_contents_config(value: Value) -> Result<Self> {
+    trace!("Configuring interaction config from {:?}", &value);
     let config: Self = serde_json::from_value(value)
       .context("failed to parse JSON-RPC interaction configuration")?;
     config.validate()?;

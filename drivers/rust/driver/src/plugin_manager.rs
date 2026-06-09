@@ -654,8 +654,7 @@ fn build_interaction_contents_inner(
   let plugin_config = interaction.plugin_config();
   let interaction_configuration = plugin_config
     .get(plugin_name)
-    .and_then(|config| config.get("interactionConfiguration"))
-    .cloned();
+    .map(|config| Value::Object(config.iter().map(|(k, v)| (k.clone(), v.clone())).collect()));
   proto_v2::InteractionContents {
     interaction_type: interaction.v4_type().to_string(),
     plugin_configuration: Some(proto_v2::PluginConfiguration {

@@ -709,10 +709,7 @@ object DefaultPluginManager: PluginManager {
     val pluginConfigBuilder = PluginV2.PluginConfiguration.newBuilder()
     val interactionConfig = interaction.pluginConfiguration[pluginName]
     if (!interactionConfig.isNullOrEmpty()) {
-      val interactionConfiguration = interactionConfig["interactionConfiguration"]?.asObject()?.entries
-      if (!interactionConfiguration.isNullOrEmpty()) {
-        pluginConfigBuilder.interactionConfiguration = toProtoStruct(interactionConfiguration)
-      }
+      pluginConfigBuilder.interactionConfiguration = toProtoStruct(interactionConfig)
     }
     val pactConfig = pact.pluginData().find { it.name == pluginName }?.configAsJsonMap()
     if (!pactConfig.isNullOrEmpty()) {
