@@ -217,6 +217,52 @@ and place it in `testContext` under the key `"testRunId"`. Drivers should propag
 into the `testRunId` field of any `LogMessage` they forward. This is the minimum needed to correlate driver and
 plugin logs for a single test without requiring changes to the core pact model.
 
+#### FFI consumer log forwarding (`pact_ffi`)
+
+Several Pact implementations (JavaScript, Go, Python, .NET) use the `pact_ffi` library rather than a native driver.
+These consumers cannot tap into the Rust `tracing` subscriber directly, so the driver must expose an explicit bridge
+for plugin log entries.
+
+Two mechanisms are needed, and both should be provided:
+
+**Callback (real-time forwarding)**
+
+The FFI consumer registers a function pointer once at startup. The driver calls it for each `LogMessage` received
+via the `Log` RPC, allowing the consumer to route entries into their native logging framework as they arrive. This
+follows the same pattern as the existing pact_ffi log initialisation functions rather than introducing a separate
+mechanism.
+
+```c
+typedef void (*PluginLogCallback)(const char *plugin_instance_id,
+                                  const char *test_run_id,
+                                  const char *level,
+                                  const char *target,
+                                  const char *message);
+
+void pactffi_register_plugin_log_callback(PluginLogCallback callback);
+```
+
+The callback will be invoked from the tokio runtime thread that handles the gRPC `Log` RPC, so consumers must ensure
+their callback implementation is thread-safe.
+
+**Capture and retrieve (post-test access)**
+
+The driver always buffers log entries per plugin instance in memory, regardless of whether a callback is registered.
+After a test completes the consumer can retrieve the buffered entries:
+
+```c
+// Returns a newline-delimited JSON string of LogMessage records for the given instance.
+// Caller is responsible for freeing the returned string.
+const char *pactffi_get_plugin_logs(const char *plugin_instance_id);
+```
+
+Buffering is unconditional because a callback alone is insufficient: if the test process crashes or the callback
+throws, entries recorded before the failure would otherwise be lost. The buffer is cleared when the plugin instance
+is shut down.
+
+Consumers that want live forwarding register a callback; consumers that only need post-test diagnostics call
+`pactffi_get_plugin_logs`. Both paths can be used together.
+
 ## Non-goals for this proposal
 
 - Defining the plugin callback protocol.
