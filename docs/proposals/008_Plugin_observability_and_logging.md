@@ -217,11 +217,40 @@ and place it in `testContext` under the key `"testRunId"`. Drivers should propag
 into the `testRunId` field of any `LogMessage` they forward. This is the minimum needed to correlate driver and
 plugin logs for a single test without requiring changes to the core pact model.
 
+#### Driver-level log sink (Rust driver)
+
+The Rust driver has no plugin manager instance — all state is held in static globals (`PLUGIN_REGISTER`,
+`PLUGIN_MANIFEST_REGISTER`). There is therefore no object on which to register a log handler. Instead, the driver
+should maintain a static, replaceable log sink, following the same pattern as the `log` crate's `set_logger`.
+
+Define a `PluginLogSink` trait in the driver:
+
+```rust
+pub trait PluginLogSink: Send + Sync {
+  fn log(&self, entry: &PluginLogEntry);
+}
+```
+
+A global static holds the active sink (defaulting to an implementation that forwards entries into the `tracing`
+subsystem). A registration function lets the embedding layer swap it out once at startup:
+
+```rust
+pub fn set_plugin_log_sink(sink: Box<dyn PluginLogSink>);
+```
+
+The driver calls `sink.log(entry)` in two places:
+- In `child_process.rs`, when a line is read from plugin stderr (replacing the current `debug!()` call).
+- In the `PluginHost` gRPC service handler, when a `LogMessage` arrives via the `Log` RPC (once that is implemented).
+
+The driver has no knowledge of pact_ffi, C callbacks, or buffering — those are concerns of whatever sink is
+registered. The default sink routes entries through `tracing` so the driver works correctly on its own without any
+sink being registered.
+
 #### FFI consumer log forwarding (`pact_ffi`)
 
 Several Pact implementations (JavaScript, Go, Python, .NET) use the `pact_ffi` library rather than a native driver.
-These consumers cannot tap into the Rust `tracing` subscriber directly, so the driver must expose an explicit bridge
-for plugin log entries.
+These consumers cannot tap into the Rust `tracing` subscriber directly, so pact_ffi registers its own
+`PluginLogSink` implementation against the driver's static sink at initialisation time.
 
 Two mechanisms are needed, and both should be provided:
 
