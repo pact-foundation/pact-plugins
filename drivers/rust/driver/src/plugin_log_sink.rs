@@ -3,6 +3,7 @@
 use std::sync::RwLock;
 
 use lazy_static::lazy_static;
+use tracing::{debug, error, info, trace, warn};
 
 /// Source of a plugin log entry
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -37,9 +38,9 @@ pub struct PluginLogEntry {
 /// Receives structured log entries from running plugin processes.
 ///
 /// Register a custom implementation with [`set_plugin_log_sink`] to intercept plugin log
-/// output. The default sink is a no-op: stderr is already written to the per-instance log
-/// file by the driver, and Log RPC entries will be forwarded to `tracing` once the
-/// `PluginHost` server is implemented.
+/// output. The built-in `DefaultPluginLogSink` is a no-op for [`PluginLogSource::Stderr`]
+/// entries (those are already written to the per-instance log file) and forwards
+/// [`PluginLogSource::LogRpc`] entries into the `tracing` subscriber.
 pub trait PluginLogSink: Send + Sync {
   fn log(&self, entry: &PluginLogEntry);
 }
@@ -47,7 +48,21 @@ pub trait PluginLogSink: Send + Sync {
 struct DefaultPluginLogSink;
 
 impl PluginLogSink for DefaultPluginLogSink {
-  fn log(&self, _entry: &PluginLogEntry) {}
+  fn log(&self, entry: &PluginLogEntry) {
+    if entry.source != PluginLogSource::LogRpc {
+      return;
+    }
+    let plugin = &entry.plugin_name;
+    let instance = &entry.plugin_instance_id;
+    let msg = &entry.message;
+    match entry.level.to_uppercase().as_str() {
+      "TRACE" => trace!(plugin_name = %plugin, plugin_instance = %instance, "{}", msg),
+      "DEBUG" => debug!(plugin_name = %plugin, plugin_instance = %instance, "{}", msg),
+      "INFO"  => info!(plugin_name = %plugin, plugin_instance = %instance, "{}", msg),
+      "WARN"  => warn!(plugin_name = %plugin, plugin_instance = %instance, "{}", msg),
+      _       => error!(plugin_name = %plugin, plugin_instance = %instance, "{}", msg),
+    }
+  }
 }
 
 lazy_static! {

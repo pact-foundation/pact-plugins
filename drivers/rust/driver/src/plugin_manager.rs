@@ -56,6 +56,21 @@ lazy_static! {
   static ref PLUGIN_MANIFEST_REGISTER: Mutex<HashMap<String, PactPluginManifest>> =
     Mutex::new(HashMap::new());
   static ref PLUGIN_REGISTER: Mutex<HashMap<String, PactPlugin>> = Mutex::new(HashMap::new());
+  /// Maps plugin_instance_id → plugin_name so the PluginHost Log RPC handler can
+  /// attach the plugin name to forwarded log entries without a proto field for it.
+  static ref INSTANCE_NAMES: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
+}
+
+pub(crate) fn plugin_name_for_instance(instance_id: &str) -> Option<String> {
+  INSTANCE_NAMES.lock().unwrap().get(instance_id).cloned()
+}
+
+fn register_plugin_instance(instance_id: &str, plugin_name: &str) {
+  INSTANCE_NAMES.lock().unwrap().insert(instance_id.to_string(), plugin_name.to_string());
+}
+
+fn deregister_plugin_instance(instance_id: &str) {
+  INSTANCE_NAMES.lock().unwrap().remove(instance_id);
 }
 
 fn host_capabilities() -> Vec<String> {
@@ -334,12 +349,24 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
   }
   debug!("Starting plugin using {:?}", &path);
 
+  let host_port = match crate::plugin_host::ensure_plugin_host_running().await {
+    Ok(port) => Some(port),
+    Err(err) => {
+      warn!("Could not start PluginHost server, Log RPC forwarding will be unavailable: {}", err);
+      None
+    }
+  };
+
   let log_level = max_level();
   let mut child_command = Command::new(path.clone());
   let mut child_command = child_command
     .env("LOG_LEVEL", log_level.to_string())
     .env("RUST_LOG", log_level.to_string())
     .current_dir(manifest.plugin_dir.clone());
+
+  if let Some(port) = host_port {
+    child_command = child_command.env("PACT_PLUGIN_HOST", format!("127.0.0.1:{}", port));
+  }
 
   if let Some(args) = &manifest.args {
     child_command = child_command.args(args);
@@ -361,7 +388,11 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
   debug!("Plugin {} started with PID {} (instance {})", manifest.name, child_pid, instance_id);
 
   match ChildPluginProcess::new(child, manifest, instance_id).await {
-    Ok(child) => PactPlugin::new(manifest, child),
+    Ok(child) => {
+      let plugin = PactPlugin::new(manifest, child)?;
+      register_plugin_instance(&plugin.instance_id, &manifest.name);
+      Ok(plugin)
+    }
     Err(err) => {
       let mut s = System::new();
       s.refresh_processes();
@@ -396,6 +427,7 @@ pub fn shutdown_plugins() {
   trace!("shutdown_plugins {:?}: Got PLUGIN_REGISTER lock", thread_id);
   for plugin in guard.values() {
     debug!("Shutting down plugin {:?}", plugin);
+    deregister_plugin_instance(&plugin.instance_id);
     plugin.kill();
     remove_plugin_entries(&plugin.manifest.name);
   }
@@ -412,6 +444,7 @@ pub fn shutdown_plugin(plugin: &mut PactPlugin) {
     "Shutting down plugin {}:{}",
     plugin.manifest.name, plugin.manifest.version
   );
+  deregister_plugin_instance(&plugin.instance_id);
   plugin.kill();
   remove_plugin_entries(&plugin.manifest.name);
 }

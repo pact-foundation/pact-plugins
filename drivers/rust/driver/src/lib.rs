@@ -2,6 +2,7 @@
 
 pub mod catalogue_manager;
 mod child_process;
+pub(crate) mod plugin_host;
 pub mod content;
 pub mod download;
 mod metrics;

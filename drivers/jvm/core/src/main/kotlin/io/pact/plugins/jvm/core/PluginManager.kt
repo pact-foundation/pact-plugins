@@ -264,6 +264,7 @@ data class DefaultPactPlugin(
     get() = cp.pid
 
   override fun shutdown() {
+    PluginHostServer.deregisterInstance(instanceId)
     cp.destroy()
     if (channel != null) {
       channel!!.shutdownNow().awaitTermination(1, TimeUnit.SECONDS)
@@ -1046,6 +1047,12 @@ object DefaultPluginManager: PluginManager {
     val logLevel = logLevel()
     pb.environment()["LOG_LEVEL"] = logLevel
     pb.environment()["RUST_LOG"] = logLevel
+    try {
+      val hostPort = PluginHostServer.ensureRunning()
+      pb.environment()["PACT_PLUGIN_HOST"] = "127.0.0.1:$hostPort"
+    } catch (e: Exception) {
+      logger.warn(e) { "Could not start PluginHost server, Log RPC forwarding will be unavailable" }
+    }
     env.forEach { (k, v) -> pb.environment()[k] = v }
 
     if (manifest.args.isNotEmpty()) {
@@ -1062,7 +1069,9 @@ object DefaultPluginManager: PluginManager {
       val timeout = System.getProperty("pact.plugin.loadTimeoutInMs")?.toLongOrNull() ?: 10000
       val startupInfo = cp.channel.poll(timeout, TimeUnit.MILLISECONDS)
       if (startupInfo is JsonValue.Object) {
-        Result.Ok(DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString(), instanceId))
+        val plugin = DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString(), instanceId)
+        PluginHostServer.registerInstance(instanceId, manifest.name)
+        Result.Ok(plugin)
       } else {
         cp.destroy()
         Result.Err("Plugin process did not output the correct startup message in $timeout ms - got $startupInfo")
