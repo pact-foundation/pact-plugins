@@ -4,10 +4,11 @@ mod pact;
 mod proto;
 
 use std::{collections::HashMap, sync::Arc};
+use std::sync::OnceLock;
 
 use anyhow::{anyhow, Context};
 use log::{debug, trace};
-use tokio::{net::TcpListener, sync::Mutex};
+use tokio::{net::TcpListener, sync::{mpsc, Mutex}};
 use tonic::{transport::Server, Request, Response, Status};
 use uuid::Uuid;
 
@@ -18,11 +19,12 @@ use crate::{
   proto::{
     body::ContentTypeHint, catalogue_entry::EntryType,
     init_plugin_response::Response as InitResponse, pact_plugin_server::PactPluginServer,
+    plugin_host_client::PluginHostClient,
     verification_preparation_response::Response as PreparationResponse,
     verify_interaction_response::Response as VerifyResponse, Body, Catalogue, CatalogueEntry,
     ConfigureInteractionRequest, ConfigureInteractionResponse, GenerateContentRequest,
     GenerateContentResponse, InitPluginRequest, InitPluginResponse, InitPluginSuccess,
-    InteractionData, InteractionResponse, MockServerDetails, MockServerRequest,
+    InteractionData, InteractionResponse, LogMessage, MockServerDetails, MockServerRequest,
     MockServerResults, PluginConfiguration, StartMockServerRequest, StartMockServerResponse,
     VerificationPreparationRequest, VerificationPreparationResponse, VerificationResult,
     VerificationResultItem, VerifyInteractionRequest, VerifyInteractionResponse,
@@ -32,6 +34,79 @@ use crate::{
 use proto::pact_plugin_server::PactPlugin;
 
 const PLUGIN_NAME: &str = "jsonrpc";
+
+/// Plugin instance UUID set by the driver in InitPluginRequest; included in every Log RPC call
+static PLUGIN_INSTANCE_ID: OnceLock<String> = OnceLock::new();
+
+/// Wraps env_logger and also forwards records to the driver via the PluginHost Log RPC
+struct PluginHostLogger {
+  inner: env_logger::Logger,
+  host_tx: Option<mpsc::UnboundedSender<LogMessage>>,
+}
+
+impl log::Log for PluginHostLogger {
+  fn enabled(&self, metadata: &log::Metadata) -> bool {
+    self.inner.enabled(metadata)
+  }
+
+  fn log(&self, record: &log::Record) {
+    if !self.inner.enabled(record.metadata()) {
+      return;
+    }
+    if let Some(tx) = &self.host_tx {
+      let instance_id = PLUGIN_INSTANCE_ID.get().cloned().unwrap_or_default();
+      let timestamp_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+      let _ = tx.send(LogMessage {
+        plugin_instance_id: instance_id,
+        test_run_id: String::new(),
+        level: record.level().to_string().to_uppercase(),
+        message: record.args().to_string(),
+        target: record.target().to_string(),
+        timestamp_ms,
+      });
+    }
+    self.inner.log(record);
+  }
+
+  fn flush(&self) {
+    self.inner.flush();
+  }
+}
+
+async fn init_logging() {
+  let inner = env_logger::Builder::from_default_env().build();
+
+  let host_tx = match std::env::var("PACT_PLUGIN_HOST") {
+    Ok(host_addr) => {
+      let endpoint = format!("http://{}", host_addr);
+      match PluginHostClient::connect(endpoint).await {
+        Ok(mut client) => {
+          let (tx, mut rx) = mpsc::unbounded_channel::<LogMessage>();
+          tokio::spawn(async move {
+            while let Some(msg) = rx.recv().await {
+              let _ = client.log(tonic::Request::new(msg)).await;
+            }
+          });
+          Some(tx)
+        }
+        Err(err) => {
+          eprintln!("Could not connect to PluginHost, log forwarding disabled: {err}");
+          None
+        }
+      }
+    }
+    Err(_) => None,
+  };
+
+  let logger = PluginHostLogger { inner, host_tx };
+  if let Err(err) = log::set_boxed_logger(Box::new(logger)) {
+    eprintln!("Failed to install logger: {err}");
+  }
+  log::set_max_level(log::LevelFilter::Trace);
+}
 
 #[derive(Debug, Default)]
 struct JsonRpcPlugin {
@@ -44,6 +119,7 @@ impl PactPlugin for JsonRpcPlugin {
     &self,
     request: Request<InitPluginRequest>,
   ) -> Result<Response<InitPluginResponse>, Status> {
+    PLUGIN_INSTANCE_ID.set(request.get_ref().plugin_instance_id.clone()).ok();
     debug!(
       "Init request from {}/{} with host capabilities {:?}",
       request.get_ref().implementation,
@@ -421,7 +497,7 @@ impl PactPlugin for JsonRpcPlugin {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-  env_logger::init();
+  init_logging().await;
 
   let listener = TcpListener::bind("127.0.0.1:0")
     .await

@@ -17,6 +17,8 @@ message InitPluginRequest {
   string version = 2;
   // Host capabilities provided by the driver and available to the plugin
   repeated string hostCapabilities = 3;
+  // UUID assigned by the driver at process start; the plugin includes this in every log record it emits
+  string pluginInstanceId = 4;
 }
 
 // Entry to be added to the core catalogue. Each entry describes one of the features the plugin provides.
@@ -413,4 +415,26 @@ service PactPlugin {
 //  rpc PrepareInteractionForVerification(VerificationPreparationRequest) returns (VerificationPreparationResponse);
 //  // Execute the verification for the interaction.
 //  rpc VerifyInteraction(VerifyInteractionRequest) returns (VerifyInteractionResponse);
+}
+
+// Structured log record emitted by a plugin and forwarded to the driver via the Log RPC
+message LogMessage {
+  // Plugin instance UUID (from InitPluginRequest.pluginInstanceId)
+  string pluginInstanceId = 1;
+  // Test run UUID (from testContext["testRunId"], if available)
+  string testRunId = 2;
+  // Log level: TRACE, DEBUG, INFO, WARN, ERROR
+  string level = 3;
+  // Human-readable log message
+  string message = 4;
+  // Logger name / module path (e.g. "pact_csv_plugin::matching")
+  string target = 5;
+  // Unix epoch milliseconds
+  int64 timestampMs = 6;
+}
+
+// Driver-side service implemented by the driver and called by plugins
+service PluginHost {
+  // Forward a structured log record from the plugin to the driver's logging framework
+  rpc Log(LogMessage) returns (google.protobuf.Empty);
 }

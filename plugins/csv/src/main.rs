@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::io;
 use std::io::{Read, Write};
 use std::net::SocketAddr;
+use std::sync::OnceLock;
 
 use anyhow::anyhow;
 use csv::{Reader, ReaderBuilder, StringRecord};
@@ -16,6 +17,7 @@ use pact_models::matchingrules::{MatchingRule, RuleList, RuleLogic};
 use pact_models::prelude::ContentType;
 use serde_json::Value;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc;
 use tonic::{transport::Server, Response};
 use uuid::Uuid;
 
@@ -23,12 +25,87 @@ use crate::csv_content::{generate_csv_content, has_headers, setup_csv_contents};
 use crate::proto::body::ContentTypeHint;
 use crate::proto::catalogue_entry::EntryType;
 use crate::proto::pact_plugin_server::{PactPlugin, PactPluginServer};
+use crate::proto::plugin_host_client::PluginHostClient;
 use crate::proto::to_object;
 
 mod csv_content;
 mod parser;
 mod proto;
 mod utils;
+
+/// Plugin instance UUID set by the driver in InitPluginRequest; included in every Log RPC call
+static PLUGIN_INSTANCE_ID: OnceLock<String> = OnceLock::new();
+
+/// Wraps env_logger and also forwards records to the driver via the PluginHost Log RPC
+struct PluginHostLogger {
+  inner: env_logger::Logger,
+  host_tx: Option<mpsc::UnboundedSender<proto::LogMessage>>,
+}
+
+impl log::Log for PluginHostLogger {
+  fn enabled(&self, metadata: &log::Metadata) -> bool {
+    self.inner.enabled(metadata)
+  }
+
+  fn log(&self, record: &log::Record) {
+    if !self.inner.enabled(record.metadata()) {
+      return;
+    }
+    if let Some(tx) = &self.host_tx {
+      let instance_id = PLUGIN_INSTANCE_ID.get().cloned().unwrap_or_default();
+      let timestamp_ms = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0);
+      let _ = tx.send(proto::LogMessage {
+        plugin_instance_id: instance_id,
+        test_run_id: String::new(),
+        level: record.level().to_string().to_uppercase(),
+        message: record.args().to_string(),
+        target: record.target().to_string(),
+        timestamp_ms,
+      });
+    }
+    self.inner.log(record);
+  }
+
+  fn flush(&self) {
+    self.inner.flush();
+  }
+}
+
+async fn init_logging() {
+  let mut builder = env_logger::Builder::from_env(Env::new().filter("LOG_LEVEL"));
+  let inner = builder.build();
+
+  let host_tx = match std::env::var("PACT_PLUGIN_HOST") {
+    Ok(host_addr) => {
+      let endpoint = format!("http://{}", host_addr);
+      match PluginHostClient::connect(endpoint).await {
+        Ok(mut client) => {
+          let (tx, mut rx) = mpsc::unbounded_channel::<proto::LogMessage>();
+          tokio::spawn(async move {
+            while let Some(msg) = rx.recv().await {
+              let _ = client.log(tonic::Request::new(msg)).await;
+            }
+          });
+          Some(tx)
+        }
+        Err(err) => {
+          eprintln!("Could not connect to PluginHost, log forwarding disabled: {err}");
+          None
+        }
+      }
+    }
+    Err(_) => None,
+  };
+
+  let logger = PluginHostLogger { inner, host_tx };
+  if let Err(err) = log::set_boxed_logger(Box::new(logger)) {
+    eprintln!("Failed to install logger: {err}");
+  }
+  log::set_max_level(log::LevelFilter::Trace);
+}
 
 #[derive(Debug, Default)]
 pub struct CsvPactPlugin {}
@@ -42,6 +119,7 @@ impl PactPlugin for CsvPactPlugin {
     request: tonic::Request<proto::InitPluginRequest>,
   ) -> Result<tonic::Response<proto::InitPluginResponse>, tonic::Status> {
     let message = request.get_ref();
+    PLUGIN_INSTANCE_ID.set(message.plugin_instance_id.clone()).ok();
     debug!("Init request from {}/{}", message.implementation, message.version);
     Ok(Response::new(proto::InitPluginResponse {
       response: Some(proto::init_plugin_response::Response::Success(
@@ -385,6 +463,7 @@ mod tests {
         implementation: "plugin-driver-rust".to_string(),
         version: "1.0.0-beta.1".to_string(),
         host_capabilities: vec![],
+        ..Default::default()
       }))
       .await
       .unwrap()
@@ -415,8 +494,7 @@ impl Stream for TcpIncoming {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let env = Env::new().filter("LOG_LEVEL");
-  env_logger::init_from_env(env);
+  init_logging().await;
 
   let addr: SocketAddr = "0.0.0.0:0".parse()?;
   let listener = TcpListener::bind(addr).await?;
