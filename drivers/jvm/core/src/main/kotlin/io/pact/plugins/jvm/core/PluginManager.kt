@@ -1052,7 +1052,9 @@ object DefaultPluginManager: PluginManager {
       pb.command().addAll(manifest.args)
     }
 
-    val cp = ChildProcess(pb, manifest)
+    val instanceId = java.util.UUID.randomUUID().toString()
+    logger.debug { "Plugin ${manifest.name} assigned instance ID $instanceId" }
+    val cp = ChildProcess(pb, manifest, instanceId)
     return try {
       logger.debug { "Starting plugin ${manifest.name} process ${pb.command()}" }
       cp.start()
@@ -1060,8 +1062,6 @@ object DefaultPluginManager: PluginManager {
       val timeout = System.getProperty("pact.plugin.loadTimeoutInMs")?.toLongOrNull() ?: 10000
       val startupInfo = cp.channel.poll(timeout, TimeUnit.MILLISECONDS)
       if (startupInfo is JsonValue.Object) {
-        val instanceId = java.util.UUID.randomUUID().toString()
-        logger.debug { "Plugin ${manifest.name} assigned instance ID $instanceId" }
         Result.Ok(DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString(), instanceId))
       } else {
         cp.destroy()

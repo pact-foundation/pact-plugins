@@ -699,13 +699,14 @@ impl PactPluginRpc for PactPlugin {
 
 impl PactPlugin {
   /// Create a new Plugin
-  pub fn new(manifest: &PactPluginManifest, child: ChildPluginProcess, instance_id: String) -> anyhow::Result<Self> {
+  pub fn new(manifest: &PactPluginManifest, child: ChildPluginProcess) -> anyhow::Result<Self> {
+    let instance_id = child.instance_id.clone();
     Ok(PactPlugin {
       manifest: manifest.clone(),
       interface_version: PluginInterfaceVersion::try_from(manifest.plugin_interface_version)?,
+      instance_id,
       child: Arc::new(child),
       plugin_capabilities: vec![],
-      instance_id,
       access_count: Arc::new(AtomicUsize::new(1)),
     })
   }

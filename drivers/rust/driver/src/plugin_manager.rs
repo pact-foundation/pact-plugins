@@ -360,8 +360,8 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
   let instance_id = Uuid::new_v4().to_string();
   debug!("Plugin {} started with PID {} (instance {})", manifest.name, child_pid, instance_id);
 
-  match ChildPluginProcess::new(child, manifest).await {
-    Ok(child) => PactPlugin::new(manifest, child, instance_id),
+  match ChildPluginProcess::new(child, manifest, instance_id).await {
+    Ok(child) => PactPlugin::new(manifest, child),
     Err(err) => {
       let mut s = System::new();
       s.refresh_processes();

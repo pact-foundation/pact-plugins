@@ -1,14 +1,20 @@
 //! Module for managing running child processes
-use std::io::{BufRead, BufReader};
+use std::fs;
+use std::fs::File;
+use std::io::{BufRead, BufReader, Write};
+use std::path::PathBuf;
 use std::process::Child;
 use std::sync::mpsc::channel;
 use std::time::Duration;
 
 use anyhow::anyhow;
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use sysinfo::{Pid, System};
 use tracing::{debug, error, trace, warn};
 
+use crate::plugin_log_sink::{PluginLogEntry, PluginLogSource, emit_plugin_log};
+use crate::plugin_manager::pact_plugin_dir;
 use crate::plugin_models::PactPluginManifest;
 
 #[derive(Clone, PartialEq, Eq, Serialize, Deserialize, Debug)]
@@ -24,12 +30,43 @@ pub struct ChildPluginProcess {
   /// OS PID of the running process
   pub child_pid: usize,
   /// Info on the running plugin
-  pub plugin_info: RunningPluginInfo
+  pub plugin_info: RunningPluginInfo,
+  /// UUID assigned by the driver at process start
+  pub instance_id: String,
+}
+
+fn plugin_log_dir() -> PathBuf {
+  if let Ok(dir) = std::env::var("PACT_OUTPUT_DIR") {
+    PathBuf::from(dir).join("logs")
+  } else {
+    pact_plugin_dir()
+      .unwrap_or_else(|_| PathBuf::from("."))
+      .join("logs")
+  }
+}
+
+fn open_plugin_log_file(plugin_name: &str, instance_id: &str) -> Option<File> {
+  let log_dir = plugin_log_dir();
+  if let Err(err) = fs::create_dir_all(&log_dir) {
+    warn!("Could not create plugin log directory {:?}: {}", log_dir, err);
+    return None;
+  }
+  let log_path = log_dir.join(format!("pact-plugin-{}-{}.log", plugin_name, instance_id));
+  match File::create(&log_path) {
+    Ok(f) => {
+      debug!("Plugin stderr for instance {} captured to {:?}", instance_id, log_path);
+      Some(f)
+    }
+    Err(err) => {
+      warn!("Could not create plugin log file {:?}: {}", log_path, err);
+      None
+    }
+  }
 }
 
 impl ChildPluginProcess {
   /// Start the child process and try read the startup JSON message from its standard output.
-  pub async fn new(mut child: Child, manifest: &PactPluginManifest) -> anyhow::Result<Self> {
+  pub async fn new(mut child: Child, manifest: &PactPluginManifest, instance_id: String) -> anyhow::Result<Self> {
     let (tx, rx) = channel();
     let child_pid = child.id();
     let child_out = child.stdout.take()
@@ -40,6 +77,7 @@ impl ChildPluginProcess {
     trace!("Starting output polling tasks...");
 
     let plugin_name = manifest.name.clone();
+    let stdout_instance_id = instance_id.clone();
     std::thread::spawn(move || {
       trace!("Starting thread to poll plugin STDOUT");
 
@@ -56,7 +94,8 @@ impl ChildPluginProcess {
                 Ok(plugin_info) => {
                   tx.send(Ok(ChildPluginProcess {
                     child_pid: child_pid as usize,
-                    plugin_info
+                    plugin_info,
+                    instance_id: stdout_instance_id.clone(),
                   })).unwrap_or_default()
                 }
                 Err(err) => {
@@ -77,14 +116,29 @@ impl ChildPluginProcess {
       trace!("Thread to poll plugin STDOUT done");
     });
 
+    let log_file = open_plugin_log_file(&manifest.name, &instance_id);
     let plugin_name = manifest.name.clone();
+    let stderr_instance_id = instance_id;
     std::thread::spawn(move || {
       trace!("Starting thread to poll plugin STDERR");
+      let mut log_file = log_file;
       let mut reader = BufReader::new(child_err);
       let mut line = String::with_capacity(256);
       while let Ok(chars_read) = reader.read_line(&mut line) {
         if chars_read > 0 {
-          debug!("Plugin({}, {}, STDERR) || {}", plugin_name, child_pid, line);
+          if let Some(ref mut f) = log_file {
+            let _ = f.write_all(line.as_bytes());
+          }
+          emit_plugin_log(&PluginLogEntry {
+            plugin_name: plugin_name.clone(),
+            plugin_instance_id: stderr_instance_id.clone(),
+            test_run_id: None,
+            level: "DEBUG".to_string(),
+            message: line.trim_end_matches(['\n', '\r']).to_string(),
+            target: None,
+            timestamp_ms: Utc::now().timestamp_millis(),
+            source: PluginLogSource::Stderr,
+          });
         } else {
           trace!("0 bytes read from STDERR, this indicates EOF");
           break;
