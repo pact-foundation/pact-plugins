@@ -19,7 +19,8 @@ enum class PluginInterfaceVersion(val value: Int) {
 data class PluginInitRequest(
   val implementation: String,
   val version: String,
-  val hostCapabilities: List<String> = emptyList()
+  val hostCapabilities: List<String> = emptyList(),
+  val pluginInstanceId: String = ""
 )
 
 data class PluginInitResponse(
@@ -104,6 +105,7 @@ class PactPluginV2RpcClient(
       .setImplementation(request.implementation)
       .setVersion(request.version)
       .addAllHostCapabilities(request.hostCapabilities)
+      .setPluginInstanceId(request.pluginInstanceId)
       .build())
 
     return when (response.responseCase) {

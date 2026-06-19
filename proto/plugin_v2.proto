@@ -20,6 +20,8 @@ message InitPluginRequest {
   string version = 2;
   // Host capabilities provided by the driver and available to the plugin
   repeated string hostCapabilities = 3;
+  // UUID assigned by the driver at process start; the plugin includes this in every log record it emits
+  string pluginInstanceId = 4;
 }
 
 // Entry to be added to the core catalogue. Each entry describes one of the features the plugin provides.
@@ -109,6 +111,8 @@ message CompareContentsRequest {
   map<string, MatchingRules> rules = 4;
   // Additional data added to the Pact/Interaction by the plugin
   PluginConfiguration pluginConfiguration = 5;
+  // Context data provided by the test framework (carries testRunId for log correlation)
+  google.protobuf.Struct testContext = 6;
 }
 
 // Indicates that there was a mismatch with the content type
@@ -157,6 +161,8 @@ message ConfigureInteractionRequest {
   string contentType = 1;
   // This is data specified by the user in the consumer test
   google.protobuf.Struct contentsConfig = 2;
+  // Context data provided by the test framework (carries testRunId for log correlation)
+  google.protobuf.Struct testContext = 3;
 }
 
 // Represents a matching rule
@@ -426,6 +432,28 @@ message VerifyInteractionResponse {
 
     VerificationResult result = 2;
   }
+}
+
+// Structured log record emitted by a plugin and forwarded to the driver via the Log RPC
+message LogMessage {
+  // Plugin instance UUID (from InitPluginRequest.pluginInstanceId)
+  string pluginInstanceId = 1;
+  // Test run UUID (from testContext["testRunId"], if available)
+  string testRunId = 2;
+  // Log level: TRACE, DEBUG, INFO, WARN, ERROR
+  string level = 3;
+  // Human-readable log message
+  string message = 4;
+  // Logger name / module path (e.g. "pact_csv_plugin::matching")
+  string target = 5;
+  // Unix epoch milliseconds
+  int64 timestampMs = 6;
+}
+
+// Driver-side service implemented by the driver and called by plugins
+service PluginHost {
+  // Forward a structured log record from the plugin to the driver's logging framework
+  rpc Log(LogMessage) returns (google.protobuf.Empty);
 }
 
 service PactPlugin {

@@ -228,6 +228,8 @@ interface PactPlugin {
   val port: Int?
   val serverKey: String?
   val processPid: Long?
+  /** UUID assigned by the driver at process start; included in every log record emitted by this instance */
+  val instanceId: String
   var rpcClient: PactPluginRpcClient?
   var catalogueEntries: List<Plugin.CatalogueEntry>?
   var pluginCapabilities: List<String>
@@ -252,6 +254,7 @@ data class DefaultPactPlugin(
   override val manifest: PactPluginManifest,
   override val port: Int?,
   override val serverKey: String,
+  override val instanceId: String,
   override var rpcClient: PactPluginRpcClient? = null,
   override var catalogueEntries: List<Plugin.CatalogueEntry>? = null,
   override var pluginCapabilities: List<String> = emptyList(),
@@ -989,7 +992,8 @@ object DefaultPluginManager: PluginManager {
     val request = PluginInitRequest(
       implementation = "plugin-driver-jvm",
       version = Utils.lookupVersion(PluginManager::class.java),
-      hostCapabilities = CatalogueManager.coreEntries().map { "${it.type}/${it.key}" }
+      hostCapabilities = CatalogueManager.coreEntries().map { "${it.type}/${it.key}" },
+      pluginInstanceId = plugin.instanceId
     )
 
     val response =  plugin.withRpcClient { client -> client.initPlugin(request) }
@@ -1056,7 +1060,9 @@ object DefaultPluginManager: PluginManager {
       val timeout = System.getProperty("pact.plugin.loadTimeoutInMs")?.toLongOrNull() ?: 10000
       val startupInfo = cp.channel.poll(timeout, TimeUnit.MILLISECONDS)
       if (startupInfo is JsonValue.Object) {
-        Result.Ok(DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString()))
+        val instanceId = java.util.UUID.randomUUID().toString()
+        logger.debug { "Plugin ${manifest.name} assigned instance ID $instanceId" }
+        Result.Ok(DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString(), instanceId))
       } else {
         cp.destroy()
         Result.Err("Plugin process did not output the correct startup message in $timeout ms - got $startupInfo")

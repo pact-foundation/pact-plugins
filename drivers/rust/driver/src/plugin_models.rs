@@ -144,6 +144,7 @@ pub struct PluginInitRequest {
   pub implementation: String,
   pub version: String,
   pub host_capabilities: Vec<String>,
+  pub plugin_instance_id: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -203,6 +204,7 @@ impl PluginClient {
           implementation: request.implementation,
           version: request.version,
           host_capabilities: request.host_capabilities,
+          plugin_instance_id: request.plugin_instance_id,
         }))
         .await
         .and_then(|response| match response.into_inner().response {
@@ -541,6 +543,9 @@ pub struct PactPlugin {
   /// Optional capabilities negotiated for this plugin instance
   pub plugin_capabilities: Vec<String>,
 
+  /// UUID assigned by the driver at process start; used to correlate log output from this instance
+  pub instance_id: String,
+
   /// Count of access to the plugin. If this is ever zero, the plugin process will be shutdown
   access_count: Arc<AtomicUsize>,
 }
@@ -694,12 +699,13 @@ impl PactPluginRpc for PactPlugin {
 
 impl PactPlugin {
   /// Create a new Plugin
-  pub fn new(manifest: &PactPluginManifest, child: ChildPluginProcess) -> anyhow::Result<Self> {
+  pub fn new(manifest: &PactPluginManifest, child: ChildPluginProcess, instance_id: String) -> anyhow::Result<Self> {
     Ok(PactPlugin {
       manifest: manifest.clone(),
       interface_version: PluginInterfaceVersion::try_from(manifest.plugin_interface_version)?,
       child: Arc::new(child),
       plugin_capabilities: vec![],
+      instance_id,
       access_count: Arc::new(AtomicUsize::new(1)),
     })
   }
@@ -848,12 +854,14 @@ pub(crate) mod tests {
       implementation: "plugin-driver-rust".to_string(),
       version: "1.0.0-beta.1".to_string(),
       host_capabilities: vec!["interaction/request-response".to_string()],
+      plugin_instance_id: "test-instance-id".to_string(),
     };
 
     let converted_request = proto_v2::InitPluginRequest {
       implementation: request.implementation,
       version: request.version,
       host_capabilities: request.host_capabilities,
+      plugin_instance_id: request.plugin_instance_id,
     };
     assert_eq!(converted_request.implementation, "plugin-driver-rust");
     assert_eq!(converted_request.version, "1.0.0-beta.1");

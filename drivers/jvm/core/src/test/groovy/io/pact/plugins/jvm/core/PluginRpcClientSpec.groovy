@@ -15,7 +15,7 @@ class PluginRpcClientSpec extends Specification {
     given:
     def stub = Mockito.mock(PactPluginGrpcV2.PactPluginBlockingStub)
     def client = new PactPluginV2RpcClient(stub)
-    def request = new PluginInitRequest('plugin-driver-jvm', '1.0.0-beta.1', ['content-matcher/test'])
+    def request = new PluginInitRequest('plugin-driver-jvm', '1.0.0-beta.1', ['content-matcher/test'], 'test-instance-id')
     def response = PluginV2.InitPluginResponse.newBuilder()
       .setSuccess(PluginV2.InitPluginSuccess.newBuilder()
         .addCatalogue(PluginV2.CatalogueEntry.newBuilder()
@@ -43,7 +43,7 @@ class PluginRpcClientSpec extends Specification {
     given:
     def stub = Mockito.mock(PactPluginGrpcV2.PactPluginBlockingStub)
     def client = new PactPluginV2RpcClient(stub)
-    def request = new PluginInitRequest('plugin-driver-jvm', '1.0.0-beta.1', [])
+    def request = new PluginInitRequest('plugin-driver-jvm', '1.0.0-beta.1', [], 'test-instance-id')
     def response = PluginV2.InitPluginResponse.newBuilder()
       .setFailure(PluginV2.InitPluginFailure.newBuilder()
         .setError('Missing required host capabilities')
