@@ -8,6 +8,7 @@ import io.grpc.stub.StreamObserver
 import io.pact.plugin.v2.PluginHostGrpc
 import io.pact.plugin.v2.PluginV2
 import java.util.concurrent.ConcurrentHashMap
+import org.slf4j.MDC
 
 private val logger = KotlinLogging.logger {}
 
@@ -18,13 +19,19 @@ internal class PluginHostGrpcService : PluginHostGrpc.PluginHostImplBase() {
     val target = request.target.ifEmpty { "io.pact.plugin.$pluginName" }
     val pluginLogger = KotlinLogging.logger(target)
     val message = "[instance:$instanceId] ${request.message}"
-    when (request.level.uppercase()) {
-      "TRACE" -> pluginLogger.trace { message }
-      "DEBUG" -> pluginLogger.debug { message }
-      "INFO"  -> pluginLogger.info { message }
-      "WARN"  -> pluginLogger.warn { message }
-      "ERROR" -> pluginLogger.error { message }
-      else    -> pluginLogger.debug { message }
+    val testRunId = request.testRunId.ifEmpty { null }
+    if (testRunId != null) MDC.put("testRunId", testRunId)
+    try {
+      when (request.level.uppercase()) {
+        "TRACE" -> pluginLogger.trace { message }
+        "DEBUG" -> pluginLogger.debug { message }
+        "INFO"  -> pluginLogger.info { message }
+        "WARN"  -> pluginLogger.warn { message }
+        "ERROR" -> pluginLogger.error { message }
+        else    -> pluginLogger.debug { message }
+      }
+    } finally {
+      if (testRunId != null) MDC.remove("testRunId")
     }
     responseObserver.onNext(Empty.getDefaultInstance())
     responseObserver.onCompleted()

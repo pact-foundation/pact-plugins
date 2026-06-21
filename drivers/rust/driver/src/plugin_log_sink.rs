@@ -55,12 +55,13 @@ impl PluginLogSink for DefaultPluginLogSink {
     let plugin = &entry.plugin_name;
     let instance = &entry.plugin_instance_id;
     let msg = &entry.message;
+    let run_id = entry.test_run_id.as_deref().unwrap_or("");
     match entry.level.to_uppercase().as_str() {
-      "TRACE" => trace!(plugin_name = %plugin, plugin_instance = %instance, "{}", msg),
-      "DEBUG" => debug!(plugin_name = %plugin, plugin_instance = %instance, "{}", msg),
-      "INFO"  => info!(plugin_name = %plugin, plugin_instance = %instance, "{}", msg),
-      "WARN"  => warn!(plugin_name = %plugin, plugin_instance = %instance, "{}", msg),
-      _       => error!(plugin_name = %plugin, plugin_instance = %instance, "{}", msg),
+      "TRACE" => trace!(plugin_name = %plugin, plugin_instance = %instance, test_run_id = %run_id, "{}", msg),
+      "DEBUG" => debug!(plugin_name = %plugin, plugin_instance = %instance, test_run_id = %run_id, "{}", msg),
+      "INFO"  => info!(plugin_name = %plugin, plugin_instance = %instance, test_run_id = %run_id, "{}", msg),
+      "WARN"  => warn!(plugin_name = %plugin, plugin_instance = %instance, test_run_id = %run_id, "{}", msg),
+      _       => error!(plugin_name = %plugin, plugin_instance = %instance, test_run_id = %run_id, "{}", msg),
     }
   }
 }
