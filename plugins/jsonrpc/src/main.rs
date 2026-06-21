@@ -12,6 +12,8 @@ use tokio::{net::TcpListener, sync::{mpsc, Mutex}};
 use tonic::{transport::Server, Request, Response, Status};
 use uuid::Uuid;
 
+use prost_types;
+
 use crate::{
   jsonrpc::{config_from_struct, override_string, parse_json_body},
   mock_server::RunningMockServer,
@@ -38,6 +40,21 @@ const PLUGIN_NAME: &str = "jsonrpc";
 /// Plugin instance UUID set by the driver in InitPluginRequest; included in every Log RPC call
 static PLUGIN_INSTANCE_ID: OnceLock<String> = OnceLock::new();
 
+/// Test run ID from testContext["testRunId"]; scoped per gRPC request task
+tokio::task_local! {
+  static TEST_RUN_ID: String;
+}
+
+fn extract_test_run_id(ctx: Option<&prost_types::Struct>) -> String {
+  ctx
+    .and_then(|s| s.fields.get("testRunId"))
+    .and_then(|v| match &v.kind {
+      Some(prost_types::value::Kind::StringValue(s)) => Some(s.clone()),
+      _ => None,
+    })
+    .unwrap_or_default()
+}
+
 /// Wraps env_logger and also forwards records to the driver via the PluginHost Log RPC
 struct PluginHostLogger {
   inner: env_logger::Logger,
@@ -55,13 +72,14 @@ impl log::Log for PluginHostLogger {
     }
     if let Some(tx) = &self.host_tx {
       let instance_id = PLUGIN_INSTANCE_ID.get().cloned().unwrap_or_default();
+      let test_run_id = TEST_RUN_ID.try_with(|id| id.clone()).unwrap_or_default();
       let timestamp_ms = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
         .unwrap_or(0);
       let _ = tx.send(LogMessage {
         plugin_instance_id: instance_id,
-        test_run_id: String::new(),
+        test_run_id,
         level: record.level().to_string().to_uppercase(),
         message: record.args().to_string(),
         target: record.target().to_string(),
@@ -174,6 +192,8 @@ impl PactPlugin for JsonRpcPlugin {
     &self,
     request: Request<ConfigureInteractionRequest>,
   ) -> Result<Response<ConfigureInteractionResponse>, Status> {
+    let test_run_id = extract_test_run_id(request.get_ref().test_context.as_ref());
+    TEST_RUN_ID.scope(test_run_id, async move {
     let request = request.get_ref();
     if !request.content_type.is_empty()
       && request.content_type != "application/json"
@@ -247,6 +267,7 @@ impl PactPlugin for JsonRpcPlugin {
     ],
     plugin_configuration: None,
   }))
+    }).await
   }
 
   async fn generate_content(
@@ -262,6 +283,9 @@ impl PactPlugin for JsonRpcPlugin {
     &self,
     request: Request<StartMockServerRequest>,
   ) -> Result<Response<StartMockServerResponse>, Status> {
+    let test_run_id = extract_test_run_id(request.get_ref().test_context.as_ref());
+    let mock_servers = self.mock_servers.clone();
+    TEST_RUN_ID.scope(test_run_id, async move {
     let request = request.get_ref();
     if request.interactions.is_empty() {
       return Ok(Response::new(StartMockServerResponse {
@@ -297,13 +321,14 @@ impl PactPlugin for JsonRpcPlugin {
       port: server.port() as u32,
       address: format!("http://{}:{}", server.address(), server.port()),
     };
-    self.mock_servers.lock().await.insert(key, server);
+    mock_servers.lock().await.insert(key, server);
 
     Ok(Response::new(StartMockServerResponse {
       response: Some(proto::start_mock_server_response::Response::Details(
         details,
       )),
     }))
+    }).await
   }
 
   async fn shutdown_mock_server(
@@ -346,6 +371,8 @@ impl PactPlugin for JsonRpcPlugin {
     &self,
     request: Request<VerificationPreparationRequest>,
   ) -> Result<Response<VerificationPreparationResponse>, Status> {
+    let test_run_id = extract_test_run_id(request.get_ref().test_context.as_ref());
+    TEST_RUN_ID.scope(test_run_id, async move {
     let request = request.get_ref();
     let config_value = request
       .interaction_contents
@@ -366,12 +393,15 @@ impl PactPlugin for JsonRpcPlugin {
         metadata: config.interaction_metadata().into_iter().collect(),
       })),
     }))
+    }).await
   }
 
   async fn verify_interaction(
     &self,
     request: Request<VerifyInteractionRequest>,
   ) -> Result<Response<VerifyInteractionResponse>, Status> {
+    let test_run_id = extract_test_run_id(request.get_ref().test_context.as_ref());
+    TEST_RUN_ID.scope(test_run_id, async move {
     let request = request.get_ref();
     let config_value = request
       .interaction_contents
@@ -492,6 +522,7 @@ impl PactPlugin for JsonRpcPlugin {
         ],
       })),
     }))
+    }).await
   }
 }
 

@@ -108,6 +108,8 @@ message CompareContentsRequest {
   map<string, MatchingRules> rules = 4;
   // Additional data added to the Pact/Interaction by the plugin
   PluginConfiguration pluginConfiguration = 5;
+  // Context data provided by the test framework (carries testRunId for log correlation)
+  google.protobuf.Struct testContext = 6;
 }
 
 // Indicates that there was a mismatch with the content type
@@ -156,6 +158,8 @@ message ConfigureInteractionRequest {
   string contentType = 1;
   // This is data specified by the user in the consumer test
   google.protobuf.Struct contentsConfig = 2;
+  // Context data provided by the test framework (carries testRunId for log correlation)
+  google.protobuf.Struct testContext = 3;
 }
 
 // Represents a matching rule
