@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use std::io;
 use std::io::{Read, Write};
 use std::net::SocketAddr;
+use std::sync::OnceLock;
 
 use anyhow::anyhow;
 use csv::{Reader, ReaderBuilder, StringRecord};
@@ -16,19 +17,125 @@ use pact_models::matchingrules::{MatchingRule, RuleList, RuleLogic};
 use pact_models::prelude::ContentType;
 use serde_json::Value;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::sync::mpsc;
 use tonic::{transport::Server, Response};
 use uuid::Uuid;
+
+use prost_types;
 
 use crate::csv_content::{generate_csv_content, has_headers, setup_csv_contents};
 use crate::proto::body::ContentTypeHint;
 use crate::proto::catalogue_entry::EntryType;
 use crate::proto::pact_plugin_server::{PactPlugin, PactPluginServer};
+use crate::proto::plugin_host_client::PluginHostClient;
 use crate::proto::to_object;
 
 mod csv_content;
 mod parser;
 mod proto;
 mod utils;
+
+/// Plugin instance UUID set by the driver in InitPluginRequest; included in every Log RPC call
+static PLUGIN_INSTANCE_ID: OnceLock<String> = OnceLock::new();
+
+/// Test run ID from testContext["testRunId"]; scoped per gRPC request task
+tokio::task_local! {
+  static TEST_RUN_ID: String;
+}
+
+fn extract_test_run_id(ctx: Option<&prost_types::Struct>) -> String {
+  ctx
+    .and_then(|s| s.fields.get("testRunId"))
+    .and_then(|v| match &v.kind {
+      Some(prost_types::value::Kind::StringValue(s)) => Some(s.clone()),
+      _ => None,
+    })
+    .unwrap_or_default()
+}
+
+fn is_transport_target(target: &str) -> bool {
+  target.starts_with("h2::") || target.starts_with("tower::") ||
+  target.starts_with("tonic::") || target.starts_with("hyper_util::") ||
+  target.starts_with("hyper::")
+}
+
+/// Wraps env_logger and also forwards records to the driver via the PluginHost Log RPC
+struct PluginHostLogger {
+  inner: env_logger::Logger,
+  host_tx: Option<mpsc::UnboundedSender<proto::LogMessage>>,
+}
+
+impl log::Log for PluginHostLogger {
+  fn enabled(&self, metadata: &log::Metadata) -> bool {
+    self.inner.enabled(metadata)
+  }
+
+  fn log(&self, record: &log::Record) {
+    if !self.inner.enabled(record.metadata()) {
+      return;
+    }
+    if let Some(tx) = &self.host_tx {
+      if record.level() != log::Level::Trace && !is_transport_target(record.target()) {
+        let instance_id = PLUGIN_INSTANCE_ID.get().cloned().unwrap_or_default();
+        let test_run_id = TEST_RUN_ID.try_with(|id| id.clone()).unwrap_or_default();
+        let timestamp_ms = std::time::SystemTime::now()
+          .duration_since(std::time::UNIX_EPOCH)
+          .map(|d| d.as_millis() as i64)
+          .unwrap_or(0);
+        let _ = tx.send(proto::LogMessage {
+          plugin_instance_id: instance_id,
+          test_run_id,
+          level: record.level().to_string().to_uppercase(),
+          message: record.args().to_string(),
+          target: record.target().to_string(),
+          timestamp_ms,
+        });
+      }
+    }
+    self.inner.log(record);
+  }
+
+  fn flush(&self) {
+    self.inner.flush();
+  }
+}
+
+async fn init_logging() {
+  if let Ok(id) = std::env::var("PACT_PLUGIN_INSTANCE_ID") {
+    PLUGIN_INSTANCE_ID.set(id).ok();
+  }
+
+  let mut builder = env_logger::Builder::from_env(Env::new().filter("LOG_LEVEL"));
+  let inner = builder.build();
+
+  let host_tx = match std::env::var("PACT_PLUGIN_HOST") {
+    Ok(host_addr) => {
+      let endpoint = format!("http://{}", host_addr);
+      match PluginHostClient::connect(endpoint).await {
+        Ok(mut client) => {
+          let (tx, mut rx) = mpsc::unbounded_channel::<proto::LogMessage>();
+          tokio::spawn(async move {
+            while let Some(msg) = rx.recv().await {
+              let _ = client.log(tonic::Request::new(msg)).await;
+            }
+          });
+          Some(tx)
+        }
+        Err(err) => {
+          eprintln!("Could not connect to PluginHost, log forwarding disabled: {err}");
+          None
+        }
+      }
+    }
+    Err(_) => None,
+  };
+
+  let logger = PluginHostLogger { inner, host_tx };
+  if let Err(err) = log::set_boxed_logger(Box::new(logger)) {
+    eprintln!("Failed to install logger: {err}");
+  }
+  log::set_max_level(log::LevelFilter::Trace);
+}
 
 #[derive(Debug, Default)]
 pub struct CsvPactPlugin {}
@@ -42,6 +149,7 @@ impl PactPlugin for CsvPactPlugin {
     request: tonic::Request<proto::InitPluginRequest>,
   ) -> Result<tonic::Response<proto::InitPluginResponse>, tonic::Status> {
     let message = request.get_ref();
+    PLUGIN_INSTANCE_ID.set(message.plugin_instance_id.clone()).ok();
     debug!("Init request from {}/{}", message.implementation, message.version);
     Ok(Response::new(proto::InitPluginResponse {
       response: Some(proto::init_plugin_response::Response::Success(
@@ -82,90 +190,93 @@ impl PactPlugin for CsvPactPlugin {
     &self,
     request: tonic::Request<proto::CompareContentsRequest>,
   ) -> Result<tonic::Response<proto::CompareContentsResponse>, tonic::Status> {
-    let request = request.get_ref();
-    debug!("compare_contents request - {:?}", request);
+    let test_run_id = extract_test_run_id(request.get_ref().test_context.as_ref());
+    TEST_RUN_ID.scope(test_run_id, async move {
+      let request = request.get_ref();
+      debug!("compare_contents request - {:?}", request);
 
-    let has_headers = has_headers(&request.plugin_configuration);
+      let has_headers = has_headers(&request.plugin_configuration);
 
-    match (request.expected.as_ref(), request.actual.as_ref()) {
-      (Some(expected), Some(actual)) => {
-        let expected_csv_data = std::str::from_utf8(expected.content.as_ref().unwrap())
-          .map_err(|err| tonic::Status::aborted(format!("Failed to compare CSV contents: {}", err)))?;
-        let mut expected_rdr = ReaderBuilder::new().has_headers(has_headers)
-          .from_reader(expected_csv_data.as_bytes());
-        let actual_csv_data = actual.content.as_ref().unwrap();
-        let mut actual_rdr = ReaderBuilder::new().has_headers(has_headers)
-          .from_reader(actual_csv_data.as_slice());
+      match (request.expected.as_ref(), request.actual.as_ref()) {
+        (Some(expected), Some(actual)) => {
+          let expected_csv_data = std::str::from_utf8(expected.content.as_ref().unwrap())
+            .map_err(|err| tonic::Status::aborted(format!("Failed to compare CSV contents: {}", err)))?;
+          let mut expected_rdr = ReaderBuilder::new().has_headers(has_headers)
+            .from_reader(expected_csv_data.as_bytes());
+          let actual_csv_data = actual.content.as_ref().unwrap();
+          let mut actual_rdr = ReaderBuilder::new().has_headers(has_headers)
+            .from_reader(actual_csv_data.as_slice());
 
-        let rules = request.rules.iter()
-          .map(|(key, rules)| {
-            let rules = rules.rule.iter().fold(RuleList::empty(RuleLogic::And), |mut list, rule| {
-              match to_object(&rule.values.as_ref().unwrap()) {
-                Value::Object(mut map) => {
-                  map.insert("match".to_string(), Value::String(rule.r#type.clone()));
-                  debug!("Creating matching rule with {:?}", map);
-                  list.add_rule(&MatchingRule::from_json(&Value::Object(map)).unwrap());
+          let rules = request.rules.iter()
+            .map(|(key, rules)| {
+              let rules = rules.rule.iter().fold(RuleList::empty(RuleLogic::And), |mut list, rule| {
+                match to_object(&rule.values.as_ref().unwrap()) {
+                  Value::Object(mut map) => {
+                    map.insert("match".to_string(), Value::String(rule.r#type.clone()));
+                    debug!("Creating matching rule with {:?}", map);
+                    list.add_rule(&MatchingRule::from_json(&Value::Object(map)).unwrap());
+                  }
+                  _ => {}
                 }
-                _ => {}
+                list
+              });
+              (key.clone(), rules)
+            }).collect();
+          compare_contents(has_headers, &mut expected_rdr, &mut actual_rdr,
+                           request.allow_unexpected_keys, rules)
+            .map_err(|err| tonic::Status::aborted(format!("Failed to compare CSV contents: {}", err)))
+        }
+        (None, Some(actual)) => {
+          let contents = actual.content.as_ref().unwrap();
+          Ok(Response::new(proto::CompareContentsResponse {
+            error: String::default(),
+            type_mismatch: None,
+            results: hashmap! {
+              String::default() => proto::ContentMismatches {
+                mismatches: vec![
+                  proto::ContentMismatch {
+                    expected: None,
+                    actual: Some(contents.clone()),
+                    mismatch: format!("Expected no CSV content, but got {} bytes", contents.len()),
+                    path: "".to_string(),
+                    diff: "".to_string(),
+                    mismatch_type: String::default(),
+                  }
+                ]
               }
-              list
-            });
-            (key.clone(), rules)
-          }).collect();
-        compare_contents(has_headers, &mut expected_rdr, &mut actual_rdr,
-                         request.allow_unexpected_keys, rules)
-          .map_err(|err| tonic::Status::aborted(format!("Failed to compare CSV contents: {}", err)))
-      }
-      (None, Some(actual)) => {
-        let contents = actual.content.as_ref().unwrap();
-        Ok(Response::new(proto::CompareContentsResponse {
-          error: String::default(),
-          type_mismatch: None,
-          results: hashmap! {
-            String::default() => proto::ContentMismatches {
-              mismatches: vec![
-                proto::ContentMismatch {
-                  expected: None,
-                  actual: Some(contents.clone()),
-                  mismatch: format!("Expected no CSV content, but got {} bytes", contents.len()),
-                  path: "".to_string(),
-                  diff: "".to_string(),
-                  mismatch_type: String::default(),
-                }
-              ]
             }
-          }
-        }))
-      }
-      (Some(expected), None) => {
-        let contents = expected.content.as_ref().unwrap();
-        Ok(Response::new(proto::CompareContentsResponse {
-          error: String::default(),
-          type_mismatch: None,
-          results: hashmap! {
-            String::default() => proto::ContentMismatches {
-              mismatches: vec![
-                proto::ContentMismatch {
-                  expected: Some(contents.clone()),
-                  actual: None,
-                  mismatch: format!("Expected CSV content, but did not get any"),
-                  path: "".to_string(),
-                  diff: "".to_string(),
-                  mismatch_type: String::default(),
-                }
-              ]
+          }))
+        }
+        (Some(expected), None) => {
+          let contents = expected.content.as_ref().unwrap();
+          Ok(Response::new(proto::CompareContentsResponse {
+            error: String::default(),
+            type_mismatch: None,
+            results: hashmap! {
+              String::default() => proto::ContentMismatches {
+                mismatches: vec![
+                  proto::ContentMismatch {
+                    expected: Some(contents.clone()),
+                    actual: None,
+                    mismatch: format!("Expected CSV content, but did not get any"),
+                    path: "".to_string(),
+                    diff: "".to_string(),
+                    mismatch_type: String::default(),
+                  }
+                ]
+              }
             }
-          }
-        }))
+          }))
+        }
+        (None, None) => {
+          Ok(Response::new(proto::CompareContentsResponse {
+            error: String::default(),
+            type_mismatch: None,
+            results: hashmap!{}
+          }))
+        }
       }
-      (None, None) => {
-        Ok(Response::new(proto::CompareContentsResponse {
-          error: String::default(),
-          type_mismatch: None,
-          results: hashmap!{}
-        }))
-      }
-    }
+    }).await
   }
 
   // Request to configure the interaction with CSV contents
@@ -177,9 +288,12 @@ impl PactPlugin for CsvPactPlugin {
     &self,
     request: tonic::Request<proto::ConfigureInteractionRequest>,
   ) -> Result<tonic::Response<proto::ConfigureInteractionResponse>, tonic::Status> {
-    debug!("Received configure_contents request for '{}'", request.get_ref().content_type);
-    setup_csv_contents(&request)
-      .map_err(|err| tonic::Status::aborted(format!("Invalid column definition: {}", err)))
+    let test_run_id = extract_test_run_id(request.get_ref().test_context.as_ref());
+    TEST_RUN_ID.scope(test_run_id, async move {
+      debug!("Received configure_contents request for '{}'", request.get_ref().content_type);
+      setup_csv_contents(&request)
+        .map_err(|err| tonic::Status::aborted(format!("Invalid column definition: {}", err)))
+    }).await
   }
 
   // Request to generate CSV contents
@@ -385,6 +499,7 @@ mod tests {
         implementation: "plugin-driver-rust".to_string(),
         version: "1.0.0-beta.1".to_string(),
         host_capabilities: vec![],
+        ..Default::default()
       }))
       .await
       .unwrap()
@@ -415,8 +530,7 @@ impl Stream for TcpIncoming {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-  let env = Env::new().filter("LOG_LEVEL");
-  env_logger::init_from_env(env);
+  init_logging().await;
 
   let addr: SocketAddr = "0.0.0.0:0".parse()?;
   let listener = TcpListener::bind(addr).await?;

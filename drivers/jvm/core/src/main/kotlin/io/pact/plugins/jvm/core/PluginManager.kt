@@ -228,6 +228,8 @@ interface PactPlugin {
   val port: Int?
   val serverKey: String?
   val processPid: Long?
+  /** UUID assigned by the driver at process start; included in every log record emitted by this instance */
+  val instanceId: String
   var rpcClient: PactPluginRpcClient?
   var catalogueEntries: List<Plugin.CatalogueEntry>?
   var pluginCapabilities: List<String>
@@ -252,6 +254,7 @@ data class DefaultPactPlugin(
   override val manifest: PactPluginManifest,
   override val port: Int?,
   override val serverKey: String,
+  override val instanceId: String,
   override var rpcClient: PactPluginRpcClient? = null,
   override var catalogueEntries: List<Plugin.CatalogueEntry>? = null,
   override var pluginCapabilities: List<String> = emptyList(),
@@ -261,6 +264,7 @@ data class DefaultPactPlugin(
     get() = cp.pid
 
   override fun shutdown() {
+    PluginHostServer.deregisterInstance(instanceId)
     cp.destroy()
     if (channel != null) {
       channel!!.shutdownNow().awaitTermination(1, TimeUnit.SECONDS)
@@ -980,7 +984,6 @@ object DefaultPluginManager: PluginManager {
 
       return Result.Ok(plugin)
     } catch (e: Exception) {
-      logger.error(e) { "Failed to initialise the plugin" }
       return Result.Err(e)
     }
   }
@@ -989,7 +992,8 @@ object DefaultPluginManager: PluginManager {
     val request = PluginInitRequest(
       implementation = "plugin-driver-jvm",
       version = Utils.lookupVersion(PluginManager::class.java),
-      hostCapabilities = CatalogueManager.coreEntries().map { "${it.type}/${it.key}" }
+      hostCapabilities = CatalogueManager.coreEntries().map { "${it.type}/${it.key}" },
+      pluginInstanceId = plugin.instanceId
     )
 
     val response =  plugin.withRpcClient { client -> client.initPlugin(request) }
@@ -1042,28 +1046,42 @@ object DefaultPluginManager: PluginManager {
     val logLevel = logLevel()
     pb.environment()["LOG_LEVEL"] = logLevel
     pb.environment()["RUST_LOG"] = logLevel
+    val instanceId = java.util.UUID.randomUUID().toString()
+    logger.debug { "Plugin ${manifest.name} assigned instance ID $instanceId" }
+    pb.environment()["PACT_PLUGIN_INSTANCE_ID"] = instanceId
+
+    try {
+      val hostPort = PluginHostServer.ensureRunning()
+      pb.environment()["PACT_PLUGIN_HOST"] = "127.0.0.1:$hostPort"
+    } catch (e: Exception) {
+      logger.warn(e) { "Could not start PluginHost server, Log RPC forwarding will be unavailable" }
+    }
     env.forEach { (k, v) -> pb.environment()[k] = v }
 
     if (manifest.args.isNotEmpty()) {
       pb.command().addAll(manifest.args)
     }
 
-    val cp = ChildProcess(pb, manifest)
+    val cp = ChildProcess(pb, manifest, instanceId)
     return try {
       logger.debug { "Starting plugin ${manifest.name} process ${pb.command()}" }
       cp.start()
+      PluginHostServer.registerInstance(instanceId, manifest.name)
       logger.debug { "Plugin ${manifest.name} started with PID ${cp.pid}" }
       val timeout = System.getProperty("pact.plugin.loadTimeoutInMs")?.toLongOrNull() ?: 10000
       val startupInfo = cp.channel.poll(timeout, TimeUnit.MILLISECONDS)
       if (startupInfo is JsonValue.Object) {
-        Result.Ok(DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString()))
+        val plugin = DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString(), instanceId)
+        Result.Ok(plugin)
       } else {
         cp.destroy()
+        PluginHostServer.deregisterInstance(instanceId)
         Result.Err("Plugin process did not output the correct startup message in $timeout ms - got $startupInfo")
       }
     } catch (e: Exception) {
       logger.error(e) { "Plugin process did not start correctly" }
       cp.destroy()
+      PluginHostServer.deregisterInstance(instanceId)
       Result.Err("Plugin process did not start correctly - ${e.message}")
     }
   }

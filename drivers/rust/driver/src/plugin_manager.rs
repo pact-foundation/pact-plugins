@@ -1,6 +1,7 @@
 //! Manages interactions with Pact plugins
 use std::collections::HashMap;
 use std::env;
+use uuid::Uuid;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Write};
@@ -55,6 +56,21 @@ lazy_static! {
   static ref PLUGIN_MANIFEST_REGISTER: Mutex<HashMap<String, PactPluginManifest>> =
     Mutex::new(HashMap::new());
   static ref PLUGIN_REGISTER: Mutex<HashMap<String, PactPlugin>> = Mutex::new(HashMap::new());
+  /// Maps plugin_instance_id → plugin_name so the PluginHost Log RPC handler can
+  /// attach the plugin name to forwarded log entries without a proto field for it.
+  static ref INSTANCE_NAMES: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
+}
+
+pub(crate) fn plugin_name_for_instance(instance_id: &str) -> Option<String> {
+  INSTANCE_NAMES.lock().unwrap().get(instance_id).cloned()
+}
+
+fn register_plugin_instance(instance_id: &str, plugin_name: &str) {
+  INSTANCE_NAMES.lock().unwrap().insert(instance_id.to_string(), plugin_name.to_string());
+}
+
+fn deregister_plugin_instance(instance_id: &str) {
+  INSTANCE_NAMES.lock().unwrap().remove(instance_id);
 }
 
 fn host_capabilities() -> Vec<String> {
@@ -273,7 +289,9 @@ async fn initialise_plugin(
             plugin.port()
           );
 
-          let response = init_handshake(manifest, &mut plugin).await.map_err(|err| {
+          let instance_id = plugin.instance_id.clone();
+          let response = init_handshake(manifest, &mut plugin, &instance_id).await.map_err(|err| {
+            deregister_plugin_instance(&instance_id);
             plugin.kill();
             anyhow!("Failed to send init request to the plugin - {}", err)
           })?;
@@ -297,11 +315,13 @@ async fn initialise_plugin(
 pub async fn init_handshake(
   manifest: &PactPluginManifest,
   plugin: &mut (dyn PactPluginRpc + Send + Sync),
+  instance_id: &str,
 ) -> anyhow::Result<crate::plugin_models::PluginInitResponse> {
   let request = PluginInitRequest {
     implementation: "plugin-driver-rust".to_string(),
     version: option_env!("CARGO_PKG_VERSION").unwrap_or("0").to_string(),
     host_capabilities: host_capabilities(),
+    plugin_instance_id: instance_id.to_string(),
   };
   let response = plugin.init_plugin(request).await?;
   debug!(
@@ -330,12 +350,27 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
   }
   debug!("Starting plugin using {:?}", &path);
 
+  let host_port = match crate::plugin_host::ensure_plugin_host_running().await {
+    Ok(port) => Some(port),
+    Err(err) => {
+      warn!("Could not start PluginHost server, Log RPC forwarding will be unavailable: {}", err);
+      None
+    }
+  };
+
   let log_level = max_level();
   let mut child_command = Command::new(path.clone());
   let mut child_command = child_command
     .env("LOG_LEVEL", log_level.to_string())
     .env("RUST_LOG", log_level.to_string())
     .current_dir(manifest.plugin_dir.clone());
+
+  let instance_id = Uuid::new_v4().to_string();
+
+  child_command = child_command.env("PACT_PLUGIN_INSTANCE_ID", &instance_id);
+  if let Some(port) = host_port {
+    child_command = child_command.env("PACT_PLUGIN_HOST", format!("127.0.0.1:{}", port));
+  }
 
   if let Some(args) = &manifest.args {
     child_command = child_command.args(args);
@@ -353,11 +388,16 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
       )
     })?;
   let child_pid = child.id();
-  debug!("Plugin {} started with PID {}", manifest.name, child_pid);
+  debug!("Plugin {} started with PID {} (instance {})", manifest.name, child_pid, instance_id);
+  register_plugin_instance(&instance_id, &manifest.name);
 
-  match ChildPluginProcess::new(child, manifest).await {
-    Ok(child) => PactPlugin::new(manifest, child),
+  match ChildPluginProcess::new(child, manifest, instance_id.clone()).await {
+    Ok(child) => {
+      let plugin = PactPlugin::new(manifest, child)?;
+      Ok(plugin)
+    }
     Err(err) => {
+      deregister_plugin_instance(&instance_id);
       let mut s = System::new();
       s.refresh_processes();
       if let Some(process) = s.process(Pid::from_u32(child_pid)) {
@@ -391,6 +431,7 @@ pub fn shutdown_plugins() {
   trace!("shutdown_plugins {:?}: Got PLUGIN_REGISTER lock", thread_id);
   for plugin in guard.values() {
     debug!("Shutting down plugin {:?}", plugin);
+    deregister_plugin_instance(&plugin.instance_id);
     plugin.kill();
     remove_plugin_entries(&plugin.manifest.name);
   }
@@ -407,6 +448,7 @@ pub fn shutdown_plugin(plugin: &mut PactPlugin) {
     "Shutting down plugin {}:{}",
     plugin.manifest.name, plugin.manifest.version
   );
+  deregister_plugin_instance(&plugin.instance_id);
   plugin.kill();
   remove_plugin_entries(&plugin.manifest.name);
 }
@@ -1326,7 +1368,7 @@ mod tests {
     };
     let mut plugin = InitRecordingPlugin::default();
 
-    let response = init_handshake(&manifest, &mut plugin).await.unwrap();
+    let response = init_handshake(&manifest, &mut plugin, "test-instance-id").await.unwrap();
     let request = plugin.request.read().unwrap().clone().unwrap();
 
     assert!(
@@ -1350,7 +1392,7 @@ mod tests {
       (missing host capabilities: interaction/request-response)";
     let mut plugin = FailingInitPlugin { error: expected_error.to_string() };
 
-    let err = init_handshake(&manifest, &mut plugin).await.unwrap_err();
+    let err = init_handshake(&manifest, &mut plugin, "test-instance-id").await.unwrap_err();
 
     expect!(err.to_string()).to(be_equal_to(expected_error.to_string()));
   }

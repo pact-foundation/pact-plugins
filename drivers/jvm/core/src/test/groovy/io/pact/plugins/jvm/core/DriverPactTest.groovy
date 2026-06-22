@@ -66,6 +66,11 @@ class DriverPactTest {
     }
 
     @Override
+    String getInstanceId() {
+      'test-instance-id'
+    }
+
+    @Override
     PactPluginRpcClient getRpcClient() {
       Mockito.mock(PactPluginRpcClient)
     }
@@ -166,7 +171,7 @@ class DriverPactTest {
     Plugin.InitPluginRequest requestMessage = Plugin.InitPluginRequest.parseFrom(message.request.contents.value)
     Plugin.InitPluginResponse responseMessage = Plugin.InitPluginResponse.parseFrom(message.response.first().contents.value)
     def plugin = new MockPlugin(
-      request: new PluginInitRequest(requestMessage.implementation, requestMessage.version, []),
+      request: new PluginInitRequest(requestMessage.implementation, requestMessage.version, [], 'test-instance-id'),
       response: new PluginInitResponse(responseMessage.catalogueList, [])
     )
 
