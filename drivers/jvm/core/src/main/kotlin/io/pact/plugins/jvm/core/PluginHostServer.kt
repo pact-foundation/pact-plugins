@@ -8,6 +8,8 @@ import io.grpc.stub.StreamObserver
 import io.pact.plugin.v2.PluginHostGrpc
 import io.pact.plugin.v2.PluginV2
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.atomic.AtomicInteger
 import org.slf4j.MDC
 
 private val logger = KotlinLogging.logger {}
@@ -20,15 +22,20 @@ internal class PluginHostGrpcService : PluginHostGrpc.PluginHostImplBase() {
       return
     }
     val instanceId = request.pluginInstanceId
-    val pluginName = PluginHostServer.pluginNameForInstance(instanceId) ?: instanceId
-    val target = request.target.ifEmpty { "io.pact.plugin.$pluginName" }
-    val pluginLogger = KotlinLogging.logger(target)
-    val message = "[instance:$instanceId] ${request.message}"
+    val pluginName = PluginHostServer.pluginNameForInstance(instanceId)
+    val loggerName = if (!pluginName.isNullOrEmpty()) "io.pact.plugin.$pluginName" else "io.pact.plugin"
+    val pluginLogger = KotlinLogging.logger(loggerName)
+    val shortId = instanceId.take(8)
+    val prefix = if (!pluginName.isNullOrEmpty()) {
+      if (shortId.isNotEmpty()) "[$pluginName:$shortId]" else "[$pluginName]"
+    } else {
+      if (shortId.isNotEmpty()) "[plugin:$shortId]" else "[plugin]"
+    }
+    val message = "$prefix ${request.message}"
     val testRunId = request.testRunId.ifEmpty { null }
     if (testRunId != null) MDC.put("testRunId", testRunId)
     try {
       when (request.level.uppercase()) {
-        "TRACE" -> pluginLogger.trace { message }
         "DEBUG" -> pluginLogger.debug { message }
         "INFO"  -> pluginLogger.info { message }
         "WARN"  -> pluginLogger.warn { message }
@@ -52,12 +59,20 @@ object PluginHostServer {
   private var server: Server? = null
   private var port: Int = 0
   private val instanceNames = ConcurrentHashMap<String, String>()
+  private val threadIndex = AtomicInteger(0)
 
   @Synchronized
   fun ensureRunning(): Int {
     if (server == null) {
+      val executor = Executors.newCachedThreadPool { r ->
+        Thread(r).apply {
+          name = "pact-plugin-log-${threadIndex.incrementAndGet()}"
+          isDaemon = true
+        }
+      }
       server = ServerBuilder.forPort(0)
         .addService(PluginHostGrpcService())
+        .executor(executor)
         .build()
         .start()
       port = server!!.port

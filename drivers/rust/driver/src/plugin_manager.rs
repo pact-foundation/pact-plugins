@@ -364,8 +364,12 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
     .env("RUST_LOG", log_level.to_string())
     .current_dir(manifest.plugin_dir.clone());
 
+  let instance_id = Uuid::new_v4().to_string();
+
   if let Some(port) = host_port {
-    child_command = child_command.env("PACT_PLUGIN_HOST", format!("127.0.0.1:{}", port));
+    child_command = child_command
+      .env("PACT_PLUGIN_HOST", format!("127.0.0.1:{}", port))
+      .env("PACT_PLUGIN_INSTANCE_ID", &instance_id);
   }
 
   if let Some(args) = &manifest.args {
@@ -384,16 +388,16 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
       )
     })?;
   let child_pid = child.id();
-  let instance_id = Uuid::new_v4().to_string();
   debug!("Plugin {} started with PID {} (instance {})", manifest.name, child_pid, instance_id);
+  register_plugin_instance(&instance_id, &manifest.name);
 
-  match ChildPluginProcess::new(child, manifest, instance_id).await {
+  match ChildPluginProcess::new(child, manifest, instance_id.clone()).await {
     Ok(child) => {
       let plugin = PactPlugin::new(manifest, child)?;
-      register_plugin_instance(&plugin.instance_id, &manifest.name);
       Ok(plugin)
     }
     Err(err) => {
+      deregister_plugin_instance(&instance_id);
       let mut s = System::new();
       s.refresh_processes();
       if let Some(process) = s.process(Pid::from_u32(child_pid)) {

@@ -1047,9 +1047,13 @@ object DefaultPluginManager: PluginManager {
     val logLevel = logLevel()
     pb.environment()["LOG_LEVEL"] = logLevel
     pb.environment()["RUST_LOG"] = logLevel
+    val instanceId = java.util.UUID.randomUUID().toString()
+    logger.debug { "Plugin ${manifest.name} assigned instance ID $instanceId" }
+
     try {
       val hostPort = PluginHostServer.ensureRunning()
       pb.environment()["PACT_PLUGIN_HOST"] = "127.0.0.1:$hostPort"
+      pb.environment()["PACT_PLUGIN_INSTANCE_ID"] = instanceId
     } catch (e: Exception) {
       logger.warn(e) { "Could not start PluginHost server, Log RPC forwarding will be unavailable" }
     }
@@ -1059,26 +1063,26 @@ object DefaultPluginManager: PluginManager {
       pb.command().addAll(manifest.args)
     }
 
-    val instanceId = java.util.UUID.randomUUID().toString()
-    logger.debug { "Plugin ${manifest.name} assigned instance ID $instanceId" }
     val cp = ChildProcess(pb, manifest, instanceId)
     return try {
       logger.debug { "Starting plugin ${manifest.name} process ${pb.command()}" }
       cp.start()
+      PluginHostServer.registerInstance(instanceId, manifest.name)
       logger.debug { "Plugin ${manifest.name} started with PID ${cp.pid}" }
       val timeout = System.getProperty("pact.plugin.loadTimeoutInMs")?.toLongOrNull() ?: 10000
       val startupInfo = cp.channel.poll(timeout, TimeUnit.MILLISECONDS)
       if (startupInfo is JsonValue.Object) {
         val plugin = DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString(), instanceId)
-        PluginHostServer.registerInstance(instanceId, manifest.name)
         Result.Ok(plugin)
       } else {
         cp.destroy()
+        PluginHostServer.deregisterInstance(instanceId)
         Result.Err("Plugin process did not output the correct startup message in $timeout ms - got $startupInfo")
       }
     } catch (e: Exception) {
       logger.error(e) { "Plugin process did not start correctly" }
       cp.destroy()
+      PluginHostServer.deregisterInstance(instanceId)
       Result.Err("Plugin process did not start correctly - ${e.message}")
     }
   }

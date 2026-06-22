@@ -97,6 +97,10 @@ impl log::Log for PluginHostLogger {
 }
 
 async fn init_logging() {
+  if let Ok(id) = std::env::var("PACT_PLUGIN_INSTANCE_ID") {
+    PLUGIN_INSTANCE_ID.set(id).ok();
+  }
+
   let inner = env_logger::Builder::from_default_env().build();
 
   let host_tx = match std::env::var("PACT_PLUGIN_HOST") {

@@ -95,6 +95,10 @@ impl log::Log for PluginHostLogger {
 }
 
 async fn init_logging() {
+  if let Ok(id) = std::env::var("PACT_PLUGIN_INSTANCE_ID") {
+    PLUGIN_INSTANCE_ID.set(id).ok();
+  }
+
   let mut builder = env_logger::Builder::from_env(Env::new().filter("LOG_LEVEL"));
   let inner = builder.build();
 
