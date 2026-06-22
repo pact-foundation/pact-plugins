@@ -113,7 +113,7 @@ async fn test_proto_client() {
     };
     let mut mock_plugin = MockPlugin { request, response };
 
-    let result = init_handshake(&manifest, &mut mock_plugin).await;
+    let result = init_handshake(&manifest, &mut mock_plugin, "test-instance").await;
 
     expect!(result).to(be_ok());
   }
