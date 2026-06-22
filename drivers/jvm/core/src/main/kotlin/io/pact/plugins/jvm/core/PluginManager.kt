@@ -984,7 +984,6 @@ object DefaultPluginManager: PluginManager {
 
       return Result.Ok(plugin)
     } catch (e: Exception) {
-      logger.error(e) { "Failed to initialise the plugin" }
       return Result.Err(e)
     }
   }
