@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.0.0-beta.3 - V2 Plugin observability and structured log forwarding
+
+* 72cc15c - feat(008): Plugin observability and structured log forwarding (#99) (Ronald Holshausen, Mon Jun 22 15:45:05 2026 +1000)
+* 441ce4b - bump version to 1.0.0-beta.3 (Ronald Holshausen, Tue Jun 9 13:08:32 2026 +1000)
+
 # 1.0.0-beta.2 - Implement V2 plugin interface
 
 * 14f394b - fix: corrected an issue in the v2 plugin driver with interaction config (Ronald Holshausen, Tue Jun 9 12:36:59 2026 +1000)
