@@ -291,6 +291,7 @@ async fn initialise_plugin(
 
           let instance_id = plugin.instance_id.clone();
           let response = init_handshake(manifest, &mut plugin, &instance_id).await.map_err(|err| {
+            deregister_plugin_instance(&instance_id);
             plugin.kill();
             anyhow!("Failed to send init request to the plugin - {}", err)
           })?;
@@ -366,10 +367,9 @@ async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<P
 
   let instance_id = Uuid::new_v4().to_string();
 
+  child_command = child_command.env("PACT_PLUGIN_INSTANCE_ID", &instance_id);
   if let Some(port) = host_port {
-    child_command = child_command
-      .env("PACT_PLUGIN_HOST", format!("127.0.0.1:{}", port))
-      .env("PACT_PLUGIN_INSTANCE_ID", &instance_id);
+    child_command = child_command.env("PACT_PLUGIN_HOST", format!("127.0.0.1:{}", port));
   }
 
   if let Some(args) = &manifest.args {

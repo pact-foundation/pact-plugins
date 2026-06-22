@@ -53,11 +53,13 @@ identifying the current test run, useful for correlating log messages back to a 
 
 #### Per-instance log file
 
-The driver captures everything your plugin writes to **stderr** and saves it to a per-instance log file at:
+The driver captures everything your plugin writes to **stderr** and saves it to a per-instance log file. The
+location depends on whether `PACT_OUTPUT_DIR` is set in the environment:
 
-```
-~/.pact/plugins/logs/pact-plugin-<name>-<instanceId>.log
-```
+| Condition | Log file path |
+|-----------|--------------|
+| `PACT_OUTPUT_DIR` is set | `$PACT_OUTPUT_DIR/logs/pact-plugin-<name>-<instanceId>.log` |
+| Default | `~/.pact/plugins/logs/pact-plugin-<name>-<instanceId>.log` |
 
 This file receives the complete log output of your plugin at whatever level the framework configures, including
 TRACE. You do not need to do anything special — just write to stderr as normal.

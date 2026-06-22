@@ -5,14 +5,14 @@
 ///
 /// Add this to `RUST_LOG` or compose it into your `EnvFilter` in the test harness:
 /// ```text
-/// RUST_LOG=warn,my_crate=debug,pact_plugin_driver=info,h2=warn,tonic=warn,hyper_util=warn,tower=warn
+/// RUST_LOG=warn,my_crate=debug,pact_plugin_driver=info,h2=warn,hyper=warn,hyper_util=warn,tonic=warn,tower=warn
 /// ```
 /// Or in code:
 /// ```rust,ignore
 /// use tracing_subscriber::EnvFilter;
 /// let filter = EnvFilter::new(format!("info,{}", pact_plugin_driver::TRANSPORT_FILTER_DIRECTIVES));
 /// ```
-pub const TRANSPORT_FILTER_DIRECTIVES: &str = "h2=warn,tonic=warn,hyper_util=warn,tower=warn";
+pub const TRANSPORT_FILTER_DIRECTIVES: &str = "h2=warn,hyper=warn,hyper_util=warn,tonic=warn,tower=warn";
 
 pub mod catalogue_manager;
 mod child_process;

@@ -1048,11 +1048,11 @@ object DefaultPluginManager: PluginManager {
     pb.environment()["RUST_LOG"] = logLevel
     val instanceId = java.util.UUID.randomUUID().toString()
     logger.debug { "Plugin ${manifest.name} assigned instance ID $instanceId" }
+    pb.environment()["PACT_PLUGIN_INSTANCE_ID"] = instanceId
 
     try {
       val hostPort = PluginHostServer.ensureRunning()
       pb.environment()["PACT_PLUGIN_HOST"] = "127.0.0.1:$hostPort"
-      pb.environment()["PACT_PLUGIN_INSTANCE_ID"] = instanceId
     } catch (e: Exception) {
       logger.warn(e) { "Could not start PluginHost server, Log RPC forwarding will be unavailable" }
     }
