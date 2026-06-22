@@ -14,6 +14,11 @@ private val logger = KotlinLogging.logger {}
 
 internal class PluginHostGrpcService : PluginHostGrpc.PluginHostImplBase() {
   override fun log(request: PluginV2.LogMessage, responseObserver: StreamObserver<Empty>) {
+    if (request.level.uppercase() == "TRACE") {
+      responseObserver.onNext(Empty.getDefaultInstance())
+      responseObserver.onCompleted()
+      return
+    }
     val instanceId = request.pluginInstanceId
     val pluginName = PluginHostServer.pluginNameForInstance(instanceId) ?: instanceId
     val target = request.target.ifEmpty { "io.pact.plugin.$pluginName" }

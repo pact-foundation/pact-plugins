@@ -69,20 +69,22 @@ impl log::Log for PluginHostLogger {
       return;
     }
     if let Some(tx) = &self.host_tx {
-      let instance_id = PLUGIN_INSTANCE_ID.get().cloned().unwrap_or_default();
-      let test_run_id = TEST_RUN_ID.try_with(|id| id.clone()).unwrap_or_default();
-      let timestamp_ms = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_millis() as i64)
-        .unwrap_or(0);
-      let _ = tx.send(proto::LogMessage {
-        plugin_instance_id: instance_id,
-        test_run_id,
-        level: record.level().to_string().to_uppercase(),
-        message: record.args().to_string(),
-        target: record.target().to_string(),
-        timestamp_ms,
-      });
+      if record.level() != log::Level::Trace {
+        let instance_id = PLUGIN_INSTANCE_ID.get().cloned().unwrap_or_default();
+        let test_run_id = TEST_RUN_ID.try_with(|id| id.clone()).unwrap_or_default();
+        let timestamp_ms = std::time::SystemTime::now()
+          .duration_since(std::time::UNIX_EPOCH)
+          .map(|d| d.as_millis() as i64)
+          .unwrap_or(0);
+        let _ = tx.send(proto::LogMessage {
+          plugin_instance_id: instance_id,
+          test_run_id,
+          level: record.level().to_string().to_uppercase(),
+          message: record.args().to_string(),
+          target: record.target().to_string(),
+          timestamp_ms,
+        });
+      }
     }
     self.inner.log(record);
   }
