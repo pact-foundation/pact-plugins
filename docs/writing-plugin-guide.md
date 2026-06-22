@@ -66,8 +66,12 @@ TRACE. You do not need to do anything special — just write to stderr as normal
 
 If the `PACT_PLUGIN_HOST` environment variable is set when your plugin starts, the driver is offering a
 `PluginHost` gRPC endpoint. You should connect to it and forward **DEBUG-level and above** log records via the
-`Log` RPC. TRACE records are intentionally excluded — they are verbose transport-layer noise that belongs only in
-the log file, not in the driver's (and therefore the test framework's) log output.
+`Log` RPC, with two exceptions that must be excluded to keep test output clean:
+
+- **TRACE records** — too verbose; captured in the log file only.
+- **Transport-layer targets** — records whose logger name/target starts with `h2::`, `tower::`, `tonic::`,
+  `hyper_util::`, or `hyper::` are gRPC transport internals, not plugin application output. Forward them to
+  stderr as normal but do not send them via the Log RPC.
 
 The `PACT_PLUGIN_INSTANCE_ID` environment variable is also set by the driver before your plugin starts. Read it
 at startup and use it as `pluginInstanceId` in every `LogMessage`. Do not wait for `InitPluginRequest` to arrive

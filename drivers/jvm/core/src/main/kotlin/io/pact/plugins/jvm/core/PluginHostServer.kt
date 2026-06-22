@@ -14,9 +14,14 @@ import org.slf4j.MDC
 
 private val logger = KotlinLogging.logger {}
 
+private val TRANSPORT_TARGET_PREFIXES = listOf("h2::", "tower::", "tonic::", "hyper_util::", "hyper::")
+
+private fun isTransportTarget(target: String) =
+  TRANSPORT_TARGET_PREFIXES.any { target.startsWith(it) }
+
 internal class PluginHostGrpcService : PluginHostGrpc.PluginHostImplBase() {
   override fun log(request: PluginV2.LogMessage, responseObserver: StreamObserver<Empty>) {
-    if (request.level.uppercase() == "TRACE") {
+    if (request.level.uppercase() == "TRACE" || isTransportTarget(request.target)) {
       responseObserver.onNext(Empty.getDefaultInstance())
       responseObserver.onCompleted()
       return

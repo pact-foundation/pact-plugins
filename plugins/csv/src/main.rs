@@ -53,6 +53,12 @@ fn extract_test_run_id(ctx: Option<&prost_types::Struct>) -> String {
     .unwrap_or_default()
 }
 
+fn is_transport_target(target: &str) -> bool {
+  target.starts_with("h2::") || target.starts_with("tower::") ||
+  target.starts_with("tonic::") || target.starts_with("hyper_util::") ||
+  target.starts_with("hyper::")
+}
+
 /// Wraps env_logger and also forwards records to the driver via the PluginHost Log RPC
 struct PluginHostLogger {
   inner: env_logger::Logger,
@@ -69,7 +75,7 @@ impl log::Log for PluginHostLogger {
       return;
     }
     if let Some(tx) = &self.host_tx {
-      if record.level() != log::Level::Trace {
+      if record.level() != log::Level::Trace && !is_transport_target(record.target()) {
         let instance_id = PLUGIN_INSTANCE_ID.get().cloned().unwrap_or_default();
         let test_run_id = TEST_RUN_ID.try_with(|id| id.clone()).unwrap_or_default();
         let timestamp_ms = std::time::SystemTime::now()

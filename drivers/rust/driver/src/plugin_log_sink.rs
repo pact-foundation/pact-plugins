@@ -47,12 +47,21 @@ pub trait PluginLogSink: Send + Sync {
 
 struct DefaultPluginLogSink;
 
+fn is_transport_target(target: &str) -> bool {
+  target.starts_with("h2::") || target.starts_with("tower::") ||
+  target.starts_with("tonic::") || target.starts_with("hyper_util::") ||
+  target.starts_with("hyper::")
+}
+
 impl PluginLogSink for DefaultPluginLogSink {
   fn log(&self, entry: &PluginLogEntry) {
     if entry.source != PluginLogSource::LogRpc {
       return;
     }
     if entry.level.to_uppercase() == "TRACE" {
+      return;
+    }
+    if entry.target.as_deref().map(is_transport_target).unwrap_or(false) {
       return;
     }
     let plugin = &entry.plugin_name;
