@@ -29,6 +29,67 @@ Refer to for more details on the interface and gRPC methods that need to be impl
 You can find the [proto file](../proto/plugin.proto) that defines the plugin interface in the proto directory. Your 
 plugin will need to implement this interface.
 
+## Plugin Interface Version 2
+
+Version 2 of the plugin interface ([plugin_v2.proto](../proto/plugin_v2.proto)) extends v1 with capability
+negotiation and structured log forwarding. A v2 plugin sets `pluginInterfaceVersion: 2` in its manifest.
+
+### Capability negotiation
+
+The `InitPluginRequest` in v2 adds two fields:
+
+- `hostCapabilities` — list of capability strings advertised by the driver (e.g. `"content-matcher/csv"`). Your
+  plugin can inspect these to decide which optional features to enable.
+- `pluginInstanceId` — a UUID assigned by the driver to this specific instance of your plugin. Store this value
+  and include it in every `LogMessage` you send (see below).
+
+### Test context
+
+Several request types (`CompareContentsRequest`, `ConfigureInteractionRequest`, etc.) carry a `testContext` struct.
+This is freeform data from the test framework. The key field of interest is `testContext["testRunId"]`: a UUID
+identifying the current test run, useful for correlating log messages back to a specific test.
+
+### Logging
+
+#### Per-instance log file
+
+The driver captures everything your plugin writes to **stderr** and saves it to a per-instance log file at:
+
+```
+~/.pact/plugins/logs/pact-plugin-<name>-<instanceId>.log
+```
+
+This file receives the complete log output of your plugin at whatever level the framework configures, including
+TRACE. You do not need to do anything special — just write to stderr as normal.
+
+#### Forwarding logs to the driver via Log RPC
+
+If the `PACT_PLUGIN_HOST` environment variable is set when your plugin starts, the driver is offering a
+`PluginHost` gRPC endpoint. You should connect to it and forward **DEBUG-level and above** log records via the
+`Log` RPC. TRACE records are intentionally excluded — they are verbose transport-layer noise that belongs only in
+the log file, not in the driver's (and therefore the test framework's) log output.
+
+The `PACT_PLUGIN_INSTANCE_ID` environment variable is also set by the driver before your plugin starts. Read it
+at startup and use it as `pluginInstanceId` in every `LogMessage`. Do not wait for `InitPluginRequest` to arrive
+before setting this value — the driver expects log messages with the correct instance ID from the moment your
+plugin begins connecting.
+
+A minimal forwarding implementation:
+
+1. Read `PACT_PLUGIN_INSTANCE_ID` from the environment at startup and store it.
+2. If `PACT_PLUGIN_HOST` is set, open a gRPC connection to that address (plain-text, no TLS).
+3. For each log record at DEBUG or above, call `PluginHost.Log` with a `LogMessage` containing:
+   - `pluginInstanceId` — the value from `PACT_PLUGIN_INSTANCE_ID`
+   - `testRunId` — extracted from `testContext["testRunId"]` if a test context is active, otherwise empty
+   - `level` — one of `DEBUG`, `INFO`, `WARN`, `ERROR`
+   - `message` — the log message text
+   - `target` — the logger name or module path (e.g. `"my_plugin::matching"`)
+   - `timestampMs` — Unix epoch milliseconds
+4. Always also write the record to stderr so it appears in the log file regardless of whether the Log RPC
+   connection is available.
+
+See the [CSV plugin](../plugins/csv/src/main.rs) for a complete Rust reference implementation.
+
 When the plugin starts up, it needs to write a small JSON message to standard output that contains the port the plugin
 is running on and an optional server key. The port should be one assigned by the operating system so there are no clashes
 with other servers. The server key is reserved for use as a bearer token to restrict access to the
