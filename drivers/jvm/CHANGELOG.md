@@ -1,5 +1,16 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 1.0.0-beta.3 - Plugin observability and structured log forwarding
+
+* 44af519 - bump version to 1.0.0-beta.4 (Ronald Holshausen, Tue Jun 23 09:31:53 2026 +1000)
+* a17ea79 - update changelog for release 1.0.0-beta.3 (Ronald Holshausen, Tue Jun 23 09:30:53 2026 +1000)
+* 72cc15c - feat(008): Plugin observability and structured log forwarding (#99) (Ronald Holshausen, Mon Jun 22 15:45:05 2026 +1000)
+* be81e46 - docs: Add driver-level PluginLogSink abstraction to proposal 008 (Ronald Holshausen, Fri Jun 12 11:48:51 2026 +1000)
+* 16df146 - docs: Add FFI consumer log forwarding design to proposal 008 (Ronald Holshausen, Fri Jun 12 11:39:30 2026 +1000)
+* 7bbd336 - docs: Expand proposal 008 with concrete findings from trace log analysis (Ronald Holshausen, Fri Jun 12 11:29:54 2026 +1000)
+* 158c034 - chore: Update examples CI build to use latest verifier (Ronald Holshausen, Tue Jun 9 17:30:24 2026 +1000)
+* b76e294 - bump version to 1.0.0-beta.3 (Ronald Holshausen, Tue Jun 9 13:26:12 2026 +1000)
+
 # 1.0.0-beta.2 - Implement V2 plugin interface
 
 * 441ce4b - bump version to 1.0.0-beta.3 (Ronald Holshausen, Tue Jun 9 13:08:32 2026 +1000)
