@@ -243,13 +243,16 @@ impl PluginClient {
         .compare_contents(Request::new(request))
         .await
         .map(|response| response.into_inner()),
-      PluginClient::V2(client) => client
-        .compare_contents(Request::new(Self::convert_message::<
-          _,
-          proto_v2::CompareContentsRequest,
-        >(request)?))
-        .await
-        .and_then(|response| Self::convert_message(response.into_inner())),
+      PluginClient::V2(client) => {
+        let mut v2_req = Self::convert_message::<_, proto_v2::CompareContentsRequest>(request)?;
+        if v2_req.test_context.is_none() {
+          v2_req.test_context = crate::test_context::current_test_context();
+        }
+        client
+          .compare_contents(Request::new(v2_req))
+          .await
+          .and_then(|response| Self::convert_message(response.into_inner()))
+      }
     }
   }
 
@@ -262,13 +265,17 @@ impl PluginClient {
         .configure_interaction(Request::new(request))
         .await
         .map(|response| response.into_inner()),
-      PluginClient::V2(client) => client
-        .configure_interaction(Request::new(Self::convert_message::<
-          _,
-          proto_v2::ConfigureInteractionRequest,
-        >(request)?))
-        .await
-        .and_then(|response| Self::convert_message(response.into_inner())),
+      PluginClient::V2(client) => {
+        let mut v2_req =
+          Self::convert_message::<_, proto_v2::ConfigureInteractionRequest>(request)?;
+        if v2_req.test_context.is_none() {
+          v2_req.test_context = crate::test_context::current_test_context();
+        }
+        client
+          .configure_interaction(Request::new(v2_req))
+          .await
+          .and_then(|response| Self::convert_message(response.into_inner()))
+      }
     }
   }
 

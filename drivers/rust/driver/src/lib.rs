@@ -27,5 +27,6 @@ pub mod plugin_models;
 pub mod proto;
 pub(crate) mod proto_v2;
 pub mod repository;
+pub mod test_context;
 pub mod utils;
 pub mod verification;

@@ -3,10 +3,11 @@
 use std::sync::RwLock;
 
 use lazy_static::lazy_static;
+use serde::Serialize;
 use tracing::{debug, error, info, warn};
 
 /// Source of a plugin log entry
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub enum PluginLogSource {
   /// Raw line read from the plugin process stderr
   Stderr,
@@ -15,7 +16,7 @@ pub enum PluginLogSource {
 }
 
 /// Structured log entry produced by a running plugin
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct PluginLogEntry {
   /// Plugin name from its manifest
   pub plugin_name: String,
