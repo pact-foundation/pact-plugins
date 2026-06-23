@@ -2,6 +2,8 @@ package io.pact.plugins.jvm.core
 
 import com.google.protobuf.MessageLite
 import com.google.protobuf.Parser
+import com.google.protobuf.Struct
+import com.google.protobuf.Value
 import io.pact.plugin.PactPluginGrpc
 import io.pact.plugin.Plugin
 import io.pact.plugin.v2.PactPluginGrpc as PactPluginGrpcV2
@@ -136,18 +138,37 @@ class PactPluginV2RpcClient(
     stub.updateCatalogue(convert(request, PluginV2.Catalogue.parser()))
   }
 
-  override fun compareContents(request: Plugin.CompareContentsRequest): Plugin.CompareContentsResponse =
-    convert(
-      stub.compareContents(convert(request, PluginV2.CompareContentsRequest.parser())),
-      Plugin.CompareContentsResponse.parser()
-    )
+  override fun compareContents(request: Plugin.CompareContentsRequest): Plugin.CompareContentsResponse {
+    var v2Request = convert(request, PluginV2.CompareContentsRequest.parser())
+    val testRunId = TestContext.currentTestRunId()
+    if (!v2Request.hasTestContext() && testRunId != null) {
+      v2Request = v2Request.toBuilder()
+        .setTestContext(
+          Struct.newBuilder()
+            .putFields("testRunId", Value.newBuilder().setStringValue(testRunId).build())
+            .build()
+        )
+        .build()
+    }
+    return convert(stub.compareContents(v2Request), Plugin.CompareContentsResponse.parser())
+  }
 
   override fun configureInteraction(
     request: Plugin.ConfigureInteractionRequest
-  ): Plugin.ConfigureInteractionResponse = convert(
-    stub.configureInteraction(convert(request, PluginV2.ConfigureInteractionRequest.parser())),
-    Plugin.ConfigureInteractionResponse.parser()
-  )
+  ): Plugin.ConfigureInteractionResponse {
+    var v2Request = convert(request, PluginV2.ConfigureInteractionRequest.parser())
+    val testRunId = TestContext.currentTestRunId()
+    if (!v2Request.hasTestContext() && testRunId != null) {
+      v2Request = v2Request.toBuilder()
+        .setTestContext(
+          Struct.newBuilder()
+            .putFields("testRunId", Value.newBuilder().setStringValue(testRunId).build())
+            .build()
+        )
+        .build()
+    }
+    return convert(stub.configureInteraction(v2Request), Plugin.ConfigureInteractionResponse.parser())
+  }
 
   override fun generateContent(request: Plugin.GenerateContentRequest): Plugin.GenerateContentResponse =
     convert(
