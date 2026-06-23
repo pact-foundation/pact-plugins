@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.0.0-beta.4 - Maintenance Release
+
+* d1f1240 - feat(008): Add test run ID thread-local and inject testContext into V2 plugin requests (#100) (Ronald Holshausen, Tue Jun 23 14:55:48 2026 +1000)
+* 44af519 - bump version to 1.0.0-beta.4 (Ronald Holshausen, Tue Jun 23 09:31:53 2026 +1000)
+
 # 1.0.0-beta.3 - V2 Plugin observability and structured log forwarding
 
 * 72cc15c - feat(008): Plugin observability and structured log forwarding (#99) (Ronald Holshausen, Mon Jun 22 15:45:05 2026 +1000)
