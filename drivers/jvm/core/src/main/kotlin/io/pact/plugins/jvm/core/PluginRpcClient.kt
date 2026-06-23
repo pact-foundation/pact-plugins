@@ -141,14 +141,11 @@ class PactPluginV2RpcClient(
   override fun compareContents(request: Plugin.CompareContentsRequest): Plugin.CompareContentsResponse {
     var v2Request = convert(request, PluginV2.CompareContentsRequest.parser())
     val testRunId = TestContext.currentTestRunId()
-    if (!v2Request.hasTestContext() && testRunId != null) {
-      v2Request = v2Request.toBuilder()
-        .setTestContext(
-          Struct.newBuilder()
-            .putFields("testRunId", Value.newBuilder().setStringValue(testRunId).build())
-            .build()
-        )
-        .build()
+    if (testRunId != null && !v2Request.testContext.containsFields("testRunId")) {
+      val contextBuilder = if (v2Request.hasTestContext()) v2Request.testContext.toBuilder()
+                           else Struct.newBuilder()
+      contextBuilder.putFields("testRunId", Value.newBuilder().setStringValue(testRunId).build())
+      v2Request = v2Request.toBuilder().setTestContext(contextBuilder.build()).build()
     }
     return convert(stub.compareContents(v2Request), Plugin.CompareContentsResponse.parser())
   }
@@ -158,14 +155,11 @@ class PactPluginV2RpcClient(
   ): Plugin.ConfigureInteractionResponse {
     var v2Request = convert(request, PluginV2.ConfigureInteractionRequest.parser())
     val testRunId = TestContext.currentTestRunId()
-    if (!v2Request.hasTestContext() && testRunId != null) {
-      v2Request = v2Request.toBuilder()
-        .setTestContext(
-          Struct.newBuilder()
-            .putFields("testRunId", Value.newBuilder().setStringValue(testRunId).build())
-            .build()
-        )
-        .build()
+    if (testRunId != null && !v2Request.testContext.containsFields("testRunId")) {
+      val contextBuilder = if (v2Request.hasTestContext()) v2Request.testContext.toBuilder()
+                           else Struct.newBuilder()
+      contextBuilder.putFields("testRunId", Value.newBuilder().setStringValue(testRunId).build())
+      v2Request = v2Request.toBuilder().setTestContext(contextBuilder.build()).build()
     }
     return convert(stub.configureInteraction(v2Request), Plugin.ConfigureInteractionResponse.parser())
   }

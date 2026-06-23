@@ -245,8 +245,11 @@ impl PluginClient {
         .map(|response| response.into_inner()),
       PluginClient::V2(client) => {
         let mut v2_req = Self::convert_message::<_, proto_v2::CompareContentsRequest>(request)?;
-        if v2_req.test_context.is_none() {
-          v2_req.test_context = crate::test_context::current_test_context();
+        if let Some(id) = crate::test_context::current_test_run_id() {
+          let ctx = v2_req.test_context.get_or_insert_with(prost_types::Struct::default);
+          ctx.fields.entry("testRunId".to_string()).or_insert_with(|| prost_types::Value {
+            kind: Some(prost_types::value::Kind::StringValue(id)),
+          });
         }
         client
           .compare_contents(Request::new(v2_req))
@@ -268,8 +271,11 @@ impl PluginClient {
       PluginClient::V2(client) => {
         let mut v2_req =
           Self::convert_message::<_, proto_v2::ConfigureInteractionRequest>(request)?;
-        if v2_req.test_context.is_none() {
-          v2_req.test_context = crate::test_context::current_test_context();
+        if let Some(id) = crate::test_context::current_test_run_id() {
+          let ctx = v2_req.test_context.get_or_insert_with(prost_types::Struct::default);
+          ctx.fields.entry("testRunId".to_string()).or_insert_with(|| prost_types::Value {
+            kind: Some(prost_types::value::Kind::StringValue(id)),
+          });
         }
         client
           .configure_interaction(Request::new(v2_req))
