@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.0.0-beta.5 - Bugfix Release
+
+* d0fbfe4 - feat(008): Inject testContext into V2 plugin requests in JVM driver (#101) (Ronald Holshausen, Tue Jun 23 15:52:17 2026 +1000)
+* 6958d21 - bump version to 1.0.0-beta.5 (Ronald Holshausen, Tue Jun 23 14:58:37 2026 +1000)
+
 # 1.0.0-beta.4 - Maintenance Release
 
 * d1f1240 - feat(008): Add test run ID thread-local and inject testContext into V2 plugin requests (#100) (Ronald Holshausen, Tue Jun 23 14:55:48 2026 +1000)
