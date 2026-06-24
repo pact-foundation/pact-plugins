@@ -106,6 +106,15 @@ async fn init_logging() {
   }
 
   let mut builder = env_logger::Builder::from_env(Env::new().filter("LOG_LEVEL"));
+  builder.format(|buf, record| {
+    use std::io::Write;
+    let test_run_id = TEST_RUN_ID.try_with(|id| id.clone()).unwrap_or_default();
+    if !test_run_id.is_empty() {
+      writeln!(buf, "[{} {} {}] {}", record.level(), record.target(), test_run_id, record.args())
+    } else {
+      writeln!(buf, "[{} {}] {}", record.level(), record.target(), record.args())
+    }
+  });
   let inner = builder.build();
 
   let host_tx = match std::env::var("PACT_PLUGIN_HOST") {

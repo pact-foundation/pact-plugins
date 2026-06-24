@@ -36,8 +36,8 @@ internal class PluginHostGrpcService : PluginHostGrpc.PluginHostImplBase() {
     } else {
       if (shortId.isNotEmpty()) "[plugin:$shortId]" else "[plugin]"
     }
-    val message = "$prefix ${request.message}"
     val testRunId = request.testRunId.ifEmpty { null }
+    val message = if (testRunId != null) "$prefix [$testRunId] ${request.message}" else "$prefix ${request.message}"
     if (testRunId != null) MDC.put("testRunId", testRunId)
     try {
       when (request.level.uppercase()) {
