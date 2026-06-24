@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 1.0.0-beta.5 - Include testRunId in JVM host log messages
+
+* d273288 - fix(008): Include testRunId in JVM host log messages and plugin log format (#102) (Ronald Holshausen, Wed Jun 24 13:25:06 2026 +1000)
+* b699c8c - bump version to 1.0.0-beta.5 (Ronald Holshausen, Tue Jun 23 16:04:54 2026 +1000)
+
 # 1.0.0-beta.4 - V2 Plugin observability and structured log forwarding improvements
 
 * 6604986 - bump version to 1.0.0-beta.6 (Ronald Holshausen, Tue Jun 23 15:54:08 2026 +1000)
