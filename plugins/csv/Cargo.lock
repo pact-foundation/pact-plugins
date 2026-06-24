@@ -2076,7 +2076,7 @@ dependencies = [
  "log",
  "logos 0.12.1",
  "maplit",
- "pact-plugin-driver 1.0.0-beta.3",
+ "pact-plugin-driver 1.0.0-beta.6",
  "pact_matching",
  "pact_models",
  "prost",
@@ -2134,7 +2134,7 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "1.0.0-beta.3"
+version = "1.0.0-beta.6"
 dependencies = [
  "anyhow",
  "async-trait",
