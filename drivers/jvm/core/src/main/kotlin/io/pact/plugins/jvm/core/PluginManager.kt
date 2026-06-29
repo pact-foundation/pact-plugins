@@ -247,7 +247,7 @@ interface PactPlugin {
 /**
  * Default implementation of a Pact Plugin
  */
-data class DefaultPactPlugin(
+data class GrpcPactPlugin(
   val cp: ChildProcess,
   override val manifest: PactPluginManifest,
   override val port: Int?,
@@ -951,7 +951,7 @@ object DefaultPluginManager: PluginManager {
     }
   }
 
-  private fun tryInitPlugin(plugin: DefaultPactPlugin, address: String): Result<PactPlugin, Exception> {
+  private fun tryInitPlugin(plugin: GrpcPactPlugin, address: String): Result<PactPlugin, Exception> {
     try {
       val channel = ManagedChannelBuilder.forTarget(address)
         .usePlaintext()
@@ -1025,7 +1025,7 @@ object DefaultPluginManager: PluginManager {
     manifest: PactPluginManifest,
     env: Map<String, String> = mapOf(),
     vararg command: String
-  ): Result<DefaultPactPlugin, String> {
+  ): Result<GrpcPactPlugin, String> {
     logger.debug { "Starting plugin with manifest $manifest" }
     val pb = if (command.isNotEmpty()) {
       ProcessBuilder(command.asList() + manifest.pluginDir.resolve(manifest.entryPoint).toString())
@@ -1069,7 +1069,7 @@ object DefaultPluginManager: PluginManager {
       val timeout = System.getProperty("pact.plugin.loadTimeoutInMs")?.toLongOrNull() ?: 10000
       val startupInfo = cp.channel.poll(timeout, TimeUnit.MILLISECONDS)
       if (startupInfo is JsonValue.Object) {
-        val plugin = DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString(), instanceId)
+        val plugin = GrpcPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString(), instanceId)
         Result.Ok(plugin)
       } else {
         cp.destroy()
