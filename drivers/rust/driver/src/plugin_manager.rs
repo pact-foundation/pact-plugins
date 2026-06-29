@@ -7,7 +7,7 @@ use std::io::{BufReader, Write};
 use std::path::PathBuf;
 use std::str::FromStr;
 use std::str::from_utf8;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::thread;
 
 use anyhow::{Context, anyhow, bail};
@@ -31,11 +31,12 @@ use crate::catalogue_manager::{
 };
 use crate::content::ContentMismatch;
 use crate::download::{download_json_from_github, download_plugin_executable, fetch_json_from_url};
+use crate::grpc_plugin::{GrpcPactPlugin, start_plugin_process};
 use crate::metrics::send_metrics;
 use crate::mock_server::{MockServerConfig, MockServerDetails, MockServerResults};
 use crate::plugin_models::{
   PactPlugin, PactPluginManifest, PactPluginRpc, PluginDependency, PluginInitRequest,
-  PluginInterfaceVersion,
+  PluginInstance, PluginInterfaceVersion,
 };
 use crate::proto::*;
 use crate::proto_v2;
@@ -48,8 +49,7 @@ use crate::verification::{InteractionVerificationData, InteractionVerificationRe
 lazy_static! {
   static ref PLUGIN_MANIFEST_REGISTER: Mutex<HashMap<String, PactPluginManifest>> =
     Mutex::new(HashMap::new());
-  static ref PLUGIN_REGISTER: Mutex<HashMap<String, Arc<dyn PactPlugin + Send + Sync>>> =
-    Mutex::new(HashMap::new());
+  static ref PLUGIN_REGISTER: Mutex<HashMap<String, PactPlugin>> = Mutex::new(HashMap::new());
   /// Maps plugin_instance_id → plugin_name so the PluginHost Log RPC handler can
   /// attach the plugin name to forwarded log entries without a proto field for it.
   static ref INSTANCE_NAMES: Mutex<HashMap<String, String>> = Mutex::new(HashMap::new());
@@ -76,7 +76,7 @@ fn host_capabilities() -> Vec<String> {
 
 /// Load the plugin defined by the dependency information. Will first look in the global
 /// plugin registry.
-pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<Arc<dyn PactPlugin + Send + Sync>> {
+pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<PactPlugin> {
   let thread_id = thread::current().id();
   debug!("Loading plugin {:?}", plugin);
   trace!(
@@ -90,10 +90,10 @@ pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<Arc<dyn Pa
   let mut inner = PLUGIN_REGISTER.lock().unwrap();
   trace!("load_plugin {:?}: Got PLUGIN_REGISTER lock", thread_id);
   let result = match lookup_plugin_inner(plugin, &inner) {
-    Some(plugin_arc) => {
-      debug!("Found running plugin {:?}", plugin_arc);
-      plugin_arc.update_access();
-      Ok(plugin_arc)
+    Some(plugin) => {
+      debug!("Found running plugin {:?}", plugin);
+      plugin.update_access();
+      Ok(plugin.clone())
     }
     None => {
       debug!("Did not find plugin, will attempt to start it");
@@ -128,23 +128,23 @@ pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<Arc<dyn Pa
   result
 }
 
-fn lookup_plugin_inner(
+fn lookup_plugin_inner<'a>(
   plugin: &PluginDependency,
-  plugin_register: &HashMap<String, Arc<dyn PactPlugin + Send + Sync>>,
-) -> Option<Arc<dyn PactPlugin + Send + Sync>> {
+  plugin_register: &'a HashMap<String, PactPlugin>,
+) -> Option<&'a PactPlugin> {
   if let Some(version) = &plugin.version {
-    plugin_register.get(format!("{}/{}", plugin.name, version).as_str()).cloned()
+    plugin_register.get(format!("{}/{}", plugin.name, version).as_str())
   } else {
     plugin_register
       .iter()
-      .filter(|(_, value)| value.manifest().name == plugin.name)
-      .max_by(|(_, v1), (_, v2)| v1.manifest().version.cmp(&v2.manifest().version))
-      .map(|(_, plugin)| plugin.clone())
+      .filter(|(_, value)| value.manifest.name == plugin.name)
+      .max_by(|(_, v1), (_, v2)| v1.manifest.version.cmp(&v2.manifest.version))
+      .map(|(_, plugin)| plugin)
   }
 }
 
 /// Look up the plugin in the global plugin register
-pub fn lookup_plugin(plugin: &PluginDependency) -> Option<Arc<dyn PactPlugin + Send + Sync>> {
+pub fn lookup_plugin(plugin: &PluginDependency) -> Option<PactPlugin> {
   let thread_id = thread::current().id();
   trace!(
     "lookup_plugin {:?}: Waiting on PLUGIN_REGISTER lock",
@@ -157,7 +157,7 @@ pub fn lookup_plugin(plugin: &PluginDependency) -> Option<Arc<dyn PactPlugin + S
     "lookup_plugin {:?}: Releasing PLUGIN_REGISTER lock",
     thread_id
   );
-  entry
+  entry.cloned()
 }
 
 /// Return the plugin manifest for the given plugin. Will first look in the global plugin manifest
@@ -263,8 +263,8 @@ pub fn lookup_plugin_manifest(plugin: &PluginDependency) -> Option<PactPluginMan
 
 async fn initialise_plugin(
   manifest: &PactPluginManifest,
-  plugin_register: &mut HashMap<String, Arc<dyn PactPlugin + Send + Sync>>,
-) -> anyhow::Result<Arc<dyn PactPlugin + Send + Sync>> {
+  plugin_register: &mut HashMap<String, PactPlugin>,
+) -> anyhow::Result<PactPlugin> {
   let interface_version = PluginInterfaceVersion::try_from(manifest.plugin_interface_version)
     .with_context(|| {
       format!(
@@ -277,25 +277,25 @@ async fn initialise_plugin(
     PluginInterfaceVersion::V1 | PluginInterfaceVersion::V2 => {
       match manifest.executable_type.as_str() {
         "exec" => {
-          let mut plugin = crate::grpc_plugin::start_plugin_process(manifest).await?;
+          let plugin = start_plugin_process(manifest).await?;
           debug!(
             "Plugin process started OK (port = {}), sending init message",
             plugin.port()
           );
 
-          let instance_id = plugin.instance_id().to_string();
-          let response = init_handshake(manifest, &mut plugin, &instance_id).await.map_err(|err| {
+          let instance_id = plugin.instance_id.clone();
+          let mut grpc_plugin = GrpcPactPlugin::new(plugin);
+          let response = init_handshake(manifest, &mut grpc_plugin, &instance_id).await.map_err(|err| {
             deregister_plugin_instance(&instance_id);
-            plugin.kill();
+            grpc_plugin.plugin.kill();
             anyhow!("Failed to send init request to the plugin - {}", err)
           })?;
-          plugin.plugin_capabilities = response.plugin_capabilities;
+          grpc_plugin.plugin.plugin_capabilities = response.plugin_capabilities;
 
-          let plugin: Arc<dyn PactPlugin + Send + Sync> = Arc::new(plugin);
           let key = format!("{}/{}", manifest.name, manifest.version);
-          plugin_register.insert(key, plugin.clone());
+          plugin_register.insert(key, grpc_plugin.plugin.clone());
 
-          Ok(plugin)
+          Ok(grpc_plugin.plugin)
         }
         _ => Err(anyhow!(
           "Plugin executable type of {} is not supported",
@@ -340,9 +340,9 @@ pub fn shutdown_plugins() {
   trace!("shutdown_plugins {:?}: Got PLUGIN_REGISTER lock", thread_id);
   for plugin in guard.values() {
     debug!("Shutting down plugin {:?}", plugin);
-    deregister_plugin_instance(plugin.instance_id());
+    deregister_plugin_instance(&plugin.instance_id);
     plugin.kill();
-    remove_plugin_entries(&plugin.manifest().name);
+    remove_plugin_entries(&plugin.manifest.name);
   }
   guard.clear();
   trace!(
@@ -352,14 +352,14 @@ pub fn shutdown_plugins() {
 }
 
 /// Shutdown the given plugin
-pub fn shutdown_plugin(plugin: &dyn PactPlugin) {
+pub fn shutdown_plugin(plugin: &PactPlugin) {
   debug!(
     "Shutting down plugin {}:{}",
-    plugin.manifest().name, plugin.manifest().version
+    plugin.manifest.name, plugin.manifest.version
   );
-  deregister_plugin_instance(plugin.instance_id());
+  deregister_plugin_instance(&plugin.instance_id);
   plugin.kill();
-  remove_plugin_entries(&plugin.manifest().name);
+  remove_plugin_entries(&plugin.manifest.name);
 }
 
 /// Publish the current catalogue to all plugins
@@ -396,10 +396,11 @@ pub async fn publish_updated_catalogue() {
   };
 
   for plugin in plugins {
-    if let Err(err) = plugin.update_catalogue(request.clone()).await {
+    let grpc_plugin = GrpcPactPlugin::new(plugin.clone());
+    if let Err(err) = grpc_plugin.update_catalogue(request.clone()).await {
       warn!(
         "Failed to send updated catalogue to plugin '{}' - {}",
-        plugin.manifest().name, err
+        plugin.manifest.name, err
       );
     }
   }
@@ -420,8 +421,8 @@ pub fn increment_plugin_access(plugin: &PluginDependency) {
     thread_id
   );
 
-  if let Some(plugin_arc) = lookup_plugin_inner(plugin, &inner) {
-    plugin_arc.update_access();
+  if let Some(plugin) = lookup_plugin_inner(plugin, &inner) {
+    plugin.update_access();
   }
 
   trace!(
@@ -440,16 +441,15 @@ pub fn drop_plugin_access(plugin: &PluginDependency) {
     thread_id
   );
   let mut inner = PLUGIN_REGISTER.lock().unwrap();
-  trace!("drop_plugin_access {:?}: Got PLUGIN_REGISTER lock", thread_id);
+  trace!(
+    "drop_plugin_access {:?}: Got PLUGIN_REGISTER lock",
+    thread_id
+  );
 
-  if let Some(plugin_arc) = lookup_plugin_inner(plugin, &inner) {
-    let key = format!(
-      "{}/{}",
-      plugin_arc.manifest().name,
-      plugin_arc.manifest().version
-    );
-    if plugin_arc.drop_access() == 0 {
-      shutdown_plugin(plugin_arc.as_ref());
+  if let Some(plugin) = lookup_plugin_inner(plugin, &inner) {
+    let key = format!("{}/{}", plugin.manifest.name, plugin.manifest.version);
+    if plugin.drop_access() == 0 {
+      shutdown_plugin(plugin);
       inner.remove(key.as_str());
     }
   }
@@ -496,6 +496,7 @@ pub async fn start_mock_server_v2(
     "Sending startMockServer request to plugin"
   );
 
+  let grpc_plugin = GrpcPactPlugin::new(plugin);
   let response = if manifest.plugin_interface_version >= 2 {
     let v4_pact = pact.as_v4_pact().map_err(|_| anyhow!("Pact must be a V4 pact for V2 plugin interface"))?;
     let interactions = build_v2_interaction_contents(manifest, &v4_pact);
@@ -506,7 +507,7 @@ pub async fn start_mock_server_v2(
       interactions,
       test_context: Some(to_proto_struct(&test_context)),
     };
-    plugin.start_mock_server_v2(request).await?
+    grpc_plugin.start_mock_server_v2(request).await?
   } else {
     let request = StartMockServerRequest {
       host_interface: config.host_interface.unwrap_or_default(),
@@ -515,7 +516,7 @@ pub async fn start_mock_server_v2(
       pact: pact.to_json(PactSpecification::V4)?.to_string(),
       test_context: Some(to_proto_struct(&test_context)),
     };
-    plugin.start_mock_server(request).await?
+    grpc_plugin.start_mock_server(request).await?
   };
 
   debug!("Got response ${response:?}");
@@ -531,7 +532,7 @@ pub async fn start_mock_server_v2(
       key: details.key.clone(),
       base_url: details.address.clone(),
       port: details.port,
-      plugin,
+      plugin: grpc_plugin.plugin,
     }),
   }
 }
@@ -627,12 +628,13 @@ pub async fn shutdown_mock_server(
   };
 
   debug!(
-    plugin_name = mock_server.plugin.manifest().name.as_str(),
-    plugin_version = mock_server.plugin.manifest().version.as_str(),
+    plugin_name = mock_server.plugin.manifest.name.as_str(),
+    plugin_version = mock_server.plugin.manifest.version.as_str(),
     server_key = mock_server.key.as_str(),
     "Sending shutdownMockServer request to plugin"
   );
-  let response = mock_server.plugin.shutdown_mock_server(request).await?;
+  let grpc_plugin = GrpcPactPlugin::new(mock_server.plugin.clone());
+  let response = grpc_plugin.shutdown_mock_server(request).await?;
   debug!("Got response: {response:?}");
 
   if response.ok {
@@ -680,12 +682,13 @@ pub async fn get_mock_server_results(
   };
 
   debug!(
-    plugin_name = mock_server.plugin.manifest().name.as_str(),
-    plugin_version = mock_server.plugin.manifest().version.as_str(),
+    plugin_name = mock_server.plugin.manifest.name.as_str(),
+    plugin_version = mock_server.plugin.manifest.version.as_str(),
     server_key = mock_server.key.as_str(),
     "Sending getMockServerResults request to plugin"
   );
-  let response = mock_server.plugin.get_mock_server_results(request).await?;
+  let grpc_plugin = GrpcPactPlugin::new(mock_server.plugin.clone());
+  let response = grpc_plugin.get_mock_server_results(request).await?;
   debug!("Got response: {response:?}");
 
   if response.ok {
@@ -737,12 +740,13 @@ pub async fn prepare_validation_for_interaction(
   })?;
   let plugin = lookup_plugin(&manifest.as_dependency())
     .ok_or_else(|| anyhow!("Did not find a running plugin for manifest {:?}", manifest))?;
+  let grpc_plugin = GrpcPactPlugin::new(plugin);
 
-  prepare_validation_for_interaction_inner(plugin.as_ref(), pact, interaction, context).await
+  prepare_validation_for_interaction_inner(&grpc_plugin, pact, interaction, context).await
 }
 
 pub(crate) async fn prepare_validation_for_interaction_inner(
-  plugin: &dyn PactPlugin,
+  plugin: &dyn PluginInstance,
   pact: &V4Pact,
   interaction: &(dyn V4Interaction + Send + Sync),
   context: &HashMap<String, Value>,
@@ -835,9 +839,10 @@ pub async fn verify_interaction(
   })?;
   let plugin = lookup_plugin(&manifest.as_dependency())
     .ok_or_else(|| anyhow!("Did not find a running plugin for manifest {:?}", manifest))?;
+  let grpc_plugin = GrpcPactPlugin::new(plugin);
 
   verify_interaction_inner(
-    plugin.as_ref(),
+    &grpc_plugin,
     verification_data,
     config,
     pact,
@@ -847,7 +852,7 @@ pub async fn verify_interaction(
 }
 
 pub(crate) async fn verify_interaction_inner(
-  plugin: &dyn PactPlugin,
+  plugin: &dyn PluginInstance,
   verification_data: &InteractionVerificationData,
   config: &HashMap<String, Value>,
   pact: &V4Pact,
@@ -992,25 +997,26 @@ fn create_plugin_dir(manifest: &PactPluginManifest) -> anyhow::Result<PathBuf> {
 mod tests {
   use std::collections::HashMap;
   use std::fs::{self, File};
-  use std::sync::Arc;
 
-  use expectest::prelude::*;
   use maplit::hashmap;
   use pact_models::prelude::v4::V4Pact;
   use pact_models::v4::interaction::V4Interaction;
   use pact_models::v4::sync_message::SynchronousMessage;
+
+  use expectest::prelude::*;
   use tempdir::TempDir;
+
+  use crate::plugin_manager::prepare_validation_for_interaction_inner;
+  use crate::plugin_manager::verify_interaction_inner;
+  use crate::plugin_models::PluginDependency;
+  use crate::plugin_models::tests::{FailingInitPlugin, InitRecordingPlugin, MockPlugin};
+  use crate::verification::InteractionVerificationData;
 
   use crate::catalogue_manager::{
     CatalogueEntry, CatalogueEntryProviderType, CatalogueEntryType, register_core_entries,
   };
-  use crate::plugin_manager::{
-    init_handshake, initialise_plugin, load_manifest_from_dir,
-    prepare_validation_for_interaction_inner, verify_interaction_inner,
-  };
-  use crate::plugin_models::tests::{FailingInitPlugin, InitRecordingPlugin, MockPlugin};
-  use crate::plugin_models::{PactPlugin, PactPluginManifest, PluginDependency};
-  use crate::verification::InteractionVerificationData;
+
+  use super::{PactPluginManifest, init_handshake, initialise_plugin, load_manifest_from_dir};
 
   #[test]
   fn load_manifest_from_dir_test() {
@@ -1086,7 +1092,7 @@ mod tests {
       ..PactPluginManifest::default()
     };
 
-    let mut plugin_register: HashMap<String, Arc<dyn PactPlugin + Send + Sync>> = HashMap::new();
+    let mut plugin_register = HashMap::new();
     let err = initialise_plugin(&manifest, &mut plugin_register)
       .await
       .unwrap_err();

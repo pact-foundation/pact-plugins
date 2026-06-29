@@ -1,45 +1,39 @@
-//! gRPC-based plugin implementation
+//! gRPC plugin wrapper and process management
 
-use std::path::PathBuf;
-use std::process::{Command, Stdio};
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::process::Command;
+use std::process::Stdio;
 
 use anyhow::anyhow;
 use async_trait::async_trait;
 use log::max_level;
 use os_info::Type;
 use prost::Message;
+use std::path::PathBuf;
 use sysinfo::{Pid, System};
 use tonic::codegen::InterceptedService;
 use tonic::metadata::{Ascii, MetadataValue};
 use tonic::service::Interceptor;
 use tonic::transport::Channel;
 use tonic::{Request, Status};
-use tracing::{debug, trace, warn};
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 use crate::child_process::ChildPluginProcess;
-use crate::plugin_manager::{deregister_plugin_instance, register_plugin_instance};
 use crate::plugin_models::{
   PactPlugin, PactPluginManifest, PactPluginRpc, PluginInitRequest, PluginInitResponse,
-  PluginInterfaceVersion,
+  PluginInstance, PluginInterfaceVersion,
 };
 use crate::proto::pact_plugin_client::PactPluginClient as PactPluginClientV1;
 use crate::proto::*;
 use crate::proto_v2::{self, pact_plugin_client::PactPluginClient as PactPluginClientV2};
 
-// ---------------------------------------------------------------------------
-// PluginClient — V1/V2 gRPC client selector
-// ---------------------------------------------------------------------------
-
-enum PluginClient {
+pub(crate) enum PluginClient {
   V1(PactPluginClientV1<InterceptedService<Channel, PactPluginInterceptor>>),
   V2(PactPluginClientV2<InterceptedService<Channel, PactPluginInterceptor>>),
 }
 
 impl PluginClient {
-  fn convert_message<T, U>(message: T) -> Result<U, Status>
+  pub(crate) fn convert_message<T, U>(message: T) -> Result<U, Status>
   where
     T: Message,
     U: Message + Default,
@@ -206,7 +200,9 @@ impl PluginClient {
           proto_v2::MockServerRequest,
         >(request)?))
         .await
-        .and_then(|response| Self::convert_message::<_, ShutdownMockServerResponse>(response.into_inner())),
+        .and_then(|response| {
+          Self::convert_message::<_, ShutdownMockServerResponse>(response.into_inner())
+        }),
     }
   }
 
@@ -322,12 +318,10 @@ impl PluginClient {
   }
 }
 
-// ---------------------------------------------------------------------------
-// PactPluginInterceptor — injects server key as auth header
-// ---------------------------------------------------------------------------
-
+/// Interceptor to inject the server key as an authorisation header
 #[derive(Clone, Debug)]
 pub(crate) struct PactPluginInterceptor {
+  /// Server key to inject
   server_key: MetadataValue<Ascii>,
 }
 
@@ -347,53 +341,19 @@ impl Interceptor for PactPluginInterceptor {
   }
 }
 
-// ---------------------------------------------------------------------------
-// GrpcPactPlugin — concrete gRPC-backed plugin instance
-// ---------------------------------------------------------------------------
-
-/// Running gRPC plugin details
+/// Wrapper around `PactPlugin` that provides gRPC connectivity
 #[derive(Debug, Clone)]
 pub struct GrpcPactPlugin {
-  /// Manifest for this plugin
-  pub manifest: PactPluginManifest,
-
-  /// Interface version supported by the plugin
-  pub interface_version: PluginInterfaceVersion,
-
-  /// Running child process
-  pub child: Arc<ChildPluginProcess>,
-
-  /// Optional capabilities negotiated for this plugin instance
-  pub plugin_capabilities: Vec<String>,
-
-  /// UUID assigned by the driver at process start; used to correlate log output from this instance
-  pub instance_id: String,
-
-  /// Count of access to the plugin. If this is ever zero, the plugin process will be shutdown
-  access_count: Arc<AtomicUsize>,
+  pub plugin: PactPlugin,
 }
 
 impl GrpcPactPlugin {
-  /// Create a new GrpcPactPlugin
-  pub fn new(manifest: &PactPluginManifest, child: ChildPluginProcess) -> anyhow::Result<Self> {
-    let instance_id = child.instance_id.clone();
-    Ok(GrpcPactPlugin {
-      manifest: manifest.clone(),
-      interface_version: PluginInterfaceVersion::try_from(manifest.plugin_interface_version)?,
-      instance_id,
-      child: Arc::new(child),
-      plugin_capabilities: vec![],
-      access_count: Arc::new(AtomicUsize::new(1)),
-    })
-  }
-
-  /// Port the plugin is running on
-  pub fn port(&self) -> u16 {
-    self.child.port()
+  pub fn new(plugin: PactPlugin) -> Self {
+    GrpcPactPlugin { plugin }
   }
 
   async fn connect_channel(&self) -> anyhow::Result<Channel> {
-    let port = self.child.port();
+    let port = self.plugin.child.port();
     match Channel::from_shared(format!("http://[::1]:{}", port))?
       .connect()
       .await
@@ -411,8 +371,9 @@ impl GrpcPactPlugin {
 
   async fn get_plugin_client(&self) -> anyhow::Result<PluginClient> {
     let channel = self.connect_channel().await?;
-    let interceptor = PactPluginInterceptor::new(self.child.plugin_info.server_key.as_str())?;
-    match self.interface_version {
+    let interceptor =
+      PactPluginInterceptor::new(self.plugin.child.plugin_info.server_key.as_str())?;
+    match self.plugin.interface_version {
       PluginInterfaceVersion::V1 => Ok(PluginClient::V1(PactPluginClientV1::with_interceptor(
         channel,
         interceptor,
@@ -426,49 +387,20 @@ impl GrpcPactPlugin {
 }
 
 #[async_trait]
-impl PactPlugin for GrpcPactPlugin {
+impl PactPluginRpc for GrpcPactPlugin {
+  async fn init_plugin(
+    &mut self,
+    request: PluginInitRequest,
+  ) -> anyhow::Result<PluginInitResponse> {
+    let mut client = self.get_plugin_client().await?;
+    client.init_plugin(request).await.map_err(anyhow::Error::from)
+  }
+}
+
+#[async_trait]
+impl PluginInstance for GrpcPactPlugin {
   fn manifest(&self) -> &PactPluginManifest {
-    &self.manifest
-  }
-
-  fn kill(&self) {
-    self.child.kill();
-  }
-
-  fn update_access(&self) {
-    let count = self.access_count.fetch_add(1, Ordering::SeqCst);
-    trace!(
-      "update_access: Plugin {}/{} access is now {}",
-      self.manifest.name,
-      self.manifest.version,
-      count + 1
-    );
-  }
-
-  fn drop_access(&self) -> usize {
-    let check = self
-      .access_count
-      .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |count| {
-        if count > 0 { Some(count - 1) } else { None }
-      });
-    let count = if let Ok(v) = check {
-      if v > 0 { v - 1 } else { v }
-    } else {
-      0
-    };
-    trace!(
-      "drop_access: Plugin {}/{} access is now {}",
-      self.manifest.name, self.manifest.version, count
-    );
-    count
-  }
-
-  fn instance_id(&self) -> &str {
-    &self.instance_id
-  }
-
-  fn has_capability(&self, capability: &str) -> bool {
-    self.plugin_capabilities.iter().any(|c| c == capability)
+    &self.plugin.manifest
   }
 
   async fn compare_contents(
@@ -532,7 +464,10 @@ impl PactPlugin for GrpcPactPlugin {
     request: VerificationPreparationRequest,
   ) -> anyhow::Result<VerificationPreparationResponse> {
     let mut client = self.get_plugin_client().await?;
-    client.prepare_interaction_for_verification(request).await.map_err(anyhow::Error::from)
+    client
+      .prepare_interaction_for_verification(request)
+      .await
+      .map_err(anyhow::Error::from)
   }
 
   async fn prepare_interaction_for_verification_v2(
@@ -540,7 +475,10 @@ impl PactPlugin for GrpcPactPlugin {
     request: proto_v2::VerificationPreparationRequest,
   ) -> anyhow::Result<VerificationPreparationResponse> {
     let mut client = self.get_plugin_client().await?;
-    client.prepare_interaction_for_verification_v2(request).await.map_err(anyhow::Error::from)
+    client
+      .prepare_interaction_for_verification_v2(request)
+      .await
+      .map_err(anyhow::Error::from)
   }
 
   async fn verify_interaction(
@@ -565,24 +503,8 @@ impl PactPlugin for GrpcPactPlugin {
   }
 }
 
-#[async_trait]
-impl PactPluginRpc for GrpcPactPlugin {
-  async fn init_plugin(
-    &mut self,
-    request: PluginInitRequest,
-  ) -> anyhow::Result<PluginInitResponse> {
-    let mut client = self.get_plugin_client().await?;
-    client.init_plugin(request).await.map_err(anyhow::Error::from)
-  }
-}
-
-// ---------------------------------------------------------------------------
-// start_plugin_process — launches the plugin executable
-// ---------------------------------------------------------------------------
-
-pub(crate) async fn start_plugin_process(
-  manifest: &PactPluginManifest,
-) -> anyhow::Result<GrpcPactPlugin> {
+/// Start a plugin process and return a PactPlugin with the child process attached
+pub(crate) async fn start_plugin_process(manifest: &PactPluginManifest) -> anyhow::Result<PactPlugin> {
   debug!("Starting plugin with manifest {:?}", manifest);
 
   let os_info = os_info::get();
@@ -638,20 +560,21 @@ pub(crate) async fn start_plugin_process(
     })?;
   let child_pid = child.id();
   debug!("Plugin {} started with PID {} (instance {})", manifest.name, child_pid, instance_id);
-  register_plugin_instance(&instance_id, &manifest.name);
+  crate::plugin_manager::register_plugin_instance(&instance_id, &manifest.name);
 
   match ChildPluginProcess::new(child, manifest, instance_id.clone()).await {
     Ok(child) => {
-      let plugin = GrpcPactPlugin::new(manifest, child)?;
+      let plugin = PactPlugin::new(manifest, child)?;
       Ok(plugin)
     }
     Err(err) => {
-      deregister_plugin_instance(&instance_id);
+      crate::plugin_manager::deregister_plugin_instance(&instance_id);
       let mut s = System::new();
       s.refresh_processes();
       if let Some(process) = s.process(Pid::from_u32(child_pid)) {
         #[cfg(not(windows))]
         process.kill();
+        // revert windows specific logic once https://github.com/GuillaumeGomez/sysinfo/pull/1341/files is merged/released
         #[cfg(windows)]
         let _ = Command::new("taskkill.exe")
           .arg("/PID")
@@ -667,23 +590,21 @@ pub(crate) async fn start_plugin_process(
   }
 }
 
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
-
 #[cfg(test)]
 pub(crate) mod tests {
-  use std::collections::HashMap;
-
   use tonic::Status;
 
-  use crate::grpc_plugin::PluginClient;
-  use crate::plugin_models::{PluginInitRequest, PluginInitResponse};
+  use crate::plugin_models::PluginInitResponse;
   use crate::proto::*;
-  use crate::proto_v2;
+
+  use super::PluginClient;
 
   #[test]
   fn converts_between_v1_and_v2_messages() {
+    use std::collections::HashMap;
+    use crate::plugin_models::PluginInitRequest;
+    use crate::proto_v2;
+
     let request = PluginInitRequest {
       implementation: "plugin-driver-rust".to_string(),
       version: "1.0.0-beta.1".to_string(),

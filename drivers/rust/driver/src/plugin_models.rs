@@ -1,13 +1,17 @@
 //! Models for representing plugins
 
 use std::collections::HashMap;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Display, Formatter};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use tracing::trace;
 
+use crate::child_process::ChildPluginProcess;
 use crate::proto::*;
 use crate::proto_v2;
 
@@ -154,39 +158,19 @@ impl TryFrom<u8> for PluginInterfaceVersion {
   }
 }
 
-/// Trait for initialising a plugin via the init handshake
+/// Trait for the plugin init handshake only (used by anything that can handle the init message)
 #[async_trait]
 pub trait PactPluginRpc {
   /// Send an init request to the plugin process
-  async fn init_plugin(
-    &mut self,
-    request: PluginInitRequest,
-  ) -> anyhow::Result<PluginInitResponse>;
+  async fn init_plugin(&mut self, request: PluginInitRequest)
+    -> anyhow::Result<PluginInitResponse>;
 }
 
-/// Trait representing an active plugin instance.
-///
-/// The default implementations for the V2-only methods return an error, matching the
-/// behaviour of a V1-only plugin.
+/// Trait for a running plugin instance that can handle gRPC calls
 #[async_trait]
-pub trait PactPlugin: Debug + Send + Sync {
-  /// Manifest for this plugin
+pub trait PluginInstance: std::fmt::Debug + Send + Sync {
+  /// Return the manifest for this plugin
   fn manifest(&self) -> &PactPluginManifest;
-
-  /// Kill the running plugin process
-  fn kill(&self);
-
-  /// Increment the access count (interior mutability)
-  fn update_access(&self);
-
-  /// Decrement and return the access count (interior mutability)
-  fn drop_access(&self) -> usize;
-
-  /// Instance ID assigned at process start
-  fn instance_id(&self) -> &str;
-
-  /// Check whether the plugin declared a specific capability
-  fn has_capability(&self, capability: &str) -> bool;
 
   /// Send a compare contents request to the plugin process
   async fn compare_contents(
@@ -194,7 +178,7 @@ pub trait PactPlugin: Debug + Send + Sync {
     request: CompareContentsRequest,
   ) -> anyhow::Result<CompareContentsResponse>;
 
-  /// Send a configure interaction request to the plugin process
+  /// Send a configure contents request to the plugin process
   async fn configure_interaction(
     &self,
     request: ConfigureInteractionRequest,
@@ -206,13 +190,13 @@ pub trait PactPlugin: Debug + Send + Sync {
     request: GenerateContentRequest,
   ) -> anyhow::Result<GenerateContentResponse>;
 
-  /// Start a mock server (V1 — pact JSON wire format)
+  /// Start a mock server
   async fn start_mock_server(
     &self,
     request: StartMockServerRequest,
   ) -> anyhow::Result<StartMockServerResponse>;
 
-  /// Start a mock server using V2 structured interaction data (no pact JSON)
+  /// Start a mock server using V2 structured interaction data (no pact JSON).
   async fn start_mock_server_v2(
     &self,
     request: proto_v2::StartMockServerRequest,
@@ -233,13 +217,13 @@ pub trait PactPlugin: Debug + Send + Sync {
     request: MockServerRequest,
   ) -> anyhow::Result<MockServerResults>;
 
-  /// Prepare an interaction for verification
+  /// Prepare an interaction for verification.
   async fn prepare_interaction_for_verification(
     &self,
     request: VerificationPreparationRequest,
   ) -> anyhow::Result<VerificationPreparationResponse>;
 
-  /// Prepare an interaction for verification using V2 structured data
+  /// Prepare an interaction for verification using V2 structured interaction data.
   async fn prepare_interaction_for_verification_v2(
     &self,
     request: proto_v2::VerificationPreparationRequest,
@@ -248,13 +232,13 @@ pub trait PactPlugin: Debug + Send + Sync {
     Err(anyhow!("V2 interface not supported by this plugin"))
   }
 
-  /// Execute the verification for the interaction
+  /// Execute the verification for the interaction.
   async fn verify_interaction(
     &self,
     request: VerifyInteractionRequest,
   ) -> anyhow::Result<VerifyInteractionResponse>;
 
-  /// Execute the verification for the interaction using V2 structured data
+  /// Execute the verification for the interaction using V2 structured interaction data.
   async fn verify_interaction_v2(
     &self,
     request: proto_v2::VerifyInteractionRequest,
@@ -263,8 +247,99 @@ pub trait PactPlugin: Debug + Send + Sync {
     Err(anyhow!("V2 interface not supported by this plugin"))
   }
 
-  /// Updates the catalogue (sent when the core catalogue has been updated)
+  /// Updates the catalogue.
   async fn update_catalogue(&self, request: Catalogue) -> anyhow::Result<()>;
+}
+
+/// Running plugin details
+#[derive(Debug, Clone)]
+pub struct PactPlugin {
+  /// Manifest for this plugin
+  pub manifest: PactPluginManifest,
+
+  /// Interface version supported by the plugin
+  pub interface_version: PluginInterfaceVersion,
+
+  /// Running child process
+  pub child: Arc<ChildPluginProcess>,
+
+  /// Optional capabilities negotiated for this plugin instance
+  pub plugin_capabilities: Vec<String>,
+
+  /// UUID assigned by the driver at process start; used to correlate log output from this instance
+  pub instance_id: String,
+
+  /// Count of access to the plugin. If this is ever zero, the plugin process will be shutdown
+  access_count: Arc<AtomicUsize>,
+}
+
+impl PactPlugin {
+  /// Create a new Plugin
+  pub fn new(manifest: &PactPluginManifest, child: ChildPluginProcess) -> anyhow::Result<Self> {
+    let instance_id = child.instance_id.clone();
+    Ok(PactPlugin {
+      manifest: manifest.clone(),
+      interface_version: PluginInterfaceVersion::try_from(manifest.plugin_interface_version)?,
+      instance_id,
+      child: Arc::new(child),
+      plugin_capabilities: vec![],
+      access_count: Arc::new(AtomicUsize::new(1)),
+    })
+  }
+
+  pub fn has_plugin_capability(&self, capability: &str) -> bool {
+    self.plugin_capabilities.iter().any(|value| value == capability)
+  }
+
+  /// Check if this plugin has the given capability
+  pub fn has_capability(&self, capability: &str) -> bool {
+    self.plugin_capabilities.iter().any(|c| c == capability)
+  }
+
+  /// Return the instance ID for this plugin
+  pub fn instance_id(&self) -> &str {
+    &self.instance_id
+  }
+
+  /// Port the plugin is running on
+  pub fn port(&self) -> u16 {
+    self.child.port()
+  }
+
+  /// Kill the running plugin process
+  pub fn kill(&self) {
+    self.child.kill();
+  }
+
+  /// Update the access count of the plugin
+  pub fn update_access(&self) {
+    let count = self.access_count.fetch_add(1, Ordering::SeqCst);
+    trace!(
+      "update_access: Plugin {}/{} access is now {}",
+      self.manifest.name,
+      self.manifest.version,
+      count + 1
+    );
+  }
+
+  /// Decrement and return the access count for the plugin
+  pub fn drop_access(&self) -> usize {
+    let check = self
+      .access_count
+      .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |count| {
+        if count > 0 { Some(count - 1) } else { None }
+      });
+    let count = if let Ok(v) = check {
+      if v > 0 { v - 1 } else { v }
+    } else {
+      0
+    };
+    trace!(
+      "drop_access: Plugin {}/{} access is now {}",
+      self.manifest.name, self.manifest.version, count
+    );
+    count
+  }
 }
 
 /// Plugin configuration to add to the matching context for an interaction
@@ -282,13 +357,10 @@ pub(crate) mod tests {
 
   use async_trait::async_trait;
 
-  use crate::plugin_models::{
-    PactPlugin, PactPluginManifest, PluginInitResponse,
-  };
+  use crate::plugin_models::{PactPluginManifest, PluginInitRequest, PluginInitResponse, PluginInstance};
   use crate::proto::verification_preparation_response::Response;
   use crate::proto::*;
 
-  /// Test double that records the last prepare/verify requests it received.
   pub(crate) struct MockPlugin {
     pub manifest: PactPluginManifest,
     pub prepare_request: RwLock<VerificationPreparationRequest>,
@@ -314,25 +386,9 @@ pub(crate) mod tests {
   }
 
   #[async_trait]
-  impl PactPlugin for MockPlugin {
+  impl PluginInstance for MockPlugin {
     fn manifest(&self) -> &PactPluginManifest {
       &self.manifest
-    }
-
-    fn kill(&self) {}
-
-    fn update_access(&self) {}
-
-    fn drop_access(&self) -> usize {
-      1
-    }
-
-    fn instance_id(&self) -> &str {
-      "test-instance"
-    }
-
-    fn has_capability(&self, _capability: &str) -> bool {
-      false
     }
 
     async fn compare_contents(
@@ -414,7 +470,6 @@ pub(crate) mod tests {
     }
   }
 
-  /// Minimal PactPluginRpc implementation that returns a fixed error from init_plugin.
   pub(crate) struct FailingInitPlugin {
     pub error: String,
   }
@@ -423,21 +478,20 @@ pub(crate) mod tests {
   impl crate::plugin_models::PactPluginRpc for FailingInitPlugin {
     async fn init_plugin(
       &mut self,
-      _request: crate::plugin_models::PluginInitRequest,
+      _request: PluginInitRequest,
     ) -> anyhow::Result<PluginInitResponse> {
       Err(anyhow::anyhow!("{}", self.error))
     }
   }
 
-  /// Minimal PactPluginRpc implementation that records the init request it received.
   pub(crate) struct InitRecordingPlugin {
-    pub request: std::sync::RwLock<Option<crate::plugin_models::PluginInitRequest>>,
+    pub request: RwLock<Option<PluginInitRequest>>,
   }
 
   impl Default for InitRecordingPlugin {
     fn default() -> Self {
       Self {
-        request: std::sync::RwLock::new(None),
+        request: RwLock::new(None),
       }
     }
   }
@@ -446,7 +500,7 @@ pub(crate) mod tests {
   impl crate::plugin_models::PactPluginRpc for InitRecordingPlugin {
     async fn init_plugin(
       &mut self,
-      request: crate::plugin_models::PluginInitRequest,
+      request: PluginInitRequest,
     ) -> anyhow::Result<PluginInitResponse> {
       *self.request.write().unwrap() = Some(request);
       Ok(PluginInitResponse {
