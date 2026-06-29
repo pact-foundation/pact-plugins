@@ -15,9 +15,8 @@ use serde_json::Value;
 use tracing::{debug, error};
 
 use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
-use crate::grpc_plugin::GrpcPactPlugin;
 use crate::plugin_manager::lookup_plugin;
-use crate::plugin_models::{PactPluginManifest, PluginInstance, PluginInteractionConfig};
+use crate::plugin_models::{PactPluginManifest, PluginInteractionConfig};
 use crate::proto::{
   Body,
   CompareContentsRequest,
@@ -207,7 +206,7 @@ impl ContentMatcher {
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()
       .expect("Plugin type is required");
     match lookup_plugin(&plugin_manifest.as_dependency()) {
-      Some(plugin) => match GrpcPactPlugin::new(plugin).configure_interaction(request).await {
+      Some(plugin) => match plugin.configure_interaction(request).await {
         Ok(response) => {
           debug!("Got response: {:?}", response);
           if response.error.is_empty() {
@@ -390,7 +389,7 @@ impl ContentMatcher {
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()
       .expect("Plugin type is required");
     match lookup_plugin(&plugin_manifest.as_dependency()) {
-      Some(plugin) => match GrpcPactPlugin::new(plugin).compare_contents(request).await {
+      Some(plugin) => match plugin.compare_contents(request).await {
         Ok(response) => if let Some(mismatch) = response.type_mismatch {
           Err(hashmap!{
             String::default() => vec![
@@ -552,7 +551,7 @@ impl ContentGenerator {
     match lookup_plugin(&plugin_manifest.as_dependency()) {
       Some(plugin) => {
         debug!("Sending generateContent request to plugin {:?}", plugin_manifest);
-        match GrpcPactPlugin::new(plugin).generate_content(request).await?.contents {
+        match plugin.generate_content(request).await?.contents {
           Some(contents) => {
             Ok(OptionalBody::Present(
               Bytes::from(contents.content.unwrap_or_default()),
