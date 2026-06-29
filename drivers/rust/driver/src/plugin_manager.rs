@@ -278,16 +278,18 @@ async fn initialise_plugin(
       match manifest.executable_type.as_str() {
         "exec" => {
           let plugin = start_plugin_process(manifest).await?;
+          #[allow(deprecated)]
+          let port = plugin.port();
           debug!(
             "Plugin process started OK (port = {}), sending init message",
-            plugin.port()
+            port
           );
 
           let instance_id = plugin.instance_id.clone();
           let mut grpc_plugin = GrpcPactPlugin::new(plugin);
           let response = init_handshake(manifest, &mut grpc_plugin, &instance_id).await.map_err(|err| {
             deregister_plugin_instance(&instance_id);
-            grpc_plugin.plugin.kill();
+            grpc_plugin.kill();
             anyhow!("Failed to send init request to the plugin - {}", err)
           })?;
           grpc_plugin.plugin.plugin_capabilities = response.plugin_capabilities;
@@ -341,6 +343,7 @@ pub fn shutdown_plugins() {
   for plugin in guard.values() {
     debug!("Shutting down plugin {:?}", plugin);
     deregister_plugin_instance(&plugin.instance_id);
+    #[allow(deprecated)]
     plugin.kill();
     remove_plugin_entries(&plugin.manifest.name);
   }
@@ -358,6 +361,7 @@ pub fn shutdown_plugin(plugin: &PactPlugin) {
     plugin.manifest.name, plugin.manifest.version
   );
   deregister_plugin_instance(&plugin.instance_id);
+  #[allow(deprecated)]
   plugin.kill();
   remove_plugin_entries(&plugin.manifest.name);
 }

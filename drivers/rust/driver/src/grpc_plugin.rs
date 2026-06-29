@@ -352,6 +352,7 @@ impl GrpcPactPlugin {
     GrpcPactPlugin { plugin }
   }
 
+  #[allow(deprecated)]
   async fn connect_channel(&self) -> anyhow::Result<Channel> {
     let port = self.plugin.child.port();
     match Channel::from_shared(format!("http://[::1]:{}", port))?
@@ -369,6 +370,7 @@ impl GrpcPactPlugin {
     }
   }
 
+  #[allow(deprecated)]
   async fn get_plugin_client(&self) -> anyhow::Result<PluginClient> {
     let channel = self.connect_channel().await?;
     let interceptor =
@@ -401,6 +403,19 @@ impl PactPluginRpc for GrpcPactPlugin {
 impl PluginInstance for GrpcPactPlugin {
   fn manifest(&self) -> &PactPluginManifest {
     &self.plugin.manifest
+  }
+
+  fn instance_id(&self) -> &str {
+    &self.plugin.instance_id
+  }
+
+  fn has_capability(&self, capability: &str) -> bool {
+    self.plugin.has_capability(capability)
+  }
+
+  #[allow(deprecated)]
+  fn kill(&self) {
+    self.plugin.child.kill();
   }
 
   async fn compare_contents(

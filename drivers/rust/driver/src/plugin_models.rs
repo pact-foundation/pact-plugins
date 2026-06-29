@@ -166,11 +166,24 @@ pub trait PactPluginRpc {
     -> anyhow::Result<PluginInitResponse>;
 }
 
-/// Trait for a running plugin instance that can handle gRPC calls
+/// Trait for a running plugin instance.
+///
+/// Implementations include [`crate::grpc_plugin::GrpcPactPlugin`] for exec-type plugins
+/// that communicate via gRPC, and future embedded runtimes (Lua, Python, …).
 #[async_trait]
 pub trait PluginInstance: std::fmt::Debug + Send + Sync {
-  /// Return the manifest for this plugin
+  /// Return the manifest for this plugin.
   fn manifest(&self) -> &PactPluginManifest;
+
+  /// Return the instance ID assigned to this plugin at startup.
+  fn instance_id(&self) -> &str;
+
+  /// Check whether the plugin declared a specific capability.
+  fn has_capability(&self, capability: &str) -> bool;
+
+  /// Terminate the running plugin. The default no-op suits embedded runtimes
+  /// that are not managed as a child process.
+  fn kill(&self) {}
 
   /// Send a compare contents request to the plugin process
   async fn compare_contents(
@@ -260,7 +273,13 @@ pub struct PactPlugin {
   /// Interface version supported by the plugin
   pub interface_version: PluginInterfaceVersion,
 
-  /// Running child process
+  /// Running child process.
+  ///
+  /// Deprecated: not all plugin types have a child process; this field is now
+  /// owned by the gRPC layer. Access plugin lifecycle through [`PluginInstance`] methods instead.
+  #[deprecated(
+    note = "Not all plugin types have a child process; use PluginInstance methods for plugin lifecycle"
+  )]
   pub child: Arc<ChildPluginProcess>,
 
   /// Optional capabilities negotiated for this plugin instance
@@ -275,6 +294,7 @@ pub struct PactPlugin {
 
 impl PactPlugin {
   /// Create a new Plugin
+  #[allow(deprecated)]
   pub fn new(manifest: &PactPluginManifest, child: ChildPluginProcess) -> anyhow::Result<Self> {
     let instance_id = child.instance_id.clone();
     Ok(PactPlugin {
@@ -301,12 +321,20 @@ impl PactPlugin {
     &self.instance_id
   }
 
-  /// Port the plugin is running on
+  /// Port the plugin is running on.
+  ///
+  /// Deprecated: port is a gRPC-specific concept; use `GrpcPactPlugin` directly if you need it.
+  #[deprecated(note = "Port is specific to gRPC plugins; access it via GrpcPactPlugin")]
+  #[allow(deprecated)]
   pub fn port(&self) -> u16 {
     self.child.port()
   }
 
-  /// Kill the running plugin process
+  /// Kill the running plugin process.
+  ///
+  /// Deprecated: use [`PluginInstance::kill`] instead so non-gRPC plugin types are handled correctly.
+  #[deprecated(note = "Use PluginInstance::kill() instead")]
+  #[allow(deprecated)]
   pub fn kill(&self) {
     self.child.kill();
   }
@@ -389,6 +417,14 @@ pub(crate) mod tests {
   impl PluginInstance for MockPlugin {
     fn manifest(&self) -> &PactPluginManifest {
       &self.manifest
+    }
+
+    fn instance_id(&self) -> &str {
+      "test-instance"
+    }
+
+    fn has_capability(&self, _capability: &str) -> bool {
+      false
     }
 
     async fn compare_contents(
