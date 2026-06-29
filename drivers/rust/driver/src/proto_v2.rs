@@ -606,13 +606,6 @@ pub struct MockServerDetails {
     #[prost(string, tag = "3")]
     pub address: ::prost::alloc::string::String,
 }
-/// Request to shut down a running mock server (deprecated in V2; use MockServerRequest)
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct ShutdownMockServerRequest {
-    /// The server ID to shutdown
-    #[prost(string, tag = "1")]
-    pub server_key: ::prost::alloc::string::String,
-}
 /// Request for a running mock server by ID
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct MockServerRequest {
@@ -632,16 +625,6 @@ pub struct MockServerResult {
     /// Any mismatches that occurred
     #[prost(message, repeated, tag = "3")]
     pub mismatches: ::prost::alloc::vec::Vec<ContentMismatch>,
-}
-/// Response to the shut down mock server request (deprecated in V2; use MockServerResults)
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ShutdownMockServerResponse {
-    /// If the mock status is all ok
-    #[prost(bool, tag = "1")]
-    pub ok: bool,
-    /// The results of the test run, will contain an entry for each request received by the mock server
-    #[prost(message, repeated, tag = "2")]
-    pub results: ::prost::alloc::vec::Vec<MockServerResult>,
 }
 /// Matching results of the mock server.
 #[derive(Clone, PartialEq, ::prost::Message)]
