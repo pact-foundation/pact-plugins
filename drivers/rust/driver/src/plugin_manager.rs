@@ -37,7 +37,7 @@ use crate::grpc_plugin::{GrpcPactPlugin, start_plugin_process};
 use crate::metrics::send_metrics;
 use crate::mock_server::{MockServerConfig, MockServerDetails, MockServerResults};
 use crate::plugin_models::{
-  PactPluginManifest, PactPluginRpc, PluginDependency, PluginInitRequest,
+  PactPlugin, PactPluginManifest, PactPluginRpc, PluginDependency, PluginInitRequest,
   PluginInstance, PluginInterfaceVersion,
 };
 use crate::proto::*;
@@ -50,13 +50,17 @@ use crate::verification::{InteractionVerificationData, InteractionVerificationRe
 
 #[derive(Debug, Clone)]
 struct RegisteredPlugin {
-  plugin: Arc<dyn PluginInstance + Send + Sync>,
+  /// The running plugin instance, accessed via the PluginInstance trait.
+  instance: Arc<dyn PluginInstance + Send + Sync>,
+  /// Kept so load_plugin can return PactPlugin without breaking external callers.
+  plugin: PactPlugin,
   access_count: Arc<AtomicUsize>,
 }
 
 impl RegisteredPlugin {
-  fn new(plugin: Arc<dyn PluginInstance + Send + Sync>) -> Self {
+  fn new(instance: Arc<dyn PluginInstance + Send + Sync>, plugin: PactPlugin) -> Self {
     RegisteredPlugin {
+      instance,
       plugin,
       access_count: Arc::new(AtomicUsize::new(1)),
     }
@@ -66,8 +70,8 @@ impl RegisteredPlugin {
     let count = self.access_count.fetch_add(1, Ordering::SeqCst);
     trace!(
       "update_access: Plugin {}/{} access is now {}",
-      self.plugin.manifest().name,
-      self.plugin.manifest().version,
+      self.plugin.manifest.name,
+      self.plugin.manifest.version,
       count + 1
     );
   }
@@ -85,7 +89,7 @@ impl RegisteredPlugin {
     };
     trace!(
       "drop_access: Plugin {}/{} access is now {}",
-      self.plugin.manifest().name, self.plugin.manifest().version, count
+      self.plugin.manifest.name, self.plugin.manifest.version, count
     );
     count
   }
@@ -121,7 +125,7 @@ fn host_capabilities() -> Vec<String> {
 
 /// Load the plugin defined by the dependency information. Will first look in the global
 /// plugin registry.
-pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<Arc<dyn PluginInstance + Send + Sync>> {
+pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<PactPlugin> {
   let thread_id = thread::current().id();
   debug!("Loading plugin {:?}", plugin);
   trace!(
@@ -136,7 +140,7 @@ pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<Arc<dyn Pl
   trace!("load_plugin {:?}: Got PLUGIN_REGISTER lock", thread_id);
   let result = match lookup_plugin_inner(plugin, &inner) {
     Some(entry) => {
-      debug!("Found running plugin {:?}", entry.plugin.manifest());
+      debug!("Found running plugin {:?}", entry.plugin.manifest);
       entry.update_access();
       Ok(entry.plugin.clone())
     }
@@ -182,8 +186,8 @@ fn lookup_plugin_inner<'a>(
   } else {
     plugin_register
       .iter()
-      .filter(|(_, value)| value.plugin.manifest().name == plugin.name)
-      .max_by(|(_, v1), (_, v2)| v1.plugin.manifest().version.cmp(&v2.plugin.manifest().version))
+      .filter(|(_, value)| value.plugin.manifest.name == plugin.name)
+      .max_by(|(_, v1), (_, v2)| v1.plugin.manifest.version.cmp(&v2.plugin.manifest.version))
       .map(|(_, entry)| entry)
   }
 }
@@ -202,7 +206,7 @@ pub fn lookup_plugin(plugin: &PluginDependency) -> Option<Arc<dyn PluginInstance
     "lookup_plugin {:?}: Releasing PLUGIN_REGISTER lock",
     thread_id
   );
-  entry.map(|e| e.plugin.clone())
+  entry.map(|e| e.instance.clone())
 }
 
 /// Return the plugin manifest for the given plugin. Will first look in the global plugin manifest
@@ -309,7 +313,7 @@ pub fn lookup_plugin_manifest(plugin: &PluginDependency) -> Option<PactPluginMan
 async fn initialise_plugin(
   manifest: &PactPluginManifest,
   plugin_register: &mut HashMap<String, RegisteredPlugin>,
-) -> anyhow::Result<Arc<dyn PluginInstance + Send + Sync>> {
+) -> anyhow::Result<PactPlugin> {
   let interface_version = PluginInterfaceVersion::try_from(manifest.plugin_interface_version)
     .with_context(|| {
       format!(
@@ -338,12 +342,13 @@ async fn initialise_plugin(
             anyhow!("Failed to send init request to the plugin - {}", err)
           })?;
           grpc_plugin.plugin.plugin_capabilities = response.plugin_capabilities;
+          let pact_plugin = grpc_plugin.plugin.clone();
 
           let key = format!("{}/{}", manifest.name, manifest.version);
           let instance: Arc<dyn PluginInstance + Send + Sync> = Arc::new(grpc_plugin);
-          plugin_register.insert(key, RegisteredPlugin::new(instance.clone()));
+          plugin_register.insert(key, RegisteredPlugin::new(instance, pact_plugin.clone()));
 
-          Ok(instance)
+          Ok(pact_plugin)
         }
         _ => Err(anyhow!(
           "Plugin executable type of {} is not supported",
@@ -387,10 +392,10 @@ pub fn shutdown_plugins() {
   let mut guard = PLUGIN_REGISTER.lock().unwrap();
   trace!("shutdown_plugins {:?}: Got PLUGIN_REGISTER lock", thread_id);
   for entry in guard.values() {
-    debug!("Shutting down plugin {:?}", entry.plugin.manifest());
-    deregister_plugin_instance(entry.plugin.instance_id());
-    entry.plugin.kill();
-    remove_plugin_entries(&entry.plugin.manifest().name);
+    debug!("Shutting down plugin {:?}", entry.plugin.manifest);
+    deregister_plugin_instance(&entry.plugin.instance_id);
+    entry.instance.kill();
+    remove_plugin_entries(&entry.plugin.manifest.name);
   }
   guard.clear();
   trace!(
@@ -435,7 +440,7 @@ pub async fn publish_updated_catalogue() {
       "publish_updated_catalogue {:?}: Got PLUGIN_REGISTER lock",
       thread_id
     );
-    let plugins = inner.values().map(|e| e.plugin.clone()).collect::<Vec<_>>();
+    let plugins = inner.values().map(|e| e.instance.clone()).collect::<Vec<_>>();
     trace!(
       "publish_updated_catalogue {:?}: Releasing PLUGIN_REGISTER lock",
       thread_id
@@ -494,16 +499,16 @@ pub fn drop_plugin_access(plugin: &PluginDependency) {
   );
 
   let shutdown_info = lookup_plugin_inner(plugin, &inner).and_then(|entry| {
-    let key = format!("{}/{}", entry.plugin.manifest().name, entry.plugin.manifest().version);
-    let plugin_ref = entry.plugin.clone();
+    let key = format!("{}/{}", entry.plugin.manifest.name, entry.plugin.manifest.version);
+    let instance_ref = entry.instance.clone();
     if entry.drop_access() == 0 {
-      Some((key, plugin_ref))
+      Some((key, instance_ref))
     } else {
       None
     }
   });
-  if let Some((key, plugin_ref)) = shutdown_info {
-    shutdown_plugin(plugin_ref.as_ref());
+  if let Some((key, instance_ref)) = shutdown_info {
+    shutdown_plugin(instance_ref.as_ref());
     inner.remove(key.as_str());
   }
 
