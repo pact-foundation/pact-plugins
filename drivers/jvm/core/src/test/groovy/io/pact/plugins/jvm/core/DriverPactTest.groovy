@@ -8,7 +8,6 @@ import au.com.dius.pact.core.model.PactSpecVersion
 import au.com.dius.pact.core.model.V4Interaction
 import au.com.dius.pact.core.model.V4Pact
 import au.com.dius.pact.core.model.annotations.Pact
-import io.grpc.ManagedChannel
 import io.pact.plugin.Plugin
 import org.jetbrains.annotations.Nullable
 import org.junit.jupiter.api.Test
@@ -71,16 +70,6 @@ class DriverPactTest {
     }
 
     @Override
-    PactPluginRpcClient getRpcClient() {
-      Mockito.mock(PactPluginRpcClient)
-    }
-
-    @Override
-    void setRpcClient(@Nullable PactPluginRpcClient rpcClient) {
-
-    }
-
-    @Override
     List<Plugin.CatalogueEntry> getCatalogueEntries() {
       null
     }
@@ -97,16 +86,6 @@ class DriverPactTest {
 
     @Override
     void setCatalogueEntries(@Nullable List<Plugin.CatalogueEntry> catalogueEntries) {
-
-    }
-
-    @Override
-    ManagedChannel getChannel() {
-      null
-    }
-
-    @Override
-    void setChannel(@Nullable ManagedChannel channel) {
 
     }
 
