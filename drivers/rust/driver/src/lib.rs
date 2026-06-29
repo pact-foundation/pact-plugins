@@ -18,6 +18,7 @@ pub mod catalogue_manager;
 mod child_process;
 pub(crate) mod plugin_host;
 pub mod content;
+pub mod grpc_plugin;
 pub mod download;
 mod metrics;
 pub mod mock_server;

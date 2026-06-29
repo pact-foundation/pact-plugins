@@ -16,7 +16,7 @@ use tracing::{debug, error};
 
 use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
 use crate::plugin_manager::lookup_plugin;
-use crate::plugin_models::{PactPluginManifest, PactPluginRpc, PluginInteractionConfig};
+use crate::plugin_models::{PactPluginManifest, PluginInteractionConfig};
 use crate::proto::{
   Body,
   CompareContentsRequest,
