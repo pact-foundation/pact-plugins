@@ -11,7 +11,7 @@ use pact_plugin_driver::plugin_manager::init_handshake;
 use pact_plugin_driver::plugin_models::{
   PactPluginManifest, PactPluginRpc, PluginInitRequest, PluginInitResponse
 };
-use pact_plugin_driver::proto::*;
+use pact_plugin_driver::proto::{InitPluginRequest, InitPluginResponse};
 
 struct MockPlugin {
   pub request: InitPluginRequest,
@@ -29,42 +29,6 @@ impl PactPluginRpc for MockPlugin {
     } else {
       Err(anyhow!("Received incorrect request, expected {:?} but got {:?}", self.request, request))
     }
-  }
-
-  async fn compare_contents(&self, _request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
-    unimplemented!()
-  }
-
-  async fn configure_interaction(&self, _request: ConfigureInteractionRequest) -> anyhow::Result<ConfigureInteractionResponse> {
-    unimplemented!()
-  }
-
-  async fn generate_content(&self, _request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
-    unimplemented!()
-  }
-
-  async fn start_mock_server(&self, _request: StartMockServerRequest) -> anyhow::Result<StartMockServerResponse> {
-    unimplemented!()
-  }
-
-  async fn shutdown_mock_server(&self, _request: ShutdownMockServerRequest) -> anyhow::Result<ShutdownMockServerResponse> {
-    unimplemented!()
-  }
-
-  async fn get_mock_server_results(&self, _request: MockServerRequest) -> anyhow::Result<MockServerResults> {
-    unimplemented!()
-  }
-
-  async fn prepare_interaction_for_verification(&self, _request: VerificationPreparationRequest) -> anyhow::Result<VerificationPreparationResponse> {
-    unimplemented!()
-  }
-
-  async fn verify_interaction(&self, _request: VerifyInteractionRequest) -> anyhow::Result<VerifyInteractionResponse> {
-    unimplemented!()
-  }
-
-  async fn update_catalogue(&self, _request: Catalogue) -> anyhow::Result<()> {
-    unimplemented!()
   }
 }
 
