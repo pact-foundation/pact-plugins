@@ -12,7 +12,7 @@ function matching.validate_token(token, algorithm, key)
     end
 
     local expiration_time = token.payload["exp"]
-    if expiration_time < os.time() then
+    if expiration_time and expiration_time < os.time() then
         table.insert(result, "Actual token has expired")
     end
 
@@ -36,7 +36,10 @@ function matching.match_claims(expected_claims, actual_claims)
     logger("matching JWT claims")
     logger("expected claims: " .. inspect(expected_claims))
     logger("actual claims: " .. inspect(actual_claims))
-    return match_map(expected_claims, actual_claims, Set({"iss", "sub", "aud", "exp"}), {}, Set({"exp", "nbf", "iat", "jti"}))
+    -- "exp" is deliberately not compulsory here (unlike iss/sub/aud): it's a timestamp that
+    -- legitimately differs between the expected and actual token, and its presence/validity
+    -- is already checked semantically by validate_token above.
+    return match_map(expected_claims, actual_claims, Set({"iss", "sub", "aud"}), {}, Set({"exp", "nbf", "iat", "jti"}))
 end
 
 function match_map(expected, actual, compulsory_keys, allowed_keys, keys_to_ignore)

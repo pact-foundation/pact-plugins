@@ -23,10 +23,11 @@ function init(implementation, version)
     -- Add some entropy to the random number generator
     math.randomseed(os.time())
 
-    -- The driver treats each semicolon-separated content type as a regex pattern when
-    -- matching against an actual content type (a substring search in the Rust driver, a full
-    -- match in the JVM driver), so the "+" in the "+json" structured syntax suffix must be
-    -- escaped - otherwise it's interpreted as a regex quantifier and silently fails to match.
+    -- The driver treats each semicolon-separated content type as a regex pattern, anchored at
+    -- both ends (the whole content type must match, not just part of it), when matching
+    -- against an actual content type - same behaviour on both drivers. So the "+" in the
+    -- "+json" structured syntax suffix must be escaped, otherwise it's interpreted as a regex
+    -- quantifier and silently fails to match.
     local params = { ["content-types"] = "application/jwt;application/jwt\\+json" }
     local catalogue_entries = {}
     table.insert(catalogue_entries, { entryType = "CONTENT_MATCHER", key = "jwt", values = params })

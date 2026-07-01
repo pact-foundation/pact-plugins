@@ -508,6 +508,20 @@ fn lua_to_compare_response(table: Table) -> anyhow::Result<CompareContentsRespon
   })
 }
 
+/// Stringifies a scalar Lua value (used for the `expected`/`actual` fields of a mismatch
+/// table), rather than requiring exactly a Lua string - a claim/header value being compared
+/// could just as easily be a number or boolean.
+fn lua_scalar_to_string(value: Value) -> anyhow::Result<Option<String>> {
+  match value {
+    Value::Nil => Ok(None),
+    Value::Boolean(b) => Ok(Some(b.to_string())),
+    Value::Integer(i) => Ok(Some(i.to_string())),
+    Value::Number(n) => Ok(Some(n.to_string())),
+    Value::String(s) => Ok(Some(s.to_str()?.to_string())),
+    other => Err(anyhow!("Expected a scalar mismatch value from Lua, got {}", other.type_name())),
+  }
+}
+
 fn lua_value_to_content_mismatches(path: &str, value: Value) -> anyhow::Result<Vec<ContentMismatch>> {
   match value {
     Value::String(s) => Ok(vec![ContentMismatch {
@@ -522,8 +536,10 @@ fn lua_value_to_content_mismatches(path: &str, value: Value) -> anyhow::Result<V
       // Either a single mismatch table ({mismatch=..., expected=..., ...}), or a sequence of them / plain strings
       let mismatch_field: Option<String> = table.get("mismatch")?;
       if let Some(mismatch) = mismatch_field {
-        let expected: Option<String> = table.get("expected")?;
-        let actual: Option<String> = table.get("actual")?;
+        // expected/actual can reasonably be non-string Lua values (e.g. a numeric or boolean
+        // claim value), so stringify whatever's there rather than requiring exactly a string.
+        let expected = lua_scalar_to_string(table.get("expected")?)?;
+        let actual = lua_scalar_to_string(table.get("actual")?)?;
         let path_override: Option<String> = table.get("path")?;
         let diff: Option<String> = table.get("diff")?;
         let mismatch_type: Option<String> = table.get("mismatch_type")?;
@@ -989,5 +1005,55 @@ mod tests {
     };
     let compare_response = plugin.compare_contents(compare_request).await.unwrap();
     assert!(!compare_response.results.is_empty(), "expected a mismatch to be detected");
+  }
+
+  #[tokio::test]
+  async fn compare_contents_handles_non_string_mismatch_values() {
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      r#"
+        function match_contents(request)
+          return {
+            mismatches = {
+              ["claims:exp"] = { expected = 123, actual = 456, mismatch = "exp differs", path = "claims:exp" },
+              ["claims:verified"] = { expected = true, actual = false, mismatch = "verified differs", path = "claims:verified" }
+            }
+          }
+        end
+      "#,
+    ).unwrap();
+
+    let manifest = PactPluginManifest {
+      plugin_dir: plugin_dir.path().to_string_lossy().to_string(),
+      plugin_interface_version: 1,
+      name: "scalar-mismatch-test".to_string(),
+      version: "0.0.0".to_string(),
+      executable_type: "lua".to_string(),
+      minimum_required_version: None,
+      entry_point: "entry.lua".to_string(),
+      entry_points: HashMap::new(),
+      args: None,
+      dependencies: None,
+      plugin_config: HashMap::new(),
+    };
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+
+    let compare_request = CompareContentsRequest {
+      expected: None,
+      actual: None,
+      allow_unexpected_keys: false,
+      rules: HashMap::new(),
+      plugin_configuration: None,
+    };
+    let response = plugin.compare_contents(compare_request).await.unwrap();
+
+    let exp_mismatch = &response.results["claims:exp"].mismatches[0];
+    assert_eq!(exp_mismatch.expected.as_deref(), Some("123".as_bytes()));
+    assert_eq!(exp_mismatch.actual.as_deref(), Some("456".as_bytes()));
+
+    let verified_mismatch = &response.results["claims:verified"].mismatches[0];
+    assert_eq!(verified_mismatch.expected.as_deref(), Some("true".as_bytes()));
+    assert_eq!(verified_mismatch.actual.as_deref(), Some("false".as_bytes()));
   }
 }

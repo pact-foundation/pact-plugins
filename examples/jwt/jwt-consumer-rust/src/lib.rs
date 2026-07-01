@@ -82,7 +82,8 @@ xGgMNbvImsticz5CUjXC1IkCnbdLrC16YFKMKguaRvTDDOF+
     let now = SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
     let claims = Claims {
       aud: "1234566778".to_string(),
-      exp: now,
+      exp: now + 300, // 5 minutes in the future, so the token isn't already expired by the
+                      // time the plugin validates it
       iss: "ldsdkdalds".to_string(),
       sub: "slksjkdjkdks".to_string(),
     };
