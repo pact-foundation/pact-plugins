@@ -113,6 +113,16 @@ object CatalogueManager {
   }
 }
 
+/**
+ * Checks if a registered content-type pattern matches this content type. The pattern is
+ * matched as a regex against the base type (i.e. with any parameters like `charset`
+ * stripped); Kotlin's `matches` is a full match (the whole base type must match, not just a
+ * substring) - this must stay consistent with the equivalent check in the Rust driver's
+ * `catalogue_manager::matches_pattern`, so a plugin's catalogue registration behaves the same
+ * way regardless of which driver loaded it. Regex metacharacters in a content type (most
+ * commonly `+`, as in a `+json`/`+xml` structured syntax suffix) need to be escaped by the
+ * plugin author for a literal match.
+ */
 private fun ContentType.matches(type: String) = this.getBaseType().orEmpty().matches(Regex(type))
 
 /**
