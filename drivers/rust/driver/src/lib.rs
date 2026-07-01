@@ -16,6 +16,7 @@ pub const TRANSPORT_FILTER_DIRECTIVES: &str = "h2=warn,hyper=warn,hyper_util=war
 
 pub mod catalogue_manager;
 mod child_process;
+pub mod grpc_plugin;
 pub(crate) mod plugin_host;
 pub mod content;
 pub mod download;

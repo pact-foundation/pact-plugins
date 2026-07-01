@@ -5,7 +5,7 @@ import spock.lang.Specification
 
 import java.util.concurrent.TimeUnit
 
-class DefaultPactPluginSpec extends Specification {
+class GrpcPactPluginSpec extends Specification {
 
   def 'on shutdown destroys the child process'() {
     given:
@@ -23,7 +23,7 @@ class DefaultPactPluginSpec extends Specification {
       []
     )
     def channel = Mock(ManagedChannel)
-    def plugin = new DefaultPactPlugin(
+    def plugin = new GrpcPactPlugin(
       childProcess,
       manifest,
       null,
@@ -58,7 +58,7 @@ class DefaultPactPluginSpec extends Specification {
       []
     )
     def channel = Mock(ManagedChannel)
-    def plugin = new DefaultPactPlugin(
+    def plugin = new GrpcPactPlugin(
       childProcess,
       manifest,
       null,

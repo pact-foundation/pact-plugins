@@ -230,10 +230,8 @@ interface PactPlugin {
   val processPid: Long?
   /** UUID assigned by the driver at process start; included in every log record emitted by this instance */
   val instanceId: String
-  var rpcClient: PactPluginRpcClient?
   var catalogueEntries: List<Plugin.CatalogueEntry>?
   var pluginCapabilities: List<String>
-  var channel: ManagedChannel?
 
   /**
    * Shutdown the running plugin
@@ -249,16 +247,16 @@ interface PactPlugin {
 /**
  * Default implementation of a Pact Plugin
  */
-data class DefaultPactPlugin(
+data class GrpcPactPlugin(
   val cp: ChildProcess,
   override val manifest: PactPluginManifest,
   override val port: Int?,
   override val serverKey: String,
   override val instanceId: String,
-  override var rpcClient: PactPluginRpcClient? = null,
+  var rpcClient: PactPluginRpcClient? = null,
   override var catalogueEntries: List<Plugin.CatalogueEntry>? = null,
   override var pluginCapabilities: List<String> = emptyList(),
-  override var channel: ManagedChannel? = null
+  var channel: ManagedChannel? = null
 ) : PactPlugin {
   override val processPid: Long
     get() = cp.pid
@@ -953,7 +951,7 @@ object DefaultPluginManager: PluginManager {
     }
   }
 
-  private fun tryInitPlugin(plugin: PactPlugin, address: String): Result<PactPlugin, Exception> {
+  private fun tryInitPlugin(plugin: GrpcPactPlugin, address: String): Result<PactPlugin, Exception> {
     try {
       val channel = ManagedChannelBuilder.forTarget(address)
         .usePlaintext()
@@ -1027,7 +1025,7 @@ object DefaultPluginManager: PluginManager {
     manifest: PactPluginManifest,
     env: Map<String, String> = mapOf(),
     vararg command: String
-  ): Result<PactPlugin, String> {
+  ): Result<GrpcPactPlugin, String> {
     logger.debug { "Starting plugin with manifest $manifest" }
     val pb = if (command.isNotEmpty()) {
       ProcessBuilder(command.asList() + manifest.pluginDir.resolve(manifest.entryPoint).toString())
@@ -1071,7 +1069,7 @@ object DefaultPluginManager: PluginManager {
       val timeout = System.getProperty("pact.plugin.loadTimeoutInMs")?.toLongOrNull() ?: 10000
       val startupInfo = cp.channel.poll(timeout, TimeUnit.MILLISECONDS)
       if (startupInfo is JsonValue.Object) {
-        val plugin = DefaultPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString(), instanceId)
+        val plugin = GrpcPactPlugin(cp, manifest, toInteger(startupInfo["port"]), startupInfo["serverKey"].toString(), instanceId)
         Result.Ok(plugin)
       } else {
         cp.destroy()
