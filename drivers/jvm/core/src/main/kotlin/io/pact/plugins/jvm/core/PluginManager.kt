@@ -127,6 +127,14 @@ interface PactPluginManifest {
    * List of system dependencies or plugins required to be able to execute this plugin
    */
   val dependencies: List<PluginDependency>
+
+  /**
+   * Plugin specific configuration data (arbitrary key/value pairs from the manifest's
+   * `pluginConfig` field). Used, for example, by Lua plugins to override the LuaRocks
+   * directory the driver looks in for pure-Lua package dependencies (see `LuaPactPlugin`).
+   */
+  val pluginConfig: Map<String, Any?>
+    get() = emptyMap()
 }
 
 data class DefaultPactPluginManifest(
@@ -139,8 +147,28 @@ data class DefaultPactPluginManifest(
   override val entryPoint: String,
   override val entryPoints: Map<String, String?>,
   override val args: List<String>,
-  override val dependencies: List<PluginDependency>
+  override val dependencies: List<PluginDependency>,
+  override val pluginConfig: Map<String, Any?> = emptyMap()
 ): PactPluginManifest {
+
+  // Explicit 10-arg constructor for callers (e.g. Groovy specs) that can't rely on Kotlin's
+  // default-parameter mechanism, which needs a synthetic bitmask argument reflection-based
+  // callers don't know to supply.
+  constructor(
+    pluginDir: File,
+    pluginInterfaceVersion: Int,
+    name: String,
+    version: String,
+    executableType: String,
+    minimumRequiredVersion: String?,
+    entryPoint: String,
+    entryPoints: Map<String, String?>,
+    args: List<String>,
+    dependencies: List<PluginDependency>
+  ) : this(
+    pluginDir, pluginInterfaceVersion, name, version, executableType, minimumRequiredVersion,
+    entryPoint, entryPoints, args, dependencies, emptyMap()
+  )
 
   fun toMap(): Map<String, Any> {
     val map = mutableMapOf<String, Any>(
@@ -174,6 +202,10 @@ data class DefaultPactPluginManifest(
       }
     }
 
+    if (pluginConfig.isNotEmpty()) {
+      map["pluginConfig"] = pluginConfig
+    }
+
     return map
   }
 
@@ -204,6 +236,18 @@ data class DefaultPactPluginManifest(
         emptyList()
       }
 
+      val pluginConfig = if (pluginJson.has("pluginConfig")) {
+        when (val pc = pluginJson["pluginConfig"]) {
+          is JsonValue.Object -> pc.entries.entries.associate { it.key to it.value.unwrap() }
+          else -> {
+            logger.warn { "pluginConfig field in plugin manifest is invalid" }
+            emptyMap()
+          }
+        }
+      } else {
+        emptyMap()
+      }
+
       return DefaultPactPluginManifest(
         pluginDir,
         toInteger(pluginJson["pluginInterfaceVersion"]) ?: 1,
@@ -214,7 +258,8 @@ data class DefaultPactPluginManifest(
         pluginJson["entryPoint"].asString().orEmpty(),
         entryPoints,
         args,
-        listOf()
+        listOf(),
+        pluginConfig
       )
     }
   }

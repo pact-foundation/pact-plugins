@@ -66,6 +66,7 @@ class LuaPactPlugin(
 
   init {
     engine.addPackagePath(manifest.pluginDir)
+    addLuaRocksPath()
     registerHostFunctions()
     engine.loadScript(resolveEntryPoint())
   }
@@ -79,6 +80,46 @@ class LuaPactPlugin(
     }
     require(path.exists()) { "Lua plugin entry point $path does not exist" }
     return path
+  }
+
+  /**
+   * Makes pure-Lua packages installed via `luarocks` available to `require`, so a plugin can
+   * depend on rocks instead of vendoring every third-party library it uses.
+   *
+   * LuaRocks installs modules under `<rocksDir>/share/lua/<version>/`, where `<rocksDir>`
+   * defaults to `~/.luarocks` (its standard per-user tree) but can be a system tree or a
+   * custom prefix if the user configured LuaRocks differently. A plugin can override the
+   * directory this driver looks in via a `luaRocksDir` key in the manifest's `pluginConfig`.
+   * Only the `share/lua` (pure Lua) path is added - packages with compiled C extensions
+   * (under `lib/lua`) are not supported. Mirrors the Rust driver's `lua_plugin::add_luarocks_path`.
+   */
+  private fun addLuaRocksPath() {
+    val configured = manifest.pluginConfig["luaRocksDir"] as? String
+    val rocksDir = if (configured != null) {
+      File(configured)
+    } else {
+      File(System.getProperty("user.home"), ".luarocks")
+    }
+
+    val luaDir = File(rocksDir, "share/lua/$LUAROCKS_LUA_VERSION")
+    if (!luaDir.exists()) {
+      if (configured != null) {
+        logger.debug {
+          "Configured luaRocksDir '$rocksDir' does not have a share/lua/$LUAROCKS_LUA_VERSION " +
+            "directory, ignoring"
+        }
+      }
+      return
+    }
+
+    engine.addPackagePath(luaDir, includeDirectoryModules = true)
+    logger.debug { "Added LuaRocks path $luaDir for plugin ${manifest.name}" }
+  }
+
+  companion object {
+    /** The Lua version this driver embeds - also the version segment LuaRocks uses in its
+     * per-version tree layout (e.g. `share/lua/5.4/`). */
+    private const val LUAROCKS_LUA_VERSION = "5.4"
   }
 
   private fun registerHostFunctions() {

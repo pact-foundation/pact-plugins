@@ -179,4 +179,74 @@ class LuaPactPluginTest {
       pluginDir.deleteRecursively()
     }
   }
+
+  @Test
+  fun `loads pure Lua packages from a configured luaRocksDir`() {
+    val rocksRoot = kotlin.io.path.createTempDirectory("luarocks-test").toFile()
+    val luaDir = File(rocksRoot, "share/lua/5.4")
+    luaDir.mkdirs()
+    File(luaDir, "greeter.lua").writeText(
+      """return { hello = function() return "hello from luarocks" end }"""
+    )
+
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-plugin-test").toFile()
+    File(pluginDir, "entry.lua").writeText(
+      """
+        local greeter = require "greeter"
+        function init(implementation, version)
+          return { { entryType = "CONTENT_MATCHER", key = greeter.hello(), values = {} } }
+        end
+      """.trimIndent()
+    )
+
+    val manifest = DefaultPactPluginManifest(
+      pluginDir = pluginDir,
+      pluginInterfaceVersion = 1,
+      name = "luarocks-test",
+      version = "0.0.0",
+      executableType = "lua",
+      minimumRequiredVersion = null,
+      entryPoint = "entry.lua",
+      entryPoints = emptyMap(),
+      args = emptyList(),
+      dependencies = emptyList(),
+      pluginConfig = mapOf("luaRocksDir" to rocksRoot.absolutePath)
+    )
+
+    val plugin = LuaPactPlugin(manifest)
+    try {
+      val response = plugin.withRpcClient {
+        it.initPlugin(PluginInitRequest(implementation = "test", version = "0.0.0"))
+      }
+      assertEquals("hello from luarocks", response.catalogueEntries[0].key)
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+      rocksRoot.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `ignores a missing luaRocksDir instead of failing`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-plugin-test").toFile()
+    File(pluginDir, "entry.lua").writeText("-- no-op")
+
+    val manifest = DefaultPactPluginManifest(
+      pluginDir = pluginDir,
+      pluginInterfaceVersion = 1,
+      name = "luarocks-test",
+      version = "0.0.0",
+      executableType = "lua",
+      minimumRequiredVersion = null,
+      entryPoint = "entry.lua",
+      entryPoints = emptyMap(),
+      args = emptyList(),
+      dependencies = emptyList(),
+      pluginConfig = mapOf("luaRocksDir" to "/no/such/directory")
+    )
+
+    val plugin = LuaPactPlugin(manifest)
+    plugin.shutdown()
+    pluginDir.deleteRecursively()
+  }
 }

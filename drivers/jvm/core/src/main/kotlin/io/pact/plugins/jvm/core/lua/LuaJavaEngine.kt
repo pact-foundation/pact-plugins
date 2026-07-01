@@ -39,10 +39,15 @@ class LuaJavaEngine : LuaEngine {
     lua.setGlobal(name)
   }
 
-  override fun addPackagePath(directory: File) {
+  override fun addPackagePath(directory: File, includeDirectoryModules: Boolean) {
     val pkg = lua.get("package")
     val existing = pkg.get("path").toJavaObject() as? String ?: ""
-    pkg.set("path", "${directory.absolutePath}/?.lua;$existing")
+    val newEntries = if (includeDirectoryModules) {
+      "${directory.absolutePath}/?.lua;${directory.absolutePath}/?/init.lua"
+    } else {
+      "${directory.absolutePath}/?.lua"
+    }
+    pkg.set("path", "$newEntries;$existing")
   }
 
   override fun loadScript(scriptPath: File) {

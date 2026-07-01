@@ -228,11 +228,8 @@ The driver registers a few host (native) functions as Lua globals before loading
 
 ### LuaRocks support
 
-**Currently Rust-driver only** - the JVM driver doesn't yet add a LuaRocks tree to `package.path`, so a plugin
-relying on this should still vendor any dependencies it needs to work under the JVM driver too.
-
 Pure-Lua packages installed via [LuaRocks](https://luarocks.org/) are available to `require` in your script,
-without needing to vendor every third-party library you depend on. The Rust driver adds the standard LuaRocks
+without needing to vendor every third-party library you depend on. Both drivers add the standard LuaRocks
 per-Lua-version tree layout to `package.path`:
 
 ```

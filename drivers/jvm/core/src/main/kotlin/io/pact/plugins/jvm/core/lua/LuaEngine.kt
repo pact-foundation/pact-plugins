@@ -21,9 +21,11 @@ interface LuaEngine : AutoCloseable {
 
   /**
    * Adds a directory to the front of Lua's `package.path`, so `require` can find `.lua`
-   * files in it.
+   * files in it. If [includeDirectoryModules] is true, also adds the `<directory>/?/init.lua`
+   * pattern, so a `require`d name can resolve to a subdirectory containing an `init.lua` -
+   * the layout LuaRocks uses for a rocks tree (see `LuaPactPlugin`'s LuaRocks support).
    */
-  fun addPackagePath(directory: File)
+  fun addPackagePath(directory: File, includeDirectoryModules: Boolean = false)
 
   /**
    * Loads and executes a Lua script file (its top-level code, e.g. function definitions).
