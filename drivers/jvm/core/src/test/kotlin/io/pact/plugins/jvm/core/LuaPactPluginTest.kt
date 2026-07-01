@@ -142,4 +142,41 @@ class LuaPactPluginTest {
       plugin.shutdown()
     }
   }
+
+  @Test
+  fun `captures print and logger output into the per-instance log file`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-plugin-log-test").toFile()
+    File(pluginDir, "entry.lua").writeText(
+      """
+        print("hello", "world", 42)
+        logger("a logger message")
+      """.trimIndent()
+    )
+    val instanceId = "test-instance-${System.nanoTime()}"
+    val manifest = DefaultPactPluginManifest(
+      pluginDir = pluginDir,
+      pluginInterfaceVersion = 1,
+      name = "log-test",
+      version = "0.0.0",
+      executableType = "lua",
+      minimumRequiredVersion = null,
+      entryPoint = "entry.lua",
+      entryPoints = emptyMap(),
+      args = emptyList(),
+      dependencies = emptyList()
+    )
+
+    val plugin = LuaPactPlugin(manifest, instanceId)
+    plugin.shutdown()
+
+    val logFile = File(ChildProcess.pluginLogDir(), "pact-plugin-log-test-$instanceId.log")
+    try {
+      assertTrue(logFile.exists(), "Expected a log file at $logFile")
+      val nl = System.lineSeparator()
+      assertEquals("hello\tworld\t42$nl" + "a logger message$nl", logFile.readText())
+    } finally {
+      logFile.delete()
+      pluginDir.deleteRecursively()
+    }
+  }
 }

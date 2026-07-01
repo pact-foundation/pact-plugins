@@ -12,12 +12,14 @@
 //! - `update_catalogue(catalogue)` (optional) - see [`PluginInstance::update_catalogue`].
 
 use std::collections::HashMap;
+use std::fs::File;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
-use mlua::{Function, Lua, LuaSerdeExt, Table, Value};
+use mlua::{Function, Lua, LuaSerdeExt, Table, Value, Variadic};
 use rsa::pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPublicKey, LineEnding};
 use rsa::{Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey};
 use sha2::{Digest, Sha512};
@@ -57,10 +59,11 @@ pub(crate) fn start_lua_plugin(
   let script_path = resolve_entry_point(manifest)?;
   debug!("Loading Lua plugin {} from {:?}", manifest.name, script_path);
 
+  let log = Arc::new(LuaPluginLog::open(&manifest.name, &instance_id));
   let lua = Lua::new();
   set_package_path(&lua, &script_path)?;
   add_luarocks_path(&lua, manifest)?;
-  register_host_functions(&lua, &manifest.name)?;
+  register_host_functions(&lua, &manifest.name, &log)?;
   load_script(&lua, &script_path)?;
 
   Ok(LuaPactPlugin {
@@ -76,6 +79,33 @@ impl LuaPactPlugin {
   /// handshake, before the instance is shared behind an `Arc`).
   pub(crate) fn set_plugin_capabilities(&mut self, capabilities: Vec<String>) {
     self.plugin_capabilities = capabilities;
+  }
+}
+
+/// Captures a Lua plugin's diagnostic output (`print` and `logger()` calls) into the same
+/// per-instance log file a gRPC plugin's stderr is captured to -
+/// `<pact-dir>/logs/pact-plugin-<name>-<instance_id>.log` (see
+/// `child_process::open_plugin_log_file`) - so operators don't need to know which kind of
+/// plugin they're looking at to find its log. A Lua plugin runs embedded in the driver's own
+/// process, so without this its `print` output would otherwise go straight to the driver's
+/// own real stdout, mixed in with everything else.
+struct LuaPluginLog {
+  file: Mutex<Option<File>>,
+}
+
+impl LuaPluginLog {
+  fn open(plugin_name: &str, instance_id: &str) -> Self {
+    LuaPluginLog {
+      file: Mutex::new(crate::child_process::open_plugin_log_file(plugin_name, instance_id)),
+    }
+  }
+
+  fn write_line(&self, line: &str) {
+    if let Ok(mut guard) = self.file.lock()
+      && let Some(file) = guard.as_mut() {
+      let _ = writeln!(file, "{}", line);
+      let _ = file.flush();
+    }
   }
 }
 
@@ -158,14 +188,32 @@ fn load_script(lua: &Lua, script_path: &Path) -> anyhow::Result<()> {
 
 /// Registers the host (Rust) functions that a Lua plugin script can call: a logger, and the
 /// RSA/base64 primitives needed by the JWT plugin (Lua has no crypto standard library).
-fn register_host_functions(lua: &Lua, plugin_name: &str) -> anyhow::Result<()> {
+fn register_host_functions(lua: &Lua, plugin_name: &str, log: &Arc<LuaPluginLog>) -> anyhow::Result<()> {
   let globals = lua.globals();
 
   let name = plugin_name.to_string();
+  let logger_log = log.clone();
   globals.set(
     "logger",
     lua.create_function(move |_, message: String| {
       debug!(plugin = name.as_str(), "{}", message);
+      logger_log.write_line(&message);
+      Ok(())
+    })?,
+  )?;
+
+  // Redirects Lua's built-in `print` (its "stdout") into the same per-instance log file, so
+  // it doesn't leak into the driver's own real stdout - see `LuaPluginLog`.
+  let print_log = log.clone();
+  globals.set(
+    "print",
+    lua.create_function(move |lua, args: Variadic<Value>| {
+      let tostring: Function = lua.globals().get("tostring")?;
+      let mut parts = Vec::with_capacity(args.len());
+      for arg in args.iter() {
+        parts.push(tostring.call::<String>(arg.clone())?);
+      }
+      print_log.write_line(&parts.join("\t"));
       Ok(())
     })?,
   )?;
@@ -814,6 +862,45 @@ mod tests {
     };
 
     start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+  }
+
+  #[test]
+  fn captures_print_and_logger_output_into_the_per_instance_log_file() {
+    let output_dir = tempdir::TempDir::new("lua-plugin-log-test").unwrap();
+    // SAFETY: no other test reads/writes PACT_OUTPUT_DIR; matches existing test conventions
+    // in this crate for env-var-configured global state (see plugin_manager.rs tests).
+    unsafe { std::env::set_var("PACT_OUTPUT_DIR", output_dir.path()); }
+
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      r#"
+        print("hello", "world", 42)
+        logger("a logger message")
+      "#,
+    ).unwrap();
+
+    let manifest = PactPluginManifest {
+      plugin_dir: plugin_dir.path().to_string_lossy().to_string(),
+      plugin_interface_version: 1,
+      name: "log-test".to_string(),
+      version: "0.0.0".to_string(),
+      executable_type: "lua".to_string(),
+      minimum_required_version: None,
+      entry_point: "entry.lua".to_string(),
+      entry_points: HashMap::new(),
+      args: None,
+      dependencies: None,
+      plugin_config: HashMap::new(),
+    };
+
+    start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+    unsafe { std::env::remove_var("PACT_OUTPUT_DIR"); }
+
+    let log_path = output_dir.path().join("logs").join("pact-plugin-log-test-test-instance.log");
+    let contents = std::fs::read_to_string(&log_path)
+      .unwrap_or_else(|err| panic!("Expected a log file at {:?} - {}", log_path, err));
+    assert_eq!(contents, "hello\tworld\t42\na logger message\n");
   }
 
   #[tokio::test]

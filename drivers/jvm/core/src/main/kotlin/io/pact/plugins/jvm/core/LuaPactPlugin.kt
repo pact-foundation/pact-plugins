@@ -54,6 +54,16 @@ class LuaPactPlugin(
 
   private val engine: LuaEngine = LuaJavaEngine()
 
+  /**
+   * Captures this plugin's diagnostic output (`print` and `logger()` calls) into the same
+   * per-instance log file a gRPC plugin's stderr is captured to (see
+   * [ChildProcess.openLogFile]) - so operators don't need to know which kind of plugin
+   * they're looking at to find its log. A Lua plugin runs embedded in the driver's own
+   * process, so without this its `print` output would otherwise go straight to the driver's
+   * own real stdout, mixed in with everything else.
+   */
+  private val pluginLog = ChildProcess.openLogFile(manifest, instanceId)
+
   init {
     engine.addPackagePath(manifest.pluginDir)
     registerHostFunctions()
@@ -73,7 +83,15 @@ class LuaPactPlugin(
 
   private fun registerHostFunctions() {
     engine.registerFunction("logger") { args ->
-      logger.debug { "[${manifest.name}] ${args.getOrNull(0)}" }
+      val message = args.getOrNull(0)?.toString()
+      logger.debug { "[${manifest.name}] $message" }
+      pluginLog?.println(message)
+      null
+    }
+    // Redirects Lua's built-in `print` (its "stdout") into the same per-instance log file, so
+    // it doesn't leak into the driver's own real stdout.
+    engine.registerFunction("print") { args ->
+      pluginLog?.println(args.joinToString("\t") { stringifyForPrint(it) })
       null
     }
     engine.registerFunction("rsa_sign") { args ->
@@ -94,11 +112,25 @@ class LuaPactPlugin(
 
   override fun shutdown() {
     engine.close()
+    pluginLog?.close()
   }
 
   override fun <T> withRpcClient(callback: java.util.function.Function<PactPluginRpcClient, T>): T {
     return callback.apply(LuaPluginRpcClient(engine))
   }
+}
+
+/**
+ * Formats a value the same way Lua's `tostring()` would, for the `print` host function
+ * override. Values here have already been deep-converted from Lua to plain Kotlin types
+ * (see `LuaJavaEngine.normalize`), so a whole-numbered `Double` (Lua doesn't distinguish
+ * integers from floats at this boundary) is reformatted without the trailing `.0` to match
+ * what a real Lua `print` call would have shown.
+ */
+private fun stringifyForPrint(value: Any?): String = when (value) {
+  null -> "nil"
+  is Double -> if (value == Math.floor(value) && !value.isInfinite()) value.toLong().toString() else value.toString()
+  else -> value.toString()
 }
 
 private fun argToString(value: Any?): String = when (value) {
