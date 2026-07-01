@@ -59,6 +59,7 @@ pub(crate) fn start_lua_plugin(
 
   let lua = Lua::new();
   set_package_path(&lua, &script_path)?;
+  add_luarocks_path(&lua, manifest)?;
   register_host_functions(&lua, &manifest.name)?;
   load_script(&lua, &script_path)?;
 
@@ -97,6 +98,51 @@ fn set_package_path(lua: &Lua, script_path: &Path) -> anyhow::Result<()> {
   let existing: String = package.get("path").unwrap_or_default();
   let new_path = format!("{}/?.lua;{}", script_dir.to_string_lossy(), existing);
   package.set("path", new_path)?;
+  Ok(())
+}
+
+/// The Lua version this driver embeds (fixed by mlua's `lua54` feature) - also the version
+/// segment LuaRocks uses in its per-version tree layout (e.g. `share/lua/5.4/`).
+const LUAROCKS_LUA_VERSION: &str = "5.4";
+
+/// Makes pure-Lua packages installed via `luarocks` available to `require`, so a plugin can
+/// depend on rocks instead of vendoring every third-party library it uses.
+///
+/// LuaRocks installs modules under `<rocks_dir>/share/lua/<version>/`, where `<rocks_dir>`
+/// defaults to `~/.luarocks` (its standard per-user tree) but can be a system tree or a
+/// custom prefix if the user configured LuaRocks differently. A plugin can override the
+/// directory this driver looks in via a `luaRocksDir` key in the manifest's `pluginConfig`.
+/// Only the `share/lua` (pure Lua) path is added - packages with compiled C extensions
+/// (under `lib/lua`) are not supported.
+fn add_luarocks_path(lua: &Lua, manifest: &PactPluginManifest) -> anyhow::Result<()> {
+  let configured = manifest.plugin_config.get("luaRocksDir").and_then(|v| v.as_str());
+  let rocks_dir = match configured {
+    Some(dir) => PathBuf::from(dir),
+    None => match home::home_dir() {
+      Some(home) => home.join(".luarocks"),
+      None => return Ok(()),
+    },
+  };
+
+  let lua_dir = rocks_dir.join("share").join("lua").join(LUAROCKS_LUA_VERSION);
+  if !lua_dir.exists() {
+    if configured.is_some() {
+      debug!(
+        "Configured luaRocksDir '{}' does not have a share/lua/{} directory, ignoring",
+        rocks_dir.display(), LUAROCKS_LUA_VERSION
+      );
+    }
+    return Ok(());
+  }
+
+  let package: Table = lua.globals().get("package")?;
+  let existing: String = package.get("path").unwrap_or_default();
+  let new_path = format!(
+    "{}/?.lua;{}/?/init.lua;{}",
+    lua_dir.to_string_lossy(), lua_dir.to_string_lossy(), existing
+  );
+  package.set("path", new_path)?;
+  debug!("Added LuaRocks path {:?} for plugin {}", lua_dir, manifest.name);
   Ok(())
 }
 
@@ -696,6 +742,79 @@ mod tests {
   }
 
   const PRIVATE_KEY: &str = include_str!("../tests/fixtures/jwt-test-key.pem");
+
+  #[test]
+  fn loads_pure_lua_packages_from_a_configured_luarocks_directory() {
+    let rocks_root = tempdir::TempDir::new("luarocks-test").unwrap();
+    let lua_dir = rocks_root.path().join("share").join("lua").join(LUAROCKS_LUA_VERSION);
+    std::fs::create_dir_all(&lua_dir).unwrap();
+    std::fs::write(
+      lua_dir.join("greeter.lua"),
+      r#"return { hello = function() return "hello from luarocks" end }"#,
+    ).unwrap();
+
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      r#"
+        local greeter = require "greeter"
+        GREETER_RESULT = greeter.hello()
+      "#,
+    ).unwrap();
+
+    let mut plugin_config = HashMap::new();
+    plugin_config.insert(
+      "luaRocksDir".to_string(),
+      serde_json::Value::String(rocks_root.path().to_string_lossy().to_string()),
+    );
+
+    let manifest = PactPluginManifest {
+      plugin_dir: plugin_dir.path().to_string_lossy().to_string(),
+      plugin_interface_version: 1,
+      name: "luarocks-test".to_string(),
+      version: "0.0.0".to_string(),
+      executable_type: "lua".to_string(),
+      minimum_required_version: None,
+      entry_point: "entry.lua".to_string(),
+      entry_points: HashMap::new(),
+      args: None,
+      dependencies: None,
+      plugin_config,
+    };
+
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+    let lua = plugin.runtime.lock().unwrap();
+    let result: String = lua.globals().get("GREETER_RESULT").unwrap();
+    assert_eq!(result, "hello from luarocks");
+  }
+
+  #[test]
+  fn ignores_a_missing_luarocks_directory_instead_of_failing() {
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    std::fs::write(plugin_dir.path().join("entry.lua"), "-- no-op").unwrap();
+
+    let mut plugin_config = HashMap::new();
+    plugin_config.insert(
+      "luaRocksDir".to_string(),
+      serde_json::Value::String("/no/such/directory".to_string()),
+    );
+
+    let manifest = PactPluginManifest {
+      plugin_dir: plugin_dir.path().to_string_lossy().to_string(),
+      plugin_interface_version: 1,
+      name: "luarocks-test".to_string(),
+      version: "0.0.0".to_string(),
+      executable_type: "lua".to_string(),
+      minimum_required_version: None,
+      entry_point: "entry.lua".to_string(),
+      entry_points: HashMap::new(),
+      args: None,
+      dependencies: None,
+      plugin_config,
+    };
+
+    start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+  }
 
   #[tokio::test]
   async fn loads_the_jwt_plugin_and_runs_the_init_function() {
