@@ -925,11 +925,15 @@ object DefaultPluginManager: PluginManager {
     val interfaceVersion = PluginInterfaceVersion.from(manifest.pluginInterfaceVersion)
       ?: return Result.Err("Unsupported plugin interface version ${manifest.pluginInterfaceVersion} for ${manifest.name}")
 
-    val result = when (manifest.executableType) {
-      "exec" -> startPluginProcess(manifest)
+    return when (manifest.executableType) {
+      "exec" -> initialiseExecPlugin(manifest)
+      "lua" -> initialiseLuaPlugin(manifest)
       else -> Result.Err("Plugin executable type of ${manifest.executableType} is not supported")
     }
-    return when (result) {
+  }
+
+  private fun initialiseExecPlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
+    return when (val result = startPluginProcess(manifest)) {
       is Result.Ok -> {
         val plugin = result.value
         PLUGIN_REGISTER["${manifest.name}/${manifest.version}"] = plugin
@@ -948,6 +952,20 @@ object DefaultPluginManager: PluginManager {
         }
       }
       is Result.Err -> Result.Err(result.error)
+    }
+  }
+
+  private fun initialiseLuaPlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
+    return try {
+      val plugin = LuaPactPlugin(manifest)
+      PLUGIN_REGISTER["${manifest.name}/${manifest.version}"] = plugin
+      logger.debug { "Lua plugin ${manifest.name} loaded OK, sending init message" }
+      initPlugin(plugin)
+      Result.Ok(plugin)
+    } catch (e: Exception) {
+      PLUGIN_REGISTER.remove("${manifest.name}/${manifest.version}")
+      logger.error(e) { "Failed to start Lua plugin ${manifest.name}" }
+      Result.Err("Failed to start Lua plugin ${manifest.name}: ${e.message}")
     }
   }
 

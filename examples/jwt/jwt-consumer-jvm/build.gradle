@@ -1,0 +1,32 @@
+plugins {
+  id 'java'
+}
+
+repositories {
+  mavenLocal()
+  mavenCentral()
+}
+
+dependencies {
+  testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
+  testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
+  testImplementation 'au.com.dius.pact.consumer:junit5:4.7.3'
+  testImplementation 'io.pact.plugin.driver:core:1.0.0-beta.6'
+  testImplementation 'ch.qos.logback:logback-classic:1.4.11'
+  testImplementation 'org.hamcrest:hamcrest:2.2'
+  testImplementation 'io.jsonwebtoken:jjwt-api:0.12.6'
+  testRuntimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
+  testRuntimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
+  // Parses the test's PKCS#1 "RSA PRIVATE KEY" PEM (java.security.KeyFactory only handles PKCS#8)
+  testImplementation 'org.bouncycastle:bcpkix-jdk18on:1.81'
+
+  testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
+}
+
+test {
+  useJUnitPlatform()
+  systemProperty('pact.mockserver.addCloseHeader', 'true')
+  systemProperty('http.keepAlive', 'false')
+  systemProperty('pact_do_not_track', 'true')
+}

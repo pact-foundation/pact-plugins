@@ -23,7 +23,11 @@ function init(implementation, version)
     -- Add some entropy to the random number generator
     math.randomseed(os.time())
 
-    local params = { ["content-types"] = "application/jwt;application/jwt+json" }
+    -- The driver treats each semicolon-separated content type as a regex pattern when
+    -- matching against an actual content type (a substring search in the Rust driver, a full
+    -- match in the JVM driver), so the "+" in the "+json" structured syntax suffix must be
+    -- escaped - otherwise it's interpreted as a regex quantifier and silently fails to match.
+    local params = { ["content-types"] = "application/jwt;application/jwt\\+json" }
     local catalogue_entries = {}
     table.insert(catalogue_entries, { entryType = "CONTENT_MATCHER", key = "jwt", values = params })
     table.insert(catalogue_entries, { entryType = "CONTENT_GENERATOR", key = "jwt", values = params })
@@ -68,7 +72,11 @@ function configure_interaction(content_type, config)
                 contents = {
                     contents = signed_token,
                     content_type = "application/jwt+json",
-                    content_type_hint = "TEXT"
+                    -- Content type ends in "+json" (a structured syntax suffix), but a compact
+                    -- JWT ("header.payload.signature") isn't itself JSON, so it must be hinted
+                    -- as BINARY - otherwise implementations that special-case "+json" content
+                    -- types try to parse the body as JSON when persisting/reading pact files.
+                    content_type_hint = "BINARY"
                 },
                 part_name = "",
                 plugin_config = plugin_config
@@ -82,8 +90,15 @@ end
 function match_contents(match_request)
     logger("Got a match request: " .. inspect(match_request))
 
-    local public_key = match_request.plugin_configuration.interaction_configuration["public-key"]
-    local algorithm = match_request.plugin_configuration.interaction_configuration["algorithm"]
+    -- The JVM driver namespaces interaction_configuration under "request"/"response" keys
+    -- when the same plugin configures both parts of one interaction (so the two configs
+    -- don't collide); the Rust driver keeps it flat. Handle both: prefer "request" (this is
+    -- always called to match a request or a response body, and our config is identical for
+    -- both), falling back to "response" or the flat table.
+    local interaction_config = match_request.plugin_configuration.interaction_configuration
+    local part_config = interaction_config.request or interaction_config.response or interaction_config
+    local public_key = part_config["public-key"]
+    local algorithm = part_config["algorithm"]
 
     local expected_jwt, expected_error = jwt.decode_token(match_request.expected.contents)
     if expected_error then
