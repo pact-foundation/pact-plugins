@@ -350,6 +350,41 @@ async fn initialise_plugin(
 
           Ok(pact_plugin)
         }
+        "lua" => {
+          #[cfg(feature = "lua")]
+          {
+            let instance_id = uuid::Uuid::new_v4().to_string();
+            let mut lua_plugin = crate::lua_plugin::start_lua_plugin(manifest, instance_id.clone())?;
+            let response = init_handshake(manifest, &mut lua_plugin, &instance_id).await.map_err(|err| {
+              anyhow!("Failed to send init request to the Lua plugin - {}", err)
+            })?;
+            lua_plugin.set_plugin_capabilities(response.plugin_capabilities.clone());
+
+            #[allow(deprecated)]
+            let child = crate::child_process::ChildPluginProcess {
+              child_pid: 0,
+              plugin_info: crate::child_process::RunningPluginInfo {
+                port: 0,
+                server_key: String::new(),
+              },
+              instance_id: instance_id.clone(),
+            };
+            let mut pact_plugin = PactPlugin::new(manifest, child)?;
+            pact_plugin.plugin_capabilities = response.plugin_capabilities.clone();
+
+            let key = format!("{}/{}", manifest.name, manifest.version);
+            let instance: Arc<dyn PluginInstance + Send + Sync> = Arc::new(lua_plugin);
+            plugin_register.insert(key, RegisteredPlugin::new(instance, pact_plugin.clone()));
+
+            Ok(pact_plugin)
+          }
+          #[cfg(not(feature = "lua"))]
+          {
+            Err(anyhow!(
+              "Lua plugins are not supported (the 'lua' feature of pact-plugin-driver is not enabled)"
+            ))
+          }
+        }
         _ => Err(anyhow!(
           "Plugin executable type of {} is not supported",
           manifest.executable_type

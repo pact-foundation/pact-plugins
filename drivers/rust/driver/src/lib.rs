@@ -20,6 +20,8 @@ pub mod grpc_plugin;
 pub(crate) mod plugin_host;
 pub mod content;
 pub mod download;
+#[cfg(feature = "lua")]
+pub mod lua_plugin;
 mod metrics;
 pub mod mock_server;
 pub mod plugin_log_sink;

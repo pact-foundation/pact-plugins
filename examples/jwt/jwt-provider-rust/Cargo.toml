@@ -1,0 +1,16 @@
+[package]
+name = "jwt-provider-rust"
+version = "0.1.0"
+edition = "2018"
+
+[dependencies]
+actix-web = "4.9"
+anyhow = "1.0.42"
+jsonwebtoken = "9.3.0"
+log = "0.4.14"
+serde = { version = "1.0.203", features = ["derive"] }
+simple-log = "1.1.0"
+# cookie 0.16 (pulled in by actix-web) requires "time = 0.3" unbounded; newer 0.3.x releases
+# made an internal breaking change to a parsing API cookie 0.16 relies on. Pin to the last
+# known-good release until actix-web bumps its cookie dependency.
+time = "=0.3.36"
