@@ -5,13 +5,18 @@ test or during provider verification). They are designed to be stateless and res
 that is running the tests. They can be written in any language that has gRPC support, but ideally should
 be written in a language that has minimal system dependencies.
 
+Alternatively, a content-matcher/content-generator plugin can be written in **Lua** and embedded directly in the
+driver's own process instead of run as a separate gRPC child process - see
+[Writing plugins in Lua](#writing-plugins-in-lua) below.
+
 **IMPORTANT NOTE:** Please keep the end users in mind when selecting a language to write a plugin in. If you use, say
 Java, that means any user who uses your plugin needs to have a JDK installed on their machines and CI servers, as well
 as anything that verifies a Pact file created using that plugin even if the provider is written in a different language.
 
 There are two prototype example plugins, one for [CSV](../plugins/csv) and one for [Protobuf](../plugins/protobuf). 
 You can find examples of consumer and provider tests using these plugins in the [examples](../examples) in this repository.
-The CSV plugin is written in Rust and the Protobuf one in Kotlin. 
+The CSV plugin is written in Rust and the Protobuf one in Kotlin. There is also a [JWT](../plugins/jwt) plugin written
+in Lua - see [Writing plugins in Lua](#writing-plugins-in-lua).
 
 ## Plugin Interface
 
@@ -111,6 +116,156 @@ $ ~/.pact/plugins/csv-0.0.0/pact-plugin-csv
 ```
 
 Refer to the [Plugin drivers](plugin-driver-design.md) for more details.
+
+## Writing plugins in Lua
+
+As an alternative to a compiled gRPC server, a content-matcher/content-generator plugin can be written in **Lua**
+and run embedded directly in the driver's own process, instead of as a separate child process. This trades away
+language-agnosticism (only Lua is supported this way) for a much simpler authoring experience: no gRPC boilerplate,
+no protobuf code generation, and no separate executable to build and distribute per OS/architecture - just `.lua`
+files.
+
+Both drivers embed a real Lua 5.4 interpreter, so a script behaves identically on either one:
+
+- The Rust driver embeds Lua via [`mlua`](https://crates.io/crates/mlua) (feature `lua`, enabled by default).
+- The JVM driver embeds Lua via [`party.iroiro/luajava`](https://github.com/gudzpoz/luajava), a JNI binding to the
+  real Lua 5.4 C library, behind a small `LuaEngine` abstraction
+  (`drivers/jvm/core/.../lua/LuaEngine.kt`) so the underlying binding could be swapped out later.
+
+See the [JWT plugin](../plugins/jwt) for a complete, working reference implementation, and
+[its examples](../examples/jwt) for consumer/provider tests exercising it on both drivers.
+
+### Scope
+
+Only content matching and generation is supported: `compareContents`, `configureInteraction`, and `generateContent`.
+Mock-server hosting and provider-verification RPCs (`verifyInteraction`/`prepareInteractionForVerification`) are
+only ever invoked for `TRANSPORT`-registered plugins, never for `CONTENT_MATCHER`/`CONTENT_GENERATOR` ones (see
+[Content Matchers and Generators](content-matcher-design.md)), so there's no reason to support them for a Lua
+plugin - a Lua plugin gets full provider-verification support for free through `compareContents`/`generateContents`
+alone, since the core verifier makes the real request to the provider and then reuses ordinary content matching to
+compare the actual response against the expected one.
+
+### Manifest
+
+Set `executableType` to `"lua"` and `entryPoint` to the relative path of your entry point script, for example:
+
+```json
+{
+  "manifestVersion": 1,
+  "pluginInterfaceVersion": 1,
+  "name": "jwt",
+  "version": "0.0.0",
+  "executableType": "lua",
+  "entryPoint": "plugin.lua"
+}
+```
+
+There's no `entryPoints`-per-OS variant, no `args`, and no executable to gzip/tar for a release - a Lua plugin is
+just the script files plus this manifest, installed the same way as any other plugin (see
+[Installing your plugin](#installing-your-plugin) below): copied into
+`~/.pact/plugins/<name>-<version>/` (or `$PACT_PLUGIN_DIR/<name>-<version>/`).
+
+### Entry point contract
+
+Your entry point script must define these global functions. Request/response "tables" below use plain Lua
+tables with string keys, mapping directly to the fields of the corresponding gRPC message (see the
+[proto file](../proto/plugin.proto)) - the driver converts between the two automatically.
+
+- **`init(implementation, version) -> table`** - called once, right after your script is loaded. Must return an
+  array of catalogue entries, each shaped as:
+  ```lua
+  { entryType = "CONTENT_MATCHER", key = "jwt", values = { ["content-types"] = "application/jwt" } }
+  ```
+  `entryType` is `"CONTENT_MATCHER"` or `"CONTENT_GENERATOR"`; `values["content-types"]` is a semicolon-separated
+  list of MIME types your plugin handles, matched as a regex against the actual content type (anchored - the
+  *whole* type must match, not just part of it), so any regex metacharacter in a content type (most commonly `+`,
+  as in a `+json`/`+xml` structured syntax suffix) needs to be escaped for a literal match - see `plugin.lua` in
+  the JWT plugin for a worked example.
+- **`configure_interaction(content_type, config) -> table`** - called once per interaction part (request or
+  response) when a consumer test configures your content type. `config` is the table of data the user specified in
+  their test. Must return:
+  ```lua
+  {
+    interactions = {
+      { contents = { contents = "...", content_type = "...", content_type_hint = "TEXT" }, part_name = "" }
+    },
+    plugin_config = { interaction_configuration = { ... }, pact_configuration = { ... } }
+  }
+  ```
+  `content_type_hint` is one of `"DEFAULT"`, `"TEXT"`, or `"BINARY"` - use `"BINARY"` for any content whose body
+  isn't actually parseable as its stated content type suggests (for example, a compact JWT under
+  `application/jwt+json` isn't JSON; see the note in `plugin.lua`). `plugin_config` is arbitrary data your plugin
+  needs persisted into the Pact file (e.g. a public key derived during configuration, so verification can validate
+  a signature without ever needing the private key) - it's handed back to you as
+  `plugin_configuration` in later `match_contents` calls for the same interaction.
+- **`match_contents(request) -> table`** - called to compare actual content against expected content. `request`
+  has `expected`/`actual` (each a body table like above, or `nil`), `allow_unexpected_keys` (boolean), `rules`
+  (a table keyed by matching-rule expression, each value an array of `{ type = "...", values = {...} }`), and
+  `plugin_configuration` (whatever you returned from `configure_interaction`). Return one of:
+  - `{ error = "..." }` - a hard error; verification is marked failed.
+  - `{ ["type-mismatch"] = { expected = "...", actual = "..." } }` - the content types themselves didn't match.
+  - `{ mismatches = { ["$"] = {...}, ["some.path"] = {...} } }` - a table keyed by matching-rule-expression path;
+    each value is either a plain string, a table `{ mismatch = "...", path = "...", expected = ..., actual = ...,
+    diff = "...", mismatch_type = "..." }`, or an array of either. An empty (or absent) `mismatches` table means
+    the content matched.
+- **`generate_content(contents, generators, test_mode)` (optional)** - called to generate contents using any
+  defined generators. `test_mode` is `"Consumer"` or `"Provider"`. If you don't define this function, the driver
+  passes the original `contents` through unchanged - reasonable for content (like a JWT) that has nothing to
+  generate field-by-field.
+- **`update_catalogue(catalogue)` (optional)** - called whenever another plugin loads and the combined catalogue
+  changes. If you don't define this function, it's a no-op.
+
+### Host functions available to your script
+
+The driver registers a few host (native) functions as Lua globals before loading your script:
+
+- **`logger(message)`** - writes a diagnostic message (see [Output and logging](#output-and-logging) below).
+- **`rsa_sign(data, privateKeyPem)`**, **`rsa_public_key(privateKeyPem)`**, **`rsa_validate(tokenParts, algorithm,
+  publicKeyPem)`**, **`b64_decode_no_pad(data)`** - RSA (RS512/PKCS#1 PEM) signing/verification and base64
+  decoding primitives, since Lua has no built-in crypto support. These exist specifically to support the JWT
+  reference plugin; if your plugin needs different cryptographic or encoding primitives, either implement them in
+  pure Lua or pull in a [LuaRocks package](#luarocks-support) that provides them.
+
+### LuaRocks support
+
+**Currently Rust-driver only** - the JVM driver doesn't yet add a LuaRocks tree to `package.path`, so a plugin
+relying on this should still vendor any dependencies it needs to work under the JVM driver too.
+
+Pure-Lua packages installed via [LuaRocks](https://luarocks.org/) are available to `require` in your script,
+without needing to vendor every third-party library you depend on. The Rust driver adds the standard LuaRocks
+per-Lua-version tree layout to `package.path`:
+
+```
+<rocks_dir>/share/lua/5.4/?.lua
+<rocks_dir>/share/lua/5.4/?/init.lua
+```
+
+`<rocks_dir>` defaults to `~/.luarocks` (LuaRocks' standard per-user tree). Your plugin can override it with a
+`luaRocksDir` key in the manifest's `pluginConfig`:
+
+```json
+{
+  "executableType": "lua",
+  "entryPoint": "plugin.lua",
+  "pluginConfig": {
+    "luaRocksDir": "/custom/path/to/rocks/tree"
+  }
+}
+```
+
+If the resulting `share/lua/5.4` directory doesn't exist (default or configured), it's silently skipped rather
+than erroring, since not every Lua plugin needs rocks. Only pure-Lua packages are supported - packages with
+compiled C extensions (under a rocks tree's `lib/lua`) are not, since those would need to be compiled
+per-platform, which defeats much of the point of writing a plugin in Lua in the first place.
+
+### Output and logging
+
+Lua plugins don't have their own OS-level stdout/stderr the way a gRPC child process does - they run embedded in
+the driver's own process. Calling Lua's built-in `print(...)` (or the `logger(message)` host function above) is
+redirected into exactly the same per-instance log file a gRPC plugin's stderr is captured to (see
+[Per-instance log file](#per-instance-log-file) above): `<pact-dir>/logs/pact-plugin-<name>-<instanceId>.log`. You
+don't need to do anything special - just call `print(...)` or `logger(...)` as normal, and check that file if
+something isn't behaving as expected.
 
 ## Plugin manifest
 
