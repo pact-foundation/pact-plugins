@@ -786,10 +786,13 @@ mod tests {
   use super::*;
 
   fn jwt_manifest() -> PactPluginManifest {
-    let plugin_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-      .join("../../../plugins/jwt")
-      .canonicalize()
-      .expect("plugins/jwt directory should exist");
+    // Deliberately not `.canonicalize()`d: on Windows that returns a `\\?\`-prefixed verbatim
+    // path, and the forward slashes `set_package_path`/`add_luarocks_path` append to build
+    // Lua's `package.path` aren't auto-translated to `\` under that prefix (unlike a normal
+    // path), breaking `require` for every sibling .lua file. A plain absolute path (with
+    // unresolved `..` components) resolves fine without it.
+    let plugin_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../plugins/jwt");
+    assert!(plugin_dir.exists(), "plugins/jwt directory should exist at {:?}", plugin_dir);
     PactPluginManifest {
       plugin_dir: plugin_dir.to_string_lossy().to_string(),
       plugin_interface_version: 1,
