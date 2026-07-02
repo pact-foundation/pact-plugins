@@ -10,6 +10,26 @@
 //! - `match_contents(request) -> table` - see [`PluginInstance::compare_contents`].
 //! - `generate_content(contents, generators, test_mode)` (optional) - see [`PluginInstance::generate_content`].
 //! - `update_catalogue(catalogue)` (optional) - see [`PluginInstance::update_catalogue`].
+//!
+//! A Lua plugin that registers a `TRANSPORT` catalogue entry (instead of, or as well as, a
+//! `CONTENT_MATCHER`/`CONTENT_GENERATOR` one) must also define these functions. The plugin
+//! itself is responsible for whatever the transport actually requires (opening sockets,
+//! making outbound calls, etc.) - the driver only calls these functions at the right points
+//! in the test lifecycle, exactly as it would over gRPC for an `exec` plugin:
+//!
+//! - `start_mock_server(request) -> table` - see [`PluginInstance::start_mock_server`] /
+//!   [`PluginInstance::start_mock_server_v2`].
+//! - `shutdown_mock_server(server_key) -> table` - see [`PluginInstance::shutdown_mock_server`].
+//! - `get_mock_server_results(server_key) -> table` - see [`PluginInstance::get_mock_server_results`].
+//! - `prepare_interaction_for_verification(request) -> table` - see
+//!   [`PluginInstance::prepare_interaction_for_verification`] /
+//!   [`PluginInstance::prepare_interaction_for_verification_v2`].
+//! - `verify_interaction(request) -> table` - see [`PluginInstance::verify_interaction`] /
+//!   [`PluginInstance::verify_interaction_v2`].
+//!
+//! Each of these is called with either a V1-shaped or a V2-shaped request table, never both,
+//! depending on the plugin's own `pluginInterfaceVersion` in its manifest - the same static,
+//! per-instance choice the driver makes for gRPC plugins (see `plugin_manager.rs`).
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -30,7 +50,7 @@ use crate::plugin_models::{
 };
 use crate::proto::*;
 use crate::proto_v2;
-use crate::utils::{proto_struct_to_json, to_proto_struct};
+use crate::utils::{proto_struct_to_json, proto_value_to_json, to_proto_struct, to_proto_value};
 
 /// A running Lua plugin instance. Each instance owns its own embedded Lua VM.
 pub struct LuaPactPlugin {
@@ -612,6 +632,265 @@ fn lua_to_configure_response(lua: &Lua, table: Table) -> anyhow::Result<Configur
   })
 }
 
+// ---- TRANSPORT plugin support: mock server / verification <-> Lua ----
+
+/// Converts a `google.protobuf.Struct` to a plain Lua value, `nil` if not set.
+fn struct_to_lua(lua: &Lua, value: &Option<prost_types::Struct>) -> mlua::Result<Value> {
+  match value {
+    Some(value) => lua.to_value(&proto_struct_to_json(value)),
+    None => Ok(Value::Nil),
+  }
+}
+
+/// Converts V2 `InteractionContents` (structured per-interaction data sent in place of a whole
+/// Pact JSON document) into a Lua table shaped as
+/// `{ interaction_type, consumer, provider, plugin_configuration = { interaction_configuration, pact_configuration } }`.
+fn interaction_contents_to_lua(lua: &Lua, contents: &proto_v2::InteractionContents) -> mlua::Result<Table> {
+  let table = lua.create_table()?;
+  table.set("interaction_type", contents.interaction_type.clone())?;
+  table.set("consumer", contents.consumer.clone())?;
+  table.set("provider", contents.provider.clone())?;
+  if let Some(plugin_configuration) = &contents.plugin_configuration {
+    let config_table = lua.create_table()?;
+    if let Some(interaction_configuration) = &plugin_configuration.interaction_configuration {
+      config_table.set("interaction_configuration", lua.to_value(&proto_struct_to_json(interaction_configuration))?)?;
+    }
+    if let Some(pact_configuration) = &plugin_configuration.pact_configuration {
+      config_table.set("pact_configuration", lua.to_value(&proto_struct_to_json(pact_configuration))?)?;
+    }
+    table.set("plugin_configuration", config_table)?;
+  }
+  Ok(table)
+}
+
+/// V1 `InteractionData` and V2 `InteractionData` are structurally identical (same wire format);
+/// converting via an encode/decode round trip lets the rest of this module deal with a single
+/// (V1) type, matching the approach `plugin_manager.rs` uses in the other direction (see
+/// `to_proto_v2_interaction_data`).
+fn v2_interaction_data_to_v1(data: &proto_v2::InteractionData) -> InteractionData {
+  use prost::Message;
+  InteractionData::decode(data.encode_to_vec().as_slice())
+    .expect("V1 and V2 InteractionData have identical wire format")
+}
+
+/// Converts request/response metadata to a Lua table. Each value is either a plain Lua value
+/// (JSON-like, for a non-binary `MetadataValue`) or a `{ binary = <lua string> }` wrapper table
+/// (for a binary `MetadataValue`), so a Lua script can tell the two apart.
+fn metadata_to_lua(lua: &Lua, metadata: &HashMap<String, MetadataValue>) -> mlua::Result<Table> {
+  let table = lua.create_table()?;
+  for (key, value) in metadata {
+    let lua_value = match &value.value {
+      Some(metadata_value::Value::NonBinaryValue(value)) => lua.to_value(&proto_value_to_json(value))?,
+      Some(metadata_value::Value::BinaryValue(bytes)) => {
+        let wrapper = lua.create_table()?;
+        wrapper.set("binary", lua.create_string(bytes)?)?;
+        Value::Table(wrapper)
+      }
+      None => Value::Nil,
+    };
+    table.set(key.clone(), lua_value)?;
+  }
+  Ok(table)
+}
+
+/// Converts a Lua metadata table (see [`metadata_to_lua`]) back into `MetadataValue`s.
+fn lua_to_metadata(lua: &Lua, table: Option<Table>) -> anyhow::Result<HashMap<String, MetadataValue>> {
+  let mut metadata = HashMap::new();
+  if let Some(table) = table {
+    for pair in table.pairs::<String, Value>() {
+      let (key, value) = pair?;
+      let binary: Option<mlua::String> = match &value {
+        Value::Table(wrapper) => wrapper.get("binary")?,
+        _ => None,
+      };
+      let metadata_value = if let Some(binary) = binary {
+        metadata_value::Value::BinaryValue(binary.as_bytes().to_vec())
+      } else {
+        let json: serde_json::Value = lua.from_value(value)?;
+        metadata_value::Value::NonBinaryValue(to_proto_value(&json))
+      };
+      metadata.insert(key, MetadataValue { value: Some(metadata_value) });
+    }
+  }
+  Ok(metadata)
+}
+
+/// Converts `InteractionData` (a request/response body plus metadata) to a Lua table shaped as
+/// `{ body = <body table>, metadata = <metadata table> }`, or `nil` if not set.
+fn interaction_data_to_lua(lua: &Lua, data: &Option<InteractionData>) -> mlua::Result<Value> {
+  match data {
+    None => Ok(Value::Nil),
+    Some(data) => {
+      let table = lua.create_table()?;
+      table.set("body", body_to_lua(lua, &data.body)?)?;
+      table.set("metadata", metadata_to_lua(lua, &data.metadata)?)?;
+      Ok(Value::Table(table))
+    }
+  }
+}
+
+/// Converts a Lua interaction-data table (see [`interaction_data_to_lua`]) back into
+/// `InteractionData`, or `None` if the Lua value was `nil`.
+fn lua_to_interaction_data(lua: &Lua, value: Option<Value>) -> anyhow::Result<Option<InteractionData>> {
+  match value {
+    None | Some(Value::Nil) => Ok(None),
+    Some(Value::Table(table)) => {
+      let body: Option<Value> = table.get("body")?;
+      let body = match body {
+        Some(value) => lua_to_body(value)?,
+        None => None,
+      };
+      let metadata_table: Option<Table> = table.get("metadata")?;
+      Ok(Some(InteractionData {
+        body,
+        metadata: lua_to_metadata(lua, metadata_table)?,
+      }))
+    }
+    Some(other) => Err(anyhow!("Expected an interaction data table or nil from Lua, got {}", other.type_name())),
+  }
+}
+
+/// Converts the table returned by the Lua `start_mock_server` function, shaped as either
+/// `{ error = "..." }` or `{ details = { key, port, address } }`, into a `StartMockServerResponse`.
+fn lua_to_start_mock_server_response(table: Table) -> anyhow::Result<StartMockServerResponse> {
+  let error: Option<String> = table.get("error")?;
+  if let Some(error) = error {
+    return Ok(StartMockServerResponse {
+      response: Some(start_mock_server_response::Response::Error(error)),
+    });
+  }
+
+  let details: Option<Table> = table.get("details")?;
+  let details = details.ok_or_else(|| {
+    anyhow!("Lua start_mock_server() must return either an 'error' or 'details' field")
+  })?;
+  Ok(StartMockServerResponse {
+    response: Some(start_mock_server_response::Response::Details(MockServerDetails {
+      key: details.get("key")?,
+      port: details.get("port")?,
+      address: details.get("address")?,
+    })),
+  })
+}
+
+/// Converts the table returned by the Lua `shutdown_mock_server`/`get_mock_server_results`
+/// functions, shaped as `{ ok = bool, results = { { path, error, mismatches = { ... } }, ... } }`,
+/// into `MockServerResults`. Reuses [`lua_value_to_content_mismatches`] for each result's
+/// `mismatches` field, the same helper `match_contents` responses use.
+fn lua_to_mock_server_results(table: Table) -> anyhow::Result<MockServerResults> {
+  let ok: bool = table.get("ok").unwrap_or(true);
+  let mut results = vec![];
+  let results_table: Option<Table> = table.get("results")?;
+  if let Some(results_table) = results_table {
+    for entry in results_table.sequence_values::<Table>() {
+      let entry = entry?;
+      let path: String = entry.get("path").unwrap_or_default();
+      let error: String = entry.get("error").unwrap_or_default();
+      let mismatches_value: Value = entry.get("mismatches").unwrap_or(Value::Nil);
+      results.push(MockServerResult {
+        path: path.clone(),
+        error,
+        mismatches: lua_value_to_content_mismatches(&path, mismatches_value)?,
+      });
+    }
+  }
+  Ok(MockServerResults { ok, results })
+}
+
+/// Converts the table returned by the Lua `prepare_interaction_for_verification` function,
+/// shaped as either `{ error = "..." }` or `{ interaction_data = { body, metadata } }`, into a
+/// `VerificationPreparationResponse`.
+fn lua_to_verification_preparation_response(
+  lua: &Lua,
+  table: Table,
+) -> anyhow::Result<VerificationPreparationResponse> {
+  let error: Option<String> = table.get("error")?;
+  if let Some(error) = error {
+    return Ok(VerificationPreparationResponse {
+      response: Some(verification_preparation_response::Response::Error(error)),
+    });
+  }
+
+  let data: Option<Value> = table.get("interaction_data")?;
+  let data = data.ok_or_else(|| {
+    anyhow!("Lua prepare_interaction_for_verification() must return either an 'error' or 'interaction_data' field")
+  })?;
+  let interaction_data = lua_to_interaction_data(lua, Some(data))?
+    .unwrap_or_else(|| InteractionData { body: None, metadata: HashMap::new() });
+  Ok(VerificationPreparationResponse {
+    response: Some(verification_preparation_response::Response::InteractionData(interaction_data)),
+  })
+}
+
+/// Converts a single Lua verification mismatch (a plain error string, or a mismatch table shaped
+/// like a `match_contents` mismatch) into a `VerificationResultItem`.
+fn lua_to_verification_result_item(value: Value) -> anyhow::Result<VerificationResultItem> {
+  match value {
+    Value::String(s) => Ok(VerificationResultItem {
+      result: Some(verification_result_item::Result::Error(s.to_str()?.to_string())),
+    }),
+    Value::Table(table) => {
+      let mismatch: Option<String> = table.get("mismatch")?;
+      let path: Option<String> = table.get("path")?;
+      let expected = lua_scalar_to_string(table.get("expected")?)?;
+      let actual = lua_scalar_to_string(table.get("actual")?)?;
+      let diff: Option<String> = table.get("diff")?;
+      let mismatch_type: Option<String> = table.get("mismatch_type")?;
+      Ok(VerificationResultItem {
+        result: Some(verification_result_item::Result::Mismatch(ContentMismatch {
+          expected: expected.map(|s| s.into_bytes()),
+          actual: actual.map(|s| s.into_bytes()),
+          mismatch: mismatch.unwrap_or_default(),
+          path: path.unwrap_or_default(),
+          diff: diff.unwrap_or_default(),
+          mismatch_type: mismatch_type.unwrap_or_default(),
+        })),
+      })
+    }
+    other => Err(anyhow!("Expected a mismatch string or table from Lua, got {}", other.type_name())),
+  }
+}
+
+/// Converts the table returned by the Lua `verify_interaction` function, shaped as either
+/// `{ error = "..." }` or
+/// `{ result = { success, response_data, mismatches = { ... }, output = { ... } } }`, into a
+/// `VerifyInteractionResponse`.
+fn lua_to_verify_interaction_response(lua: &Lua, table: Table) -> anyhow::Result<VerifyInteractionResponse> {
+  let error: Option<String> = table.get("error")?;
+  if let Some(error) = error {
+    return Ok(VerifyInteractionResponse {
+      response: Some(verify_interaction_response::Response::Error(error)),
+    });
+  }
+
+  let result_table: Option<Table> = table.get("result")?;
+  let result_table = result_table
+    .ok_or_else(|| anyhow!("Lua verify_interaction() must return either an 'error' or 'result' field"))?;
+
+  let success: bool = result_table.get("success").unwrap_or(false);
+  let response_data: Option<Value> = result_table.get("response_data")?;
+  let response_data = lua_to_interaction_data(lua, response_data)?;
+
+  let mut mismatches = vec![];
+  let mismatches_value: Option<Value> = result_table.get("mismatches")?;
+  if let Some(Value::Table(mismatches_table)) = mismatches_value {
+    for entry in mismatches_table.sequence_values::<Value>() {
+      mismatches.push(lua_to_verification_result_item(entry?)?);
+    }
+  }
+
+  let output: Option<Vec<String>> = result_table.get("output")?;
+
+  Ok(VerifyInteractionResponse {
+    response: Some(verify_interaction_response::Response::Result(VerificationResult {
+      success,
+      response_data,
+      mismatches,
+      output: output.unwrap_or_default(),
+    })),
+  })
+}
+
 #[async_trait]
 impl PactPluginRpc for LuaPactPlugin {
   async fn init_plugin(&mut self, request: PluginInitRequest) -> anyhow::Result<PluginInitResponse> {
@@ -713,48 +992,163 @@ impl PluginInstance for LuaPactPlugin {
 
   async fn start_mock_server(
     &self,
-    _request: StartMockServerRequest,
+    request: StartMockServerRequest,
   ) -> anyhow::Result<StartMockServerResponse> {
-    Err(anyhow!("Mock servers are not supported by Lua content-matcher plugins"))
+    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let start_fn: Function = lua
+      .globals()
+      .get("start_mock_server")
+      .map_err(|_| anyhow!("Lua plugin does not define a global 'start_mock_server' function"))?;
+    let request_table = lua.create_table()?;
+    request_table.set("host_interface", request.host_interface)?;
+    request_table.set("port", request.port)?;
+    request_table.set("tls", request.tls)?;
+    request_table.set("pact", request.pact)?;
+    request_table.set("test_context", struct_to_lua(&lua, &request.test_context)?)?;
+    let result: Table = start_fn
+      .call(request_table)
+      .map_err(|err| anyhow!("Lua start_mock_server() function failed - {}", err))?;
+    lua_to_start_mock_server_response(result)
   }
 
   async fn start_mock_server_v2(
     &self,
-    _request: proto_v2::StartMockServerRequest,
+    request: proto_v2::StartMockServerRequest,
   ) -> anyhow::Result<StartMockServerResponse> {
-    Err(anyhow!("Mock servers are not supported by Lua content-matcher plugins"))
+    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let start_fn: Function = lua
+      .globals()
+      .get("start_mock_server")
+      .map_err(|_| anyhow!("Lua plugin does not define a global 'start_mock_server' function"))?;
+    let request_table = lua.create_table()?;
+    request_table.set("host_interface", request.host_interface)?;
+    request_table.set("port", request.port)?;
+    request_table.set("tls", request.tls)?;
+    let interactions_table = lua.create_table()?;
+    for interaction in &request.interactions {
+      interactions_table.push(interaction_contents_to_lua(&lua, interaction)?)?;
+    }
+    request_table.set("interactions", interactions_table)?;
+    request_table.set("test_context", struct_to_lua(&lua, &request.test_context)?)?;
+    let result: Table = start_fn
+      .call(request_table)
+      .map_err(|err| anyhow!("Lua start_mock_server() function failed - {}", err))?;
+    lua_to_start_mock_server_response(result)
   }
 
   async fn shutdown_mock_server(
     &self,
-    _request: ShutdownMockServerRequest,
+    request: ShutdownMockServerRequest,
   ) -> anyhow::Result<ShutdownMockServerResponse> {
-    Err(anyhow!("Mock servers are not supported by Lua content-matcher plugins"))
+    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let shutdown_fn: Function = lua
+      .globals()
+      .get("shutdown_mock_server")
+      .map_err(|_| anyhow!("Lua plugin does not define a global 'shutdown_mock_server' function"))?;
+    let result: Table = shutdown_fn
+      .call(request.server_key)
+      .map_err(|err| anyhow!("Lua shutdown_mock_server() function failed - {}", err))?;
+    let results = lua_to_mock_server_results(result)?;
+    Ok(ShutdownMockServerResponse {
+      ok: results.ok,
+      results: results.results,
+    })
   }
 
   async fn get_mock_server_results(
     &self,
-    _request: MockServerRequest,
+    request: MockServerRequest,
   ) -> anyhow::Result<MockServerResults> {
-    Err(anyhow!("Mock servers are not supported by Lua content-matcher plugins"))
+    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let results_fn: Function = lua
+      .globals()
+      .get("get_mock_server_results")
+      .map_err(|_| anyhow!("Lua plugin does not define a global 'get_mock_server_results' function"))?;
+    let result: Table = results_fn
+      .call(request.server_key)
+      .map_err(|err| anyhow!("Lua get_mock_server_results() function failed - {}", err))?;
+    lua_to_mock_server_results(result)
   }
 
   async fn prepare_interaction_for_verification(
     &self,
-    _request: VerificationPreparationRequest,
+    request: VerificationPreparationRequest,
   ) -> anyhow::Result<VerificationPreparationResponse> {
-    Err(anyhow!(
-      "prepare_interaction_for_verification is only supported by TRANSPORT plugins, not Lua content-matcher plugins"
-    ))
+    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let prepare_fn: Function = lua.globals().get("prepare_interaction_for_verification").map_err(|_| {
+      anyhow!("Lua plugin does not define a global 'prepare_interaction_for_verification' function")
+    })?;
+    let request_table = lua.create_table()?;
+    request_table.set("pact", request.pact)?;
+    request_table.set("interaction_key", request.interaction_key)?;
+    request_table.set("config", struct_to_lua(&lua, &request.config)?)?;
+    let result: Table = prepare_fn
+      .call(request_table)
+      .map_err(|err| anyhow!("Lua prepare_interaction_for_verification() function failed - {}", err))?;
+    lua_to_verification_preparation_response(&lua, result)
+  }
+
+  async fn prepare_interaction_for_verification_v2(
+    &self,
+    request: proto_v2::VerificationPreparationRequest,
+  ) -> anyhow::Result<VerificationPreparationResponse> {
+    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let prepare_fn: Function = lua.globals().get("prepare_interaction_for_verification").map_err(|_| {
+      anyhow!("Lua plugin does not define a global 'prepare_interaction_for_verification' function")
+    })?;
+    let request_table = lua.create_table()?;
+    if let Some(interaction_contents) = &request.interaction_contents {
+      request_table.set("interaction_contents", interaction_contents_to_lua(&lua, interaction_contents)?)?;
+    }
+    request_table.set("config", struct_to_lua(&lua, &request.config)?)?;
+    request_table.set("test_context", struct_to_lua(&lua, &request.test_context)?)?;
+    let result: Table = prepare_fn
+      .call(request_table)
+      .map_err(|err| anyhow!("Lua prepare_interaction_for_verification() function failed - {}", err))?;
+    lua_to_verification_preparation_response(&lua, result)
   }
 
   async fn verify_interaction(
     &self,
-    _request: VerifyInteractionRequest,
+    request: VerifyInteractionRequest,
   ) -> anyhow::Result<VerifyInteractionResponse> {
-    Err(anyhow!(
-      "verify_interaction is only supported by TRANSPORT plugins, not Lua content-matcher plugins"
-    ))
+    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let verify_fn: Function = lua
+      .globals()
+      .get("verify_interaction")
+      .map_err(|_| anyhow!("Lua plugin does not define a global 'verify_interaction' function"))?;
+    let request_table = lua.create_table()?;
+    request_table.set("interaction_data", interaction_data_to_lua(&lua, &request.interaction_data)?)?;
+    request_table.set("config", struct_to_lua(&lua, &request.config)?)?;
+    request_table.set("pact", request.pact)?;
+    request_table.set("interaction_key", request.interaction_key)?;
+    let result: Table = verify_fn
+      .call(request_table)
+      .map_err(|err| anyhow!("Lua verify_interaction() function failed - {}", err))?;
+    lua_to_verify_interaction_response(&lua, result)
+  }
+
+  async fn verify_interaction_v2(
+    &self,
+    request: proto_v2::VerifyInteractionRequest,
+  ) -> anyhow::Result<VerifyInteractionResponse> {
+    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let verify_fn: Function = lua
+      .globals()
+      .get("verify_interaction")
+      .map_err(|_| anyhow!("Lua plugin does not define a global 'verify_interaction' function"))?;
+    let request_table = lua.create_table()?;
+    let interaction_data = request.interaction_data.as_ref().map(v2_interaction_data_to_v1);
+    request_table.set("interaction_data", interaction_data_to_lua(&lua, &interaction_data)?)?;
+    request_table.set("config", struct_to_lua(&lua, &request.config)?)?;
+    if let Some(interaction_contents) = &request.interaction_contents {
+      request_table.set("interaction_contents", interaction_contents_to_lua(&lua, interaction_contents)?)?;
+    }
+    request_table.set("test_context", struct_to_lua(&lua, &request.test_context)?)?;
+    let result: Table = verify_fn
+      .call(request_table)
+      .map_err(|err| anyhow!("Lua verify_interaction() function failed - {}", err))?;
+    lua_to_verify_interaction_response(&lua, result)
   }
 
   async fn update_catalogue(&self, request: Catalogue) -> anyhow::Result<()> {
@@ -1058,5 +1452,314 @@ mod tests {
     let verified_mismatch = &response.results["claims:verified"].mismatches[0];
     assert_eq!(verified_mismatch.expected.as_deref(), Some("true".as_bytes()));
     assert_eq!(verified_mismatch.actual.as_deref(), Some("false".as_bytes()));
+  }
+
+  fn transport_manifest(plugin_dir: &std::path::Path, plugin_interface_version: u8) -> PactPluginManifest {
+    PactPluginManifest {
+      plugin_dir: plugin_dir.to_string_lossy().to_string(),
+      plugin_interface_version,
+      name: "transport-test".to_string(),
+      version: "0.0.0".to_string(),
+      executable_type: "lua".to_string(),
+      minimum_required_version: None,
+      entry_point: "entry.lua".to_string(),
+      entry_points: HashMap::new(),
+      args: None,
+      dependencies: None,
+      plugin_config: HashMap::new(),
+    }
+  }
+
+  const TRANSPORT_PLUGIN_SCRIPT: &str = r#"
+    function start_mock_server(request)
+      START_MOCK_SERVER_REQUEST = request
+      if request.port == 0 then
+        return { error = "could not bind a mock server" }
+      end
+      return { details = { key = "mock-server-1", port = 12345, address = "127.0.0.1:12345" } }
+    end
+
+    function shutdown_mock_server(server_key)
+      SHUTDOWN_SERVER_KEY = server_key
+      return {
+        ok = false,
+        results = { { path = "/foo", error = "did not match", mismatches = { "simple string mismatch" } } }
+      }
+    end
+
+    function get_mock_server_results(server_key)
+      GET_RESULTS_SERVER_KEY = server_key
+      return { ok = true, results = {} }
+    end
+
+    function prepare_interaction_for_verification(request)
+      PREPARE_REQUEST = request
+      return {
+        interaction_data = {
+          body = { content_type = "application/json", contents = "prepared-body", content_type_hint = "TEXT" },
+          metadata = { path = "/foo", tag = { binary = "raw-bytes" } }
+        }
+      }
+    end
+
+    function verify_interaction(request)
+      VERIFY_REQUEST = request
+      if request.config ~= nil and request.config.fail == true then
+        return { error = "verification failed" }
+      end
+      return {
+        result = {
+          success = true,
+          response_data = { body = { content_type = "application/json", contents = "response-body" }, metadata = {} },
+          mismatches = { "a plain mismatch", { mismatch = "a table mismatch", path = "$.foo", expected = 1, actual = 2 } },
+          output = { "POST /foo", "200 OK" }
+        }
+      }
+    end
+  "#;
+
+  fn start_transport_plugin(plugin_interface_version: u8) -> LuaPactPlugin {
+    let plugin_dir = tempdir::TempDir::new("lua-transport-plugin-test").unwrap();
+    std::fs::write(plugin_dir.path().join("entry.lua"), TRANSPORT_PLUGIN_SCRIPT).unwrap();
+    let manifest = transport_manifest(plugin_dir.path(), plugin_interface_version);
+    // The script is fully read into the Lua VM by `start_lua_plugin`, so the tempdir doesn't
+    // need to outlive this call.
+    start_lua_plugin(&manifest, "test-instance".to_string()).unwrap()
+  }
+
+  #[tokio::test]
+  async fn start_mock_server_v1_round_trip() {
+    let plugin = start_transport_plugin(1);
+    let response = plugin.start_mock_server(StartMockServerRequest {
+      host_interface: "127.0.0.1".to_string(),
+      port: 8080,
+      tls: false,
+      pact: "{\"consumer\":{}}".to_string(),
+      test_context: None,
+    }).await.unwrap();
+    match response.response.unwrap() {
+      start_mock_server_response::Response::Details(details) => {
+        assert_eq!(details.key, "mock-server-1");
+        assert_eq!(details.port, 12345);
+        assert_eq!(details.address, "127.0.0.1:12345");
+      }
+      other => panic!("expected mock server details, got {:?}", other),
+    }
+  }
+
+  #[tokio::test]
+  async fn start_mock_server_v1_returns_the_lua_error() {
+    let plugin = start_transport_plugin(1);
+    let response = plugin.start_mock_server(StartMockServerRequest {
+      host_interface: "127.0.0.1".to_string(),
+      port: 0,
+      tls: false,
+      pact: "{}".to_string(),
+      test_context: None,
+    }).await.unwrap();
+    match response.response.unwrap() {
+      start_mock_server_response::Response::Error(err) => assert_eq!(err, "could not bind a mock server"),
+      other => panic!("expected an error response, got {:?}", other),
+    }
+  }
+
+  #[tokio::test]
+  async fn start_mock_server_v2_passes_structured_interactions() {
+    let plugin = start_transport_plugin(2);
+    let request = proto_v2::StartMockServerRequest {
+      host_interface: "127.0.0.1".to_string(),
+      port: 8080,
+      tls: false,
+      interactions: vec![proto_v2::InteractionContents {
+        interaction_type: "Synchronous/HTTP".to_string(),
+        plugin_configuration: None,
+        consumer: "test-consumer".to_string(),
+        provider: "test-provider".to_string(),
+      }],
+      test_context: None,
+    };
+    let response = plugin.start_mock_server_v2(request).await.unwrap();
+    assert!(matches!(response.response.unwrap(), start_mock_server_response::Response::Details(_)));
+
+    let lua = plugin.runtime.lock().unwrap();
+    let captured: Table = lua.globals().get("START_MOCK_SERVER_REQUEST").unwrap();
+    let interactions: Table = captured.get("interactions").unwrap();
+    let first: Table = interactions.get(1).unwrap();
+    assert_eq!(first.get::<String>("interaction_type").unwrap(), "Synchronous/HTTP");
+    assert_eq!(first.get::<String>("consumer").unwrap(), "test-consumer");
+  }
+
+  #[tokio::test]
+  async fn shutdown_and_get_mock_server_results_parse_mismatches() {
+    let plugin = start_transport_plugin(1);
+
+    let shutdown_response = plugin.shutdown_mock_server(ShutdownMockServerRequest {
+      server_key: "mock-server-1".to_string(),
+    }).await.unwrap();
+    assert!(!shutdown_response.ok);
+    assert_eq!(shutdown_response.results.len(), 1);
+    assert_eq!(shutdown_response.results[0].path, "/foo");
+    assert_eq!(shutdown_response.results[0].mismatches[0].mismatch, "simple string mismatch");
+
+    let results_response = plugin.get_mock_server_results(MockServerRequest {
+      server_key: "mock-server-1".to_string(),
+    }).await.unwrap();
+    assert!(results_response.ok);
+    assert!(results_response.results.is_empty());
+  }
+
+  #[tokio::test]
+  async fn prepare_interaction_for_verification_v1_round_trip() {
+    let plugin = start_transport_plugin(1);
+    let response = plugin.prepare_interaction_for_verification(VerificationPreparationRequest {
+      pact: "{}".to_string(),
+      interaction_key: "interaction-1".to_string(),
+      config: None,
+    }).await.unwrap();
+
+    match response.response.unwrap() {
+      verification_preparation_response::Response::InteractionData(data) => {
+        let body = data.body.unwrap();
+        assert_eq!(body.content, Some("prepared-body".as_bytes().to_vec()));
+        let metadata = data.metadata;
+        assert!(matches!(
+          metadata["path"].value,
+          Some(metadata_value::Value::NonBinaryValue(_))
+        ));
+        match &metadata["tag"].value {
+          Some(metadata_value::Value::BinaryValue(bytes)) => assert_eq!(bytes, b"raw-bytes"),
+          other => panic!("expected a binary metadata value, got {:?}", other),
+        }
+      }
+      other => panic!("expected interaction data, got {:?}", other),
+    }
+  }
+
+  #[tokio::test]
+  async fn prepare_interaction_for_verification_v2_passes_interaction_contents() {
+    let plugin = start_transport_plugin(2);
+    let request = proto_v2::VerificationPreparationRequest {
+      interaction_contents: Some(proto_v2::InteractionContents {
+        interaction_type: "Synchronous/HTTP".to_string(),
+        plugin_configuration: None,
+        consumer: "test-consumer".to_string(),
+        provider: "test-provider".to_string(),
+      }),
+      config: None,
+      test_context: None,
+    };
+    let response = plugin.prepare_interaction_for_verification_v2(request).await.unwrap();
+    assert!(matches!(
+      response.response.unwrap(),
+      verification_preparation_response::Response::InteractionData(_)
+    ));
+
+    let lua = plugin.runtime.lock().unwrap();
+    let captured: Table = lua.globals().get("PREPARE_REQUEST").unwrap();
+    let interaction_contents: Table = captured.get("interaction_contents").unwrap();
+    assert_eq!(interaction_contents.get::<String>("provider").unwrap(), "test-provider");
+  }
+
+  #[tokio::test]
+  async fn verify_interaction_v1_round_trip() {
+    let plugin = start_transport_plugin(1);
+    let mut metadata = HashMap::new();
+    metadata.insert("path".to_string(), MetadataValue {
+      value: Some(metadata_value::Value::NonBinaryValue(prost_types::Value {
+        kind: Some(prost_types::value::Kind::StringValue("/foo".to_string())),
+      })),
+    });
+    let response = plugin.verify_interaction(VerifyInteractionRequest {
+      interaction_data: Some(InteractionData {
+        body: Some(Body {
+          content_type: "application/json".to_string(),
+          content: Some("request-body".as_bytes().to_vec()),
+          content_type_hint: body::ContentTypeHint::Text as i32,
+        }),
+        metadata,
+      }),
+      config: None,
+      pact: "{}".to_string(),
+      interaction_key: "interaction-1".to_string(),
+    }).await.unwrap();
+
+    match response.response.unwrap() {
+      verify_interaction_response::Response::Result(result) => {
+        assert!(result.success);
+        assert_eq!(result.output, vec!["POST /foo".to_string(), "200 OK".to_string()]);
+        assert_eq!(result.mismatches.len(), 2);
+        match &result.mismatches[0].result {
+          Some(verification_result_item::Result::Error(err)) => assert_eq!(err, "a plain mismatch"),
+          other => panic!("expected an error mismatch, got {:?}", other),
+        }
+        match &result.mismatches[1].result {
+          Some(verification_result_item::Result::Mismatch(mismatch)) => {
+            assert_eq!(mismatch.mismatch, "a table mismatch");
+            assert_eq!(mismatch.expected, Some(b"1".to_vec()));
+          }
+          other => panic!("expected a mismatch, got {:?}", other),
+        }
+      }
+      other => panic!("expected a verification result, got {:?}", other),
+    }
+
+    let lua = plugin.runtime.lock().unwrap();
+    let captured: Table = lua.globals().get("VERIFY_REQUEST").unwrap();
+    let interaction_data: Table = captured.get("interaction_data").unwrap();
+    let metadata: Table = interaction_data.get("metadata").unwrap();
+    assert_eq!(metadata.get::<String>("path").unwrap(), "/foo");
+  }
+
+  #[tokio::test]
+  async fn verify_interaction_v1_returns_the_lua_error() {
+    let plugin = start_transport_plugin(1);
+    let mut config = HashMap::new();
+    config.insert("fail".to_string(), serde_json::Value::Bool(true));
+    let response = plugin.verify_interaction(VerifyInteractionRequest {
+      interaction_data: None,
+      config: Some(to_proto_struct(&config)),
+      pact: "{}".to_string(),
+      interaction_key: "interaction-1".to_string(),
+    }).await.unwrap();
+    match response.response.unwrap() {
+      verify_interaction_response::Response::Error(err) => assert_eq!(err, "verification failed"),
+      other => panic!("expected an error response, got {:?}", other),
+    }
+  }
+
+  #[tokio::test]
+  async fn verify_interaction_v2_converts_the_v2_interaction_data_and_contents() {
+    let plugin = start_transport_plugin(2);
+    let request = proto_v2::VerifyInteractionRequest {
+      interaction_data: Some(proto_v2::InteractionData {
+        body: Some(proto_v2::Body {
+          content_type: "application/json".to_string(),
+          content: Some("request-body".as_bytes().to_vec()),
+          content_type_hint: 0,
+        }),
+        metadata: HashMap::new(),
+      }),
+      config: None,
+      interaction_contents: Some(proto_v2::InteractionContents {
+        interaction_type: "Synchronous/HTTP".to_string(),
+        plugin_configuration: None,
+        consumer: "test-consumer".to_string(),
+        provider: "test-provider".to_string(),
+      }),
+      test_context: None,
+    };
+    let response = plugin.verify_interaction_v2(request).await.unwrap();
+    assert!(matches!(
+      response.response.unwrap(),
+      verify_interaction_response::Response::Result(_)
+    ));
+
+    let lua = plugin.runtime.lock().unwrap();
+    let captured: Table = lua.globals().get("VERIFY_REQUEST").unwrap();
+    let interaction_data: Table = captured.get("interaction_data").unwrap();
+    let body: Table = interaction_data.get("body").unwrap();
+    assert_eq!(body.get::<mlua::String>("contents").unwrap().to_str().unwrap(), "request-body");
+    let interaction_contents: Table = captured.get("interaction_contents").unwrap();
+    assert_eq!(interaction_contents.get::<String>("consumer").unwrap(), "test-consumer");
   }
 }

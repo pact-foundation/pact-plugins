@@ -1,6 +1,7 @@
 package io.pact.plugins.jvm.core
 
 import io.pact.plugin.Plugin
+import io.pact.plugin.v2.PluginV2
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -248,5 +249,269 @@ class LuaPactPluginTest {
     val plugin = LuaPactPlugin(manifest)
     plugin.shutdown()
     pluginDir.deleteRecursively()
+  }
+
+  private val transportPluginScript = """
+    function start_mock_server(request)
+      START_MOCK_SERVER_REQUEST = request
+      if request.port == 0 then
+        return { error = "could not bind a mock server" }
+      end
+      return { details = { key = "mock-server-1", port = 12345, address = "127.0.0.1:12345" } }
+    end
+
+    function shutdown_mock_server(server_key)
+      SHUTDOWN_SERVER_KEY = server_key
+      return {
+        ok = false,
+        results = { { path = "/foo", error = "did not match", mismatches = { "simple string mismatch" } } }
+      }
+    end
+
+    function get_mock_server_results(server_key)
+      GET_RESULTS_SERVER_KEY = server_key
+      return { ok = true, results = {} }
+    end
+
+    function prepare_interaction_for_verification(request)
+      PREPARE_REQUEST = request
+      return {
+        interaction_data = {
+          body = { content_type = "application/json", contents = "prepared-body", content_type_hint = "TEXT" },
+          metadata = { path = "/foo", tag = { binary = "raw-bytes" } }
+        }
+      }
+    end
+
+    function verify_interaction(request)
+      VERIFY_REQUEST = request
+      return {
+        result = {
+          success = true,
+          response_data = { body = { content_type = "application/json", contents = "response-body" }, metadata = {} },
+          mismatches = { "a plain mismatch", { mismatch = "a table mismatch", path = "${'$'}.foo", expected = 1, actual = 2 } },
+          output = { "POST /foo", "200 OK" }
+        }
+      }
+    end
+  """.trimIndent()
+
+  private fun transportManifest(pluginDir: File, pluginInterfaceVersion: Int): PactPluginManifest {
+    File(pluginDir, "entry.lua").writeText(transportPluginScript)
+    return DefaultPactPluginManifest(
+      pluginDir = pluginDir,
+      pluginInterfaceVersion = pluginInterfaceVersion,
+      name = "transport-test",
+      version = "0.0.0",
+      executableType = "lua",
+      minimumRequiredVersion = null,
+      entryPoint = "entry.lua",
+      entryPoints = emptyMap(),
+      args = emptyList(),
+      dependencies = emptyList()
+    )
+  }
+
+  @Test
+  fun `startMockServer v1 round trip`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-transport-plugin-test").toFile()
+    val plugin = LuaPactPlugin(transportManifest(pluginDir, 1))
+    try {
+      val request = Plugin.StartMockServerRequest.newBuilder()
+        .setHostInterface("127.0.0.1")
+        .setPort(8080)
+        .setPact("{\"consumer\":{}}")
+        .build()
+      val response = plugin.withRpcClient { it.startMockServer(request) }
+      assertTrue(response.hasDetails())
+      assertEquals("mock-server-1", response.details.key)
+      assertEquals(12345, response.details.port)
+      assertEquals("127.0.0.1:12345", response.details.address)
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `startMockServer v1 returns the lua error`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-transport-plugin-test").toFile()
+    val plugin = LuaPactPlugin(transportManifest(pluginDir, 1))
+    try {
+      val request = Plugin.StartMockServerRequest.newBuilder()
+        .setHostInterface("127.0.0.1")
+        .setPort(0)
+        .setPact("{}")
+        .build()
+      val response = plugin.withRpcClient { it.startMockServer(request) }
+      assertTrue(response.hasError())
+      assertEquals("could not bind a mock server", response.error)
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `startMockServer v2 passes structured interactions`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-transport-plugin-test").toFile()
+    val plugin = LuaPactPlugin(transportManifest(pluginDir, 2))
+    try {
+      val request = PluginV2.StartMockServerRequest.newBuilder()
+        .setHostInterface("127.0.0.1")
+        .setPort(8080)
+        .addInteractions(
+          PluginV2.InteractionContents.newBuilder()
+            .setInteractionType("Synchronous/HTTP")
+            .setConsumer("test-consumer")
+            .setProvider("test-provider")
+            .build()
+        )
+        .build()
+      val response = plugin.withRpcClient { it.startMockServerV2(request) }
+      assertTrue(response.hasDetails())
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `shutdown and get mock server results parse mismatches`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-transport-plugin-test").toFile()
+    val plugin = LuaPactPlugin(transportManifest(pluginDir, 1))
+    try {
+      val shutdownResponse = plugin.withRpcClient {
+        it.shutdownMockServer(Plugin.ShutdownMockServerRequest.newBuilder().setServerKey("mock-server-1").build())
+      }
+      assertFalse(shutdownResponse.ok)
+      assertEquals(1, shutdownResponse.resultsCount)
+      assertEquals("/foo", shutdownResponse.getResults(0).path)
+      assertEquals("simple string mismatch", shutdownResponse.getResults(0).getMismatches(0).mismatch)
+
+      val resultsResponse = plugin.withRpcClient {
+        it.getMockServerResults(Plugin.MockServerRequest.newBuilder().setServerKey("mock-server-1").build())
+      }
+      assertTrue(resultsResponse.ok)
+      assertEquals(0, resultsResponse.resultsCount)
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `prepareInteractionForVerification v1 round trip`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-transport-plugin-test").toFile()
+    val plugin = LuaPactPlugin(transportManifest(pluginDir, 1))
+    try {
+      val request = Plugin.VerificationPreparationRequest.newBuilder()
+        .setPact("{}")
+        .setInteractionKey("interaction-1")
+        .build()
+      val response = plugin.withRpcClient { it.prepareInteractionForVerification(request) }
+      assertTrue(response.hasInteractionData())
+      assertEquals("prepared-body", response.interactionData.body.content.value.toStringUtf8())
+      val metadata = response.interactionData.metadataMap
+      assertTrue(metadata["path"]!!.hasNonBinaryValue())
+      assertTrue(metadata["tag"]!!.hasBinaryValue())
+      assertEquals("raw-bytes", metadata["tag"]!!.binaryValue.toStringUtf8())
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `prepareInteractionForVerification v2 passes interaction contents`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-transport-plugin-test").toFile()
+    val plugin = LuaPactPlugin(transportManifest(pluginDir, 2))
+    try {
+      val request = PluginV2.VerificationPreparationRequest.newBuilder()
+        .setInteractionContents(
+          PluginV2.InteractionContents.newBuilder()
+            .setInteractionType("Synchronous/HTTP")
+            .setConsumer("test-consumer")
+            .setProvider("test-provider")
+            .build()
+        )
+        .build()
+      val response = plugin.withRpcClient { it.prepareInteractionForVerificationV2(request) }
+      assertTrue(response.hasInteractionData())
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `verifyInteraction v1 round trip`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-transport-plugin-test").toFile()
+    val plugin = LuaPactPlugin(transportManifest(pluginDir, 1))
+    try {
+      val interactionData = Plugin.InteractionData.newBuilder()
+        .setBody(
+          Plugin.Body.newBuilder()
+            .setContentType("application/json")
+            .setContent(com.google.protobuf.BytesValue.of(com.google.protobuf.ByteString.copyFromUtf8("request-body")))
+            .build()
+        )
+        .putMetadata(
+          "path",
+          Plugin.MetadataValue.newBuilder()
+            .setNonBinaryValue(com.google.protobuf.Value.newBuilder().setStringValue("/foo").build())
+            .build()
+        )
+        .build()
+      val request = Plugin.VerifyInteractionRequest.newBuilder()
+        .setInteractionData(interactionData)
+        .setPact("{}")
+        .setInteractionKey("interaction-1")
+        .build()
+      val response = plugin.withRpcClient { it.verifyInteraction(request) }
+      assertTrue(response.hasResult())
+      assertTrue(response.result.success)
+      assertEquals(listOf("POST /foo", "200 OK"), response.result.outputList)
+      assertEquals(2, response.result.mismatchesCount)
+      assertTrue(response.result.getMismatches(0).hasError())
+      assertEquals("a plain mismatch", response.result.getMismatches(0).error)
+      assertTrue(response.result.getMismatches(1).hasMismatch())
+      assertEquals("a table mismatch", response.result.getMismatches(1).mismatch.mismatch)
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `verifyInteraction v2 converts the v2 interaction data and contents`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-transport-plugin-test").toFile()
+    val plugin = LuaPactPlugin(transportManifest(pluginDir, 2))
+    try {
+      val interactionData = PluginV2.InteractionData.newBuilder()
+        .setBody(
+          PluginV2.Body.newBuilder()
+            .setContentType("application/json")
+            .setContent(com.google.protobuf.BytesValue.of(com.google.protobuf.ByteString.copyFromUtf8("request-body")))
+            .build()
+        )
+        .build()
+      val request = PluginV2.VerifyInteractionRequest.newBuilder()
+        .setInteractionData(interactionData)
+        .setInteractionContents(
+          PluginV2.InteractionContents.newBuilder()
+            .setInteractionType("Synchronous/HTTP")
+            .setConsumer("test-consumer")
+            .setProvider("test-provider")
+            .build()
+        )
+        .build()
+      val response = plugin.withRpcClient { it.verifyInteractionV2(request) }
+      assertTrue(response.hasResult())
+      assertTrue(response.result.success)
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
   }
 }

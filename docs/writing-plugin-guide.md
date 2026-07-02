@@ -5,8 +5,8 @@ test or during provider verification). They are designed to be stateless and res
 that is running the tests. They can be written in any language that has gRPC support, but ideally should
 be written in a language that has minimal system dependencies.
 
-Alternatively, a content-matcher/content-generator plugin can be written in **Lua** and embedded directly in the
-driver's own process instead of run as a separate gRPC child process - see
+Alternatively, a plugin (content-matcher/content-generator, transport, or both) can be written in **Lua** and
+embedded directly in the driver's own process instead of run as a separate gRPC child process - see
 [Writing plugins in Lua](#writing-plugins-in-lua) below.
 
 **IMPORTANT NOTE:** Please keep the end users in mind when selecting a language to write a plugin in. If you use, say
@@ -119,11 +119,10 @@ Refer to the [Plugin drivers](plugin-driver-design.md) for more details.
 
 ## Writing plugins in Lua
 
-As an alternative to a compiled gRPC server, a content-matcher/content-generator plugin can be written in **Lua**
-and run embedded directly in the driver's own process, instead of as a separate child process. This trades away
-language-agnosticism (only Lua is supported this way) for a much simpler authoring experience: no gRPC boilerplate,
-no protobuf code generation, and no separate executable to build and distribute per OS/architecture - just `.lua`
-files.
+As an alternative to a compiled gRPC server, a plugin can be written in **Lua** and run embedded directly in the
+driver's own process, instead of as a separate child process. This trades away language-agnosticism (only Lua is
+supported this way) for a much simpler authoring experience: no gRPC boilerplate, no protobuf code generation, and
+no separate executable to build and distribute per OS/architecture - just `.lua` files.
 
 Both drivers embed a real Lua 5.4 interpreter, so a script behaves identically on either one:
 
@@ -137,13 +136,21 @@ See the [JWT plugin](../plugins/jwt) for a complete, working reference implement
 
 ### Scope
 
-Only content matching and generation is supported: `compareContents`, `configureInteraction`, and `generateContent`.
-Mock-server hosting and provider-verification RPCs (`verifyInteraction`/`prepareInteractionForVerification`) are
-only ever invoked for `TRANSPORT`-registered plugins, never for `CONTENT_MATCHER`/`CONTENT_GENERATOR` ones (see
-[Content Matchers and Generators](content-matcher-design.md)), so there's no reason to support them for a Lua
-plugin - a Lua plugin gets full provider-verification support for free through `compareContents`/`generateContents`
-alone, since the core verifier makes the real request to the provider and then reuses ordinary content matching to
-compare the actual response against the expected one.
+A Lua plugin can register any combination of `CONTENT_MATCHER`/`CONTENT_GENERATOR` and `TRANSPORT` catalogue
+entries from its `init` function - the same way an `exec` (gRPC) plugin does. For a content-matcher/generator
+plugin, only `compareContents`, `configureInteraction`, and `generateContent` are ever called (see
+[Content Matchers and Generators](content-matcher-design.md)); a Lua plugin gets full provider-verification support
+for free through `compareContents`/`generateContent` alone, since the core verifier makes the real request to the
+provider and then reuses ordinary content matching to compare the actual response against the expected one.
+
+For a `TRANSPORT`-registered plugin, the mock-server (`start_mock_server`/`shutdown_mock_server`/
+`get_mock_server_results`) and provider-verification (`prepare_interaction_for_verification`/`verify_interaction`)
+functions are also supported (see [Entry point contract](#entry-point-contract) below). As with a gRPC transport
+plugin, the driver only calls these functions at the right points in the test lifecycle - your script is entirely
+responsible for whatever the transport actually requires (binding a listening socket for a mock server, making the
+real outbound call during verification, etc). Since Lua itself has no built-in socket support, and only pure-Lua
+LuaRocks packages are supported (see [LuaRocks support](#luarocks-support) below), a Lua transport plugin is
+realistically limited to protocols you can implement without a compiled networking extension.
 
 ### Manifest
 
@@ -214,6 +221,41 @@ tables with string keys, mapping directly to the fields of the corresponding gRP
   generate field-by-field.
 - **`update_catalogue(catalogue)` (optional)** - called whenever another plugin loads and the combined catalogue
   changes. If you don't define this function, it's a no-op.
+
+If your plugin registers a `TRANSPORT` catalogue entry, it must also define these functions. Each is called with
+either a V1-shaped or a V2-shaped request table, never both, depending on your manifest's `pluginInterfaceVersion`
+(the same static, per-plugin-instance choice the driver makes for a gRPC transport plugin) - a V2 request replaces
+the whole-Pact-as-JSON-string-plus-key fields with a single structured `interaction_contents` table, and adds a
+`test_context` field, so you don't need to parse a full Pact document just to find the interaction being handled.
+
+- **`start_mock_server(request) -> table`** - called to start a mock server for a consumer test. `request` has
+  `host_interface`, `port`, `tls`, `test_context`, and either `pact` (a JSON string, V1) or `interactions` (an array
+  of `{ interaction_type, consumer, provider, plugin_configuration }`, V2). Your script must actually stand up
+  whatever server the transport needs and return:
+  - `{ error = "..." }` - the mock server failed to start.
+  - `{ details = { key = "...", port = ..., address = "..." } }` - `key` is an ID you choose, used in later
+    `shutdown_mock_server`/`get_mock_server_results` calls to identify this server.
+- **`shutdown_mock_server(server_key) -> table`** and **`get_mock_server_results(server_key) -> table`** - called to
+  stop a mock server (returning its final results) or poll its results while still running. `server_key` is the
+  `key` you returned from `start_mock_server`. Both return:
+  ```lua
+  { ok = true, results = { { path = "...", error = "...", mismatches = { ... } }, ... } }
+  ```
+  Each `mismatches` entry is a plain string or a table, exactly like a `match_contents` mismatch (see above).
+- **`prepare_interaction_for_verification(request) -> table`** - called during provider verification, before the
+  real request is made, to build the request data. `request` has `config` and either `pact`/`interaction_key` (V1)
+  or `interaction_contents` (V2). Must return:
+  - `{ error = "..." }` - preparation failed.
+  - `{ interaction_data = { body = { ... }, metadata = { ... } } }` - `metadata` is a table keyed by metadata name;
+    each value is either a plain Lua value (JSON-like, for a non-binary value) or `{ binary = "..." }` (for a
+    binary value, e.g. raw header bytes).
+- **`verify_interaction(request) -> table`** - called to actually make the request against the real provider and
+  compare the response. `request` has `interaction_data` (shaped like `prepare_interaction_for_verification`'s
+  response above), `config`, and either `pact`/`interaction_key` (V1) or `interaction_contents` (V2). Must return:
+  - `{ error = "..." }` - the verification call itself failed (e.g. couldn't reach the provider).
+  - `{ result = { success = true/false, response_data = { ... } or nil, mismatches = { ... }, output = { "...", ... } } }`
+    - `mismatches` is an array where each entry is either a plain error string or a `match_contents`-shaped mismatch
+      table; `output` is an array of strings displayed to the user (e.g. the request/response line).
 
 ### Host functions available to your script
 
