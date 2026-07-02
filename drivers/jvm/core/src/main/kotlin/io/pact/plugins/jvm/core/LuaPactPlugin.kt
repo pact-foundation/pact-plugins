@@ -37,10 +37,16 @@ private val logger = KotlinLogging.logger {}
  * - `generate_content(contents, generators, test_mode)` (optional; passthrough default)
  * - `update_catalogue(catalogue)` (optional; no-op default)
  *
- * Only content-matching (`compareContents`/`configureInteraction`/`generateContent`) is
- * implemented. Mock-server and `verifyInteraction`/`prepareInteractionForVerification` are
- * only ever invoked for `TRANSPORT`-registered plugins, not `CONTENT_MATCHER`/
- * `CONTENT_GENERATOR` ones, so they throw [UnsupportedOperationException] here.
+ * A Lua plugin that registers a `TRANSPORT` catalogue entry (instead of, or as well as, a
+ * `CONTENT_MATCHER`/`CONTENT_GENERATOR` one) must also define these functions. The plugin
+ * itself is responsible for whatever the transport actually requires (opening sockets, making
+ * outbound calls, etc.) - this driver only calls these functions at the right points in the
+ * test lifecycle, exactly as it would over gRPC for an `exec` plugin (see [LuaPluginRpcClient]):
+ * - `start_mock_server(request) -> table`
+ * - `shutdown_mock_server(server_key) -> table`
+ * - `get_mock_server_results(server_key) -> table`
+ * - `prepare_interaction_for_verification(request) -> table`
+ * - `verify_interaction(request) -> table`
  */
 class LuaPactPlugin(
   override val manifest: PactPluginManifest,
