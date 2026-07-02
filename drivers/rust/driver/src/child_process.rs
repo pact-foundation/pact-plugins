@@ -35,7 +35,7 @@ pub struct ChildPluginProcess {
   pub instance_id: String,
 }
 
-fn plugin_log_dir() -> PathBuf {
+pub(crate) fn plugin_log_dir() -> PathBuf {
   if let Ok(dir) = std::env::var("PACT_OUTPUT_DIR") {
     PathBuf::from(dir).join("logs")
   } else {
@@ -45,7 +45,12 @@ fn plugin_log_dir() -> PathBuf {
   }
 }
 
-fn open_plugin_log_file(plugin_name: &str, instance_id: &str) -> Option<File> {
+/// Opens (creating/truncating) the per-instance log file a plugin's diagnostic output is
+/// captured to: `<pact-dir>/logs/pact-plugin-<name>-<instance_id>.log`. Used for a gRPC
+/// plugin's stderr stream, and for a Lua plugin's `print`/`logger` output (see `lua_plugin`) -
+/// both land in the same place so operators don't need to know which kind of plugin they're
+/// looking at to find its log.
+pub(crate) fn open_plugin_log_file(plugin_name: &str, instance_id: &str) -> Option<File> {
   let log_dir = plugin_log_dir();
   if let Err(err) = fs::create_dir_all(&log_dir) {
     warn!("Could not create plugin log directory {:?}: {}", log_dir, err);
@@ -54,7 +59,7 @@ fn open_plugin_log_file(plugin_name: &str, instance_id: &str) -> Option<File> {
   let log_path = log_dir.join(format!("pact-plugin-{}-{}.log", plugin_name, instance_id));
   match File::create(&log_path) {
     Ok(f) => {
-      debug!("Plugin stderr for instance {} captured to {:?}", instance_id, log_path);
+      debug!("Plugin output for instance {} captured to {:?}", instance_id, log_path);
       Some(f)
     }
     Err(err) => {

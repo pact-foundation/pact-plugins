@@ -30,27 +30,38 @@ open class ChildProcess(
   private lateinit var process: Process
   val channel: LinkedBlockingDeque<JsonValue> = LinkedBlockingDeque()
 
-  private fun pluginLogDir(): File {
-    val outputDir = System.getenv("PACT_OUTPUT_DIR")
-    return if (outputDir != null) {
-      File(outputDir, "logs")
-    } else {
-      val pluginDir = System.getenv("PACT_PLUGIN_DIR")
-        ?: (System.getProperty("user.home") + "/.pact/plugins")
-      File(pluginDir, "logs")
-    }
-  }
+  private fun openLogFile(): java.io.PrintWriter? = Companion.openLogFile(manifest, instanceId)
 
-  private fun openLogFile(): java.io.PrintWriter? {
-    val logDir = pluginLogDir()
-    return try {
-      logDir.mkdirs()
-      val logFile = File(logDir, "pact-plugin-${manifest.name}-${instanceId}.log")
-      logger.debug { "Plugin stderr for instance $instanceId captured to ${logFile.absolutePath}" }
-      java.io.PrintWriter(java.io.FileWriter(logFile, false), true)
-    } catch (e: Exception) {
-      logger.warn(e) { "Could not create plugin log file in ${logDir.absolutePath}" }
-      null
+  companion object {
+    fun pluginLogDir(): File {
+      val outputDir = System.getenv("PACT_OUTPUT_DIR")
+      return if (outputDir != null) {
+        File(outputDir, "logs")
+      } else {
+        val pluginDir = System.getenv("PACT_PLUGIN_DIR")
+          ?: (System.getProperty("user.home") + "/.pact/plugins")
+        File(pluginDir, "logs")
+      }
+    }
+
+    /**
+     * Opens (creating/truncating) the per-instance log file a plugin's diagnostic output is
+     * captured to: `<pact-dir>/logs/pact-plugin-<name>-<instance-id>.log`. Used for a gRPC
+     * plugin's stderr stream here, and for a Lua plugin's `print`/`logger` output (see
+     * `LuaPactPlugin`) - both land in the same place so operators don't need to know which
+     * kind of plugin they're looking at to find its log.
+     */
+    fun openLogFile(manifest: PactPluginManifest, instanceId: String): java.io.PrintWriter? {
+      val logDir = pluginLogDir()
+      return try {
+        logDir.mkdirs()
+        val logFile = File(logDir, "pact-plugin-${manifest.name}-${instanceId}.log")
+        logger.debug { "Plugin output for instance $instanceId captured to ${logFile.absolutePath}" }
+        java.io.PrintWriter(java.io.FileWriter(logFile, false), true)
+      } catch (e: Exception) {
+        logger.warn(e) { "Could not create plugin log file in ${logDir.absolutePath}" }
+        null
+      }
     }
   }
 

@@ -127,6 +127,14 @@ interface PactPluginManifest {
    * List of system dependencies or plugins required to be able to execute this plugin
    */
   val dependencies: List<PluginDependency>
+
+  /**
+   * Plugin specific configuration data (arbitrary key/value pairs from the manifest's
+   * `pluginConfig` field). Used, for example, by Lua plugins to override the LuaRocks
+   * directory the driver looks in for pure-Lua package dependencies (see `LuaPactPlugin`).
+   */
+  val pluginConfig: Map<String, Any?>
+    get() = emptyMap()
 }
 
 data class DefaultPactPluginManifest(
@@ -139,8 +147,28 @@ data class DefaultPactPluginManifest(
   override val entryPoint: String,
   override val entryPoints: Map<String, String?>,
   override val args: List<String>,
-  override val dependencies: List<PluginDependency>
+  override val dependencies: List<PluginDependency>,
+  override val pluginConfig: Map<String, Any?> = emptyMap()
 ): PactPluginManifest {
+
+  // Explicit 10-arg constructor for callers (e.g. Groovy specs) that can't rely on Kotlin's
+  // default-parameter mechanism, which needs a synthetic bitmask argument reflection-based
+  // callers don't know to supply.
+  constructor(
+    pluginDir: File,
+    pluginInterfaceVersion: Int,
+    name: String,
+    version: String,
+    executableType: String,
+    minimumRequiredVersion: String?,
+    entryPoint: String,
+    entryPoints: Map<String, String?>,
+    args: List<String>,
+    dependencies: List<PluginDependency>
+  ) : this(
+    pluginDir, pluginInterfaceVersion, name, version, executableType, minimumRequiredVersion,
+    entryPoint, entryPoints, args, dependencies, emptyMap()
+  )
 
   fun toMap(): Map<String, Any> {
     val map = mutableMapOf<String, Any>(
@@ -174,6 +202,10 @@ data class DefaultPactPluginManifest(
       }
     }
 
+    if (pluginConfig.isNotEmpty()) {
+      map["pluginConfig"] = pluginConfig
+    }
+
     return map
   }
 
@@ -204,6 +236,18 @@ data class DefaultPactPluginManifest(
         emptyList()
       }
 
+      val pluginConfig = if (pluginJson.has("pluginConfig")) {
+        when (val pc = pluginJson["pluginConfig"]) {
+          is JsonValue.Object -> pc.entries.entries.associate { it.key to it.value.unwrap() }
+          else -> {
+            logger.warn { "pluginConfig field in plugin manifest is invalid" }
+            emptyMap()
+          }
+        }
+      } else {
+        emptyMap()
+      }
+
       return DefaultPactPluginManifest(
         pluginDir,
         toInteger(pluginJson["pluginInterfaceVersion"]) ?: 1,
@@ -214,7 +258,8 @@ data class DefaultPactPluginManifest(
         pluginJson["entryPoint"].asString().orEmpty(),
         entryPoints,
         args,
-        listOf()
+        listOf(),
+        pluginConfig
       )
     }
   }
@@ -925,11 +970,15 @@ object DefaultPluginManager: PluginManager {
     val interfaceVersion = PluginInterfaceVersion.from(manifest.pluginInterfaceVersion)
       ?: return Result.Err("Unsupported plugin interface version ${manifest.pluginInterfaceVersion} for ${manifest.name}")
 
-    val result = when (manifest.executableType) {
-      "exec" -> startPluginProcess(manifest)
+    return when (manifest.executableType) {
+      "exec" -> initialiseExecPlugin(manifest)
+      "lua" -> initialiseLuaPlugin(manifest)
       else -> Result.Err("Plugin executable type of ${manifest.executableType} is not supported")
     }
-    return when (result) {
+  }
+
+  private fun initialiseExecPlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
+    return when (val result = startPluginProcess(manifest)) {
       is Result.Ok -> {
         val plugin = result.value
         PLUGIN_REGISTER["${manifest.name}/${manifest.version}"] = plugin
@@ -948,6 +997,20 @@ object DefaultPluginManager: PluginManager {
         }
       }
       is Result.Err -> Result.Err(result.error)
+    }
+  }
+
+  private fun initialiseLuaPlugin(manifest: PactPluginManifest): Result<PactPlugin, String> {
+    return try {
+      val plugin = LuaPactPlugin(manifest)
+      PLUGIN_REGISTER["${manifest.name}/${manifest.version}"] = plugin
+      logger.debug { "Lua plugin ${manifest.name} loaded OK, sending init message" }
+      initPlugin(plugin)
+      Result.Ok(plugin)
+    } catch (e: Exception) {
+      PLUGIN_REGISTER.remove("${manifest.name}/${manifest.version}")
+      logger.error(e) { "Failed to start Lua plugin ${manifest.name}" }
+      Result.Err("Failed to start Lua plugin ${manifest.name}: ${e.message}")
     }
   }
 

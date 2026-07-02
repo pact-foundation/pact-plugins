@@ -1,0 +1,29 @@
+[package]
+name = "jwt-consumer-rust"
+version = "0.0.0"
+edition = "2018"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+reqwest = "0.13.4"
+anyhow = "1.0.86"
+
+[dev-dependencies]
+expectest = "0.12.0"
+env_logger = "0.11.3"
+pact_models = "1.3.11"
+pact_consumer = "~1.4.4"
+# Pulled in transitively via pact_consumer's optional "plugins" feature with
+# default-features = false; add it explicitly here to turn its "lua" feature on
+# (Cargo unifies features across the single resolved instance of the crate).
+pact-plugin-driver = { version = "~1.0.0-beta.5", default-features = false, features = ["lua"] }
+serde = { version = "1.0.203", features = ["derive"] }
+serde_json = "1.0.120"
+jsonwebtoken = "9.3.0"
+test-log = "0.2.16"
+
+[patch.crates-io]
+pact-plugin-driver = { path = "../../../drivers/rust/driver" }
+pact_consumer = { git = "https://github.com/pact-foundation/pact-reference.git" }
+pact_matching = { git = "https://github.com/pact-foundation/pact-reference.git" }
+pact_mock_server = { git = "https://github.com/pact-foundation/pact-core-mock-server.git" }

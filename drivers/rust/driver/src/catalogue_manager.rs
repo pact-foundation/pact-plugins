@@ -223,10 +223,26 @@ pub fn find_content_matcher<CT: Into<String>>(content_type: CT) -> Option<Conten
   }).map(|entry| ContentMatcher { catalogue_entry: entry.clone() })
 }
 
+/// Checks if a registered content-type pattern matches a content type. The pattern is
+/// matched as a regex against the base type (i.e. with any parameters like `charset`
+/// stripped), anchored at both ends (the whole base type must match, not just a substring) -
+/// this must stay consistent with the equivalent check in the JVM driver's
+/// `CatalogueManager.matches`, so that a plugin's catalogue registration behaves the same way
+/// regardless of which driver loaded it. Regex metacharacters in a content type (most
+/// commonly `+`, as in a `+json`/`+xml` structured syntax suffix) need to be escaped by the
+/// plugin author for a literal match.
 fn matches_pattern(pattern: &str, content_type: &ContentType) -> bool {
-  let base_type = content_type.base_type().to_string();
-  match Regex::new(pattern) {
-    Ok(regex) => regex.is_match(content_type.to_string().as_str()) || regex.is_match(base_type.as_str()),
+  // Deliberately not `content_type.base_type()`: that replaces the subtype with the
+  // structured syntax suffix (e.g. "application/jwt+json" -> "application/json"), which is
+  // useful for deciding how to *parse* a body but wrong here - it would make two unrelated
+  // "+json" content types register as the same catalogue entry. Just strip attributes
+  // (e.g. `charset`), keeping the type/subtype+suffix as the plugin actually registered it.
+  let base_type = match &content_type.suffix {
+    Some(suffix) => format!("{}/{}+{}", content_type.main_type, content_type.sub_type, suffix),
+    None => format!("{}/{}", content_type.main_type, content_type.sub_type)
+  };
+  match Regex::new(&format!("^(?:{})$", pattern)) {
+    Ok(regex) => regex.is_match(base_type.as_str()),
     Err(err) => {
       error!("Failed to parse '{}' as a regex - {}", pattern, err);
       false
@@ -331,5 +347,34 @@ mod tests {
       key: "grpc".to_string(),
       values: hashmap!{}
     }));
+  }
+
+  #[test]
+  fn find_content_matcher_requires_the_whole_base_type_to_match() {
+    let manifest = PactPluginManifest {
+      name: "find_content_matcher_requires_the_whole_base_type_to_match".to_string(),
+      .. PactPluginManifest::default()
+    };
+    let entries = vec![
+      ProtoCatalogueEntry {
+        r#type: catalogue_entry::EntryType::ContentMatcher as i32,
+        key: "jwt".to_string(),
+        // "+" must be escaped, otherwise it's a regex quantifier, not a literal character
+        values: hashmap!{ "content-types".to_string() => "application/jwt;application/jwt\\+json".to_string() }
+      }
+    ];
+    register_plugin_entries(&manifest, &entries);
+
+    let exact_match = find_content_matcher("application/jwt+json");
+    let with_params = find_content_matcher("application/jwt+json;charset=utf-8");
+    let longer_type = find_content_matcher("application/jwt+jsonextra");
+    let unrelated_type = find_content_matcher("application/json");
+
+    remove_plugin_entries("find_content_matcher_requires_the_whole_base_type_to_match");
+
+    expect!(exact_match).to(be_some());
+    expect!(with_params).to(be_some());
+    expect!(longer_type).to(be_none());
+    expect!(unrelated_type).to(be_none());
   }
 }
