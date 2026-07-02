@@ -1,5 +1,26 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 1.0.0-beta.6 - Lua plugin support
+
+* 13abfaf - bump version to 1.0.0-beta.7 (Ronald Holshausen, Thu Jul 2 13:38:15 2026 +1000)
+* ddc56d0 - update changelog for release 1.0.0-beta.6 (Ronald Holshausen, Thu Jul 2 13:37:32 2026 +1000)
+* 40401f3 - Merge pull request #106 from pact-foundation/lua-plugin-reference-doc (Ronald Holshausen, Thu Jul 2 11:59:40 2026 +1000)
+* ec5d265 - Merge pull request #104 from pact-foundation/lua-plugins (Ronald Holshausen, Thu Jul 2 11:52:11 2026 +1000)
+* 4fbe71c - feat: add support for Lua transport plugins to both drivers (#105) (Ronald Holshausen, Thu Jul 2 11:36:36 2026 +1000)
+* 88d96d9 - docs: add a field-by-field Lua plugin function reference (Ronald Holshausen, Thu Jul 2 11:05:37 2026 +1000)
+* ff2c4a9 - fix(rust-driver): stop canonicalizing the JWT test manifest path (Windows) (Ronald Holshausen, Wed Jul 1 17:46:58 2026 +1000)
+* f361f22 - fix: address PR review feedback on Lua JWT plugin and matching robustness (Ronald Holshausen, Wed Jul 1 17:30:14 2026 +1000)
+* cfb5cb7 - feat(jvm-driver): add LuaRocks support, matching the Rust driver (Ronald Holshausen, Wed Jul 1 17:03:51 2026 +1000)
+* deb18ba - docs: add Lua plugin writing guide section and JWT example/plugin READMEs (Ronald Holshausen, Wed Jul 1 16:50:08 2026 +1000)
+* 8129033 - feat: capture Lua plugin stdout/stderr into the same per-instance log file gRPC plugins use (Ronald Holshausen, Wed Jul 1 16:32:42 2026 +1000)
+* f5355c2 - docs: capture cross-repo plugin-config inconsistencies for follow-up (Ronald Holshausen, Wed Jul 1 16:10:35 2026 +1000)
+* c9d90af - fix(catalogue): make content-type matching semantics consistent across drivers (Ronald Holshausen, Wed Jul 1 15:59:53 2026 +1000)
+* 000bc73 - feat(jvm-driver): add support for pact plugins written in Lua (Ronald Holshausen, Wed Jul 1 15:42:20 2026 +1000)
+* c9a91ed - feat(rust-driver): support LuaRocks-installed pure-Lua packages in Lua plugins (Ronald Holshausen, Wed Jul 1 12:11:17 2026 +1000)
+* d6e3aa3 - feat(rust-driver): add support for pact plugins written in Lua (Ronald Holshausen, Wed Jul 1 12:00:25 2026 +1000)
+* 55b3f02 - refactor: abstract gRPC transport behind PluginInstance trait (script-plugins foundation) (#103) (Ronald Holshausen, Wed Jul 1 10:01:22 2026 +1000)
+* ebee7bd - bump version to 1.0.0-beta.6 (Ronald Holshausen, Wed Jun 24 13:45:41 2026 +1000)
+
 # 1.0.0-beta.5 - Include testRunId in JVM host log messages
 
 * d273288 - fix(008): Include testRunId in JVM host log messages and plugin log format (#102) (Ronald Holshausen, Wed Jun 24 13:25:06 2026 +1000)
