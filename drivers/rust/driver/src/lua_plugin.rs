@@ -666,11 +666,14 @@ fn interaction_contents_to_lua(lua: &Lua, contents: &proto_v2::InteractionConten
 /// V1 `InteractionData` and V2 `InteractionData` are structurally identical (same wire format);
 /// converting via an encode/decode round trip lets the rest of this module deal with a single
 /// (V1) type, matching the approach `plugin_manager.rs` uses in the other direction (see
-/// `to_proto_v2_interaction_data`).
-fn v2_interaction_data_to_v1(data: &proto_v2::InteractionData) -> InteractionData {
+/// `to_proto_v2_interaction_data`). Returns an error rather than panicking if the round trip
+/// ever fails (it shouldn't, given the identical wire format, but this data originates from a
+/// caller-supplied gRPC request, so a decode failure should be a recoverable error, not a
+/// crash).
+fn v2_interaction_data_to_v1(data: &proto_v2::InteractionData) -> anyhow::Result<InteractionData> {
   use prost::Message;
   InteractionData::decode(data.encode_to_vec().as_slice())
-    .expect("V1 and V2 InteractionData have identical wire format")
+    .map_err(|err| anyhow!("Failed to convert V2 InteractionData to V1 - {}", err))
 }
 
 /// Converts request/response metadata to a Lua table. Each value is either a plain Lua value
@@ -778,15 +781,15 @@ fn lua_to_start_mock_server_response(table: Table) -> anyhow::Result<StartMockSe
 /// into `MockServerResults`. Reuses [`lua_value_to_content_mismatches`] for each result's
 /// `mismatches` field, the same helper `match_contents` responses use.
 fn lua_to_mock_server_results(table: Table) -> anyhow::Result<MockServerResults> {
-  let ok: bool = table.get("ok").unwrap_or(true);
+  let ok: bool = table.get::<Option<bool>>("ok")?.unwrap_or(true);
   let mut results = vec![];
   let results_table: Option<Table> = table.get("results")?;
   if let Some(results_table) = results_table {
     for entry in results_table.sequence_values::<Table>() {
       let entry = entry?;
-      let path: String = entry.get("path").unwrap_or_default();
-      let error: String = entry.get("error").unwrap_or_default();
-      let mismatches_value: Value = entry.get("mismatches").unwrap_or(Value::Nil);
+      let path: String = entry.get::<Option<String>>("path")?.unwrap_or_default();
+      let error: String = entry.get::<Option<String>>("error")?.unwrap_or_default();
+      let mismatches_value: Value = entry.get("mismatches")?;
       results.push(MockServerResult {
         path: path.clone(),
         error,
@@ -867,7 +870,7 @@ fn lua_to_verify_interaction_response(lua: &Lua, table: Table) -> anyhow::Result
   let result_table = result_table
     .ok_or_else(|| anyhow!("Lua verify_interaction() must return either an 'error' or 'result' field"))?;
 
-  let success: bool = result_table.get("success").unwrap_or(false);
+  let success: bool = result_table.get::<Option<bool>>("success")?.unwrap_or(false);
   let response_data: Option<Value> = result_table.get("response_data")?;
   let response_data = lua_to_interaction_data(lua, response_data)?;
 
@@ -1138,7 +1141,9 @@ impl PluginInstance for LuaPactPlugin {
       .get("verify_interaction")
       .map_err(|_| anyhow!("Lua plugin does not define a global 'verify_interaction' function"))?;
     let request_table = lua.create_table()?;
-    let interaction_data = request.interaction_data.as_ref().map(v2_interaction_data_to_v1);
+    let interaction_data = request.interaction_data.as_ref()
+      .map(v2_interaction_data_to_v1)
+      .transpose()?;
     request_table.set("interaction_data", interaction_data_to_lua(&lua, &interaction_data)?)?;
     request_table.set("config", struct_to_lua(&lua, &request.config)?)?;
     if let Some(interaction_contents) = &request.interaction_contents {
@@ -1761,5 +1766,56 @@ mod tests {
     assert_eq!(body.get::<mlua::String>("contents").unwrap().to_str().unwrap(), "request-body");
     let interaction_contents: Table = captured.get("interaction_contents").unwrap();
     assert_eq!(interaction_contents.get::<String>("consumer").unwrap(), "test-consumer");
+  }
+
+  #[tokio::test]
+  async fn shutdown_mock_server_defaults_ok_to_true_when_the_field_is_absent() {
+    // Regression test: `Table::get::<bool>("ok")` converts a *missing* key's Lua nil straight
+    // to `false` (mlua's bool conversion, matching Lua's own nil-is-falsy semantics) rather than
+    // erroring - so a plain `.unwrap_or(true)` fallback was never reached, and an `ok`-less
+    // response used to silently report `ok = false` instead of the documented default of
+    // `true`. Reading as `Option<bool>` first lets a missing key correctly fall through to the
+    // `unwrap_or(true)` default, since `Option<T>` intercepts Lua nil before the inner
+    // conversion happens.
+    let plugin_dir = tempdir::TempDir::new("lua-transport-plugin-test").unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      r#"
+        function shutdown_mock_server(server_key)
+          return { results = {} }
+        end
+      "#,
+    ).unwrap();
+    let manifest = transport_manifest(plugin_dir.path(), 1);
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+
+    let response = plugin.shutdown_mock_server(ShutdownMockServerRequest {
+      server_key: "mock-server-1".to_string(),
+    }).await.unwrap();
+    assert!(response.ok, "expected 'ok' to default to true when the Lua script doesn't set it");
+  }
+
+  #[tokio::test]
+  async fn shutdown_mock_server_errors_on_a_wrong_typed_path_field() {
+    let plugin_dir = tempdir::TempDir::new("lua-transport-plugin-test").unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      r#"
+        function shutdown_mock_server(server_key)
+          return { ok = false, results = { { path = {}, error = "boom", mismatches = {} } } }
+        end
+      "#,
+    ).unwrap();
+    let manifest = transport_manifest(plugin_dir.path(), 1);
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+
+    let result = plugin.shutdown_mock_server(ShutdownMockServerRequest {
+      server_key: "mock-server-1".to_string(),
+    }).await;
+    assert!(
+      result.is_err(),
+      "expected a wrong-typed 'path' field (a table, not a string) to be a hard error, not silently default, got {:?}",
+      result
+    );
   }
 }
