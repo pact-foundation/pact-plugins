@@ -1,5 +1,17 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.0.0-beta.6 - Lua plugin support
+
+* 4fbe71c - feat: add support for Lua transport plugins to both drivers (#105) (Ronald Holshausen, Thu Jul 2 11:36:36 2026 +1000)
+* ff2c4a9 - fix(rust-driver): stop canonicalizing the JWT test manifest path (Windows) (Ronald Holshausen, Wed Jul 1 17:46:58 2026 +1000)
+* f361f22 - fix: address PR review feedback on Lua JWT plugin and matching robustness (Ronald Holshausen, Wed Jul 1 17:30:14 2026 +1000)
+* 8129033 - feat: capture Lua plugin stdout/stderr into the same per-instance log file gRPC plugins use (Ronald Holshausen, Wed Jul 1 16:32:42 2026 +1000)
+* c9d90af - fix(catalogue): make content-type matching semantics consistent across drivers (Ronald Holshausen, Wed Jul 1 15:59:53 2026 +1000)
+* c9a91ed - feat(rust-driver): support LuaRocks-installed pure-Lua packages in Lua plugins (Ronald Holshausen, Wed Jul 1 12:11:17 2026 +1000)
+* d6e3aa3 - feat(rust-driver): add support for pact plugins written in Lua (Ronald Holshausen, Wed Jul 1 12:00:25 2026 +1000)
+* 55b3f02 - refactor: abstract gRPC transport behind PluginInstance trait (script-plugins foundation) (#103) (Ronald Holshausen, Wed Jul 1 10:01:22 2026 +1000)
+* 6604986 - bump version to 1.0.0-beta.6 (Ronald Holshausen, Tue Jun 23 15:54:08 2026 +1000)
+
 # 1.0.0-beta.5 - Bugfix Release
 
 * d0fbfe4 - feat(008): Inject testContext into V2 plugin requests in JVM driver (#101) (Ronald Holshausen, Tue Jun 23 15:52:17 2026 +1000)
