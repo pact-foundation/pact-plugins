@@ -176,7 +176,9 @@ just the script files plus this manifest, installed the same way as any other pl
 
 Your entry point script must define these global functions. Request/response "tables" below use plain Lua
 tables with string keys, mapping directly to the fields of the corresponding gRPC message (see the
-[proto file](../proto/plugin.proto)) - the driver converts between the two automatically.
+[proto file](../proto/plugin.proto)) - the driver converts between the two automatically. For a complete,
+field-by-field reference of every function and table shape mentioned below, see the
+[Lua plugin function reference](lua-plugin-reference.md).
 
 - **`init(implementation, version) -> table`** - called once, right after your script is loaded. Must return an
   array of catalogue entries, each shaped as:
@@ -268,11 +270,33 @@ The driver registers a few host (native) functions as Lua globals before loading
   reference plugin; if your plugin needs different cryptographic or encoding primitives, either implement them in
   pure Lua or pull in a [LuaRocks package](#luarocks-support) that provides them.
 
+### Vendoring dependencies (preferred)
+
+For any pure-Lua dependency your plugin needs, prefer copying its source directly into your plugin directory
+over relying on an installed LuaRocks tree (below). The [JWT reference plugin](../plugins/jwt) does exactly
+this - `base64.lua`, `json.lua`, and `inspect.lua` are vendored straight into `plugins/jwt/`, not fetched via
+LuaRocks.
+
+Both drivers add the plugin's own directory to `package.path` unconditionally:
+
+```
+<plugin_dir>/?.lua
+<plugin_dir>/?/init.lua
+```
+
+so `require "some_lib"` finds either a flat `some_lib.lua` or a directory-style `some_lib/init.lua`, whichever
+shape the dependency happens to use - just copy its files into your plugin directory and `require` them.
+
+Vendoring is the preferred approach because it keeps a Pact user's install step exactly the same as for any
+other Lua plugin - they don't need LuaRocks, or any rocks tree, installed on their machine at all. Reach for
+[LuaRocks support](#luarocks-support) below only where vendoring is impractical, e.g. an unusually large
+dependency, or one you expect several installed plugins to share.
+
 ### LuaRocks support
 
-Pure-Lua packages installed via [LuaRocks](https://luarocks.org/) are available to `require` in your script,
-without needing to vendor every third-party library you depend on. Both drivers add the standard LuaRocks
-per-Lua-version tree layout to `package.path`:
+As a secondary, opt-in mechanism, pure-Lua packages installed via [LuaRocks](https://luarocks.org/) are also
+available to `require` in your script. Both drivers add the standard LuaRocks per-Lua-version tree layout to
+`package.path`:
 
 ```
 <rocks_dir>/share/lua/5.4/?.lua
@@ -296,6 +320,10 @@ If the resulting `share/lua/5.4` directory doesn't exist (default or configured)
 than erroring, since not every Lua plugin needs rocks. Only pure-Lua packages are supported - packages with
 compiled C extensions (under a rocks tree's `lib/lua`) are not, since those would need to be compiled
 per-platform, which defeats much of the point of writing a plugin in Lua in the first place.
+
+Unlike vendoring, this requires a Pact user to have LuaRocks (and the specific rocks your plugin depends on)
+installed on their machine before your plugin will work - a real, if small, piece of extra setup your users
+have to do that vendoring avoids entirely. Prefer vendoring wherever it's practical.
 
 ### Output and logging
 

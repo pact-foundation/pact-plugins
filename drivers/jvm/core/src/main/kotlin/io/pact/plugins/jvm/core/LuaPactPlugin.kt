@@ -71,7 +71,7 @@ class LuaPactPlugin(
   private val pluginLog = ChildProcess.openLogFile(manifest, instanceId)
 
   init {
-    engine.addPackagePath(manifest.pluginDir)
+    engine.addPackagePath(manifest.pluginDir, includeDirectoryModules = true)
     addLuaRocksPath()
     registerHostFunctions()
     engine.loadScript(resolveEntryPoint())

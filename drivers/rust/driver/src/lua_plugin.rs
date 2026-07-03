@@ -146,7 +146,10 @@ fn set_package_path(lua: &Lua, script_path: &Path) -> anyhow::Result<()> {
   let script_dir = script_path.parent().unwrap_or_else(|| Path::new("."));
   let package: Table = lua.globals().get("package")?;
   let existing: String = package.get("path").unwrap_or_default();
-  let new_path = format!("{}/?.lua;{}", script_dir.to_string_lossy(), existing);
+  let new_path = format!(
+    "{}/?.lua;{}/?/init.lua;{}",
+    script_dir.to_string_lossy(), script_dir.to_string_lossy(), existing
+  );
   package.set("path", new_path)?;
   Ok(())
 }
@@ -1252,6 +1255,43 @@ mod tests {
     let lua = plugin.runtime.lock().unwrap();
     let result: String = lua.globals().get("GREETER_RESULT").unwrap();
     assert_eq!(result, "hello from luarocks");
+  }
+
+  #[test]
+  fn loads_a_vendored_directory_style_module_from_the_plugin_directory() {
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    let module_dir = plugin_dir.path().join("greeter");
+    std::fs::create_dir_all(&module_dir).unwrap();
+    std::fs::write(
+      module_dir.join("init.lua"),
+      r#"return { hello = function() return "hello from a vendored module" end }"#,
+    ).unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      r#"
+        local greeter = require "greeter"
+        GREETER_RESULT = greeter.hello()
+      "#,
+    ).unwrap();
+
+    let manifest = PactPluginManifest {
+      plugin_dir: plugin_dir.path().to_string_lossy().to_string(),
+      plugin_interface_version: 1,
+      name: "vendored-module-test".to_string(),
+      version: "0.0.0".to_string(),
+      executable_type: "lua".to_string(),
+      minimum_required_version: None,
+      entry_point: "entry.lua".to_string(),
+      entry_points: HashMap::new(),
+      args: None,
+      dependencies: None,
+      plugin_config: HashMap::new(),
+    };
+
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+    let lua = plugin.runtime.lock().unwrap();
+    let result: String = lua.globals().get("GREETER_RESULT").unwrap();
+    assert_eq!(result, "hello from a vendored module");
   }
 
   #[test]

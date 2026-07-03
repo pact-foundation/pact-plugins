@@ -228,6 +228,49 @@ class LuaPactPluginTest {
   }
 
   @Test
+  fun `loads a vendored directory-style module from the plugin directory`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-plugin-test").toFile()
+    val moduleDir = File(pluginDir, "greeter")
+    moduleDir.mkdirs()
+    File(moduleDir, "init.lua").writeText(
+      """return { hello = function() return "hello from a vendored module" end }"""
+    )
+    File(pluginDir, "entry.lua").writeText(
+      """
+        local greeter = require "greeter"
+        function init(implementation, version)
+          return { { entryType = "CONTENT_MATCHER", key = greeter.hello(), values = {} } }
+        end
+      """.trimIndent()
+    )
+
+    val manifest = DefaultPactPluginManifest(
+      pluginDir = pluginDir,
+      pluginInterfaceVersion = 1,
+      name = "vendored-module-test",
+      version = "0.0.0",
+      executableType = "lua",
+      minimumRequiredVersion = null,
+      entryPoint = "entry.lua",
+      entryPoints = emptyMap(),
+      args = emptyList(),
+      dependencies = emptyList(),
+      pluginConfig = emptyMap()
+    )
+
+    val plugin = LuaPactPlugin(manifest)
+    try {
+      val response = plugin.withRpcClient {
+        it.initPlugin(PluginInitRequest(implementation = "test", version = "0.0.0"))
+      }
+      assertEquals("hello from a vendored module", response.catalogueEntries[0].key)
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
   fun `ignores a missing luaRocksDir instead of failing`() {
     val pluginDir = kotlin.io.path.createTempDirectory("lua-plugin-test").toFile()
     File(pluginDir, "entry.lua").writeText("-- no-op")
