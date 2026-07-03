@@ -1,4 +1,4 @@
-# Plugin observability and logging (Draft)
+# Plugin observability and logging
 
 > [!NOTE]
 > **Implementation phase:** Phase 2 (observability). Deliver after Phase 1 ([004](./004_Verification_contract_cleanup.md), [005](./005_Plugin_capability_negotiation_and_versioning.md)) but before the new functionality proposals in Phase 3. See the [proposals README](./README.md) for the full delivery order.

@@ -1,4 +1,4 @@
-# Support script language plugins (Draft)
+# Support script language plugins
 
 Discussion for this proposal: https://github.com/pact-foundation/pact-plugins/discussions/84
 

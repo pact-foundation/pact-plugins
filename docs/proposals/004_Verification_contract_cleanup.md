@@ -1,4 +1,4 @@
-# Verification contract cleanup (Draft)
+# Verification contract cleanup
 
 > [!NOTE]
 > **Implementation phase:** Phase 1 (foundational). Deliver alongside [005](./005_Plugin_capability_negotiation_and_versioning.md) before any other V2 interface work begins. See the [proposals README](./README.md) for the full delivery order.

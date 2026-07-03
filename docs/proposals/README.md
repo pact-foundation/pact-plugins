@@ -2,17 +2,18 @@
 
 Here is the current list of proposed changes to the Pact Plugin architecture. Proposals 004–009 are listed in delivery order rather than numerical order.
 
-| Proposal | Phase | State | Discussion |
-|---|---|---|---|
-| [V2 Plugin Interface](./001_V2_Plugin_Interface.md) | Historical | Superseded | https://github.com/pact-foundation/pact-plugins/discussions/83 |
-| [Support script language plugins](./002_Support_script_language_plugins.md) | Not proceeding | Draft | https://github.com/pact-foundation/pact-plugins/discussions/84 |
-| [Support WASM plugins](./003_Support_WASM_plugins.md) | Background | Draft | https://github.com/pact-foundation/pact-plugins/discussions/85 |
-| [Verification contract cleanup](./004_Verification_contract_cleanup.md) | Phase 1 | Draft | TBD |
-| [Plugin capability negotiation and versioning](./005_Plugin_capability_negotiation_and_versioning.md) | Phase 1 | Draft | TBD |
-| [Plugin observability and logging](./008_Plugin_observability_and_logging.md) | Phase 2 | Draft | TBD |
-| [Field-level matchers and generators](./006_Field_level_matchers_and_generators.md) | Phase 3 | Draft | TBD |
-| [Driver-plugin callback model](./007_Driver_plugin_callback_model.md) | Phase 3 | Draft | TBD |
-| [Host-provided core matching and generation](./009_Host_provided_core_matching_and_generation.md) | Phase 4 | Draft | TBD |
+| Proposal | Phase      | State       | Discussion |
+|---|------------|-------------|---|
+| [V2 Plugin Interface](./001_V2_Plugin_Interface.md) | Historical | Superseded  | https://github.com/pact-foundation/pact-plugins/discussions/83 |
+| [Support script language plugins](./002_Support_script_language_plugins.md) | Phase 2    | Implemented | https://github.com/pact-foundation/pact-plugins/discussions/84 |
+| [Support WASM plugins](./003_Support_WASM_plugins.md) | Background | Draft       | https://github.com/pact-foundation/pact-plugins/discussions/85 |
+| [Support Python as a second script language plugin](./010_Support_Python_script_plugins.md) | Phase 2    | Draft       |  |
+| [Verification contract cleanup](./004_Verification_contract_cleanup.md) | Phase 1    | Implemented |  |
+| [Plugin capability negotiation and versioning](./005_Plugin_capability_negotiation_and_versioning.md) | Phase 1    | Implemented |  |
+| [Plugin observability and logging](./008_Plugin_observability_and_logging.md) | Phase 2    | Implemented |  |
+| [Field-level matchers and generators](./006_Field_level_matchers_and_generators.md) | Phase 3    | Draft       |  |
+| [Driver-plugin callback model](./007_Driver_plugin_callback_model.md) | Phase 3    | Draft       |  |
+| [Host-provided core matching and generation](./009_Host_provided_core_matching_and_generation.md) | Phase 4    | Draft       |  |
 
 ## Implementation phases
 

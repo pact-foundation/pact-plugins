@@ -1,4 +1,4 @@
-# Plugin capability negotiation and versioning (Draft)
+# Plugin capability negotiation and versioning
 
 > [!NOTE]
 > **Implementation phase:** Phase 1 (foundational). Deliver alongside [004](./004_Verification_contract_cleanup.md) before any other V2 interface work begins. See the [proposals README](./README.md) for the full delivery order.
