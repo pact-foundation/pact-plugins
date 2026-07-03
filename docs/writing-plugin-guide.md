@@ -277,7 +277,9 @@ over relying on an installed LuaRocks tree (below). The [JWT reference plugin](.
 this - `base64.lua`, `json.lua`, and `inspect.lua` are vendored straight into `plugins/jwt/`, not fetched via
 LuaRocks.
 
-Both drivers add the plugin's own directory to `package.path` unconditionally:
+Both drivers add the plugin's own directory (i.e. `pluginDir`, the directory containing `pact-plugin.json` -
+not the directory your entry point script happens to live in, if you've nested it in a subdirectory) to
+`package.path` unconditionally:
 
 ```
 <plugin_dir>/?.lua
