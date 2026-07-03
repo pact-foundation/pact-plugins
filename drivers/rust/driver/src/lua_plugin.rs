@@ -81,7 +81,7 @@ pub(crate) fn start_lua_plugin(
 
   let log = Arc::new(LuaPluginLog::open(&manifest.name, &instance_id));
   let lua = Lua::new();
-  set_package_path(&lua, &script_path)?;
+  set_package_path(&lua, manifest)?;
   add_luarocks_path(&lua, manifest)?;
   register_host_functions(&lua, &manifest.name, &log)?;
   load_script(&lua, &script_path)?;
@@ -142,11 +142,17 @@ fn resolve_entry_point(manifest: &PactPluginManifest) -> anyhow::Result<PathBuf>
   Ok(path)
 }
 
-fn set_package_path(lua: &Lua, script_path: &Path) -> anyhow::Result<()> {
-  let script_dir = script_path.parent().unwrap_or_else(|| Path::new("."));
+/// Adds the plugin's own directory (not the entry point script's directory, which may be a
+/// subdirectory of it if `entryPoint` is a nested path) to `package.path`, matching the JVM
+/// driver's `LuaPactPlugin.kt`, which always uses `manifest.pluginDir` for the same purpose.
+fn set_package_path(lua: &Lua, manifest: &PactPluginManifest) -> anyhow::Result<()> {
+  let plugin_dir = PathBuf::from(&manifest.plugin_dir);
   let package: Table = lua.globals().get("package")?;
   let existing: String = package.get("path").unwrap_or_default();
-  let new_path = format!("{}/?.lua;{}", script_dir.to_string_lossy(), existing);
+  let new_path = format!(
+    "{}/?.lua;{}/?/init.lua;{}",
+    plugin_dir.to_string_lossy(), plugin_dir.to_string_lossy(), existing
+  );
   package.set("path", new_path)?;
   Ok(())
 }
@@ -1252,6 +1258,83 @@ mod tests {
     let lua = plugin.runtime.lock().unwrap();
     let result: String = lua.globals().get("GREETER_RESULT").unwrap();
     assert_eq!(result, "hello from luarocks");
+  }
+
+  #[test]
+  fn loads_a_vendored_directory_style_module_from_the_plugin_directory() {
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    let module_dir = plugin_dir.path().join("greeter");
+    std::fs::create_dir_all(&module_dir).unwrap();
+    std::fs::write(
+      module_dir.join("init.lua"),
+      r#"return { hello = function() return "hello from a vendored module" end }"#,
+    ).unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      r#"
+        local greeter = require "greeter"
+        GREETER_RESULT = greeter.hello()
+      "#,
+    ).unwrap();
+
+    let manifest = PactPluginManifest {
+      plugin_dir: plugin_dir.path().to_string_lossy().to_string(),
+      plugin_interface_version: 1,
+      name: "vendored-module-test".to_string(),
+      version: "0.0.0".to_string(),
+      executable_type: "lua".to_string(),
+      minimum_required_version: None,
+      entry_point: "entry.lua".to_string(),
+      entry_points: HashMap::new(),
+      args: None,
+      dependencies: None,
+      plugin_config: HashMap::new(),
+    };
+
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+    let lua = plugin.runtime.lock().unwrap();
+    let result: String = lua.globals().get("GREETER_RESULT").unwrap();
+    assert_eq!(result, "hello from a vendored module");
+  }
+
+  #[test]
+  fn loads_a_vendored_module_when_the_entry_point_is_in_a_subdirectory() {
+    // package.path must be rooted at the plugin directory, not the entry point script's own
+    // directory, so a vendored module sitting next to a nested entry point still resolves -
+    // matching the JVM driver, which always uses `manifest.pluginDir`.
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    std::fs::write(
+      plugin_dir.path().join("greeter.lua"),
+      r#"return { hello = function() return "hello from the plugin root" end }"#,
+    ).unwrap();
+    let src_dir = plugin_dir.path().join("src");
+    std::fs::create_dir_all(&src_dir).unwrap();
+    std::fs::write(
+      src_dir.join("entry.lua"),
+      r#"
+        local greeter = require "greeter"
+        GREETER_RESULT = greeter.hello()
+      "#,
+    ).unwrap();
+
+    let manifest = PactPluginManifest {
+      plugin_dir: plugin_dir.path().to_string_lossy().to_string(),
+      plugin_interface_version: 1,
+      name: "nested-entry-point-test".to_string(),
+      version: "0.0.0".to_string(),
+      executable_type: "lua".to_string(),
+      minimum_required_version: None,
+      entry_point: "src/entry.lua".to_string(),
+      entry_points: HashMap::new(),
+      args: None,
+      dependencies: None,
+      plugin_config: HashMap::new(),
+    };
+
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+    let lua = plugin.runtime.lock().unwrap();
+    let result: String = lua.globals().get("GREETER_RESULT").unwrap();
+    assert_eq!(result, "hello from the plugin root");
   }
 
   #[test]
