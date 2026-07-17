@@ -14,3 +14,6 @@ class PactPluginValidationForInteractionException(val name: String, val error: S
 
 class PactPluginInteractionVerificationException(val name: String, val error: String) :
   RuntimeException("Plugin $name failed to run the verification for the interaction: $error")
+
+class PactCoreCapabilityNotFoundException(val key: String) :
+  RuntimeException("No core capability handler registered for '$key'")
