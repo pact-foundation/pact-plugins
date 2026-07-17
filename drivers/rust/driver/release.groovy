@@ -46,7 +46,7 @@ ask('Execute Build?: [Y]') {
 ask('Update repository index?: [Y]') {
   executeOnShell 'cp ../../../repository/repository.index .'
   executeOnShell 'git add repository.index'
-  executeOnShell "git commit -m 'chore: update repository.index' || true"
+  executeOnShell "git commit -m 'chore: update repository.index [skip ci]' || true"
   executeOnShell("git status")
   executeOnShell("git diff HEAD^..HEAD")
 }
@@ -91,7 +91,7 @@ ask('Update Changelog?: [Y]') {
   }
 
   executeOnShell("git add CHANGELOG.md")
-  executeOnShell("git commit -m 'update changelog for release $releaseVer'")
+  executeOnShell("git commit -m 'chore: update changelog for release $releaseVer [skip ci]'")
   executeOnShell("git status")
   executeOnShell("git diff HEAD^..HEAD")
 }
@@ -107,7 +107,7 @@ ask('Publish library to crates.io?: [Y]') {
   executeOnShell 'cargo publish'
 }
 
-def nextVer = Version.valueOf(releaseVer).incrementPreReleaseVersion()
+def nextVer = Version.valueOf(releaseVer).incrementPatchVersion()
 ask("Bump version to $nextVer?: [Y]") {
   executeOnShell "sed -i -e 's/version = \"${releaseVer}\"/version = \"${nextVer}\"/' Cargo.toml"
   executeOnShell "sed -i -e 's/documentation = \"https:\\/\\/docs\\.rs\\/pact-plugin-driver\\/${releaseVer}\\/pact-plugin-driver\\/\"/documentation = \"https:\\/\\/docs\\.rs\\/pact-plugin-driver\\/${nextVer}\\/pact-plugin-driver\\/\"/' Cargo.toml"
@@ -116,7 +116,7 @@ ask("Bump version to $nextVer?: [Y]") {
   executeOnShell("git add Cargo.lock")
   executeOnShell("git diff --cached")
   ask("Commit and push this change?: [Y]") {
-    executeOnShell("git commit -m 'bump version to $nextVer'")
+    executeOnShell("git commit -m 'chore: bump version to $nextVer [skip ci]'")
     executeOnShell("git push")
   }
 }

@@ -102,7 +102,7 @@ ask('Update Changelog?: [Y]') {
 
   executeOnShell("git add CHANGELOG.md")
   executeOnShell("git diff --cached")
-  executeOnShell("git commit -m 'update changelog for release $releaseVer'")
+  executeOnShell("git commit -m 'chore: update changelog for release $releaseVer [skip ci]'")
   executeOnShell("git status")
 }
 
@@ -117,13 +117,13 @@ ask('Publish artifacts to maven central?: [Y]') {
   executeOnShell 'cd core && jreleaser deploy --git-root-search'
 }
 
-def nextVer = Version.valueOf(releaseVer).incrementPreReleaseVersion()
+def nextVer = Version.valueOf(releaseVer).incrementPatchVersion()
 ask("Bump version to $nextVer?: [Y]") {
   executeOnShell "sed -i -e \"s/version = '${releaseVer}'/version = '${nextVer}'/\" build.gradle"
   executeOnShell("git add build.gradle")
   executeOnShell("git diff --cached")
   ask("Commit and push this change?: [Y]") {
-    executeOnShell("git commit -m 'bump version to $nextVer'")
+    executeOnShell("git commit -m 'chore: bump version to $nextVer [skip ci]'")
     executeOnShell("git push")
   }
 }
