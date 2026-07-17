@@ -1,5 +1,12 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 1.0.0 - Non-Beta release
+
+* 6c70d2f - chore: remove beta flag from driver versions (Ronald Holshausen, Fri Jul 17 10:19:16 2026 +1000)
+* 37318cd - feat: Support directory-style Lua modules vendored in the plugin directory (#107) (Ronald Holshausen, Fri Jul 3 15:26:46 2026 +1000)
+* 3f9b738 - doc(proposals): add a proposal for Python plugins support (Ronald Holshausen, Fri Jul 3 11:32:24 2026 +1000)
+* 3958247 - bump version to 1.0.0-beta.7 (Ronald Holshausen, Thu Jul 2 13:54:08 2026 +1000)
+
 # 1.0.0-beta.6 - Lua plugin support
 
 * 13abfaf - bump version to 1.0.0-beta.7 (Ronald Holshausen, Thu Jul 2 13:38:15 2026 +1000)
