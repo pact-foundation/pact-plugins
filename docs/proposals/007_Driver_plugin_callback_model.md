@@ -229,7 +229,13 @@ This proposal ships as one vertical slice through the mechanism, not the full ca
 3. ✅ Wiring the two existing `is_core()` branches in `content.rs` to call through instead of panicking. Done in
    both drivers, including the plugin-forwarding branch calling through the chain-aware RPC methods added in
    step 2.
-4. The Lua and WASM host-function equivalents. Not yet started.
+4. The Lua and WASM host-function equivalents.
+   - ✅ Lua: `host_compare_contents`/`host_generate_content` global functions, reachable from
+     `match_contents`/`generate_content` (Rust driver only - the JVM driver has no Lua runtime).
+     Reuses the resolver via the new `catalogue_manager::resolve_capability`, shared with step 2's
+     `plugin_host.rs`.
+   - ⬜ WASM: not yet started (blocked on [003](./003_Support_WASM_plugins.md) landing WASM plugin
+     support at all).
 
 This is deliberately the smallest slice that proves the mechanism end-to-end, because `is_core()` already exists as an
 unfinished seam. [006](./006_Field_level_matchers_and_generators.md) then adds new capability trait shapes
