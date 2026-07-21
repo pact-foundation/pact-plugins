@@ -17,11 +17,6 @@ env_logger = "0.11.10"
 pact_consumer = "~1.4.3"
 async-trait = "0.1.89"
 test-log = "0.2.20"
-# libc 0.2.187 dropped the Windows link_name aliases for localtime_s/time/gmtime_s/ctime/difftime
-# (see rust-lang/libc src/windows/mod.rs), breaking the Windows link of anything using them via
-# `gregorian` (a transitive dependency through pact_models). Remove this pin once libc publishes a
-# fix. This crate has no committed Cargo.lock, so without this it silently re-breaks on Windows.
-libc = "<0.2.187"
 
 [patch.crates-io]
 pact_consumer = { git = "https://github.com/pact-foundation/pact-reference.git" }

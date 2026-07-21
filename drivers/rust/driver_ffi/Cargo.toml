@@ -12,11 +12,6 @@ resolver = "2"
 [dev-dependencies]
 pact-plugin-driver = { version = "~1.1.0", path = "../driver" }
 pact_ffi = "~0.5.4"
-# libc 0.2.187 dropped the Windows link_name aliases for localtime_s/time/gmtime_s/ctime/difftime
-# (see rust-lang/libc src/windows/mod.rs), breaking the Windows link of anything using them via
-# `gregorian` (a transitive dependency through pact_models). Remove this pin once libc publishes a
-# fix. This crate has no committed Cargo.lock, so without this it silently re-breaks on Windows.
-libc = "<0.2.187"
 env_logger = "0.11.10"
 expectest = "0.12.0"
 serde_json = "1.0.149"
