@@ -7,7 +7,10 @@ import au.com.dius.pact.core.model.OptionalBody
 import au.com.dius.pact.core.model.Provider
 import au.com.dius.pact.core.model.V4Interaction
 import au.com.dius.pact.core.model.V4Pact
+import au.com.dius.pact.core.model.generators.GeneratorTestMode
 import au.com.dius.pact.core.support.Result
+import com.google.protobuf.BytesValue
+import com.google.protobuf.ByteString
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
 import io.pact.plugin.Plugin
@@ -292,7 +295,7 @@ class DefaultPluginManagerSpec extends Specification {
     def response = Plugin.CompareContentsResponse.newBuilder().build()
     def mockClient = Mockito.mock(PactPluginRpcClient)
     ArgumentCaptor<Plugin.CompareContentsRequest> argument = ArgumentCaptor.forClass(Plugin.CompareContentsRequest)
-    doReturn(response).when(mockClient).compareContents(argument.capture())
+    doReturn(response).when(mockClient).compareContentsWithChain(argument.capture(), Mockito.anyString(), Mockito.anyLong())
 
     when:
     manager.invokeContentMatcher(matcher, expected, actual, false, [:], [:])
@@ -306,6 +309,87 @@ class DefaultPluginManagerSpec extends Specification {
 
     cleanup:
     DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove('test-invokeContentMatcher/1.2.3')
+  }
+
+  def 'invokeContentMatcher - calls the registered core handler for a core catalogue entry'() {
+    given:
+    def manager = DefaultPluginManager.INSTANCE
+    ContentMatcher matcher = new CatalogueContentMatcher(new CatalogueEntry(
+      CatalogueEntryType.CONTENT_MATCHER, CatalogueEntryProviderType.CORE, '', 'invoke-content-matcher-core-key'))
+    OptionalBody expected = OptionalBody.body('{}', ContentType.fromString('application/stuff'))
+    OptionalBody actual = OptionalBody.body('{}'.bytes, ContentType.fromString('application/x-stuff'),
+      ContentTypeHint.BINARY)
+    def response = Plugin.CompareContentsResponse.newBuilder().build()
+    Plugin.CompareContentsRequest capturedRequest = null
+    CoreContentMatcher handler = { req -> capturedRequest = req; response } as CoreContentMatcher
+    CoreCapabilityRegistry.INSTANCE.registerContentMatcher('invoke-content-matcher-core-key', handler)
+
+    when:
+    def result = manager.invokeContentMatcher(matcher, expected, actual, false, [:], [:])
+
+    then:
+    result.is(response)
+    capturedRequest.actual.contentType == 'application/x-stuff'
+    capturedRequest.actual.contentTypeHint == Plugin.Body.ContentTypeHint.BINARY
+
+    cleanup:
+    CoreCapabilityRegistry.INSTANCE.deregisterContentMatcher('invoke-content-matcher-core-key')
+  }
+
+  def 'invokeContentMatcher - throws a clear error when no core handler is registered'() {
+    given:
+    def manager = DefaultPluginManager.INSTANCE
+    ContentMatcher matcher = new CatalogueContentMatcher(new CatalogueEntry(
+      CatalogueEntryType.CONTENT_MATCHER, CatalogueEntryProviderType.CORE, '', 'unregistered-core-matcher-key'))
+    OptionalBody expected = OptionalBody.body('{}', ContentType.fromString('application/stuff'))
+    OptionalBody actual = OptionalBody.body('{}', ContentType.fromString('application/stuff'))
+
+    when:
+    manager.invokeContentMatcher(matcher, expected, actual, false, [:], [:])
+
+    then:
+    def ex = thrown(PactCoreCapabilityNotFoundException)
+    ex.key == 'unregistered-core-matcher-key'
+  }
+
+  def 'generateContent - calls the registered core handler for a core catalogue entry'() {
+    given:
+    def manager = DefaultPluginManager.INSTANCE
+    def contentGenerator = new CatalogueContentGenerator(new CatalogueEntry(
+      CatalogueEntryType.CONTENT_GENERATOR, CatalogueEntryProviderType.CORE, '', 'generate-content-core-key'))
+    def response = Plugin.GenerateContentResponse.newBuilder()
+      .setContents(Plugin.Body.newBuilder()
+        .setContentType('text/plain')
+        .setContent(BytesValue.newBuilder().setValue(ByteString.copyFromUtf8('generated')).build())
+        .build())
+      .build()
+    CoreContentGenerator handler = { req -> response } as CoreContentGenerator
+    CoreCapabilityRegistry.INSTANCE.registerContentGenerator('generate-content-core-key', handler)
+
+    when:
+    def result = manager.generateContent(contentGenerator, ContentType.fromString('text/plain'), [:],
+      OptionalBody.empty(), GeneratorTestMode.Consumer, [], [:], [:], true)
+
+    then:
+    new String(result.value, 'UTF-8') == 'generated'
+
+    cleanup:
+    CoreCapabilityRegistry.INSTANCE.deregisterContentGenerator('generate-content-core-key')
+  }
+
+  def 'generateContent - throws a clear error when no core handler is registered'() {
+    given:
+    def manager = DefaultPluginManager.INSTANCE
+    def contentGenerator = new CatalogueContentGenerator(new CatalogueEntry(
+      CatalogueEntryType.CONTENT_GENERATOR, CatalogueEntryProviderType.CORE, '', 'unregistered-core-generator-key'))
+
+    when:
+    manager.generateContent(contentGenerator, ContentType.fromString('text/plain'), [:],
+      OptionalBody.empty(), GeneratorTestMode.Consumer, [], [:], [:], true)
+
+    then:
+    def ex = thrown(PactCoreCapabilityNotFoundException)
+    ex.key == 'unregistered-core-generator-key'
   }
 
   def 'loadPlugin - if the requested plugin is not installed, but exists in the plugin index, it will auto-install it'() {

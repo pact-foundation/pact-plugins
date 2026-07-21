@@ -606,6 +606,13 @@ pub struct MockServerDetails {
     #[prost(string, tag = "3")]
     pub address: ::prost::alloc::string::String,
 }
+/// Request to shut down a running mock server (deprecated in V2; use MockServerRequest)
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct ShutdownMockServerRequest {
+    /// The server ID to shutdown
+    #[prost(string, tag = "1")]
+    pub server_key: ::prost::alloc::string::String,
+}
 /// Request for a running mock server by ID
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct MockServerRequest {
@@ -625,6 +632,16 @@ pub struct MockServerResult {
     /// Any mismatches that occurred
     #[prost(message, repeated, tag = "3")]
     pub mismatches: ::prost::alloc::vec::Vec<ContentMismatch>,
+}
+/// Response to the shut down mock server request (deprecated in V2; use MockServerResults)
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct ShutdownMockServerResponse {
+    /// If the mock status is all ok
+    #[prost(bool, tag = "1")]
+    pub ok: bool,
+    /// The results of the test run, will contain an entry for each request received by the mock server
+    #[prost(message, repeated, tag = "2")]
+    pub results: ::prost::alloc::vec::Vec<MockServerResult>,
 }
 /// Matching results of the mock server.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -782,6 +799,30 @@ pub struct LogMessage {
     #[prost(int64, tag = "6")]
     pub timestamp_ms: i64,
 }
+/// Callback request from a plugin to invoke a content matcher capability - host-provided or
+/// owned by another plugin - resolved by catalogue entry key. See proposal 007 (Driver-plugin
+/// callback model).
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct HostCompareContentsRequest {
+    /// Catalogue entry key identifying the capability to invoke, e.g. "xml" for content-matcher/xml
+    #[prost(string, tag = "1")]
+    pub entry_key: ::prost::alloc::string::String,
+    /// The comparison request, in the same shape as PactPlugin.CompareContents
+    #[prost(message, optional, tag = "2")]
+    pub request: ::core::option::Option<CompareContentsRequest>,
+}
+/// Callback request from a plugin to invoke a content generator capability - host-provided or
+/// owned by another plugin - resolved by catalogue entry key. See proposal 007 (Driver-plugin
+/// callback model).
+#[derive(Clone, PartialEq, ::prost::Message)]
+pub struct HostGenerateContentRequest {
+    /// Catalogue entry key identifying the capability to invoke, e.g. "xml" for content-generator/xml
+    #[prost(string, tag = "1")]
+    pub entry_key: ::prost::alloc::string::String,
+    /// The generation request, in the same shape as PactPlugin.GenerateContent
+    #[prost(message, optional, tag = "2")]
+    pub request: ::core::option::Option<GenerateContentRequest>,
+}
 /// Generated client implementations.
 pub mod plugin_host_client {
     #![allow(
@@ -896,6 +937,62 @@ pub mod plugin_host_client {
                 .insert(GrpcMethod::new("io.pact.plugin.v2.PluginHost", "Log"));
             self.inner.unary(req, path, codec).await
         }
+        /// Invoke a content matcher capability by catalogue entry key. The driver resolves the key to
+        /// either a host-registered core handler or another running plugin. See proposal 007.
+        pub async fn compare_contents(
+            &mut self,
+            request: impl tonic::IntoRequest<super::HostCompareContentsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::CompareContentsResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/io.pact.plugin.v2.PluginHost/CompareContents",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("io.pact.plugin.v2.PluginHost", "CompareContents"),
+                );
+            self.inner.unary(req, path, codec).await
+        }
+        /// Invoke a content generator capability by catalogue entry key. The driver resolves the key to
+        /// either a host-registered core handler or another running plugin. See proposal 007.
+        pub async fn generate_content(
+            &mut self,
+            request: impl tonic::IntoRequest<super::HostGenerateContentRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GenerateContentResponse>,
+            tonic::Status,
+        > {
+            self.inner
+                .ready()
+                .await
+                .map_err(|e| {
+                    tonic::Status::unknown(
+                        format!("Service was not ready: {}", e.into()),
+                    )
+                })?;
+            let codec = tonic_prost::ProstCodec::default();
+            let path = http::uri::PathAndQuery::from_static(
+                "/io.pact.plugin.v2.PluginHost/GenerateContent",
+            );
+            let mut req = request.into_request();
+            req.extensions_mut()
+                .insert(
+                    GrpcMethod::new("io.pact.plugin.v2.PluginHost", "GenerateContent"),
+                );
+            self.inner.unary(req, path, codec).await
+        }
     }
 }
 /// Generated server implementations.
@@ -916,6 +1013,24 @@ pub mod plugin_host_server {
             &self,
             request: tonic::Request<super::LogMessage>,
         ) -> std::result::Result<tonic::Response<()>, tonic::Status>;
+        /// Invoke a content matcher capability by catalogue entry key. The driver resolves the key to
+        /// either a host-registered core handler or another running plugin. See proposal 007.
+        async fn compare_contents(
+            &self,
+            request: tonic::Request<super::HostCompareContentsRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::CompareContentsResponse>,
+            tonic::Status,
+        >;
+        /// Invoke a content generator capability by catalogue entry key. The driver resolves the key to
+        /// either a host-registered core handler or another running plugin. See proposal 007.
+        async fn generate_content(
+            &self,
+            request: tonic::Request<super::HostGenerateContentRequest>,
+        ) -> std::result::Result<
+            tonic::Response<super::GenerateContentResponse>,
+            tonic::Status,
+        >;
     }
     /// Driver-side service implemented by the driver and called by plugins
     #[derive(Debug)]
@@ -1022,6 +1137,96 @@ pub mod plugin_host_server {
                     let inner = self.inner.clone();
                     let fut = async move {
                         let method = LogSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/io.pact.plugin.v2.PluginHost/CompareContents" => {
+                    #[allow(non_camel_case_types)]
+                    struct CompareContentsSvc<T: PluginHost>(pub Arc<T>);
+                    impl<
+                        T: PluginHost,
+                    > tonic::server::UnaryService<super::HostCompareContentsRequest>
+                    for CompareContentsSvc<T> {
+                        type Response = super::CompareContentsResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::HostCompareContentsRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as PluginHost>::compare_contents(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = CompareContentsSvc(inner);
+                        let codec = tonic_prost::ProstCodec::default();
+                        let mut grpc = tonic::server::Grpc::new(codec)
+                            .apply_compression_config(
+                                accept_compression_encodings,
+                                send_compression_encodings,
+                            )
+                            .apply_max_message_size_config(
+                                max_decoding_message_size,
+                                max_encoding_message_size,
+                            );
+                        let res = grpc.unary(method, req).await;
+                        Ok(res)
+                    };
+                    Box::pin(fut)
+                }
+                "/io.pact.plugin.v2.PluginHost/GenerateContent" => {
+                    #[allow(non_camel_case_types)]
+                    struct GenerateContentSvc<T: PluginHost>(pub Arc<T>);
+                    impl<
+                        T: PluginHost,
+                    > tonic::server::UnaryService<super::HostGenerateContentRequest>
+                    for GenerateContentSvc<T> {
+                        type Response = super::GenerateContentResponse;
+                        type Future = BoxFuture<
+                            tonic::Response<Self::Response>,
+                            tonic::Status,
+                        >;
+                        fn call(
+                            &mut self,
+                            request: tonic::Request<super::HostGenerateContentRequest>,
+                        ) -> Self::Future {
+                            let inner = Arc::clone(&self.0);
+                            let fut = async move {
+                                <T as PluginHost>::generate_content(&inner, request).await
+                            };
+                            Box::pin(fut)
+                        }
+                    }
+                    let accept_compression_encodings = self.accept_compression_encodings;
+                    let send_compression_encodings = self.send_compression_encodings;
+                    let max_decoding_message_size = self.max_decoding_message_size;
+                    let max_encoding_message_size = self.max_encoding_message_size;
+                    let inner = self.inner.clone();
+                    let fut = async move {
+                        let method = GenerateContentSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
                             .apply_compression_config(

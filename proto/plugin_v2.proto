@@ -450,10 +450,36 @@ message LogMessage {
   int64 timestampMs = 6;
 }
 
+// Callback request from a plugin to invoke a content matcher capability - host-provided or
+// owned by another plugin - resolved by catalogue entry key. See proposal 007 (Driver-plugin
+// callback model).
+message HostCompareContentsRequest {
+  // Catalogue entry key identifying the capability to invoke, e.g. "xml" for content-matcher/xml
+  string entryKey = 1;
+  // The comparison request, in the same shape as PactPlugin.CompareContents
+  CompareContentsRequest request = 2;
+}
+
+// Callback request from a plugin to invoke a content generator capability - host-provided or
+// owned by another plugin - resolved by catalogue entry key. See proposal 007 (Driver-plugin
+// callback model).
+message HostGenerateContentRequest {
+  // Catalogue entry key identifying the capability to invoke, e.g. "xml" for content-generator/xml
+  string entryKey = 1;
+  // The generation request, in the same shape as PactPlugin.GenerateContent
+  GenerateContentRequest request = 2;
+}
+
 // Driver-side service implemented by the driver and called by plugins
 service PluginHost {
   // Forward a structured log record from the plugin to the driver's logging framework
   rpc Log(LogMessage) returns (google.protobuf.Empty);
+  // Invoke a content matcher capability by catalogue entry key. The driver resolves the key to
+  // either a host-registered core handler or another running plugin. See proposal 007.
+  rpc CompareContents(HostCompareContentsRequest) returns (CompareContentsResponse);
+  // Invoke a content generator capability by catalogue entry key. The driver resolves the key to
+  // either a host-registered core handler or another running plugin. See proposal 007.
+  rpc GenerateContent(HostGenerateContentRequest) returns (GenerateContentResponse);
 }
 
 service PactPlugin {

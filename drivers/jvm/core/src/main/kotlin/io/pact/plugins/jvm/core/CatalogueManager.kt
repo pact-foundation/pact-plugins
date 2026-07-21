@@ -59,6 +59,49 @@ object CatalogueManager {
   }
 
   /**
+   * Resolve a callback's catalogue entry key to a dispatch target, the same way
+   * [CatalogueContentMatcher.isCore]/[CatalogueContentGenerator.isCore] do for the driver's own
+   * outbound calls. Shared by every transport that lets a plugin call back into a capability by
+   * catalogue entry key - the gRPC `PluginHost` service ([PluginHostServer]) and the Lua host
+   * functions ([LuaPactPlugin]) - so there is exactly one place that decides "who provides this
+   * entry". See proposal 007 ("One resolver, multiple call directions").
+   *
+   * `entryKey` is matched by suffix against the full catalogue key (e.g. a plugin passing `"xml"`
+   * matches `"core/content-matcher/xml"`) - the same lookup [lookupEntry] does, except unlike
+   * [lookupEntry] this does not just take the first hit if more than one entry matches the
+   * suffix. A short, unqualified `entryKey` could otherwise coincidentally match more than one
+   * entry of the *same* `expectedType` (e.g. a plugin registering its own `content-matcher/xml`
+   * alongside a host-registered core `content-matcher/xml`); silently picking one (in whatever
+   * order the backing map iterates) would make the dispatch target depend on registration order
+   * rather than being deterministic. `expectedType` still guards against the *wrong* capability
+   * shape (a content-generator registered under the same name as an unrelated content-matcher),
+   * mirroring the explicit `type` check [findContentMatcher]/[findContentGenerator] already do.
+   */
+  fun resolveCapability(entryKey: String, expectedType: CatalogueEntryType): ResolvedCapability {
+    val exact = catalogue[entryKey]
+    val candidates = if (exact != null) {
+      listOf(entryKey to exact)
+    } else {
+      catalogue.entries.filter { it.key.endsWith(entryKey) }.map { it.key to it.value }
+    }
+
+    val ofExpectedType = candidates.filter { (_, entry) -> entry.type == expectedType }
+    val entry = when (ofExpectedType.size) {
+      0 -> when (val wrongType = candidates.firstOrNull()?.second) {
+        null -> throw PactCatalogueEntryNotFoundException(entryKey)
+        else -> throw PactCatalogueEntryTypeMismatchException(entryKey, wrongType.type, expectedType)
+      }
+      1 -> ofExpectedType[0].second
+      else -> throw PactCatalogueEntryAmbiguousException(entryKey, ofExpectedType.map { it.first }.sorted())
+    }
+
+    return when (entry.providerType) {
+      CatalogueEntryProviderType.CORE -> ResolvedCapability.Core(entry.key)
+      CatalogueEntryProviderType.PLUGIN -> ResolvedCapability.Plugin(entry.pluginName)
+    }
+  }
+
+  /**
    * Lookup a content matcher in the catalogue that can handle the given content type
    */
   fun findContentMatcher(contentType: ContentType): ContentMatcher? {
@@ -224,4 +267,13 @@ data class CatalogueEntry @JvmOverloads constructor(
  */
 enum class CatalogueEntryProviderType {
   CORE, PLUGIN
+}
+
+/** Where a resolved catalogue entry's capability should be dispatched. See
+ * [CatalogueManager.resolveCapability]. */
+sealed class ResolvedCapability {
+  /** A host-registered core handler, keyed by the unprefixed catalogue entry key. */
+  data class Core(val key: String) : ResolvedCapability()
+  /** A running plugin, identified by its name. */
+  data class Plugin(val pluginName: String) : ResolvedCapability()
 }

@@ -2,10 +2,21 @@
 name = "pact-plugin-driver-ffi"
 version = "0.0.0"
 edition = "2018"
+# Edition 2018 defaults to Cargo's legacy (v1) dependency resolver, which does not reliably unify
+# a [dev-dependencies] version constraint (see the libc pin below) with the same crate required
+# transitively elsewhere in the graph - it can silently pick a version the constraint should have
+# excluded. Force the modern resolver so the libc pin (and any other dependency constraint here)
+# is actually honoured on a fresh resolve, not just when reusing an already-compatible lockfile.
+resolver = "2"
 
 [dev-dependencies]
 pact-plugin-driver = { version = "~1.0.0", path = "../driver" }
 pact_ffi = "~0.5.4"
+# libc 0.2.187 dropped the Windows link_name aliases for localtime_s/time/gmtime_s/ctime/difftime
+# (see rust-lang/libc src/windows/mod.rs), breaking the Windows link of anything using them via
+# `gregorian` (a transitive dependency through pact_models). Remove this pin once libc publishes a
+# fix. This crate has no committed Cargo.lock, so without this it silently re-breaks on Windows.
+libc = "<0.2.187"
 env_logger = "0.11.10"
 expectest = "0.12.0"
 serde_json = "1.0.149"

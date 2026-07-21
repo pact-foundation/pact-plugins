@@ -14,3 +14,21 @@ class PactPluginValidationForInteractionException(val name: String, val error: S
 
 class PactPluginInteractionVerificationException(val name: String, val error: String) :
   RuntimeException("Plugin $name failed to run the verification for the interaction: $error")
+
+class PactCoreCapabilityNotFoundException(val key: String) :
+  RuntimeException("No core capability handler registered for '$key'")
+
+class PactCatalogueEntryNotFoundException(val key: String) :
+  RuntimeException("No catalogue entry found for key '$key'")
+
+class PactCatalogueEntryTypeMismatchException(val key: String, val actualType: CatalogueEntryType, val expectedType: CatalogueEntryType) :
+  RuntimeException("Catalogue entry '$key' is a $actualType, not a $expectedType")
+
+class PactCatalogueEntryAmbiguousException(val key: String, val matchingKeys: List<String>) :
+  RuntimeException("Ambiguous catalogue entry key '$key': matches multiple entries (${matchingKeys.joinToString(", ")}) - register it under a more specific key")
+
+class PactCallChainCycleException(val entryKey: String, val chain: List<String>) :
+  RuntimeException("Cycle detected calling '$entryKey': already in call chain $chain")
+
+class PactCallChainDeadlineExceededException(val chainId: String) :
+  RuntimeException("Call chain $chainId deadline has already passed")

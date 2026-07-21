@@ -15,6 +15,7 @@ use serde_json::Value;
 use tracing::{debug, error};
 
 use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
+use crate::core_capabilities;
 use crate::plugin_manager::lookup_plugin;
 use crate::plugin_models::{PactPluginManifest, PluginInteractionConfig};
 use crate::proto::{
@@ -386,68 +387,17 @@ impl ContentMatcher {
       })
     };
 
-    let plugin_manifest = self.catalogue_entry.plugin.as_ref()
-      .expect("Plugin type is required");
-    match lookup_plugin(&plugin_manifest.as_dependency()) {
-      Some(plugin) => match plugin.compare_contents(request).await {
-        Ok(response) => if let Some(mismatch) = response.type_mismatch {
-          Err(hashmap!{
-            String::default() => vec![
-              ContentMismatch {
-                expected: mismatch.expected.clone(),
-                actual: mismatch.actual.clone(),
-                mismatch: format!("Expected content type '{}' but got '{}'", mismatch.expected, mismatch.actual),
-                path: "".to_string(),
-                diff: None,
-                mismatch_type: None
-              }
-            ]
-          })
-        } else if !response.error.is_empty() {
-          Err(hashmap! {
-            String::default() => vec![
-              ContentMismatch {
-                expected: Default::default(),
-                actual: Default::default(),
-                mismatch: response.error.clone(),
-                path: "".to_string(),
-                diff: None,
-                mismatch_type: None
-              }
-            ]
-          })
-        } else if !response.results.is_empty() {
-          Err(response.results.iter().map(|(k, v)| {
-            (k.clone(), v.mismatches.iter().map(|mismatch| {
-              ContentMismatch {
-                expected: mismatch.expected.as_ref()
-                  .map(|e| from_utf8(&e).unwrap_or_default().to_string())
-                  .unwrap_or_default(),
-                actual: mismatch.actual.as_ref()
-                  .map(|a| from_utf8(&a).unwrap_or_default().to_string())
-                  .unwrap_or_default(),
-                mismatch: mismatch.mismatch.clone(),
-                path: mismatch.path.clone(),
-                diff: if mismatch.diff.is_empty() {
-                  None
-                } else {
-                  Some(mismatch.diff.clone())
-                },
-                mismatch_type: Some(mismatch.mismatch_type.clone())
-              }
-            }).collect())
-          }).collect())
-        } else {
-          Ok(())
-        }
-        Err(err) => {
-          error!("Call to plugin failed - {}", err);
+    if self.is_core() {
+      return match core_capabilities::lookup_core_content_matcher(&self.catalogue_entry.key) {
+        Some(handler) => Self::process_compare_contents_response(handler.compare_contents(request).await),
+        None => {
+          error!("No core content matcher registered for {:?}", self.catalogue_entry);
           Err(hashmap! {
             String::default() => vec![
               ContentMismatch {
                 expected: "".to_string(),
                 actual: "".to_string(),
-                mismatch: format!("Call to plugin failed = {}", err),
+                mismatch: format!("No core content matcher registered for {:?}", self.catalogue_entry),
                 path: "".to_string(),
                 diff: None,
                 mismatch_type: None
@@ -455,7 +405,19 @@ impl ContentMatcher {
             ]
           })
         }
-      },
+      };
+    }
+
+    let plugin_manifest = self.catalogue_entry.plugin.as_ref()
+      .expect("Plugin type is required");
+    match lookup_plugin(&plugin_manifest.as_dependency()) {
+      Some(plugin) => {
+        let chain_id = crate::call_chain::new_call_chain_id();
+        let deadline_ms = crate::call_chain::default_deadline_ms();
+        Self::process_compare_contents_response(
+          plugin.compare_contents_with_chain(request, &chain_id, deadline_ms).await
+        )
+      }
       None => {
         error!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry);
         Err(hashmap! {
@@ -464,6 +426,80 @@ impl ContentMatcher {
               expected: "".to_string(),
               actual: "".to_string(),
               mismatch: format!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry),
+              path: "".to_string(),
+              diff: None,
+              mismatch_type: None
+            }
+          ]
+        })
+      }
+    }
+  }
+
+  /// Convert the result of a CompareContents call (from either a core handler or a plugin) into
+  /// the mismatch map result shape shared by both callers of `match_contents`.
+  fn process_compare_contents_response(
+    response: anyhow::Result<crate::proto::CompareContentsResponse>
+  ) -> Result<(), HashMap<String, Vec<ContentMismatch>>> {
+    match response {
+      Ok(response) => if let Some(mismatch) = response.type_mismatch {
+        Err(hashmap!{
+          String::default() => vec![
+            ContentMismatch {
+              expected: mismatch.expected.clone(),
+              actual: mismatch.actual.clone(),
+              mismatch: format!("Expected content type '{}' but got '{}'", mismatch.expected, mismatch.actual),
+              path: "".to_string(),
+              diff: None,
+              mismatch_type: None
+            }
+          ]
+        })
+      } else if !response.error.is_empty() {
+        Err(hashmap! {
+          String::default() => vec![
+            ContentMismatch {
+              expected: Default::default(),
+              actual: Default::default(),
+              mismatch: response.error.clone(),
+              path: "".to_string(),
+              diff: None,
+              mismatch_type: None
+            }
+          ]
+        })
+      } else if !response.results.is_empty() {
+        Err(response.results.iter().map(|(k, v)| {
+          (k.clone(), v.mismatches.iter().map(|mismatch| {
+            ContentMismatch {
+              expected: mismatch.expected.as_ref()
+                .map(|e| from_utf8(e).unwrap_or_default().to_string())
+                .unwrap_or_default(),
+              actual: mismatch.actual.as_ref()
+                .map(|a| from_utf8(a).unwrap_or_default().to_string())
+                .unwrap_or_default(),
+              mismatch: mismatch.mismatch.clone(),
+              path: mismatch.path.clone(),
+              diff: if mismatch.diff.is_empty() {
+                None
+              } else {
+                Some(mismatch.diff.clone())
+              },
+              mismatch_type: Some(mismatch.mismatch_type.clone())
+            }
+          }).collect())
+        }).collect())
+      } else {
+        Ok(())
+      }
+      Err(err) => {
+        error!("Call to compare contents handler failed - {}", err);
+        Err(hashmap! {
+          String::default() => vec![
+            ContentMismatch {
+              expected: "".to_string(),
+              actual: "".to_string(),
+              mismatch: format!("Call to compare contents handler failed = {}", err),
               path: "".to_string(),
               diff: None,
               mismatch_type: None
@@ -546,21 +582,21 @@ impl ContentGenerator {
       .. GenerateContentRequest::default()
     };
 
+    if self.is_core() {
+      let handler = core_capabilities::lookup_core_content_generator(&self.catalogue_entry.key)
+        .ok_or_else(|| anyhow!("No core content generator registered for {:?}", self.catalogue_entry))?;
+      debug!("Calling core content generator for {:?}", self.catalogue_entry);
+      return Self::response_to_body(handler.generate_content(request).await?.contents);
+    }
+
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()
       .expect("Plugin type is required");
     match lookup_plugin(&plugin_manifest.as_dependency()) {
       Some(plugin) => {
         debug!("Sending generateContent request to plugin {:?}", plugin_manifest);
-        match plugin.generate_content(request).await?.contents {
-          Some(contents) => {
-            Ok(OptionalBody::Present(
-              Bytes::from(contents.content.unwrap_or_default()),
-              ContentType::parse(contents.content_type.as_str()).ok(),
-              None
-            ))
-          }
-          None => Ok(OptionalBody::Empty)
-        }
+        let chain_id = crate::call_chain::new_call_chain_id();
+        let deadline_ms = crate::call_chain::default_deadline_ms();
+        Self::response_to_body(plugin.generate_content_with_chain(request, &chain_id, deadline_ms).await?.contents)
       },
       None => {
         error!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry);
@@ -568,21 +604,44 @@ impl ContentGenerator {
       }
     }
   }
+
+  /// Convert a returned `Body` (from either a core handler or a plugin) into an `OptionalBody`,
+  /// the shape shared by both callers of `generate_content`.
+  fn response_to_body(contents: Option<crate::proto::Body>) -> anyhow::Result<OptionalBody> {
+    match contents {
+      Some(contents) => Ok(OptionalBody::Present(
+        Bytes::from(contents.content.unwrap_or_default()),
+        ContentType::parse(contents.content_type.as_str()).ok(),
+        None
+      )),
+      None => Ok(OptionalBody::Empty)
+    }
+  }
 }
 
 #[cfg(test)]
 mod tests {
+  use std::collections::HashMap;
+  use std::sync::Arc;
+
+  use async_trait::async_trait;
   use bytes::Bytes;
   use maplit::btreemap;
   use pact_models::bodies::OptionalBody;
   use pact_models::content_types::{ContentType, ContentTypeHint};
+  use pact_models::matchingrules::{Category, MatchingRuleCategory};
   use pretty_assertions::assert_eq;
   use prost_types::value::Kind::StringValue;
   use serde_json::Value;
 
-  use crate::proto::{Body, body, ConfigureInteractionResponse, InteractionResponse};
+  use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType, CatalogueEntryType};
+  use crate::core_capabilities::{self, CoreContentGenerator, CoreContentMatcher};
+  use crate::proto::{
+    Body, body, CompareContentsRequest, CompareContentsResponse, ConfigureInteractionResponse,
+    GenerateContentRequest, GenerateContentResponse, InteractionResponse
+  };
 
-  use super::{ContentMatcher, InteractionContents};
+  use super::{ContentGenerator, ContentMatcher, InteractionContents};
 
   // Issue https://github.com/YOU54F/pact-ruby-ffi/issues/6
   #[test_log::test]
@@ -657,5 +716,131 @@ mod tests {
         .. InteractionContents::default()
       }
     ]);
+  }
+
+  struct SuccessfulCoreMatcher;
+
+  #[async_trait]
+  impl CoreContentMatcher for SuccessfulCoreMatcher {
+    async fn compare_contents(&self, _request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
+      Ok(CompareContentsResponse::default())
+    }
+  }
+
+  fn core_content_matcher(key: &str) -> ContentMatcher {
+    ContentMatcher {
+      catalogue_entry: CatalogueEntry {
+        entry_type: CatalogueEntryType::CONTENT_MATCHER,
+        provider_type: CatalogueEntryProviderType::CORE,
+        plugin: None,
+        key: key.to_string(),
+        values: Default::default()
+      }
+    }
+  }
+
+  #[test_log::test(tokio::test)]
+  async fn match_contents_calls_the_registered_core_handler_for_a_core_catalogue_entry() {
+    let key = "match_contents_calls_the_registered_core_handler_for_a_core_catalogue_entry";
+    core_capabilities::register_core_content_matcher(key, Arc::new(SuccessfulCoreMatcher));
+
+    let result = core_content_matcher(key).match_contents(
+      &OptionalBody::Present(Bytes::from("expected"), None, None),
+      &OptionalBody::Present(Bytes::from("actual"), None, None),
+      &MatchingRuleCategory { name: Category::BODY, rules: Default::default() },
+      true,
+      None
+    ).await;
+
+    core_capabilities::deregister_core_content_matcher(key);
+
+    assert!(result.is_ok());
+  }
+
+  #[test_log::test(tokio::test)]
+  async fn match_contents_returns_a_clear_error_when_no_core_handler_is_registered() {
+    let key = "match_contents_returns_a_clear_error_when_no_core_handler_is_registered";
+
+    let result = core_content_matcher(key).match_contents(
+      &OptionalBody::Present(Bytes::from("expected"), None, None),
+      &OptionalBody::Present(Bytes::from("actual"), None, None),
+      &MatchingRuleCategory { name: Category::BODY, rules: Default::default() },
+      true,
+      None
+    ).await;
+
+    let mismatches = result.expect_err("expected an error when no core handler is registered");
+    let messages: Vec<String> = mismatches.values().flatten().map(|m| m.mismatch.clone()).collect();
+    assert!(
+      messages.iter().any(|m| m.contains("No core content matcher registered")),
+      "expected a 'No core content matcher registered' mismatch, got: {:?}", messages
+    );
+  }
+
+  struct FixedCoreGenerator;
+
+  #[async_trait]
+  impl CoreContentGenerator for FixedCoreGenerator {
+    async fn generate_content(&self, _request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
+      Ok(GenerateContentResponse {
+        contents: Some(Body {
+          content_type: "text/plain".to_string(),
+          content: Some(b"generated".to_vec()),
+          content_type_hint: body::ContentTypeHint::Default as i32
+        })
+      })
+    }
+  }
+
+  fn core_content_generator(key: &str) -> ContentGenerator {
+    ContentGenerator {
+      catalogue_entry: CatalogueEntry {
+        entry_type: CatalogueEntryType::CONTENT_GENERATOR,
+        provider_type: CatalogueEntryProviderType::CORE,
+        plugin: None,
+        key: key.to_string(),
+        values: Default::default()
+      }
+    }
+  }
+
+  #[test_log::test(tokio::test)]
+  async fn generate_content_calls_the_registered_core_handler_for_a_core_catalogue_entry() {
+    let key = "generate_content_calls_the_registered_core_handler_for_a_core_catalogue_entry";
+    core_capabilities::register_core_content_generator(key, Arc::new(FixedCoreGenerator));
+
+    let result = core_content_generator(key).generate_content(
+      &ContentType::parse("text/plain").unwrap(),
+      &HashMap::new(),
+      &OptionalBody::Empty,
+      &vec![],
+      &HashMap::new(),
+      &HashMap::new()
+    ).await;
+
+    core_capabilities::deregister_core_content_generator(key);
+
+    let body = result.expect("expected the core generator's content to be returned");
+    assert_eq!(body, OptionalBody::Present(Bytes::from("generated"), ContentType::parse("text/plain").ok(), None));
+  }
+
+  #[test_log::test(tokio::test)]
+  async fn generate_content_returns_a_clear_error_when_no_core_handler_is_registered() {
+    let key = "generate_content_returns_a_clear_error_when_no_core_handler_is_registered";
+
+    let result = core_content_generator(key).generate_content(
+      &ContentType::parse("text/plain").unwrap(),
+      &HashMap::new(),
+      &OptionalBody::Empty,
+      &vec![],
+      &HashMap::new(),
+      &HashMap::new()
+    ).await;
+
+    let err = result.expect_err("expected an error when no core handler is registered");
+    assert!(
+      err.to_string().contains("No core content generator registered"),
+      "expected a 'No core content generator registered' error, got: {}", err
+    );
   }
 }

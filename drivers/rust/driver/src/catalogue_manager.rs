@@ -173,6 +173,72 @@ pub fn lookup_entry(key: &str) -> Option<CatalogueEntry> {
     .map(|(_, v)| v.clone())
 }
 
+/// Where a resolved catalogue entry's capability should be dispatched. Shared by every transport
+/// that lets a plugin call back into a capability by catalogue entry key - the gRPC `PluginHost`
+/// service, and the Lua/WASM host functions - so there is exactly one place that decides "who
+/// provides this entry". See proposal 007 ("One resolver, [multiple] call directions").
+#[derive(Debug, Clone)]
+pub enum ResolvedCapability {
+  /// A host-registered core handler, keyed by the unprefixed catalogue entry key.
+  Core(String),
+  /// A running plugin, identified by its manifest.
+  Plugin(Box<PactPluginManifest>)
+}
+
+/// Resolve a callback's catalogue entry key to a dispatch target, the same way
+/// [`crate::content::ContentMatcher::is_core`]/[`crate::content::ContentGenerator::is_core`] do
+/// for the driver's own outbound calls.
+///
+/// `entry_key` is matched by suffix against the full catalogue key (e.g. a plugin passing
+/// `"xml"` matches `"core/content-matcher/xml"`), the same lookup [`lookup_entry`] does - except
+/// unlike [`lookup_entry`], this does not just take the first `HashMap` hit if more than one
+/// entry matches the suffix. A short, unqualified `entry_key` could otherwise coincidentally
+/// match more than one entry of the *same* `expected_type` (e.g. a plugin registering its own
+/// `content-matcher/xml` alongside a host-registered core `content-matcher/xml`), and `HashMap`
+/// iteration order is randomised per process - silently picking one would make the dispatch
+/// target non-deterministic across restarts. `expected_type` still guards against the *wrong*
+/// capability shape (a content-generator registered under the same name as an unrelated
+/// content-matcher), mirroring the explicit `entry_type` check [`find_content_matcher`]/
+/// [`find_content_generator`] already do.
+pub fn resolve_capability(entry_key: &str, expected_type: CatalogueEntryType) -> anyhow::Result<ResolvedCapability> {
+  let candidates: Vec<(String, CatalogueEntry)> = {
+    let inner = CATALOGUE_REGISTER.lock().unwrap();
+    inner.iter()
+      .filter(|(k, _)| k.ends_with(entry_key))
+      .map(|(k, v)| (k.clone(), v.clone()))
+      .collect()
+  };
+
+  let mut of_expected_type = candidates.iter().filter(|(_, entry)| entry.entry_type == expected_type);
+  let entry = match (of_expected_type.next(), of_expected_type.next()) {
+    (None, _) => return match candidates.first() {
+      Some((_, entry)) => Err(anyhow::anyhow!(
+        "Catalogue entry '{}' is a {:?}, not a {:?}", entry_key, entry.entry_type, expected_type
+      )),
+      None => Err(anyhow::anyhow!("No catalogue entry found for key '{}'", entry_key))
+    },
+    (Some(only), None) => &only.1,
+    (Some(first), Some(second)) => {
+      let mut keys: Vec<&str> = std::iter::once(first).chain(std::iter::once(second))
+        .chain(of_expected_type)
+        .map(|(k, _)| k.as_str())
+        .collect();
+      keys.sort_unstable();
+      return Err(anyhow::anyhow!(
+        "Ambiguous catalogue entry key '{}': matches multiple entries ({}) - register it under a more specific key",
+        entry_key, keys.join(", ")
+      ));
+    }
+  };
+
+  match entry.provider_type {
+    CatalogueEntryProviderType::CORE => Ok(ResolvedCapability::Core(entry.key.clone())),
+    CatalogueEntryProviderType::PLUGIN => entry.plugin.clone()
+      .map(|manifest| ResolvedCapability::Plugin(Box::new(manifest)))
+      .ok_or_else(|| anyhow::anyhow!("Catalogue entry '{}' has no plugin manifest", entry_key))
+  }
+}
+
 /// Remove all entries for a plugin given the plugin name
 pub fn remove_plugin_entries(name: &str) {
   trace!("remove_plugin_entries({})", name);
@@ -376,5 +442,81 @@ mod tests {
     expect!(with_params).to(be_some());
     expect!(longer_type).to(be_none());
     expect!(unrelated_type).to(be_none());
+  }
+
+  #[test]
+  fn resolve_capability_resolves_an_unambiguous_core_entry() {
+    let key = "resolve_capability_resolves_an_unambiguous_core_entry";
+    register_core_entries(&vec![CatalogueEntry {
+      entry_type: CatalogueEntryType::CONTENT_MATCHER,
+      provider_type: CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: key.to_string(),
+      values: hashmap!{}
+    }]);
+
+    let resolved = resolve_capability(key, CatalogueEntryType::CONTENT_MATCHER).unwrap();
+
+    let core_key = match resolved {
+      ResolvedCapability::Core(core_key) => core_key,
+      ResolvedCapability::Plugin(_) => panic!("expected a Core resolution, got Plugin")
+    };
+    expect!(core_key).to(be_equal_to(key.to_string()));
+  }
+
+  #[test]
+  fn resolve_capability_returns_a_clear_error_for_an_unregistered_key() {
+    let result = resolve_capability(
+      "resolve_capability_returns_a_clear_error_for_an_unregistered_key",
+      CatalogueEntryType::CONTENT_MATCHER
+    );
+
+    let err = result.expect_err("expected an error for an unregistered key");
+    expect!(err.to_string().contains("No catalogue entry found")).to(be_true());
+  }
+
+  #[test]
+  fn resolve_capability_returns_a_clear_error_for_the_wrong_capability_shape() {
+    let key = "resolve_capability_returns_a_clear_error_for_the_wrong_capability_shape";
+    register_core_entries(&vec![CatalogueEntry {
+      entry_type: CatalogueEntryType::CONTENT_GENERATOR,
+      provider_type: CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: key.to_string(),
+      values: hashmap!{}
+    }]);
+
+    let result = resolve_capability(key, CatalogueEntryType::CONTENT_MATCHER);
+
+    let err = result.expect_err("expected an error when the entry is a generator, not a matcher");
+    expect!(err.to_string().contains("is a CONTENT_GENERATOR, not a CONTENT_MATCHER")).to(be_true());
+  }
+
+  #[test]
+  fn resolve_capability_rejects_an_ambiguous_key_shared_by_a_core_and_a_plugin_entry() {
+    let key = "resolve_capability_rejects_an_ambiguous_key_shared_by_a_core_and_a_plugin_entry";
+    let manifest = PactPluginManifest {
+      name: "resolve_capability_rejects_an_ambiguous_key_shared_by_a_core_and_a_plugin_entry".to_string(),
+      .. PactPluginManifest::default()
+    };
+    register_core_entries(&vec![CatalogueEntry {
+      entry_type: CatalogueEntryType::CONTENT_MATCHER,
+      provider_type: CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: key.to_string(),
+      values: hashmap!{}
+    }]);
+    register_plugin_entries(&manifest, &vec![ProtoCatalogueEntry {
+      r#type: catalogue_entry::EntryType::ContentMatcher as i32,
+      key: key.to_string(),
+      values: hashmap!{}
+    }]);
+
+    let result = resolve_capability(key, CatalogueEntryType::CONTENT_MATCHER);
+
+    remove_plugin_entries(&manifest.name);
+
+    let err = result.expect_err("expected an error for a key matching more than one entry");
+    expect!(err.to_string().contains("Ambiguous catalogue entry key")).to(be_true());
   }
 }

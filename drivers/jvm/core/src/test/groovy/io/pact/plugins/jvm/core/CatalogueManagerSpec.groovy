@@ -43,4 +43,66 @@ class CatalogueManagerSpec extends Specification {
     cleanup:
     CatalogueManager.INSTANCE.removePluginEntries('CatalogueManagerSpec')
   }
+
+  def 'resolveCapability resolves an unambiguous core entry'() {
+    given:
+    def key = 'resolveCapability resolves an unambiguous core entry'
+    CatalogueManager.INSTANCE.registerCoreEntries([
+      new CatalogueEntry(CatalogueEntryType.CONTENT_MATCHER, CatalogueEntryProviderType.CORE, '', key)
+    ])
+
+    when:
+    def resolved = CatalogueManager.INSTANCE.resolveCapability(key, CatalogueEntryType.CONTENT_MATCHER)
+
+    then:
+    resolved instanceof ResolvedCapability.Core
+    ((ResolvedCapability.Core) resolved).key == key
+  }
+
+  def 'resolveCapability throws a clear error for an unregistered key'() {
+    when:
+    CatalogueManager.INSTANCE.resolveCapability(
+      'resolveCapability throws a clear error for an unregistered key', CatalogueEntryType.CONTENT_MATCHER)
+
+    then:
+    thrown(PactCatalogueEntryNotFoundException)
+  }
+
+  def 'resolveCapability throws a clear error for the wrong capability shape'() {
+    given:
+    def key = 'resolveCapability throws a clear error for the wrong capability shape'
+    CatalogueManager.INSTANCE.registerCoreEntries([
+      new CatalogueEntry(CatalogueEntryType.CONTENT_GENERATOR, CatalogueEntryProviderType.CORE, '', key)
+    ])
+
+    when:
+    CatalogueManager.INSTANCE.resolveCapability(key, CatalogueEntryType.CONTENT_MATCHER)
+
+    then:
+    def ex = thrown(PactCatalogueEntryTypeMismatchException)
+    ex.actualType == CatalogueEntryType.CONTENT_GENERATOR
+    ex.expectedType == CatalogueEntryType.CONTENT_MATCHER
+  }
+
+  def 'resolveCapability rejects an ambiguous key shared by a core and a plugin entry'() {
+    given:
+    def key = 'resolveCapability rejects an ambiguous key shared by a core and a plugin entry'
+    CatalogueManager.INSTANCE.registerCoreEntries([
+      new CatalogueEntry(CatalogueEntryType.CONTENT_MATCHER, CatalogueEntryProviderType.CORE, '', key)
+    ])
+    def pluginEntry = Plugin.CatalogueEntry.newBuilder()
+      .setType(Plugin.CatalogueEntry.EntryType.CONTENT_MATCHER)
+      .setKey(key)
+      .build()
+    CatalogueManager.INSTANCE.registerPluginEntries('CatalogueManagerSpec-ambiguous', [pluginEntry])
+
+    when:
+    CatalogueManager.INSTANCE.resolveCapability(key, CatalogueEntryType.CONTENT_MATCHER)
+
+    then:
+    thrown(PactCatalogueEntryAmbiguousException)
+
+    cleanup:
+    CatalogueManager.INSTANCE.removePluginEntries('CatalogueManagerSpec-ambiguous')
+  }
 }

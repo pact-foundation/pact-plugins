@@ -48,6 +48,22 @@ generator set through the 007 mechanism, and confirming the 006 field-level shap
 context where the rule requires it — e.g. a `date` generator needing the current time, or a rule needing sibling
 values).
 
+### Sequencing
+
+1. ✅ 007's content-level mechanism (the `CoreContentMatcher`/`CoreContentGenerator` registry and the extended
+   `PluginHost` gRPC service with cycle detection and deadline propagation). Done in both drivers — Rust
+   (`core_capabilities.rs`, `call_chain.rs`, `plugin_host.rs`) and JVM (`CoreCapabilities.kt`, `CallChain.kt`,
+   `PluginHostServer.kt`) — see [007](./007_Driver_plugin_callback_model.md#sequencing). This unblocks registering
+   any *content-level* standard matcher/generator (a whole content type, not a single field) through the mechanism
+   today.
+2. ⬜ [006](./006_Field_level_matchers_and_generators.md)'s field-level operation shape. Not started. Blocks
+   registering the field-level standard rules (`type`, `regex`, `equality`, etc. applied to a single field rather
+   than a whole content type), which is most of what this proposal is actually for.
+3. ⬜ Register the standard Pact matcher/generator set as `CORE` catalogue entries with handlers implementing 007's
+   traits (content-level now possible; field-level blocked on step 2). Not started.
+4. ⬜ WASM and Lua host-function equivalents, following [007](./007_Driver_plugin_callback_model.md#sequencing)'s
+   step 4. Not started.
+
 ## Recommended direction
 
 - Treat standard Pact matching and generation as host capabilities registered through the [007](./007_Driver_plugin_callback_model.md)

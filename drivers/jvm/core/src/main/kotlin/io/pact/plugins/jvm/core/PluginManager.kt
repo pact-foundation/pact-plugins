@@ -475,7 +475,11 @@ object DefaultPluginManager: PluginManager {
     }
   }
 
-  private fun lookupPlugin(name: String, version: String?): PactPlugin? {
+  /**
+   * Look up a currently-running plugin instance by name. Used by [PluginHostServer] to forward a
+   * plugin's callback to another plugin's capability (see [CallChain]).
+   */
+  internal fun lookupPlugin(name: String, version: String?): PactPlugin? {
     return if (version == null) {
       PLUGIN_REGISTER.filter { it.value.manifest.name == name }.entries.maxByOrNull { it.value.manifest.version }?.value
     } else {
@@ -536,9 +540,17 @@ object DefaultPluginManager: PluginManager {
           })
           .setPluginConfiguration(pluginConfigBuilder.build())
           .build()
-        val plugin = lookupPlugin(matcher.pluginName, null) ?:
-          throw PactPluginNotFoundException(matcher.pluginName, null)
-        plugin.withRpcClient { client -> client.compareContents(request) }
+        if (matcher.isCore) {
+          val handler = CoreCapabilityRegistry.contentMatcher(matcher.catalogueEntry.key) ?:
+            throw PactCoreCapabilityNotFoundException(matcher.catalogueEntry.key)
+          handler.compareContents(request)
+        } else {
+          val plugin = lookupPlugin(matcher.pluginName, null) ?:
+            throw PactPluginNotFoundException(matcher.pluginName, null)
+          val chainId = CallChain.newCallChainId()
+          val deadlineMs = CallChain.defaultDeadlineMs()
+          plugin.withRpcClient { client -> client.compareContentsWithChain(request, chainId, deadlineMs) }
+        }
       }
       else -> throw RuntimeException("Mis-configured content type matcher $matcher")
     }
@@ -696,19 +708,18 @@ object DefaultPluginManager: PluginManager {
     testContext: Map<String, JsonValue>,
     forRequest: Boolean
   ): OptionalBody {
-    val plugin = lookupPlugin(contentGenerator.catalogueEntry.pluginName, null) ?:
-      throw PactPluginNotFoundException(contentGenerator.catalogueEntry.pluginName, null)
-
-    val pluginConfig = pluginData.find { it.name == plugin.manifest.name }?.configuration?.mapValues {
-      toJson(it.value)
-    }
-    val interactionConfig = interactionData[plugin.manifest.name]
     val pluginConfigBuilder = Plugin.PluginConfiguration.newBuilder()
-    if (!pluginConfig.isNullOrEmpty()) {
-      pluginConfigBuilder.pactConfiguration = toProtoStruct(pluginConfig)
-    }
-    if (!interactionConfig.isNullOrEmpty()) {
-      pluginConfigBuilder.interactionConfiguration = toProtoStruct(interactionConfig)
+    if (!contentGenerator.isCore) {
+      val pluginConfig = pluginData.find { it.name == contentGenerator.catalogueEntry.pluginName }?.configuration?.mapValues {
+        toJson(it.value)
+      }
+      val interactionConfig = interactionData[contentGenerator.catalogueEntry.pluginName]
+      if (!pluginConfig.isNullOrEmpty()) {
+        pluginConfigBuilder.pactConfiguration = toProtoStruct(pluginConfig)
+      }
+      if (!interactionConfig.isNullOrEmpty()) {
+        pluginConfigBuilder.interactionConfiguration = toProtoStruct(interactionConfig)
+      }
     }
 
     val request = Plugin.GenerateContentRequest.newBuilder()
@@ -734,8 +745,20 @@ object DefaultPluginManager: PluginManager {
         .build()
       request.putGenerators(key, gen)
     }
-    logger.debug { "Sending generateContent request to plugin ${plugin.manifest}" }
-    val response = plugin.withRpcClient { client -> client.generateContent(request.build()) }
+
+    val response = if (contentGenerator.isCore) {
+      val handler = CoreCapabilityRegistry.contentGenerator(contentGenerator.catalogueEntry.key) ?:
+        throw PactCoreCapabilityNotFoundException(contentGenerator.catalogueEntry.key)
+      logger.debug { "Calling core content generator for ${contentGenerator.catalogueEntry}" }
+      handler.generateContent(request.build())
+    } else {
+      val plugin = lookupPlugin(contentGenerator.catalogueEntry.pluginName, null) ?:
+        throw PactPluginNotFoundException(contentGenerator.catalogueEntry.pluginName, null)
+      logger.debug { "Sending generateContent request to plugin ${plugin.manifest}" }
+      val chainId = CallChain.newCallChainId()
+      val deadlineMs = CallChain.defaultDeadlineMs()
+      plugin.withRpcClient { client -> client.generateContentWithChain(request.build(), chainId, deadlineMs) }
+    }
     logger.debug { "Got response: $response" }
     val returnedContentType = ContentType(response.contents.contentType)
     return OptionalBody.body(response.contents.content.value.toByteArray(), returnedContentType)
