@@ -1,5 +1,30 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 1.1.0 - Host-provided matching and generation interface
+
+* 4e4e46c - chore: remove libc pin as libc has been updated (Ronald Holshausen, Wed Jul 22 09:14:35 2026 +1000)
+* 8b4956e - chore: Cleanup drivers and bump version to 1.1.0 (Ronald Holshausen, Tue Jul 21 17:12:41 2026 +1000)
+* 10bdb3a - Merge pull request #108 from pact-foundation/plugin-callback-model (Ronald Holshausen, Tue Jul 21 16:46:54 2026 +1000)
+* 7dddb63 - fix(rust-driver): commit driver_ffi/driver_pact_tests Cargo.lock to actually pin libc (Ronald Holshausen, Tue Jul 21 16:26:49 2026 +1000)
+* f5236a0 - fix(jvm-driver): detect ambiguous catalogue entry keys in resolveCapability (Ronald Holshausen, Tue Jul 21 16:13:32 2026 +1000)
+* ccc2c4f - fix(rust-driver): detect ambiguous catalogue entry keys in resolve_capability (Ronald Holshausen, Tue Jul 21 16:13:18 2026 +1000)
+* f3c4e47 - fix(rust-driver): pin libc <0.2.187 to unblock Windows CI (Ronald Holshausen, Tue Jul 21 15:51:15 2026 +1000)
+* dfa2f3b - doc: correct proposal 007 - Lua host functions are done in both drivers (Ronald Holshausen, Tue Jul 21 15:21:33 2026 +1000)
+* 1321368 - feat(jvm-driver): add Lua host-function equivalents of the PluginHost callback (Ronald Holshausen, Tue Jul 21 15:20:54 2026 +1000)
+* 7af467b - doc: mark proposal 007's Lua host-function slice done (Ronald Holshausen, Tue Jul 21 15:07:01 2026 +1000)
+* a76138a - feat(rust-driver): add Lua host-function equivalents of the PluginHost callback (Ronald Holshausen, Tue Jul 21 15:06:29 2026 +1000)
+* 2dfa97a - doc: add sequencing section to proposal 009, marking 007's mechanism done (Ronald Holshausen, Tue Jul 21 13:53:15 2026 +1000)
+* 8be8152 - doc: mark proposal 007 sequencing steps 1-3 as done (Ronald Holshausen, Tue Jul 21 12:01:36 2026 +1000)
+* daf13c4 - feat(jvm-driver): extend PluginHost gRPC service with plugin callback dispatch (Ronald Holshausen, Tue Jul 21 12:00:19 2026 +1000)
+* 10d766d - feat(rust-driver): extend PluginHost gRPC service with plugin callback dispatch (Ronald Holshausen, Tue Jul 21 11:14:06 2026 +1000)
+* 9eb2501 - feat(jvm-driver): add core capability registry and wire it into content matching/generation (Ronald Holshausen, Fri Jul 17 16:54:43 2026 +1000)
+* 759aa52 - feat(driver): dispatch to registered core handlers for CORE catalogue entries (Ronald Holshausen, Fri Jul 17 16:45:42 2026 +1000)
+* 714ea70 - feat(driver): add core capability registry for host-provided handlers (Ronald Holshausen, Fri Jul 17 16:39:08 2026 +1000)
+* 25a2885 - doc: Updated proposals 007 and 009 with a concrete architecture (Ronald Holshausen, Fri Jul 17 16:06:23 2026 +1000)
+* d9bc3d1 - chore: bump version to 1.0.1 [skip ci] (Ronald Holshausen, Fri Jul 17 10:51:26 2026 +1000)
+* 57f22ff - chore: update changelog for release 1.0.0 [skip ci] (Ronald Holshausen, Fri Jul 17 10:50:56 2026 +1000)
+* 7de7a50 - chore: bump version to 1.0.1 [skip ci] (Ronald Holshausen, Fri Jul 17 10:47:56 2026 +1000)
+
 # 1.0.0 - Non-Beta release
 
 * 6c70d2f - chore: remove beta flag from driver versions (Ronald Holshausen, Fri Jul 17 10:19:16 2026 +1000)
