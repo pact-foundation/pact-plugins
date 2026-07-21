@@ -1,5 +1,16 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.1.0 - Host-provided matching and generation interface
+
+* 4e4e46c - chore: remove libc pin as libc has been updated (Ronald Holshausen, Wed Jul 22 09:14:35 2026 +1000)
+* 8b4956e - chore: Cleanup drivers and bump version to 1.1.0 (Ronald Holshausen, Tue Jul 21 17:12:41 2026 +1000)
+* ccc2c4f - fix(rust-driver): detect ambiguous catalogue entry keys in resolve_capability (Ronald Holshausen, Tue Jul 21 16:13:18 2026 +1000)
+* a76138a - feat(rust-driver): add Lua host-function equivalents of the PluginHost callback (Ronald Holshausen, Tue Jul 21 15:06:29 2026 +1000)
+* 10d766d - feat(rust-driver): extend PluginHost gRPC service with plugin callback dispatch (Ronald Holshausen, Tue Jul 21 11:14:06 2026 +1000)
+* 759aa52 - feat(driver): dispatch to registered core handlers for CORE catalogue entries (Ronald Holshausen, Fri Jul 17 16:45:42 2026 +1000)
+* 714ea70 - feat(driver): add core capability registry for host-provided handlers (Ronald Holshausen, Fri Jul 17 16:39:08 2026 +1000)
+* d9bc3d1 - chore: bump version to 1.0.1 [skip ci] (Ronald Holshausen, Fri Jul 17 10:51:26 2026 +1000)
+
 # 1.0.0 - Non-Beta release
 
 * 6c70d2f - chore: remove beta flag from driver versions (Ronald Holshausen, Fri Jul 17 10:19:16 2026 +1000)
