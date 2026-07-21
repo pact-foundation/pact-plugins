@@ -24,6 +24,9 @@ class PactCatalogueEntryNotFoundException(val key: String) :
 class PactCatalogueEntryTypeMismatchException(val key: String, val actualType: CatalogueEntryType, val expectedType: CatalogueEntryType) :
   RuntimeException("Catalogue entry '$key' is a $actualType, not a $expectedType")
 
+class PactCatalogueEntryAmbiguousException(val key: String, val matchingKeys: List<String>) :
+  RuntimeException("Ambiguous catalogue entry key '$key': matches multiple entries (${matchingKeys.joinToString(", ")}) - register it under a more specific key")
+
 class PactCallChainCycleException(val entryKey: String, val chain: List<String>) :
   RuntimeException("Cycle detected calling '$entryKey': already in call chain $chain")
 
