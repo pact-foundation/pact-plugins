@@ -53,36 +53,6 @@ internal class CallChainServerInterceptor : ServerInterceptor {
   }
 }
 
-/** Where a resolved catalogue entry's capability should be dispatched. */
-private sealed class ResolvedEntry {
-  data class Core(val key: String) : ResolvedEntry()
-  data class Plugin(val pluginName: String) : ResolvedEntry()
-}
-
-/**
- * Resolve a callback's catalogue entry key to a dispatch target, the same way
- * [CatalogueContentMatcher.isCore]/[CatalogueContentGenerator.isCore] do for the driver's own
- * outbound calls. See proposal 007 ("One resolver, two call directions").
- *
- * `entryKey` is matched by suffix against the full catalogue key (e.g. a plugin passing `"xml"`
- * matches `"core/content-matcher/xml"`), the same lookup used for plugin-provided entries today -
- * see [CatalogueManager.lookupEntry]. That means an unqualified key could coincidentally match an
- * entry of the wrong capability shape (a content-generator registered under the same name as an
- * unrelated content-matcher); `expectedType` guards against silently dispatching to it, mirroring
- * the explicit `type` check [CatalogueManager.findContentMatcher]/`findContentGenerator` already
- * do.
- */
-private fun resolveEntry(entryKey: String, expectedType: CatalogueEntryType): ResolvedEntry {
-  val entry = CatalogueManager.lookupEntry(entryKey) ?: throw PactCatalogueEntryNotFoundException(entryKey)
-  if (entry.type != expectedType) {
-    throw PactCatalogueEntryTypeMismatchException(entryKey, entry.type, expectedType)
-  }
-  return when (entry.providerType) {
-    CatalogueEntryProviderType.CORE -> ResolvedEntry.Core(entry.key)
-    CatalogueEntryProviderType.PLUGIN -> ResolvedEntry.Plugin(entry.pluginName)
-  }
-}
-
 /**
  * Extract the call-chain ID and deadline stashed by [CallChainServerInterceptor], falling back to
  * a fresh chain and the default budget if either is missing - defensive handling for a plugin
@@ -146,13 +116,13 @@ internal class PluginHostGrpcService : PluginHostGrpc.PluginHostImplBase() {
       }
       CallChain.pushCall(chainId, request.entryKey).use {
         val v1Request = convertMessage(request.request, Plugin.CompareContentsRequest.parser())
-        val response = when (val resolved = resolveEntry(request.entryKey, CatalogueEntryType.CONTENT_MATCHER)) {
-          is ResolvedEntry.Core -> {
+        val response = when (val resolved = CatalogueManager.resolveCapability(request.entryKey, CatalogueEntryType.CONTENT_MATCHER)) {
+          is ResolvedCapability.Core -> {
             val handler = CoreCapabilityRegistry.contentMatcher(resolved.key)
               ?: throw PactCoreCapabilityNotFoundException(resolved.key)
             handler.compareContents(v1Request)
           }
-          is ResolvedEntry.Plugin -> {
+          is ResolvedCapability.Plugin -> {
             val plugin = DefaultPluginManager.lookupPlugin(resolved.pluginName, null)
               ?: throw PactPluginNotFoundException(resolved.pluginName, null)
             plugin.withRpcClient { client -> client.compareContentsWithChain(v1Request, chainId, deadlineMs) }
@@ -177,13 +147,13 @@ internal class PluginHostGrpcService : PluginHostGrpc.PluginHostImplBase() {
       }
       CallChain.pushCall(chainId, request.entryKey).use {
         val v1Request = convertMessage(request.request, Plugin.GenerateContentRequest.parser())
-        val response = when (val resolved = resolveEntry(request.entryKey, CatalogueEntryType.CONTENT_GENERATOR)) {
-          is ResolvedEntry.Core -> {
+        val response = when (val resolved = CatalogueManager.resolveCapability(request.entryKey, CatalogueEntryType.CONTENT_GENERATOR)) {
+          is ResolvedCapability.Core -> {
             val handler = CoreCapabilityRegistry.contentGenerator(resolved.key)
               ?: throw PactCoreCapabilityNotFoundException(resolved.key)
             handler.generateContent(v1Request)
           }
-          is ResolvedEntry.Plugin -> {
+          is ResolvedCapability.Plugin -> {
             val plugin = DefaultPluginManager.lookupPlugin(resolved.pluginName, null)
               ?: throw PactPluginNotFoundException(resolved.pluginName, null)
             plugin.withRpcClient { client -> client.generateContentWithChain(v1Request, chainId, deadlineMs) }

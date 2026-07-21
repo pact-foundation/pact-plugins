@@ -59,6 +59,32 @@ object CatalogueManager {
   }
 
   /**
+   * Resolve a callback's catalogue entry key to a dispatch target, the same way
+   * [CatalogueContentMatcher.isCore]/[CatalogueContentGenerator.isCore] do for the driver's own
+   * outbound calls. Shared by every transport that lets a plugin call back into a capability by
+   * catalogue entry key - the gRPC `PluginHost` service ([PluginHostServer]) and the Lua host
+   * functions ([LuaPactPlugin]) - so there is exactly one place that decides "who provides this
+   * entry". See proposal 007 ("One resolver, multiple call directions").
+   *
+   * `entryKey` is matched by suffix against the full catalogue key (e.g. a plugin passing `"xml"`
+   * matches `"core/content-matcher/xml"`) via [lookupEntry]. That means an unqualified key could
+   * coincidentally match an entry of the wrong capability shape (a content-generator registered
+   * under the same name as an unrelated content-matcher); `expectedType` guards against silently
+   * dispatching to it, mirroring the explicit `type` check [findContentMatcher]/
+   * [findContentGenerator] already do.
+   */
+  fun resolveCapability(entryKey: String, expectedType: CatalogueEntryType): ResolvedCapability {
+    val entry = lookupEntry(entryKey) ?: throw PactCatalogueEntryNotFoundException(entryKey)
+    if (entry.type != expectedType) {
+      throw PactCatalogueEntryTypeMismatchException(entryKey, entry.type, expectedType)
+    }
+    return when (entry.providerType) {
+      CatalogueEntryProviderType.CORE -> ResolvedCapability.Core(entry.key)
+      CatalogueEntryProviderType.PLUGIN -> ResolvedCapability.Plugin(entry.pluginName)
+    }
+  }
+
+  /**
    * Lookup a content matcher in the catalogue that can handle the given content type
    */
   fun findContentMatcher(contentType: ContentType): ContentMatcher? {
@@ -224,4 +250,13 @@ data class CatalogueEntry @JvmOverloads constructor(
  */
 enum class CatalogueEntryProviderType {
   CORE, PLUGIN
+}
+
+/** Where a resolved catalogue entry's capability should be dispatched. See
+ * [CatalogueManager.resolveCapability]. */
+sealed class ResolvedCapability {
+  /** A host-registered core handler, keyed by the unprefixed catalogue entry key. */
+  data class Core(val key: String) : ResolvedCapability()
+  /** A running plugin, identified by its name. */
+  data class Plugin(val pluginName: String) : ResolvedCapability()
 }

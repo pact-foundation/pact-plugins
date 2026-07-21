@@ -47,6 +47,15 @@ private val logger = KotlinLogging.logger {}
  * - `get_mock_server_results(server_key) -> table`
  * - `prepare_interaction_for_verification(request) -> table`
  * - `verify_interaction(request) -> table`
+ *
+ * From within `match_contents`/`generate_content`, a script can also call back into a
+ * host-provided or another plugin's capability, named by catalogue entry key (proposal 007,
+ * "Lua transport" - the in-process equivalent of the gRPC `PluginHost` callback service, see
+ * [PluginHostServer]):
+ * - `host_compare_contents(entry_key, request) -> table` - same request/response shape as
+ *   `match_contents` itself, so a result can be returned straight through.
+ * - `host_generate_content(entry_key, contents, generators, test_mode) -> body` - same arguments
+ *   and return shape as `generate_content` itself.
  */
 class LuaPactPlugin(
   override val manifest: PactPluginManifest,
@@ -154,6 +163,71 @@ class LuaPactPlugin(
     }
     engine.registerFunction("b64_decode_no_pad") { args ->
       ByteBuffer.wrap(decodeBase64Lenient(args[0] as String))
+    }
+
+    // Callback host functions (proposal 007, "Lua transport"): let a plugin script delegate to a
+    // host-provided or another plugin's content matcher/generator, named by catalogue entry key,
+    // instead of reimplementing it. No call-chain ID or cycle detection is needed here, unlike
+    // the gRPC PluginHost callback path (PluginHostServer.kt) - this is a direct, in-process
+    // Kotlin call; a true cycle would show up as a StackOverflowError.
+    engine.registerFunction("host_compare_contents") { args ->
+      @Suppress("UNCHECKED_CAST")
+      val request = luaToCompareRequest(args[1] as Map<String, Any?>)
+      compareResponseToLua(callHostCompareContents(args[0] as String, request))
+    }
+    engine.registerFunction("host_generate_content") { args ->
+      val request = luaToGenerateRequest(args.getOrNull(1), args.getOrNull(2), args.getOrNull(3) as? String)
+      bodyToLua(callHostGenerateContent(args[0] as String, request).let { if (it.hasContents()) it.contents else null })
+    }
+  }
+
+  /**
+   * Resolve [entryKey] to a content matcher capability and dispatch to it - a host-registered
+   * [CoreContentMatcher] called in-process, or another running plugin called via a freshly-started
+   * call chain (see [CallChain]), matching the same resolver [PluginHostServer] uses for the gRPC
+   * callback path. Backs the `host_compare_contents` Lua host function.
+   */
+  private fun callHostCompareContents(
+    entryKey: String,
+    request: Plugin.CompareContentsRequest
+  ): Plugin.CompareContentsResponse {
+    return when (val resolved = CatalogueManager.resolveCapability(entryKey, CatalogueEntryType.CONTENT_MATCHER)) {
+      is ResolvedCapability.Core -> {
+        val handler = CoreCapabilityRegistry.contentMatcher(resolved.key)
+          ?: throw PactCoreCapabilityNotFoundException(resolved.key)
+        handler.compareContents(request)
+      }
+      is ResolvedCapability.Plugin -> {
+        val plugin = DefaultPluginManager.lookupPlugin(resolved.pluginName, null)
+          ?: throw PactPluginNotFoundException(resolved.pluginName, null)
+        val chainId = CallChain.newCallChainId()
+        val deadlineMs = CallChain.defaultDeadlineMs()
+        plugin.withRpcClient { client -> client.compareContentsWithChain(request, chainId, deadlineMs) }
+      }
+    }
+  }
+
+  /**
+   * Resolve [entryKey] to a content generator capability and dispatch to it. See
+   * [callHostCompareContents]; backs the `host_generate_content` Lua host function.
+   */
+  private fun callHostGenerateContent(
+    entryKey: String,
+    request: Plugin.GenerateContentRequest
+  ): Plugin.GenerateContentResponse {
+    return when (val resolved = CatalogueManager.resolveCapability(entryKey, CatalogueEntryType.CONTENT_GENERATOR)) {
+      is ResolvedCapability.Core -> {
+        val handler = CoreCapabilityRegistry.contentGenerator(resolved.key)
+          ?: throw PactCoreCapabilityNotFoundException(resolved.key)
+        handler.generateContent(request)
+      }
+      is ResolvedCapability.Plugin -> {
+        val plugin = DefaultPluginManager.lookupPlugin(resolved.pluginName, null)
+          ?: throw PactPluginNotFoundException(resolved.pluginName, null)
+        val chainId = CallChain.newCallChainId()
+        val deadlineMs = CallChain.defaultDeadlineMs()
+        plugin.withRpcClient { client -> client.generateContentWithChain(request, chainId, deadlineMs) }
+      }
     }
   }
 

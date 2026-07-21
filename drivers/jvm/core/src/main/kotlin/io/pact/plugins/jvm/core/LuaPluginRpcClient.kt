@@ -5,7 +5,6 @@ import com.google.protobuf.BytesValue
 import io.pact.plugin.Plugin
 import io.pact.plugin.v2.PluginV2
 import io.pact.plugins.jvm.core.Utils.fromProtoValue
-import io.pact.plugins.jvm.core.Utils.mapToProtoStruct
 import io.pact.plugins.jvm.core.Utils.structToMap
 import io.pact.plugins.jvm.core.Utils.toProtoValue
 import io.pact.plugins.jvm.core.lua.LuaEngine
@@ -180,146 +179,6 @@ class LuaPluginRpcClient(private val engine: LuaEngine) : PactPluginRpcClient {
     return luaToVerifyInteractionResponse(result)
   }
 
-  // ---- Body <-> Lua ----
-
-  private fun bodyToLua(body: Plugin.Body?): Map<String, Any?>? {
-    if (body == null) return null
-    return mapOf(
-      "content_type" to body.contentType,
-      "contents" to if (body.hasContent()) ByteBuffer.wrap(body.content.value.toByteArray()) else null,
-      "content_type_hint" to body.contentTypeHint.name
-    )
-  }
-
-  private fun luaToBody(value: Any?): Plugin.Body? {
-    if (value == null) return null
-    @Suppress("UNCHECKED_CAST")
-    val map = value as? Map<String, Any?>
-      ?: throw IllegalStateException("Expected a body table or nil from Lua, got $value")
-    val builder = Plugin.Body.newBuilder()
-    builder.contentType = map["content_type"] as? String ?: ""
-    map["contents"]?.let { builder.content = BytesValue.of(ByteString.copyFrom(toByteArray(it))) }
-    builder.contentTypeHint = when (map["content_type_hint"] as? String) {
-      "TEXT" -> Plugin.Body.ContentTypeHint.TEXT
-      "BINARY" -> Plugin.Body.ContentTypeHint.BINARY
-      else -> Plugin.Body.ContentTypeHint.DEFAULT
-    }
-    return builder.build()
-  }
-
-  private fun toByteArray(value: Any): ByteArray = when (value) {
-    is ByteBuffer -> {
-      val duplicate = value.duplicate()
-      ByteArray(duplicate.remaining()).also { duplicate.get(it) }
-    }
-    is String -> value.toByteArray(Charsets.UTF_8)
-    else -> throw IllegalStateException("Expected string or byte buffer content from Lua, got $value")
-  }
-
-  // ---- Matching rules / generators / plugin configuration <-> Lua ----
-
-  private fun matchingRulesToLua(rules: Map<String, Plugin.MatchingRules>): Map<String, Any?> =
-    rules.mapValues { (_, ruleList) ->
-      ruleList.ruleList.map { rule ->
-        mapOf(
-          "type" to rule.type,
-          "values" to if (rule.hasValues()) structToMap(rule.values) else null
-        )
-      }
-    }
-
-  private fun generatorToLua(generator: Plugin.Generator): Map<String, Any?> = mapOf(
-    "type" to generator.type,
-    "values" to if (generator.hasValues()) structToMap(generator.values) else null
-  )
-
-  private fun pluginConfigurationToLua(config: Plugin.PluginConfiguration?): Map<String, Any?>? {
-    if (config == null) return null
-    val map = mutableMapOf<String, Any?>()
-    if (config.hasInteractionConfiguration()) {
-      map["interaction_configuration"] = structToMap(config.interactionConfiguration)
-    }
-    if (config.hasPactConfiguration()) {
-      map["pact_configuration"] = structToMap(config.pactConfiguration)
-    }
-    return map
-  }
-
-  private fun luaToPluginConfiguration(value: Any?): Plugin.PluginConfiguration? {
-    @Suppress("UNCHECKED_CAST")
-    val map = value as? Map<String, Any?> ?: return null
-    val builder = Plugin.PluginConfiguration.newBuilder()
-    @Suppress("UNCHECKED_CAST")
-    (map["interaction_configuration"] as? Map<String, Any?>)?.let {
-      builder.interactionConfiguration = mapToProtoStruct(it)
-    }
-    @Suppress("UNCHECKED_CAST")
-    (map["pact_configuration"] as? Map<String, Any?>)?.let {
-      builder.pactConfiguration = mapToProtoStruct(it)
-    }
-    return builder.build()
-  }
-
-  // ---- CompareContents <-> Lua ----
-
-  private fun luaToCompareResponse(result: Map<String, Any?>): Plugin.CompareContentsResponse {
-    val error = result["error"] as? String
-    if (error != null) {
-      return Plugin.CompareContentsResponse.newBuilder().setError(error).build()
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    val typeMismatch = result["type-mismatch"] as? Map<String, Any?>
-    if (typeMismatch != null) {
-      return Plugin.CompareContentsResponse.newBuilder()
-        .setTypeMismatch(
-          Plugin.ContentTypeMismatch.newBuilder()
-            .setExpected(typeMismatch["expected"]?.toString() ?: "")
-            .setActual(typeMismatch["actual"]?.toString() ?: "")
-            .build()
-        )
-        .build()
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    val mismatches = result["mismatches"] as? Map<String, Any?> ?: emptyMap()
-    val builder = Plugin.CompareContentsResponse.newBuilder()
-    for ((path, value) in mismatches) {
-      val list = luaValueToContentMismatches(path, value)
-      if (list.isNotEmpty()) {
-        builder.putResults(path, Plugin.ContentMismatches.newBuilder().addAllMismatches(list).build())
-      }
-    }
-    return builder.build()
-  }
-
-  private fun luaValueToContentMismatches(path: String, value: Any?): List<Plugin.ContentMismatch> {
-    return when (value) {
-      null -> emptyList()
-      is List<*> -> value.flatMap { luaValueToContentMismatches(path, it) }
-      is Map<*, *> -> {
-        @Suppress("UNCHECKED_CAST")
-        val map = value as Map<String, Any?>
-        val mismatch = map["mismatch"] as? String
-        if (mismatch != null) {
-          val mismatchBuilder = Plugin.ContentMismatch.newBuilder()
-            .setMismatch(mismatch)
-            .setPath(map["path"] as? String ?: path)
-          map["expected"]?.let { mismatchBuilder.expected = BytesValue.of(ByteString.copyFromUtf8(it.toString())) }
-          map["actual"]?.let { mismatchBuilder.actual = BytesValue.of(ByteString.copyFromUtf8(it.toString())) }
-          (map["diff"] as? String)?.let { mismatchBuilder.diff = it }
-          (map["mismatch_type"] as? String)?.let { mismatchBuilder.mismatchType = it }
-          listOf(mismatchBuilder.build())
-        } else {
-          emptyList()
-        }
-      }
-      else -> listOf(
-        Plugin.ContentMismatch.newBuilder().setMismatch(value.toString()).setPath(path).build()
-      )
-    }
-  }
-
   // ---- ConfigureInteraction <-> Lua ----
 
   private fun luaToConfigureResponse(result: Map<String, Any?>): Plugin.ConfigureInteractionResponse {
@@ -393,7 +252,7 @@ class LuaPluginRpcClient(private val engine: LuaEngine) : PactPluginRpcClient {
       val binary = wrapper?.get("binary")
       val builder = Plugin.MetadataValue.newBuilder()
       if (binary != null) {
-        builder.binaryValue = ByteString.copyFrom(toByteArray(binary))
+        builder.binaryValue = ByteString.copyFrom(luaContentToByteArray(binary))
       } else {
         builder.nonBinaryValue = toProtoValue(entryValue)
       }
