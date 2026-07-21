@@ -231,9 +231,11 @@ This proposal ships as one vertical slice through the mechanism, not the full ca
    step 2.
 4. The Lua and WASM host-function equivalents.
    - ✅ Lua: `host_compare_contents`/`host_generate_content` global functions, reachable from
-     `match_contents`/`generate_content` (Rust driver only - the JVM driver has no Lua runtime).
-     Reuses the resolver via the new `catalogue_manager::resolve_capability`, shared with step 2's
-     `plugin_host.rs`.
+     `match_contents`/`generate_content`. Done in both drivers, each of which has its own Lua
+     plugin runtime: Rust (`lua_plugin.rs`, via `mlua`) and JVM (`LuaPactPlugin.kt`/
+     `LuaPluginRpcClient.kt`, via `luajava`). Both reuse the same resolver added in step 2 -
+     `catalogue_manager::resolve_capability` (Rust) / `CatalogueManager.resolveCapability` (JVM) -
+     shared with the gRPC `PluginHost` callback path.
    - ⬜ WASM: not yet started (blocked on [003](./003_Support_WASM_plugins.md) landing WASM plugin
      support at all).
 
