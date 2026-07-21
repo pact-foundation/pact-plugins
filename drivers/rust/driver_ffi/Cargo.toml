@@ -2,6 +2,12 @@
 name = "pact-plugin-driver-ffi"
 version = "0.0.0"
 edition = "2018"
+# Edition 2018 defaults to Cargo's legacy (v1) dependency resolver, which does not reliably unify
+# a [dev-dependencies] version constraint (see the libc pin below) with the same crate required
+# transitively elsewhere in the graph - it can silently pick a version the constraint should have
+# excluded. Force the modern resolver so the libc pin (and any other dependency constraint here)
+# is actually honoured on a fresh resolve, not just when reusing an already-compatible lockfile.
+resolver = "2"
 
 [dev-dependencies]
 pact-plugin-driver = { version = "~1.0.0", path = "../driver" }
