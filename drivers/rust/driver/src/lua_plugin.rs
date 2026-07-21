@@ -30,6 +30,20 @@
 //! Each of these is called with either a V1-shaped or a V2-shaped request table, never both,
 //! depending on the plugin's own `pluginInterfaceVersion` in its manifest - the same static,
 //! per-instance choice the driver makes for gRPC plugins (see `plugin_manager.rs`).
+//!
+//! From within `match_contents`/`generate_content`, a script can also call back into a
+//! host-provided or another plugin's capability, named by catalogue entry key (proposal 007,
+//! "Lua transport" - the in-process equivalent of the gRPC `PluginHost` callback service):
+//!
+//! - `host_compare_contents(entry_key, request) -> table` - same request/response shape as
+//!   `match_contents` itself, so a result can be returned straight through.
+//! - `host_generate_content(entry_key, contents, generators, test_mode) -> body` - same
+//!   arguments and return shape as `generate_content` itself.
+//!
+//! These are only reachable from Lua code running inside `match_contents`/`generate_content`
+//! (the two entry points the driver invokes via `call_async`); calling them from another entry
+//! point currently fails, since mlua can only resolve an async host function from within a Lua
+//! call chain that was itself started asynchronously.
 
 use std::collections::HashMap;
 use std::fs::File;
@@ -45,6 +59,9 @@ use rsa::{Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey};
 use sha2::{Digest, Sha512};
 use tracing::debug;
 
+use crate::call_chain;
+use crate::catalogue_manager::{CatalogueEntryType, ResolvedCapability, resolve_capability};
+use crate::plugin_manager::lookup_plugin;
 use crate::plugin_models::{
   PactPluginManifest, PactPluginRpc, PluginInitRequest, PluginInitResponse, PluginInstance,
 };
@@ -53,8 +70,15 @@ use crate::proto_v2;
 use crate::utils::{proto_struct_to_json, proto_value_to_json, to_proto_struct, to_proto_value};
 
 /// A running Lua plugin instance. Each instance owns its own embedded Lua VM.
+///
+/// The mutex is `tokio::sync::Mutex`, not `std::sync::Mutex`: the two host functions plugins can
+/// call to reach a host-provided or another plugin's capability (`host_compare_contents`,
+/// `host_generate_content` - see [`register_host_functions`] and proposal 007) need to hold the
+/// lock across an `.await` while they dispatch to an async [`crate::core_capabilities`] handler
+/// or forward to another plugin, which a `std::sync::MutexGuard` cannot do (it isn't `Send`,
+/// and `PluginInstance`'s `#[async_trait]` methods require a `Send` future).
 pub struct LuaPactPlugin {
-  runtime: Arc<Mutex<Lua>>,
+  runtime: Arc<tokio::sync::Mutex<Lua>>,
   manifest: PactPluginManifest,
   instance_id: String,
   plugin_capabilities: Vec<String>,
@@ -87,7 +111,7 @@ pub(crate) fn start_lua_plugin(
   load_script(&lua, &script_path)?;
 
   Ok(LuaPactPlugin {
-    runtime: Arc::new(Mutex::new(lua)),
+    runtime: Arc::new(tokio::sync::Mutex::new(lua)),
     manifest: manifest.clone(),
     instance_id,
     plugin_capabilities: vec![],
@@ -312,7 +336,83 @@ fn register_host_functions(lua: &Lua, plugin_name: &str, log: &Arc<LuaPluginLog>
     })?,
   )?;
 
+  // Callback host functions (proposal 007, "Lua transport"): let a plugin script delegate to a
+  // host-provided or another plugin's content matcher/generator, named by catalogue entry key,
+  // instead of reimplementing it. Registered as *async* Lua functions - resolving the entry may
+  // need to await an async core capability handler or forward the call to another plugin - which
+  // is why the script's own `match_contents`/`generate_content` are invoked via `call_async` (see
+  // `PluginInstance::compare_contents`/`generate_content` below): mlua only allows an async host
+  // function to be reached from a Lua call chain that was itself started with `call_async`.
+  //
+  // No call-chain ID or cycle detection is needed here, unlike the gRPC `PluginHost` callback
+  // path (`plugin_host.rs`) - this is a direct, synchronous (from Lua's perspective) Rust call;
+  // a true cycle shows up as a native stack overflow, the same reasoning that applies to WASM.
+  globals.set(
+    "host_compare_contents",
+    lua.create_async_function(move |lua, (entry_key, request): (String, Table)| async move {
+      let request = lua_to_compare_request(&lua, request).map_err(mlua::Error::external)?;
+      let response = call_host_compare_contents(&entry_key, request).await.map_err(mlua::Error::external)?;
+      compare_response_to_lua(&lua, &response)
+    })?,
+  )?;
+
+  globals.set(
+    "host_generate_content",
+    lua.create_async_function(move |lua, (entry_key, contents, generators, test_mode): (String, Value, Option<Table>, Option<String>)| async move {
+      let request = lua_to_generate_request(&lua, contents, generators, test_mode).map_err(mlua::Error::external)?;
+      let response = call_host_generate_content(&entry_key, request).await.map_err(mlua::Error::external)?;
+      body_to_lua(&lua, &response.contents)
+    })?,
+  )?;
+
   Ok(())
+}
+
+/// Resolve `entry_key` to a content matcher capability and dispatch to it - a host-registered
+/// [`crate::core_capabilities::CoreContentMatcher`] called in-process, or another running plugin
+/// called via a freshly-started call chain (see [`crate::call_chain`]), matching the same
+/// resolver [`crate::plugin_host`] uses for the gRPC callback path. Backs the `host_compare_contents`
+/// Lua host function.
+async fn call_host_compare_contents(
+  entry_key: &str,
+  request: CompareContentsRequest
+) -> anyhow::Result<CompareContentsResponse> {
+  match resolve_capability(entry_key, CatalogueEntryType::CONTENT_MATCHER)? {
+    ResolvedCapability::Core(core_key) => {
+      let handler = crate::core_capabilities::lookup_core_content_matcher(&core_key)
+        .ok_or_else(|| anyhow!("No core content matcher registered for '{}'", core_key))?;
+      handler.compare_contents(request).await
+    }
+    ResolvedCapability::Plugin(manifest) => {
+      let plugin = lookup_plugin(&manifest.as_dependency())
+        .ok_or_else(|| anyhow!("Plugin '{}' for entry '{}' is not currently running", manifest.name, entry_key))?;
+      let chain_id = call_chain::new_call_chain_id();
+      let deadline_ms = call_chain::default_deadline_ms();
+      plugin.compare_contents_with_chain(request, &chain_id, deadline_ms).await
+    }
+  }
+}
+
+/// Resolve `entry_key` to a content generator capability and dispatch to it. See
+/// [`call_host_compare_contents`]; backs the `host_generate_content` Lua host function.
+async fn call_host_generate_content(
+  entry_key: &str,
+  request: GenerateContentRequest
+) -> anyhow::Result<GenerateContentResponse> {
+  match resolve_capability(entry_key, CatalogueEntryType::CONTENT_GENERATOR)? {
+    ResolvedCapability::Core(core_key) => {
+      let handler = crate::core_capabilities::lookup_core_content_generator(&core_key)
+        .ok_or_else(|| anyhow!("No core content generator registered for '{}'", core_key))?;
+      handler.generate_content(request).await
+    }
+    ResolvedCapability::Plugin(manifest) => {
+      let plugin = lookup_plugin(&manifest.as_dependency())
+        .ok_or_else(|| anyhow!("Plugin '{}' for entry '{}' is not currently running", manifest.name, entry_key))?;
+      let chain_id = call_chain::new_call_chain_id();
+      let deadline_ms = call_chain::default_deadline_ms();
+      plugin.generate_content_with_chain(request, &chain_id, deadline_ms).await
+    }
+  }
 }
 
 /// Decode base64 (URL-safe), trying the padded then the un-padded alphabet.
@@ -429,6 +529,30 @@ fn matching_rules_to_lua(lua: &Lua, rules: &HashMap<String, MatchingRules>) -> m
   Ok(table)
 }
 
+/// Reverse of [`matching_rules_to_lua`] - used by `host_compare_contents` to convert the rules a
+/// plugin script builds when calling back into a host-provided or another plugin's matcher.
+fn lua_to_matching_rules(lua: &Lua, table: Option<Table>) -> anyhow::Result<HashMap<String, MatchingRules>> {
+  let mut result = HashMap::new();
+  if let Some(table) = table {
+    for pair in table.pairs::<String, Table>() {
+      let (path, rules_table) = pair?;
+      let mut rule = vec![];
+      for rule_value in rules_table.sequence_values::<Table>() {
+        let rule_table = rule_value?;
+        let r#type: String = rule_table.get("type")?;
+        let values: Option<Value> = rule_table.get("values")?;
+        let values = match values {
+          Some(value) => Some(to_proto_struct(&as_json_map(lua.from_value(value)?))),
+          None => None,
+        };
+        rule.push(MatchingRule { r#type, values });
+      }
+      result.insert(path, MatchingRules { rule });
+    }
+  }
+  Ok(result)
+}
+
 fn plugin_configuration_to_lua(lua: &Lua, config: &Option<PluginConfiguration>) -> mlua::Result<Value> {
   match config {
     None => Ok(Value::Nil),
@@ -492,6 +616,24 @@ fn compare_request_to_lua(lua: &Lua, request: &CompareContentsRequest) -> mlua::
     plugin_configuration_to_lua(lua, &request.plugin_configuration)?,
   )?;
   Ok(table)
+}
+
+/// Reverse of [`compare_request_to_lua`] - the request table shape a plugin script builds when
+/// calling `host_compare_contents(entry_key, request)` (see [`register_host_functions`]) is the
+/// same shape its own `match_contents(request)` function receives.
+fn lua_to_compare_request(lua: &Lua, table: Table) -> anyhow::Result<CompareContentsRequest> {
+  let expected: Value = table.get("expected")?;
+  let actual: Value = table.get("actual")?;
+  let allow_unexpected_keys: Option<bool> = table.get("allow_unexpected_keys")?;
+  let rules: Option<Table> = table.get("rules")?;
+  let plugin_configuration: Option<Value> = table.get("plugin_configuration")?;
+  Ok(CompareContentsRequest {
+    expected: lua_to_body(expected)?,
+    actual: lua_to_body(actual)?,
+    allow_unexpected_keys: allow_unexpected_keys.unwrap_or(false),
+    rules: lua_to_matching_rules(lua, rules)?,
+    plugin_configuration: lua_to_plugin_configuration(lua, plugin_configuration)?,
+  })
 }
 
 fn lua_to_compare_response(table: Table) -> anyhow::Result<CompareContentsResponse> {
@@ -588,6 +730,96 @@ fn lua_value_to_content_mismatches(path: &str, value: Value) -> anyhow::Result<V
     Value::Nil => Ok(vec![]),
     other => Err(anyhow!("Expected a mismatch string or table from Lua, got {}", other.type_name())),
   }
+}
+
+/// Converts a path's mismatches into the sequence-of-tables shape
+/// [`lua_value_to_content_mismatches`] parses, so a `host_compare_contents` response can be
+/// passed straight through as part of the calling plugin's own `match_contents` response.
+fn content_mismatches_to_lua(lua: &Lua, mismatches: &[ContentMismatch]) -> mlua::Result<Table> {
+  let list = lua.create_table()?;
+  for mismatch in mismatches {
+    let table = lua.create_table()?;
+    table.set("mismatch", mismatch.mismatch.clone())?;
+    if let Some(expected) = &mismatch.expected {
+      table.set("expected", lua.create_string(expected)?)?;
+    }
+    if let Some(actual) = &mismatch.actual {
+      table.set("actual", lua.create_string(actual)?)?;
+    }
+    table.set("path", mismatch.path.clone())?;
+    if !mismatch.diff.is_empty() {
+      table.set("diff", mismatch.diff.clone())?;
+    }
+    if !mismatch.mismatch_type.is_empty() {
+      table.set("mismatch_type", mismatch.mismatch_type.clone())?;
+    }
+    list.push(table)?;
+  }
+  Ok(list)
+}
+
+/// Reverse of [`lua_to_compare_response`] - the table `host_compare_contents` returns is shaped
+/// exactly like what a plugin's own `match_contents` function is expected to return, so a plugin
+/// can pass a host/forwarded comparison's result straight through as its own response.
+fn compare_response_to_lua(lua: &Lua, response: &CompareContentsResponse) -> mlua::Result<Table> {
+  let table = lua.create_table()?;
+  if !response.error.is_empty() {
+    table.set("error", response.error.clone())?;
+    return Ok(table);
+  }
+  if let Some(type_mismatch) = &response.type_mismatch {
+    let mismatch_table = lua.create_table()?;
+    mismatch_table.set("expected", type_mismatch.expected.clone())?;
+    mismatch_table.set("actual", type_mismatch.actual.clone())?;
+    table.set("type-mismatch", mismatch_table)?;
+    return Ok(table);
+  }
+  if !response.results.is_empty() {
+    let mismatches_table = lua.create_table()?;
+    for (path, content_mismatches) in &response.results {
+      mismatches_table.set(path.clone(), content_mismatches_to_lua(lua, &content_mismatches.mismatches)?)?;
+    }
+    table.set("mismatches", mismatches_table)?;
+  }
+  Ok(table)
+}
+
+// ---- GenerateContent <-> Lua ----
+
+/// Converts the `(entry_key, contents, generators, test_mode)` arguments a plugin script passes
+/// to `host_generate_content` (see [`register_host_functions`]) into a `GenerateContentRequest` -
+/// the same three trailing arguments its own `generate_content(contents, generators, test_mode)`
+/// function receives.
+fn lua_to_generate_request(
+  lua: &Lua,
+  contents: Value,
+  generators: Option<Table>,
+  test_mode: Option<String>
+) -> anyhow::Result<GenerateContentRequest> {
+  let mut generator_map = HashMap::new();
+  if let Some(generators) = generators {
+    for pair in generators.pairs::<String, Table>() {
+      let (path, generator_table) = pair?;
+      let r#type: String = generator_table.get("type")?;
+      let values: Option<Value> = generator_table.get("values")?;
+      let values = match values {
+        Some(value) => Some(to_proto_struct(&as_json_map(lua.from_value(value)?))),
+        None => None,
+      };
+      generator_map.insert(path, Generator { r#type, values });
+    }
+  }
+  let test_mode = match test_mode.as_deref() {
+    Some("Consumer") => generate_content_request::TestMode::Consumer,
+    Some("Provider") => generate_content_request::TestMode::Provider,
+    _ => generate_content_request::TestMode::Unknown,
+  };
+  Ok(GenerateContentRequest {
+    contents: lua_to_body(contents)?,
+    generators: generator_map,
+    test_mode: test_mode as i32,
+    .. GenerateContentRequest::default()
+  })
 }
 
 // ---- ConfigureInteraction <-> Lua ----
@@ -903,7 +1135,7 @@ fn lua_to_verify_interaction_response(lua: &Lua, table: Table) -> anyhow::Result
 #[async_trait]
 impl PactPluginRpc for LuaPactPlugin {
   async fn init_plugin(&mut self, request: PluginInitRequest) -> anyhow::Result<PluginInitResponse> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let catalogue = call_init(&lua, &request.implementation, &request.version)?;
     Ok(PluginInitResponse {
       catalogue,
@@ -930,14 +1162,15 @@ impl PluginInstance for LuaPactPlugin {
     &self,
     request: CompareContentsRequest,
   ) -> anyhow::Result<CompareContentsResponse> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let match_fn: Function = lua
       .globals()
       .get("match_contents")
       .map_err(|_| anyhow!("Lua plugin does not define a global 'match_contents' function"))?;
     let request_table = compare_request_to_lua(&lua, &request)?;
     let result: Table = match_fn
-      .call(request_table)
+      .call_async(request_table)
+      .await
       .map_err(|err| anyhow!("Lua match_contents() function failed - {}", err))?;
     lua_to_compare_response(result)
   }
@@ -946,7 +1179,7 @@ impl PluginInstance for LuaPactPlugin {
     &self,
     request: ConfigureInteractionRequest,
   ) -> anyhow::Result<ConfigureInteractionResponse> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let configure_fn: Function = lua
       .globals()
       .get("configure_interaction")
@@ -965,7 +1198,7 @@ impl PluginInstance for LuaPactPlugin {
     &self,
     request: GenerateContentRequest,
   ) -> anyhow::Result<GenerateContentResponse> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let generate_fn: Option<Function> = lua.globals().get("generate_content")?;
     match generate_fn {
       None => Ok(GenerateContentResponse {
@@ -990,7 +1223,8 @@ impl PluginInstance for LuaPactPlugin {
           generate_content_request::TestMode::Unknown => "Unknown",
         };
         let result: Value = generate_fn
-          .call((contents, generators, test_mode))
+          .call_async((contents, generators, test_mode))
+          .await
           .map_err(|err| anyhow!("Lua generate_content() function failed - {}", err))?;
         Ok(GenerateContentResponse {
           contents: lua_to_body(result)?,
@@ -1003,7 +1237,7 @@ impl PluginInstance for LuaPactPlugin {
     &self,
     request: StartMockServerRequest,
   ) -> anyhow::Result<StartMockServerResponse> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let start_fn: Function = lua
       .globals()
       .get("start_mock_server")
@@ -1024,7 +1258,7 @@ impl PluginInstance for LuaPactPlugin {
     &self,
     request: proto_v2::StartMockServerRequest,
   ) -> anyhow::Result<StartMockServerResponse> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let start_fn: Function = lua
       .globals()
       .get("start_mock_server")
@@ -1049,7 +1283,7 @@ impl PluginInstance for LuaPactPlugin {
     &self,
     request: ShutdownMockServerRequest,
   ) -> anyhow::Result<ShutdownMockServerResponse> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let shutdown_fn: Function = lua
       .globals()
       .get("shutdown_mock_server")
@@ -1068,7 +1302,7 @@ impl PluginInstance for LuaPactPlugin {
     &self,
     request: MockServerRequest,
   ) -> anyhow::Result<MockServerResults> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let results_fn: Function = lua
       .globals()
       .get("get_mock_server_results")
@@ -1083,7 +1317,7 @@ impl PluginInstance for LuaPactPlugin {
     &self,
     request: VerificationPreparationRequest,
   ) -> anyhow::Result<VerificationPreparationResponse> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let prepare_fn: Function = lua.globals().get("prepare_interaction_for_verification").map_err(|_| {
       anyhow!("Lua plugin does not define a global 'prepare_interaction_for_verification' function")
     })?;
@@ -1101,7 +1335,7 @@ impl PluginInstance for LuaPactPlugin {
     &self,
     request: proto_v2::VerificationPreparationRequest,
   ) -> anyhow::Result<VerificationPreparationResponse> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let prepare_fn: Function = lua.globals().get("prepare_interaction_for_verification").map_err(|_| {
       anyhow!("Lua plugin does not define a global 'prepare_interaction_for_verification' function")
     })?;
@@ -1121,7 +1355,7 @@ impl PluginInstance for LuaPactPlugin {
     &self,
     request: VerifyInteractionRequest,
   ) -> anyhow::Result<VerifyInteractionResponse> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let verify_fn: Function = lua
       .globals()
       .get("verify_interaction")
@@ -1141,7 +1375,7 @@ impl PluginInstance for LuaPactPlugin {
     &self,
     request: proto_v2::VerifyInteractionRequest,
   ) -> anyhow::Result<VerifyInteractionResponse> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let verify_fn: Function = lua
       .globals()
       .get("verify_interaction")
@@ -1163,7 +1397,7 @@ impl PluginInstance for LuaPactPlugin {
   }
 
   async fn update_catalogue(&self, request: Catalogue) -> anyhow::Result<()> {
-    let lua = self.runtime.lock().map_err(|_| anyhow!("Lua runtime mutex was poisoned"))?;
+    let lua = self.runtime.lock().await;
     let update_fn: Option<Function> = lua.globals().get("update_catalogue")?;
     if let Some(update_fn) = update_fn {
       let table = lua.create_table()?;
@@ -1255,7 +1489,7 @@ mod tests {
     };
 
     let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
-    let lua = plugin.runtime.lock().unwrap();
+    let lua = plugin.runtime.blocking_lock();
     let result: String = lua.globals().get("GREETER_RESULT").unwrap();
     assert_eq!(result, "hello from luarocks");
   }
@@ -1292,7 +1526,7 @@ mod tests {
     };
 
     let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
-    let lua = plugin.runtime.lock().unwrap();
+    let lua = plugin.runtime.blocking_lock();
     let result: String = lua.globals().get("GREETER_RESULT").unwrap();
     assert_eq!(result, "hello from a vendored module");
   }
@@ -1332,7 +1566,7 @@ mod tests {
     };
 
     let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
-    let lua = plugin.runtime.lock().unwrap();
+    let lua = plugin.runtime.blocking_lock();
     let result: String = lua.globals().get("GREETER_RESULT").unwrap();
     assert_eq!(result, "hello from the plugin root");
   }
@@ -1408,7 +1642,7 @@ mod tests {
   async fn loads_the_jwt_plugin_and_runs_the_init_function() {
     let manifest = jwt_manifest();
     let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
-    let lua = plugin.runtime.lock().unwrap();
+    let lua = plugin.runtime.lock().await;
     let entries = call_init(&lua, "test", "0.0.0").unwrap();
     assert_eq!(entries.len(), 2);
     assert_eq!(entries[0].key, "jwt");
@@ -1542,6 +1776,165 @@ mod tests {
     assert_eq!(verified_mismatch.actual.as_deref(), Some("false".as_bytes()));
   }
 
+  fn lua_manifest(plugin_dir: &std::path::Path, name: &str) -> PactPluginManifest {
+    PactPluginManifest {
+      plugin_dir: plugin_dir.to_string_lossy().to_string(),
+      plugin_interface_version: 1,
+      name: name.to_string(),
+      version: "0.0.0".to_string(),
+      executable_type: "lua".to_string(),
+      minimum_required_version: None,
+      entry_point: "entry.lua".to_string(),
+      entry_points: HashMap::new(),
+      args: None,
+      dependencies: None,
+      plugin_config: HashMap::new(),
+    }
+  }
+
+  fn core_matcher_entry(key: &str) -> crate::catalogue_manager::CatalogueEntry {
+    crate::catalogue_manager::CatalogueEntry {
+      entry_type: crate::catalogue_manager::CatalogueEntryType::CONTENT_MATCHER,
+      provider_type: crate::catalogue_manager::CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: key.to_string(),
+      values: HashMap::new()
+    }
+  }
+
+  fn core_generator_entry(key: &str) -> crate::catalogue_manager::CatalogueEntry {
+    crate::catalogue_manager::CatalogueEntry {
+      entry_type: crate::catalogue_manager::CatalogueEntryType::CONTENT_GENERATOR,
+      provider_type: crate::catalogue_manager::CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: key.to_string(),
+      values: HashMap::new()
+    }
+  }
+
+  struct FixedErrorCoreMatcher;
+
+  #[async_trait]
+  impl crate::core_capabilities::CoreContentMatcher for FixedErrorCoreMatcher {
+    async fn compare_contents(&self, _request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse> {
+      Ok(CompareContentsResponse {
+        error: "core matcher says no".to_string(),
+        type_mismatch: None,
+        results: HashMap::new(),
+      })
+    }
+  }
+
+  #[tokio::test]
+  async fn match_contents_calls_host_compare_contents_for_a_registered_core_capability() {
+    let key = "match_contents_calls_host_compare_contents_for_a_registered_core_capability";
+    crate::catalogue_manager::register_core_entries(&vec![core_matcher_entry(key)]);
+    crate::core_capabilities::register_core_content_matcher(key, Arc::new(FixedErrorCoreMatcher));
+
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      format!(r#"
+        function match_contents(request)
+          return host_compare_contents("{key}", request)
+        end
+      "#, key = key),
+    ).unwrap();
+    let manifest = lua_manifest(plugin_dir.path(), "host-compare-contents-test");
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+
+    let compare_request = CompareContentsRequest {
+      expected: None,
+      actual: None,
+      allow_unexpected_keys: false,
+      rules: HashMap::new(),
+      plugin_configuration: None,
+    };
+    let response = plugin.compare_contents(compare_request).await.unwrap();
+
+    crate::core_capabilities::deregister_core_content_matcher(key);
+
+    assert_eq!(response.error, "core matcher says no");
+  }
+
+  #[tokio::test]
+  async fn match_contents_surfaces_a_clear_error_when_host_compare_contents_targets_an_unregistered_entry() {
+    let key = "match_contents_surfaces_a_clear_error_when_host_compare_contents_targets_an_unregistered_entry";
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      format!(r#"
+        function match_contents(request)
+          return host_compare_contents("{key}", request)
+        end
+      "#, key = key),
+    ).unwrap();
+    let manifest = lua_manifest(plugin_dir.path(), "host-compare-contents-missing-test");
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+
+    let compare_request = CompareContentsRequest {
+      expected: None,
+      actual: None,
+      allow_unexpected_keys: false,
+      rules: HashMap::new(),
+      plugin_configuration: None,
+    };
+    let err = plugin.compare_contents(compare_request).await
+      .expect_err("expected an error when the target entry is not registered");
+    assert!(
+      err.to_string().contains("No catalogue entry found"),
+      "unexpected error message: {}", err
+    );
+  }
+
+  struct FixedCoreGenerator;
+
+  #[async_trait]
+  impl crate::core_capabilities::CoreContentGenerator for FixedCoreGenerator {
+    async fn generate_content(&self, _request: GenerateContentRequest) -> anyhow::Result<GenerateContentResponse> {
+      Ok(GenerateContentResponse {
+        contents: Some(Body {
+          content_type: "text/plain".to_string(),
+          content: Some(b"generated by the host".to_vec()),
+          content_type_hint: body::ContentTypeHint::Default as i32,
+        }),
+      })
+    }
+  }
+
+  #[tokio::test]
+  async fn generate_content_calls_host_generate_content_for_a_registered_core_capability() {
+    let key = "generate_content_calls_host_generate_content_for_a_registered_core_capability";
+    crate::catalogue_manager::register_core_entries(&vec![core_generator_entry(key)]);
+    crate::core_capabilities::register_core_content_generator(key, Arc::new(FixedCoreGenerator));
+
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      format!(r#"
+        function generate_content(contents, generators, test_mode)
+          return host_generate_content("{key}", contents, generators, test_mode)
+        end
+      "#, key = key),
+    ).unwrap();
+    let manifest = lua_manifest(plugin_dir.path(), "host-generate-content-test");
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+
+    let request = GenerateContentRequest {
+      contents: Some(Body {
+        content_type: "text/plain".to_string(),
+        content: Some(b"original".to_vec()),
+        content_type_hint: body::ContentTypeHint::Default as i32,
+      }),
+      .. GenerateContentRequest::default()
+    };
+    let response = plugin.generate_content(request).await.unwrap();
+
+    crate::core_capabilities::deregister_core_content_generator(key);
+
+    assert_eq!(response.contents.unwrap().content, Some(b"generated by the host".to_vec()));
+  }
+
   fn transport_manifest(plugin_dir: &std::path::Path, plugin_interface_version: u8) -> PactPluginManifest {
     PactPluginManifest {
       plugin_dir: plugin_dir.to_string_lossy().to_string(),
@@ -1669,7 +2062,7 @@ mod tests {
     let response = plugin.start_mock_server_v2(request).await.unwrap();
     assert!(matches!(response.response.unwrap(), start_mock_server_response::Response::Details(_)));
 
-    let lua = plugin.runtime.lock().unwrap();
+    let lua = plugin.runtime.lock().await;
     let captured: Table = lua.globals().get("START_MOCK_SERVER_REQUEST").unwrap();
     let interactions: Table = captured.get("interactions").unwrap();
     let first: Table = interactions.get(1).unwrap();
@@ -1742,7 +2135,7 @@ mod tests {
       verification_preparation_response::Response::InteractionData(_)
     ));
 
-    let lua = plugin.runtime.lock().unwrap();
+    let lua = plugin.runtime.lock().await;
     let captured: Table = lua.globals().get("PREPARE_REQUEST").unwrap();
     let interaction_contents: Table = captured.get("interaction_contents").unwrap();
     assert_eq!(interaction_contents.get::<String>("provider").unwrap(), "test-provider");
@@ -1791,7 +2184,7 @@ mod tests {
       other => panic!("expected a verification result, got {:?}", other),
     }
 
-    let lua = plugin.runtime.lock().unwrap();
+    let lua = plugin.runtime.lock().await;
     let captured: Table = lua.globals().get("VERIFY_REQUEST").unwrap();
     let interaction_data: Table = captured.get("interaction_data").unwrap();
     let metadata: Table = interaction_data.get("metadata").unwrap();
@@ -1842,7 +2235,7 @@ mod tests {
       verify_interaction_response::Response::Result(_)
     ));
 
-    let lua = plugin.runtime.lock().unwrap();
+    let lua = plugin.runtime.lock().await;
     let captured: Table = lua.globals().get("VERIFY_REQUEST").unwrap();
     let interaction_data: Table = captured.get("interaction_data").unwrap();
     let body: Table = interaction_data.get("body").unwrap();

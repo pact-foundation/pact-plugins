@@ -173,6 +173,44 @@ pub fn lookup_entry(key: &str) -> Option<CatalogueEntry> {
     .map(|(_, v)| v.clone())
 }
 
+/// Where a resolved catalogue entry's capability should be dispatched. Shared by every transport
+/// that lets a plugin call back into a capability by catalogue entry key - the gRPC `PluginHost`
+/// service, and the Lua/WASM host functions - so there is exactly one place that decides "who
+/// provides this entry". See proposal 007 ("One resolver, [multiple] call directions").
+#[derive(Debug, Clone)]
+pub enum ResolvedCapability {
+  /// A host-registered core handler, keyed by the unprefixed catalogue entry key.
+  Core(String),
+  /// A running plugin, identified by its manifest.
+  Plugin(Box<PactPluginManifest>)
+}
+
+/// Resolve a callback's catalogue entry key to a dispatch target, the same way
+/// [`crate::content::ContentMatcher::is_core`]/[`crate::content::ContentGenerator::is_core`] do
+/// for the driver's own outbound calls.
+///
+/// `entry_key` is matched by suffix against the full catalogue key (e.g. a plugin passing
+/// `"xml"` matches `"core/content-matcher/xml"`) via [`lookup_entry`]. That means an unqualified
+/// key could coincidentally match an entry of the wrong capability shape (a content-generator
+/// registered under the same name as an unrelated content-matcher); `expected_type` guards
+/// against silently dispatching to it, mirroring the explicit `entry_type` check
+/// [`find_content_matcher`]/[`find_content_generator`] already do.
+pub fn resolve_capability(entry_key: &str, expected_type: CatalogueEntryType) -> anyhow::Result<ResolvedCapability> {
+  let entry = lookup_entry(entry_key)
+    .ok_or_else(|| anyhow::anyhow!("No catalogue entry found for key '{}'", entry_key))?;
+  if entry.entry_type != expected_type {
+    return Err(anyhow::anyhow!(
+      "Catalogue entry '{}' is a {:?}, not a {:?}", entry_key, entry.entry_type, expected_type
+    ));
+  }
+  match entry.provider_type {
+    CatalogueEntryProviderType::CORE => Ok(ResolvedCapability::Core(entry.key)),
+    CatalogueEntryProviderType::PLUGIN => entry.plugin
+      .map(|manifest| ResolvedCapability::Plugin(Box::new(manifest)))
+      .ok_or_else(|| anyhow::anyhow!("Catalogue entry '{}' has no plugin manifest", entry_key))
+  }
+}
+
 /// Remove all entries for a plugin given the plugin name
 pub fn remove_plugin_entries(name: &str) {
   trace!("remove_plugin_entries({})", name);

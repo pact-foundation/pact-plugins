@@ -9,7 +9,7 @@ use tonic::{Request, Response, Status};
 use tracing::{error, info, warn};
 
 use crate::call_chain;
-use crate::catalogue_manager::{CatalogueEntryProviderType, CatalogueEntryType};
+use crate::catalogue_manager::{CatalogueEntryType, ResolvedCapability, resolve_capability};
 use crate::grpc_plugin::PluginClient;
 use crate::plugin_log_sink::{PluginLogEntry, PluginLogSource, emit_plugin_log};
 use crate::proto_v2::{
@@ -58,15 +58,16 @@ impl plugin_host_server::PluginHost for PluginHostService {
     let _guard = call_chain::push_call(&chain_id, &entry_key).map_err(Status::already_exists)?;
 
     let v1_request = PluginClient::convert_message(inner_request)?;
-    match resolve_entry(&entry_key, CatalogueEntryType::CONTENT_MATCHER)? {
-      ResolvedEntry::Core(core_key) => {
+    match resolve_capability(&entry_key, CatalogueEntryType::CONTENT_MATCHER)
+      .map_err(|err| Status::not_found(err.to_string()))? {
+      ResolvedCapability::Core(core_key) => {
         let handler = crate::core_capabilities::lookup_core_content_matcher(&core_key)
           .ok_or_else(|| Status::not_found(format!("No core content matcher registered for '{}'", core_key)))?;
         let response = handler.compare_contents(v1_request).await
           .map_err(|err| Status::internal(format!("Core content matcher for '{}' failed: {}", core_key, err)))?;
         Ok(Response::new(PluginClient::convert_message(response)?))
       }
-      ResolvedEntry::Plugin(manifest) => {
+      ResolvedCapability::Plugin(manifest) => {
         let plugin = crate::plugin_manager::lookup_plugin(&manifest.as_dependency())
           .ok_or_else(|| Status::not_found(format!("Plugin '{}' for entry '{}' is not currently running", manifest.name, entry_key)))?;
         let response = plugin.compare_contents_with_chain(v1_request, &chain_id, deadline_ms).await
@@ -94,15 +95,16 @@ impl plugin_host_server::PluginHost for PluginHostService {
     let _guard = call_chain::push_call(&chain_id, &entry_key).map_err(Status::already_exists)?;
 
     let v1_request = PluginClient::convert_message(inner_request)?;
-    match resolve_entry(&entry_key, CatalogueEntryType::CONTENT_GENERATOR)? {
-      ResolvedEntry::Core(core_key) => {
+    match resolve_capability(&entry_key, CatalogueEntryType::CONTENT_GENERATOR)
+      .map_err(|err| Status::not_found(err.to_string()))? {
+      ResolvedCapability::Core(core_key) => {
         let handler = crate::core_capabilities::lookup_core_content_generator(&core_key)
           .ok_or_else(|| Status::not_found(format!("No core content generator registered for '{}'", core_key)))?;
         let response = handler.generate_content(v1_request).await
           .map_err(|err| Status::internal(format!("Core content generator for '{}' failed: {}", core_key, err)))?;
         Ok(Response::new(PluginClient::convert_message(response)?))
       }
-      ResolvedEntry::Plugin(manifest) => {
+      ResolvedCapability::Plugin(manifest) => {
         let plugin = crate::plugin_manager::lookup_plugin(&manifest.as_dependency())
           .ok_or_else(|| Status::not_found(format!("Plugin '{}' for entry '{}' is not currently running", manifest.name, entry_key)))?;
         let response = plugin.generate_content_with_chain(v1_request, &chain_id, deadline_ms).await
@@ -110,42 +112,6 @@ impl plugin_host_server::PluginHost for PluginHostService {
         Ok(Response::new(PluginClient::convert_message(response)?))
       }
     }
-  }
-}
-
-/// Where a resolved catalogue entry's capability should be dispatched.
-enum ResolvedEntry {
-  /// A host-registered core handler, keyed by the unprefixed catalogue entry key.
-  Core(String),
-  /// A running plugin, identified by its manifest.
-  Plugin(Box<crate::plugin_models::PactPluginManifest>),
-}
-
-/// Resolve a callback's catalogue entry key to a dispatch target, the same way
-/// [`crate::content::ContentMatcher::is_core`]/[`crate::content::ContentGenerator::is_core`]
-/// do for the driver's own outbound calls. See proposal 007 ("One resolver, two call
-/// directions").
-///
-/// `entry_key` is matched by suffix against the full catalogue key (e.g. a plugin passing
-/// `"xml"` matches `"core/content-matcher/xml"`), the same lookup used for plugin-provided
-/// entries today - see [`crate::catalogue_manager::lookup_entry`]. That means an unqualified key
-/// could coincidentally match an entry of the wrong capability shape (a content-generator
-/// registered under the same name as an unrelated content-matcher); `expected_type` guards
-/// against silently dispatching to it, mirroring the explicit `entry_type` check
-/// [`crate::catalogue_manager::find_content_matcher`]/`find_content_generator` already do.
-fn resolve_entry(entry_key: &str, expected_type: CatalogueEntryType) -> Result<ResolvedEntry, Status> {
-  let entry = crate::catalogue_manager::lookup_entry(entry_key)
-    .ok_or_else(|| Status::not_found(format!("No catalogue entry found for key '{}'", entry_key)))?;
-  if entry.entry_type != expected_type {
-    return Err(Status::not_found(format!(
-      "Catalogue entry '{}' is a {:?}, not a {:?}", entry_key, entry.entry_type, expected_type
-    )));
-  }
-  match entry.provider_type {
-    CatalogueEntryProviderType::CORE => Ok(ResolvedEntry::Core(entry.key)),
-    CatalogueEntryProviderType::PLUGIN => entry.plugin
-      .map(|manifest| ResolvedEntry::Plugin(Box::new(manifest)))
-      .ok_or_else(|| Status::internal(format!("Catalogue entry '{}' has no plugin manifest", entry_key))),
   }
 }
 
