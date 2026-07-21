@@ -10,7 +10,7 @@ edition = "2018"
 resolver = "2"
 
 [dev-dependencies]
-pact-plugin-driver = { version = "~1.0.0", path = "../driver" }
+pact-plugin-driver = { version = "~1.1.0", path = "../driver" }
 pact_ffi = "~0.5.4"
 # libc 0.2.187 dropped the Windows link_name aliases for localtime_s/time/gmtime_s/ctime/difftime
 # (see rust-lang/libc src/windows/mod.rs), breaking the Windows link of anything using them via

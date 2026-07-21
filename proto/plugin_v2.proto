@@ -318,12 +318,6 @@ message MockServerDetails {
   string address = 3;
 }
 
-// Request to shut down a running mock server (deprecated in V2; use MockServerRequest)
-message ShutdownMockServerRequest {
-  // The server ID to shutdown
-  string serverKey = 1;
-}
-
 // Request for a running mock server by ID
 message MockServerRequest {
   // The server ID to shutdown
@@ -338,14 +332,6 @@ message MockServerResult {
   string error = 2;
   // Any mismatches that occurred
   repeated ContentMismatch mismatches = 3;
-}
-
-// Response to the shut down mock server request (deprecated in V2; use MockServerResults)
-message ShutdownMockServerResponse {
-  // If the mock status is all ok
-  bool ok = 1;
-  // The results of the test run, will contain an entry for each request received by the mock server
-  repeated MockServerResult results = 2;
 }
 
 // Matching results of the mock server.

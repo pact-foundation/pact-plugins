@@ -606,13 +606,6 @@ pub struct MockServerDetails {
     #[prost(string, tag = "3")]
     pub address: ::prost::alloc::string::String,
 }
-/// Request to shut down a running mock server (deprecated in V2; use MockServerRequest)
-#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
-pub struct ShutdownMockServerRequest {
-    /// The server ID to shutdown
-    #[prost(string, tag = "1")]
-    pub server_key: ::prost::alloc::string::String,
-}
 /// Request for a running mock server by ID
 #[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
 pub struct MockServerRequest {
@@ -632,16 +625,6 @@ pub struct MockServerResult {
     /// Any mismatches that occurred
     #[prost(message, repeated, tag = "3")]
     pub mismatches: ::prost::alloc::vec::Vec<ContentMismatch>,
-}
-/// Response to the shut down mock server request (deprecated in V2; use MockServerResults)
-#[derive(Clone, PartialEq, ::prost::Message)]
-pub struct ShutdownMockServerResponse {
-    /// If the mock status is all ok
-    #[prost(bool, tag = "1")]
-    pub ok: bool,
-    /// The results of the test run, will contain an entry for each request received by the mock server
-    #[prost(message, repeated, tag = "2")]
-    pub results: ::prost::alloc::vec::Vec<MockServerResult>,
 }
 /// Matching results of the mock server.
 #[derive(Clone, PartialEq, ::prost::Message)]
@@ -843,8 +826,8 @@ pub mod plugin_host_client {
         /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
-            D: TryInto<tonic::transport::Endpoint>,
-            D::Error: Into<StdError>,
+          D: TryInto<tonic::transport::Endpoint>,
+          D::Error: Into<StdError>,
         {
             let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
             Ok(Self::new(conn))
@@ -852,10 +835,10 @@ pub mod plugin_host_client {
     }
     impl<T> PluginHostClient<T>
     where
-        T: tonic::client::GrpcService<tonic::body::Body>,
-        T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
-        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
+      T: tonic::client::GrpcService<tonic::body::Body>,
+      T::Error: Into<StdError>,
+      T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
+      <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
     {
         pub fn new(inner: T) -> Self {
             let inner = tonic::client::Grpc::new(inner);
@@ -870,17 +853,17 @@ pub mod plugin_host_client {
             interceptor: F,
         ) -> PluginHostClient<InterceptedService<T, F>>
         where
-            F: tonic::service::Interceptor,
-            T::ResponseBody: Default,
-            T: tonic::codegen::Service<
-                http::Request<tonic::body::Body>,
-                Response = http::Response<
-                    <T as tonic::client::GrpcService<tonic::body::Body>>::ResponseBody,
-                >,
-            >,
-            <T as tonic::codegen::Service<
-                http::Request<tonic::body::Body>,
-            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
+          F: tonic::service::Interceptor,
+          T::ResponseBody: Default,
+          T: tonic::codegen::Service<
+              http::Request<tonic::body::Body>,
+              Response = http::Response<
+                  <T as tonic::client::GrpcService<tonic::body::Body>>::ResponseBody,
+              >,
+          >,
+          <T as tonic::codegen::Service<
+              http::Request<tonic::body::Body>,
+          >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
         {
             PluginHostClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -921,20 +904,20 @@ pub mod plugin_host_client {
             request: impl tonic::IntoRequest<super::LogMessage>,
         ) -> std::result::Result<tonic::Response<()>, tonic::Status> {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PluginHost/Log",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(GrpcMethod::new("io.pact.plugin.v2.PluginHost", "Log"));
+              .insert(GrpcMethod::new("io.pact.plugin.v2.PluginHost", "Log"));
             self.inner.unary(req, path, codec).await
         }
         /// Invoke a content matcher capability by catalogue entry key. The driver resolves the key to
@@ -947,22 +930,22 @@ pub mod plugin_host_client {
             tonic::Status,
         > {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PluginHost/CompareContents",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("io.pact.plugin.v2.PluginHost", "CompareContents"),
-                );
+              .insert(
+                  GrpcMethod::new("io.pact.plugin.v2.PluginHost", "CompareContents"),
+              );
             self.inner.unary(req, path, codec).await
         }
         /// Invoke a content generator capability by catalogue entry key. The driver resolves the key to
@@ -975,22 +958,22 @@ pub mod plugin_host_client {
             tonic::Status,
         > {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PluginHost/GenerateContent",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("io.pact.plugin.v2.PluginHost", "GenerateContent"),
-                );
+              .insert(
+                  GrpcMethod::new("io.pact.plugin.v2.PluginHost", "GenerateContent"),
+              );
             self.inner.unary(req, path, codec).await
         }
     }
@@ -1059,7 +1042,7 @@ pub mod plugin_host_server {
             interceptor: F,
         ) -> InterceptedService<Self, F>
         where
-            F: tonic::service::Interceptor,
+          F: tonic::service::Interceptor,
         {
             InterceptedService::new(Self::new(inner), interceptor)
         }
@@ -1094,9 +1077,9 @@ pub mod plugin_host_server {
     }
     impl<T, B> tonic::codegen::Service<http::Request<B>> for PluginHostServer<T>
     where
-        T: PluginHost,
-        B: Body + std::marker::Send + 'static,
-        B::Error: Into<StdError> + std::marker::Send + 'static,
+      T: PluginHost,
+      B: Body + std::marker::Send + 'static,
+      B::Error: Into<StdError> + std::marker::Send + 'static,
     {
         type Response = http::Response<tonic::body::Body>;
         type Error = std::convert::Infallible;
@@ -1139,14 +1122,14 @@ pub mod plugin_host_server {
                         let method = LogSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1184,14 +1167,14 @@ pub mod plugin_host_server {
                         let method = CompareContentsSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1229,14 +1212,14 @@ pub mod plugin_host_server {
                         let method = GenerateContentSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1249,15 +1232,15 @@ pub mod plugin_host_server {
                         );
                         let headers = response.headers_mut();
                         headers
-                            .insert(
-                                tonic::Status::GRPC_STATUS,
-                                (tonic::Code::Unimplemented as i32).into(),
-                            );
+                          .insert(
+                              tonic::Status::GRPC_STATUS,
+                              (tonic::Code::Unimplemented as i32).into(),
+                          );
                         headers
-                            .insert(
-                                http::header::CONTENT_TYPE,
-                                tonic::metadata::GRPC_CONTENT_TYPE,
-                            );
+                          .insert(
+                              http::header::CONTENT_TYPE,
+                              tonic::metadata::GRPC_CONTENT_TYPE,
+                          );
                         Ok(response)
                     })
                 }
@@ -1301,8 +1284,8 @@ pub mod pact_plugin_client {
         /// Attempt to create a new client by connecting to a given endpoint.
         pub async fn connect<D>(dst: D) -> Result<Self, tonic::transport::Error>
         where
-            D: TryInto<tonic::transport::Endpoint>,
-            D::Error: Into<StdError>,
+          D: TryInto<tonic::transport::Endpoint>,
+          D::Error: Into<StdError>,
         {
             let conn = tonic::transport::Endpoint::new(dst)?.connect().await?;
             Ok(Self::new(conn))
@@ -1310,10 +1293,10 @@ pub mod pact_plugin_client {
     }
     impl<T> PactPluginClient<T>
     where
-        T: tonic::client::GrpcService<tonic::body::Body>,
-        T::Error: Into<StdError>,
-        T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
-        <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
+      T: tonic::client::GrpcService<tonic::body::Body>,
+      T::Error: Into<StdError>,
+      T::ResponseBody: Body<Data = Bytes> + std::marker::Send + 'static,
+      <T::ResponseBody as Body>::Error: Into<StdError> + std::marker::Send,
     {
         pub fn new(inner: T) -> Self {
             let inner = tonic::client::Grpc::new(inner);
@@ -1328,17 +1311,17 @@ pub mod pact_plugin_client {
             interceptor: F,
         ) -> PactPluginClient<InterceptedService<T, F>>
         where
-            F: tonic::service::Interceptor,
-            T::ResponseBody: Default,
-            T: tonic::codegen::Service<
-                http::Request<tonic::body::Body>,
-                Response = http::Response<
-                    <T as tonic::client::GrpcService<tonic::body::Body>>::ResponseBody,
-                >,
-            >,
-            <T as tonic::codegen::Service<
-                http::Request<tonic::body::Body>,
-            >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
+          F: tonic::service::Interceptor,
+          T::ResponseBody: Default,
+          T: tonic::codegen::Service<
+              http::Request<tonic::body::Body>,
+              Response = http::Response<
+                  <T as tonic::client::GrpcService<tonic::body::Body>>::ResponseBody,
+              >,
+          >,
+          <T as tonic::codegen::Service<
+              http::Request<tonic::body::Body>,
+          >>::Error: Into<StdError> + std::marker::Send + std::marker::Sync,
         {
             PactPluginClient::new(InterceptedService::new(inner, interceptor))
         }
@@ -1382,20 +1365,20 @@ pub mod pact_plugin_client {
             tonic::Status,
         > {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PactPlugin/InitPlugin",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "InitPlugin"));
+              .insert(GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "InitPlugin"));
             self.inner.unary(req, path, codec).await
         }
         /// Updated catalogue. This will be sent when the core catalogue has been updated (probably by a plugin loading).
@@ -1404,22 +1387,22 @@ pub mod pact_plugin_client {
             request: impl tonic::IntoRequest<super::Catalogue>,
         ) -> std::result::Result<tonic::Response<()>, tonic::Status> {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PactPlugin/UpdateCatalogue",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "UpdateCatalogue"),
-                );
+              .insert(
+                  GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "UpdateCatalogue"),
+              );
             self.inner.unary(req, path, codec).await
         }
         /// Request to perform a comparison of some contents (matching request)
@@ -1431,22 +1414,22 @@ pub mod pact_plugin_client {
             tonic::Status,
         > {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PactPlugin/CompareContents",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "CompareContents"),
-                );
+              .insert(
+                  GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "CompareContents"),
+              );
             self.inner.unary(req, path, codec).await
         }
         /// Request to configure/setup the interaction for later verification. Data returned will be persisted in the pact file.
@@ -1458,25 +1441,25 @@ pub mod pact_plugin_client {
             tonic::Status,
         > {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PactPlugin/ConfigureInteraction",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "io.pact.plugin.v2.PactPlugin",
-                        "ConfigureInteraction",
-                    ),
-                );
+              .insert(
+                  GrpcMethod::new(
+                      "io.pact.plugin.v2.PactPlugin",
+                      "ConfigureInteraction",
+                  ),
+              );
             self.inner.unary(req, path, codec).await
         }
         /// Request to generate the content using any defined generators
@@ -1488,22 +1471,22 @@ pub mod pact_plugin_client {
             tonic::Status,
         > {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PactPlugin/GenerateContent",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "GenerateContent"),
-                );
+              .insert(
+                  GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "GenerateContent"),
+              );
             self.inner.unary(req, path, codec).await
         }
         /// Start a mock server
@@ -1515,22 +1498,22 @@ pub mod pact_plugin_client {
             tonic::Status,
         > {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PactPlugin/StartMockServer",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "StartMockServer"),
-                );
+              .insert(
+                  GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "StartMockServer"),
+              );
             self.inner.unary(req, path, codec).await
         }
         /// Shutdown a running mock server
@@ -1542,22 +1525,22 @@ pub mod pact_plugin_client {
             tonic::Status,
         > {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PactPlugin/ShutdownMockServer",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "ShutdownMockServer"),
-                );
+              .insert(
+                  GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "ShutdownMockServer"),
+              );
             self.inner.unary(req, path, codec).await
         }
         /// Get the matching results from a running mock server
@@ -1569,25 +1552,25 @@ pub mod pact_plugin_client {
             tonic::Status,
         > {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PactPlugin/GetMockServerResults",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "io.pact.plugin.v2.PactPlugin",
-                        "GetMockServerResults",
-                    ),
-                );
+              .insert(
+                  GrpcMethod::new(
+                      "io.pact.plugin.v2.PactPlugin",
+                      "GetMockServerResults",
+                  ),
+              );
             self.inner.unary(req, path, codec).await
         }
         /// Prepare an interaction for verification. This should return any data required to construct any request
@@ -1600,25 +1583,25 @@ pub mod pact_plugin_client {
             tonic::Status,
         > {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PactPlugin/PrepareInteractionForVerification",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new(
-                        "io.pact.plugin.v2.PactPlugin",
-                        "PrepareInteractionForVerification",
-                    ),
-                );
+              .insert(
+                  GrpcMethod::new(
+                      "io.pact.plugin.v2.PactPlugin",
+                      "PrepareInteractionForVerification",
+                  ),
+              );
             self.inner.unary(req, path, codec).await
         }
         /// Execute the verification for the interaction.
@@ -1630,22 +1613,22 @@ pub mod pact_plugin_client {
             tonic::Status,
         > {
             self.inner
-                .ready()
-                .await
-                .map_err(|e| {
-                    tonic::Status::unknown(
-                        format!("Service was not ready: {}", e.into()),
-                    )
-                })?;
+              .ready()
+              .await
+              .map_err(|e| {
+                  tonic::Status::unknown(
+                      format!("Service was not ready: {}", e.into()),
+                  )
+              })?;
             let codec = tonic_prost::ProstCodec::default();
             let path = http::uri::PathAndQuery::from_static(
                 "/io.pact.plugin.v2.PactPlugin/VerifyInteraction",
             );
             let mut req = request.into_request();
             req.extensions_mut()
-                .insert(
-                    GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "VerifyInteraction"),
-                );
+              .insert(
+                  GrpcMethod::new("io.pact.plugin.v2.PactPlugin", "VerifyInteraction"),
+              );
             self.inner.unary(req, path, codec).await
         }
     }
@@ -1768,7 +1751,7 @@ pub mod pact_plugin_server {
             interceptor: F,
         ) -> InterceptedService<Self, F>
         where
-            F: tonic::service::Interceptor,
+          F: tonic::service::Interceptor,
         {
             InterceptedService::new(Self::new(inner), interceptor)
         }
@@ -1803,9 +1786,9 @@ pub mod pact_plugin_server {
     }
     impl<T, B> tonic::codegen::Service<http::Request<B>> for PactPluginServer<T>
     where
-        T: PactPlugin,
-        B: Body + std::marker::Send + 'static,
-        B::Error: Into<StdError> + std::marker::Send + 'static,
+      T: PactPlugin,
+      B: Body + std::marker::Send + 'static,
+      B::Error: Into<StdError> + std::marker::Send + 'static,
     {
         type Response = http::Response<tonic::body::Body>;
         type Error = std::convert::Infallible;
@@ -1850,14 +1833,14 @@ pub mod pact_plugin_server {
                         let method = InitPluginSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1893,14 +1876,14 @@ pub mod pact_plugin_server {
                         let method = UpdateCatalogueSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1938,14 +1921,14 @@ pub mod pact_plugin_server {
                         let method = CompareContentsSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -1970,7 +1953,7 @@ pub mod pact_plugin_server {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as PactPlugin>::configure_interaction(&inner, request)
-                                    .await
+                                  .await
                             };
                             Box::pin(fut)
                         }
@@ -1984,14 +1967,14 @@ pub mod pact_plugin_server {
                         let method = ConfigureInteractionSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -2029,14 +2012,14 @@ pub mod pact_plugin_server {
                         let method = GenerateContentSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -2074,14 +2057,14 @@ pub mod pact_plugin_server {
                         let method = StartMockServerSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -2106,7 +2089,7 @@ pub mod pact_plugin_server {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as PactPlugin>::shutdown_mock_server(&inner, request)
-                                    .await
+                                  .await
                             };
                             Box::pin(fut)
                         }
@@ -2120,14 +2103,14 @@ pub mod pact_plugin_server {
                         let method = ShutdownMockServerSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -2152,7 +2135,7 @@ pub mod pact_plugin_server {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as PactPlugin>::get_mock_server_results(&inner, request)
-                                    .await
+                                  .await
                             };
                             Box::pin(fut)
                         }
@@ -2166,14 +2149,14 @@ pub mod pact_plugin_server {
                         let method = GetMockServerResultsSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -2202,10 +2185,10 @@ pub mod pact_plugin_server {
                             let inner = Arc::clone(&self.0);
                             let fut = async move {
                                 <T as PactPlugin>::prepare_interaction_for_verification(
-                                        &inner,
-                                        request,
-                                    )
-                                    .await
+                                    &inner,
+                                    request,
+                                )
+                                  .await
                             };
                             Box::pin(fut)
                         }
@@ -2219,14 +2202,14 @@ pub mod pact_plugin_server {
                         let method = PrepareInteractionForVerificationSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -2264,14 +2247,14 @@ pub mod pact_plugin_server {
                         let method = VerifyInteractionSvc(inner);
                         let codec = tonic_prost::ProstCodec::default();
                         let mut grpc = tonic::server::Grpc::new(codec)
-                            .apply_compression_config(
-                                accept_compression_encodings,
-                                send_compression_encodings,
-                            )
-                            .apply_max_message_size_config(
-                                max_decoding_message_size,
-                                max_encoding_message_size,
-                            );
+                          .apply_compression_config(
+                              accept_compression_encodings,
+                              send_compression_encodings,
+                          )
+                          .apply_max_message_size_config(
+                              max_decoding_message_size,
+                              max_encoding_message_size,
+                          );
                         let res = grpc.unary(method, req).await;
                         Ok(res)
                     };
@@ -2284,15 +2267,15 @@ pub mod pact_plugin_server {
                         );
                         let headers = response.headers_mut();
                         headers
-                            .insert(
-                                tonic::Status::GRPC_STATUS,
-                                (tonic::Code::Unimplemented as i32).into(),
-                            );
+                          .insert(
+                              tonic::Status::GRPC_STATUS,
+                              (tonic::Code::Unimplemented as i32).into(),
+                          );
                         headers
-                            .insert(
-                                http::header::CONTENT_TYPE,
-                                tonic::metadata::GRPC_CONTENT_TYPE,
-                            );
+                          .insert(
+                              http::header::CONTENT_TYPE,
+                              tonic::metadata::GRPC_CONTENT_TYPE,
+                          );
                         Ok(response)
                     })
                 }

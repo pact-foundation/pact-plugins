@@ -13,10 +13,7 @@ expectest = "0.12.0"
 env_logger = "0.11.3"
 pact_models = "1.3.11"
 pact_consumer = "~1.4.4"
-# Pulled in transitively via pact_consumer's optional "plugins" feature with
-# default-features = false; add it explicitly here to turn its "lua" feature on
-# (Cargo unifies features across the single resolved instance of the crate).
-pact-plugin-driver = { version = "~1.0.0-beta.5", default-features = false, features = ["lua"] }
+pact-plugin-driver = { version = "~1.0.0", default-features = false, features = ["lua"] }
 serde = { version = "1.0.203", features = ["derive"] }
 serde_json = "1.0.120"
 jsonwebtoken = "9.3.0"

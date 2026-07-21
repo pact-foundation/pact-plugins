@@ -73,7 +73,7 @@ checkout of [pact-reference](https://github.com/pact-foundation/pact-reference):
 2. `pact_verifier`'s own dependency on `pact-plugin-driver` is `default-features = false` and doesn't request the
    `lua` feature, so add an explicit dependency in `rust/pact_verifier_cli/Cargo.toml` to turn it on:
    ```toml
-   pact-plugin-driver = { version = "~1.0.0-beta.5", default-features = false, features = ["lua"] }
+   pact-plugin-driver = { version = "~1.1.0", default-features = false, features = ["lua"] }
    ```
 3. Build it:
    ```console
