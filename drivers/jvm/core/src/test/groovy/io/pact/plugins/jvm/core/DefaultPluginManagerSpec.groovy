@@ -295,7 +295,7 @@ class DefaultPluginManagerSpec extends Specification {
     def response = Plugin.CompareContentsResponse.newBuilder().build()
     def mockClient = Mockito.mock(PactPluginRpcClient)
     ArgumentCaptor<Plugin.CompareContentsRequest> argument = ArgumentCaptor.forClass(Plugin.CompareContentsRequest)
-    doReturn(response).when(mockClient).compareContents(argument.capture())
+    doReturn(response).when(mockClient).compareContentsWithChain(argument.capture(), Mockito.anyString(), Mockito.anyLong())
 
     when:
     manager.invokeContentMatcher(matcher, expected, actual, false, [:], [:])

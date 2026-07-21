@@ -475,7 +475,11 @@ object DefaultPluginManager: PluginManager {
     }
   }
 
-  private fun lookupPlugin(name: String, version: String?): PactPlugin? {
+  /**
+   * Look up a currently-running plugin instance by name. Used by [PluginHostServer] to forward a
+   * plugin's callback to another plugin's capability (see [CallChain]).
+   */
+  internal fun lookupPlugin(name: String, version: String?): PactPlugin? {
     return if (version == null) {
       PLUGIN_REGISTER.filter { it.value.manifest.name == name }.entries.maxByOrNull { it.value.manifest.version }?.value
     } else {
@@ -543,7 +547,9 @@ object DefaultPluginManager: PluginManager {
         } else {
           val plugin = lookupPlugin(matcher.pluginName, null) ?:
             throw PactPluginNotFoundException(matcher.pluginName, null)
-          plugin.withRpcClient { client -> client.compareContents(request) }
+          val chainId = CallChain.newCallChainId()
+          val deadlineMs = CallChain.defaultDeadlineMs()
+          plugin.withRpcClient { client -> client.compareContentsWithChain(request, chainId, deadlineMs) }
         }
       }
       else -> throw RuntimeException("Mis-configured content type matcher $matcher")
@@ -749,7 +755,9 @@ object DefaultPluginManager: PluginManager {
       val plugin = lookupPlugin(contentGenerator.catalogueEntry.pluginName, null) ?:
         throw PactPluginNotFoundException(contentGenerator.catalogueEntry.pluginName, null)
       logger.debug { "Sending generateContent request to plugin ${plugin.manifest}" }
-      plugin.withRpcClient { client -> client.generateContent(request.build()) }
+      val chainId = CallChain.newCallChainId()
+      val deadlineMs = CallChain.defaultDeadlineMs()
+      plugin.withRpcClient { client -> client.generateContentWithChain(request.build(), chainId, deadlineMs) }
     }
     logger.debug { "Got response: $response" }
     val returnedContentType = ContentType(response.contents.contentType)
