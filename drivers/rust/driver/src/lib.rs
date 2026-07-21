@@ -14,6 +14,7 @@
 /// ```
 pub const TRANSPORT_FILTER_DIRECTIVES: &str = "h2=warn,hyper=warn,hyper_util=warn,tonic=warn,tower=warn";
 
+pub mod call_chain;
 pub mod catalogue_manager;
 mod child_process;
 pub mod core_capabilities;

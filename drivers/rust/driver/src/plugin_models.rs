@@ -191,6 +191,22 @@ pub trait PluginInstance: std::fmt::Debug + Send + Sync {
     request: CompareContentsRequest,
   ) -> anyhow::Result<CompareContentsResponse>;
 
+  /// Send a compare contents request to the plugin process, propagating call-chain cycle
+  /// detection and deadline metadata (see [`crate::call_chain`]) for transports that support it.
+  /// The default implementation ignores `chain_id`/`deadline_ms` and delegates to
+  /// [`PluginInstance::compare_contents`], which suits in-process runtimes (Lua, WASM) where a
+  /// cycle is already caught by the native call stack; [`crate::grpc_plugin::GrpcPactPlugin`]
+  /// overrides this to send the metadata over gRPC.
+  async fn compare_contents_with_chain(
+    &self,
+    request: CompareContentsRequest,
+    chain_id: &str,
+    deadline_ms: u64,
+  ) -> anyhow::Result<CompareContentsResponse> {
+    let _ = (chain_id, deadline_ms);
+    self.compare_contents(request).await
+  }
+
   /// Send a configure contents request to the plugin process
   async fn configure_interaction(
     &self,
@@ -202,6 +218,19 @@ pub trait PluginInstance: std::fmt::Debug + Send + Sync {
     &self,
     request: GenerateContentRequest,
   ) -> anyhow::Result<GenerateContentResponse>;
+
+  /// Send a generate content request to the plugin, propagating call-chain cycle detection and
+  /// deadline metadata (see [`crate::call_chain`]) for transports that support it. See
+  /// [`PluginInstance::compare_contents_with_chain`] for the default/override split.
+  async fn generate_content_with_chain(
+    &self,
+    request: GenerateContentRequest,
+    chain_id: &str,
+    deadline_ms: u64,
+  ) -> anyhow::Result<GenerateContentResponse> {
+    let _ = (chain_id, deadline_ms);
+    self.generate_content(request).await
+  }
 
   /// Start a mock server
   async fn start_mock_server(

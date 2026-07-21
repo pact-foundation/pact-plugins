@@ -121,6 +121,59 @@ impl PluginClient {
     }
   }
 
+  async fn compare_contents_with_metadata(
+    &mut self,
+    request: CompareContentsRequest,
+    chain_id: &str,
+    deadline_ms: u64,
+  ) -> Result<CompareContentsResponse, Status> {
+    match self {
+      PluginClient::V1(client) => {
+        let mut req = Request::new(request);
+        insert_chain_metadata(&mut req, chain_id, deadline_ms)?;
+        client.compare_contents(req).await.map(|response| response.into_inner())
+      }
+      PluginClient::V2(client) => {
+        let mut v2_req = Self::convert_message::<_, proto_v2::CompareContentsRequest>(request)?;
+        if let Some(id) = crate::test_context::current_test_run_id() {
+          let ctx = v2_req.test_context.get_or_insert_with(prost_types::Struct::default);
+          ctx.fields.entry("testRunId".to_string()).or_insert_with(|| prost_types::Value {
+            kind: Some(prost_types::value::Kind::StringValue(id)),
+          });
+        }
+        let mut req = Request::new(v2_req);
+        insert_chain_metadata(&mut req, chain_id, deadline_ms)?;
+        client
+          .compare_contents(req)
+          .await
+          .and_then(|response| Self::convert_message(response.into_inner()))
+      }
+    }
+  }
+
+  async fn generate_content_with_metadata(
+    &mut self,
+    request: GenerateContentRequest,
+    chain_id: &str,
+    deadline_ms: u64,
+  ) -> Result<GenerateContentResponse, Status> {
+    match self {
+      PluginClient::V1(client) => {
+        let mut req = Request::new(request);
+        insert_chain_metadata(&mut req, chain_id, deadline_ms)?;
+        client.generate_content(req).await.map(|response| response.into_inner())
+      }
+      PluginClient::V2(client) => {
+        let mut req = Request::new(Self::convert_message::<_, proto_v2::GenerateContentRequest>(request)?);
+        insert_chain_metadata(&mut req, chain_id, deadline_ms)?;
+        client
+          .generate_content(req)
+          .await
+          .and_then(|response| Self::convert_message(response.into_inner()))
+      }
+    }
+  }
+
   async fn configure_interaction(
     &mut self,
     request: ConfigureInteractionRequest,
@@ -318,6 +371,20 @@ impl PluginClient {
   }
 }
 
+/// Attach call-chain cycle detection and deadline metadata to an outbound request to a plugin,
+/// and bound the request's own gRPC timeout to the remaining deadline budget. See
+/// [`crate::call_chain`].
+fn insert_chain_metadata<T>(request: &mut Request<T>, chain_id: &str, deadline_ms: u64) -> Result<(), Status> {
+  let chain_value = MetadataValue::try_from(chain_id)
+    .map_err(|err| Status::internal(format!("Invalid call chain id '{}': {}", chain_id, err)))?;
+  let deadline_value = MetadataValue::try_from(deadline_ms.to_string())
+    .map_err(|err| Status::internal(format!("Invalid deadline value '{}': {}", deadline_ms, err)))?;
+  request.metadata_mut().insert(crate::call_chain::CALL_CHAIN_ID_METADATA_KEY, chain_value);
+  request.metadata_mut().insert(crate::call_chain::DEADLINE_METADATA_KEY, deadline_value);
+  request.set_timeout(crate::call_chain::remaining(deadline_ms));
+  Ok(())
+}
+
 /// Interceptor to inject the server key as an authorisation header
 #[derive(Clone, Debug)]
 pub(crate) struct PactPluginInterceptor {
@@ -426,6 +493,19 @@ impl PluginInstance for GrpcPactPlugin {
     client.compare_contents(request).await.map_err(anyhow::Error::from)
   }
 
+  async fn compare_contents_with_chain(
+    &self,
+    request: CompareContentsRequest,
+    chain_id: &str,
+    deadline_ms: u64,
+  ) -> anyhow::Result<CompareContentsResponse> {
+    let mut client = self.get_plugin_client().await?;
+    client
+      .compare_contents_with_metadata(request, chain_id, deadline_ms)
+      .await
+      .map_err(anyhow::Error::from)
+  }
+
   async fn configure_interaction(
     &self,
     request: ConfigureInteractionRequest,
@@ -440,6 +520,19 @@ impl PluginInstance for GrpcPactPlugin {
   ) -> anyhow::Result<GenerateContentResponse> {
     let mut client = self.get_plugin_client().await?;
     client.generate_content(request).await.map_err(anyhow::Error::from)
+  }
+
+  async fn generate_content_with_chain(
+    &self,
+    request: GenerateContentRequest,
+    chain_id: &str,
+    deadline_ms: u64,
+  ) -> anyhow::Result<GenerateContentResponse> {
+    let mut client = self.get_plugin_client().await?;
+    client
+      .generate_content_with_metadata(request, chain_id, deadline_ms)
+      .await
+      .map_err(anyhow::Error::from)
   }
 
   async fn start_mock_server(

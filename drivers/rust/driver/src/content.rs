@@ -411,7 +411,13 @@ impl ContentMatcher {
     let plugin_manifest = self.catalogue_entry.plugin.as_ref()
       .expect("Plugin type is required");
     match lookup_plugin(&plugin_manifest.as_dependency()) {
-      Some(plugin) => Self::process_compare_contents_response(plugin.compare_contents(request).await),
+      Some(plugin) => {
+        let chain_id = crate::call_chain::new_call_chain_id();
+        let deadline_ms = crate::call_chain::default_deadline_ms();
+        Self::process_compare_contents_response(
+          plugin.compare_contents_with_chain(request, &chain_id, deadline_ms).await
+        )
+      }
       None => {
         error!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry);
         Err(hashmap! {
@@ -588,7 +594,9 @@ impl ContentGenerator {
     match lookup_plugin(&plugin_manifest.as_dependency()) {
       Some(plugin) => {
         debug!("Sending generateContent request to plugin {:?}", plugin_manifest);
-        Self::response_to_body(plugin.generate_content(request).await?.contents)
+        let chain_id = crate::call_chain::new_call_chain_id();
+        let deadline_ms = crate::call_chain::default_deadline_ms();
+        Self::response_to_body(plugin.generate_content_with_chain(request, &chain_id, deadline_ms).await?.contents)
       },
       None => {
         error!("Plugin for {:?} was not found in the plugin register", self.catalogue_entry);
