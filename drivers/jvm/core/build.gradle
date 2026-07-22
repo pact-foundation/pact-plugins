@@ -27,7 +27,11 @@ dependencies {
     implementation 'io.grpc:grpc-netty:1.72.0'
     implementation 'io.grpc:grpc-protobuf:1.72.0'
     implementation 'io.grpc:grpc-stub:1.72.0'
-    implementation "com.google.protobuf:protobuf-java:${protobufJavaVersion}"
+    // api, not implementation: the generated Plugin.* message classes (GeneratedMessage/MessageOrBuilder
+    // supertypes) are part of this module's public API surface - CoreContentMatcher/CoreContentGenerator
+    // and ContentMatcher/PactPlugin all expose them - so a host implementing those interfaces needs
+    // protobuf-java on its own compile classpath, not just this module's.
+    api "com.google.protobuf:protobuf-java:${protobufJavaVersion}"
     implementation 'io.hotmoka:toml4j:0.7.3'
     implementation 'org.apache.commons:commons-lang3:3.17.0'
     implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.5'
