@@ -24,11 +24,16 @@ class LuaPluginRpcClient(private val engine: LuaEngine) : PactPluginRpcClient {
     val entries = items.map { item ->
       @Suppress("UNCHECKED_CAST")
       val map = item as Map<String, Any?>
-      val entryType = Plugin.CatalogueEntry.EntryType.valueOf(map["entryType"] as String)
+      val entryTypeName = map["entryType"] as String
+      // Not Plugin.CatalogueEntry.EntryType.valueOf: that is the V1 enum, which throws on an entry
+      // type only the V2 interface has (GENERATOR), even though the message field itself carries
+      // the value fine.
+      val entryType = CatalogueEntryType.fromEntryName(entryTypeName)
+        ?: throw IllegalArgumentException("Unknown catalogue entry type '$entryTypeName'")
       @Suppress("UNCHECKED_CAST")
       val values = (map["values"] as? Map<String, Any?>)?.mapValues { it.value.toString() } ?: emptyMap()
       Plugin.CatalogueEntry.newBuilder()
-        .setType(entryType)
+        .setTypeValue(entryType.toEntryValue())
         .setKey(map["key"] as String)
         .putAllValues(values)
         .build()
@@ -38,8 +43,15 @@ class LuaPluginRpcClient(private val engine: LuaEngine) : PactPluginRpcClient {
 
   override fun updateCatalogue(request: Plugin.Catalogue) {
     if (!engine.hasFunction("update_catalogue")) return
-    val entries = request.catalogueList.map { entry ->
-      mapOf("entryType" to entry.type.name, "key" to entry.key, "values" to entry.valuesMap)
+    // An entry type this driver doesn't understand is skipped rather than passed to the script as
+    // some other type it isn't - see CatalogueManager.registerPluginEntries.
+    val entries = request.catalogueList.mapNotNull { entry ->
+      val entryType = CatalogueEntryType.fromEntryValue(entry.typeValue)
+      if (entryType == null) {
+        null
+      } else {
+        mapOf("entryType" to entryType.toEntryName(), "key" to entry.key, "values" to entry.valuesMap)
+      }
     }
     engine.callFunction("update_catalogue", listOf(entries))
   }

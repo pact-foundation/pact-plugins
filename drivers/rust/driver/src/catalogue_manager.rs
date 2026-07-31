@@ -10,12 +10,13 @@ use maplit::hashset;
 use pact_models::content_types::ContentType;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, instrument, trace};
+use tracing::{debug, error, instrument, trace, warn};
 
 use crate::content::{ContentGenerator, ContentMatcher};
 use crate::plugin_models::PactPluginManifest;
 use crate::proto::catalogue_entry::EntryType;
 use crate::proto::CatalogueEntry as ProtoCatalogueEntry;
+use crate::proto_v2::catalogue_entry::EntryType as EntryTypeV2;
 
 lazy_static! {
   static ref CATALOGUE_REGISTER: Mutex<HashMap<String, CatalogueEntry>> = Mutex::new(HashMap::new());
@@ -31,22 +32,87 @@ pub enum CatalogueEntryType {
   CONTENT_GENERATOR,
   /// Network transport
   TRANSPORT,
-  /// Matching rule
+  /// Matching rule for a content field/value
   MATCHER,
-  /// Generator
-  INTERACTION
+  /// Type of interaction
+  INTERACTION,
+  /// Generator for a content field/value. Only representable on the V2 plugin interface - the V1
+  /// `EntryType` enum has no equivalent. See proposal 006 (Field-level matchers and generators).
+  GENERATOR
 }
 
 impl CatalogueEntryType {
-  /// Return the protobuf type for this entry type
+  /// Return the protobuf type for this entry type.
+  ///
+  /// This maps to the *V1* enum, which cannot represent every entry type: `GENERATOR` has no V1
+  /// equivalent and is reported as `Matcher`. Use [`CatalogueEntryType::to_proto_value`] instead,
+  /// which returns the wire value and is lossless for both interface versions.
+  #[deprecated(
+    since = "1.2.0",
+    note = "Use to_proto_value, which can represent entry types that only exist on the V2 interface"
+  )]
   pub fn to_proto_type(&self) -> EntryType {
     match self {
       CatalogueEntryType::CONTENT_MATCHER => EntryType::ContentMatcher,
       CatalogueEntryType::CONTENT_GENERATOR => EntryType::ContentGenerator,
       CatalogueEntryType::TRANSPORT => EntryType::Transport,
       CatalogueEntryType::MATCHER => EntryType::Matcher,
-      CatalogueEntryType::INTERACTION => EntryType::Interaction
+      CatalogueEntryType::INTERACTION => EntryType::Interaction,
+      CatalogueEntryType::GENERATOR => EntryType::Matcher
     }
+  }
+
+  /// The V2 protobuf enum for this entry type. V2 is the canonical source of the wire values: it
+  /// mirrors V1 for the entry types both versions share, and adds the ones V1 never had.
+  fn to_proto_enum(self) -> EntryTypeV2 {
+    match self {
+      CatalogueEntryType::CONTENT_MATCHER => EntryTypeV2::ContentMatcher,
+      CatalogueEntryType::CONTENT_GENERATOR => EntryTypeV2::ContentGenerator,
+      CatalogueEntryType::TRANSPORT => EntryTypeV2::Transport,
+      CatalogueEntryType::MATCHER => EntryTypeV2::Matcher,
+      CatalogueEntryType::INTERACTION => EntryTypeV2::Interaction,
+      CatalogueEntryType::GENERATOR => EntryTypeV2::Generator
+    }
+  }
+
+  fn from_proto_enum(entry_type: EntryTypeV2) -> CatalogueEntryType {
+    match entry_type {
+      EntryTypeV2::ContentMatcher => CatalogueEntryType::CONTENT_MATCHER,
+      EntryTypeV2::ContentGenerator => CatalogueEntryType::CONTENT_GENERATOR,
+      EntryTypeV2::Transport => CatalogueEntryType::TRANSPORT,
+      EntryTypeV2::Matcher => CatalogueEntryType::MATCHER,
+      EntryTypeV2::Interaction => CatalogueEntryType::INTERACTION,
+      EntryTypeV2::Generator => CatalogueEntryType::GENERATOR
+    }
+  }
+
+  /// The protobuf enum value for this entry type, for setting the `type` field of a
+  /// `CatalogueEntry` message. Lossless for every entry type, including those a V1 plugin will
+  /// not recognise - a V1 plugin decodes an unknown value as an unrecognised enum and ignores the
+  /// entry, which is the correct outcome, whereas mapping it onto some other V1 type would have
+  /// the plugin act on an entry that is not what it thinks it is.
+  pub fn to_proto_value(self) -> i32 {
+    self.to_proto_enum() as i32
+  }
+
+  /// The entry type for a protobuf enum value, or `None` if the value is not one this driver
+  /// understands (an entry type added by a later interface version). Deliberately not defaulting
+  /// to `CONTENT_MATCHER` the way prost's generated accessor does: silently mis-typing an entry
+  /// is worse than ignoring one.
+  pub fn from_proto_value(value: i32) -> Option<CatalogueEntryType> {
+    EntryTypeV2::try_from(value).ok().map(CatalogueEntryType::from_proto_enum)
+  }
+
+  /// The protobuf enum value name for this entry type, e.g. `"CONTENT_MATCHER"`. This is the form
+  /// a Lua plugin uses in the catalogue entries returned from its `init` function.
+  pub fn as_proto_name(&self) -> &'static str {
+    self.to_proto_enum().as_str_name()
+  }
+
+  /// The entry type for a protobuf enum value name, e.g. `"CONTENT_MATCHER"`, or `None` if the
+  /// name is not one this driver understands.
+  pub fn from_proto_name(name: &str) -> Option<CatalogueEntryType> {
+    EntryTypeV2::from_str_name(name).map(CatalogueEntryType::from_proto_enum)
   }
 }
 
@@ -58,6 +124,7 @@ impl Display for CatalogueEntryType {
       CatalogueEntryType::TRANSPORT => write!(f, "transport"),
       CatalogueEntryType::MATCHER => write!(f, "matcher"),
       CatalogueEntryType::INTERACTION => write!(f, "interaction"),
+      CatalogueEntryType::GENERATOR => write!(f, "generator"),
     }
   }
 }
@@ -70,6 +137,7 @@ impl From<&str> for CatalogueEntryType {
       "interaction" => CatalogueEntryType::INTERACTION,
       "matcher" => CatalogueEntryType::MATCHER,
       "transport" => CatalogueEntryType::TRANSPORT,
+      "generator" => CatalogueEntryType::GENERATOR,
       _ => {
         let message = format!("'{}' is not a valid CatalogueEntryType value", s);
         error!("{}", message);
@@ -130,7 +198,20 @@ pub fn register_plugin_entries(plugin: &PactPluginManifest, catalogue_list: &Vec
   let mut guard = CATALOGUE_REGISTER.lock().unwrap();
 
   for entry in catalogue_list {
-    let entry_type = CatalogueEntryType::from(entry.r#type());
+    // Deliberately reading the raw field rather than prost's `entry.r#type()` accessor: the
+    // accessor is generated against the V1 enum and maps anything it doesn't recognise to the
+    // default (`CONTENT_MATCHER`), which would silently register a V2-only entry type - a
+    // `GENERATOR`, say - as a content matcher.
+    let entry_type = match CatalogueEntryType::from_proto_value(entry.r#type) {
+      Some(entry_type) => entry_type,
+      None => {
+        warn!(
+          "Ignoring catalogue entry '{}' from plugin '{}': {} is not a catalogue entry type this driver understands",
+          entry.key, plugin.name, entry.r#type
+        );
+        continue;
+      }
+    };
     let key = format!("plugin/{}/{}/{}", plugin.name, entry_type, entry.key);
     guard.insert(key.clone(), CatalogueEntry {
       entry_type,
@@ -413,6 +494,84 @@ mod tests {
       key: "grpc".to_string(),
       values: hashmap!{}
     }));
+  }
+
+  #[test]
+  fn entry_type_proto_values_and_names_round_trip() {
+    for entry_type in [
+      CatalogueEntryType::CONTENT_MATCHER,
+      CatalogueEntryType::CONTENT_GENERATOR,
+      CatalogueEntryType::TRANSPORT,
+      CatalogueEntryType::MATCHER,
+      CatalogueEntryType::INTERACTION,
+      CatalogueEntryType::GENERATOR
+    ] {
+      expect!(CatalogueEntryType::from_proto_value(entry_type.to_proto_value()))
+        .to(be_some().value(entry_type));
+      expect!(CatalogueEntryType::from_proto_name(entry_type.as_proto_name()))
+        .to(be_some().value(entry_type));
+      // The Display form round-trips too - it is what catalogue keys are built from
+      expect!(CatalogueEntryType::from(entry_type.to_string().as_str())).to(be_equal_to(entry_type));
+    }
+
+    expect!(CatalogueEntryType::from_proto_value(99)).to(be_none());
+    expect!(CatalogueEntryType::from_proto_name("NOT_AN_ENTRY_TYPE")).to(be_none());
+  }
+
+  #[test]
+  fn entry_types_shared_with_v1_keep_their_v1_wire_values() {
+    // The wire values come from the V2 enum, but the driver publishes one catalogue to every
+    // running plugin, V1 ones included - so the values V1 knows about must not shift.
+    expect!(CatalogueEntryType::CONTENT_MATCHER.to_proto_value())
+      .to(be_equal_to(EntryType::ContentMatcher as i32));
+    expect!(CatalogueEntryType::CONTENT_GENERATOR.to_proto_value())
+      .to(be_equal_to(EntryType::ContentGenerator as i32));
+    expect!(CatalogueEntryType::TRANSPORT.to_proto_value())
+      .to(be_equal_to(EntryType::Transport as i32));
+    expect!(CatalogueEntryType::MATCHER.to_proto_value())
+      .to(be_equal_to(EntryType::Matcher as i32));
+    expect!(CatalogueEntryType::INTERACTION.to_proto_value())
+      .to(be_equal_to(EntryType::Interaction as i32));
+  }
+
+  #[test]
+  fn registers_a_generator_entry_under_its_own_entry_type() {
+    let name = "registers_a_generator_entry_under_its_own_entry_type";
+    let manifest = PactPluginManifest { name: name.to_string(), .. PactPluginManifest::default() };
+    // GENERATOR only exists on the V2 enum. This is exactly the case where prost's generated
+    // `entry.r#type()` accessor - built against V1 - would report CONTENT_MATCHER instead.
+    let entries = vec![
+      ProtoCatalogueEntry {
+        r#type: CatalogueEntryType::GENERATOR.to_proto_value(),
+        key: name.to_string(),
+        values: hashmap!{}
+      }
+    ];
+
+    register_plugin_entries(&manifest, &entries);
+
+    let entry = lookup_entry(&format!("generator/{}", name));
+    let as_a_content_matcher = lookup_entry(&format!("content-matcher/{}", name));
+    remove_plugin_entries(name);
+
+    expect!(entry.map(|entry| entry.entry_type)).to(be_some().value(CatalogueEntryType::GENERATOR));
+    expect!(as_a_content_matcher).to(be_none());
+  }
+
+  #[test]
+  fn ignores_a_catalogue_entry_whose_type_this_driver_does_not_understand() {
+    let name = "ignores_a_catalogue_entry_whose_type_this_driver_does_not_understand";
+    let manifest = PactPluginManifest { name: name.to_string(), .. PactPluginManifest::default() };
+    let entries = vec![
+      ProtoCatalogueEntry { r#type: 99, key: name.to_string(), values: hashmap!{} }
+    ];
+
+    register_plugin_entries(&manifest, &entries);
+
+    let registered = all_entries().into_iter().find(|entry| entry.key == name);
+    remove_plugin_entries(name);
+
+    expect!(registered).to(be_none());
   }
 
   #[test]

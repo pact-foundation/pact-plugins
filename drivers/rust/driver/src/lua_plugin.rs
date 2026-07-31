@@ -57,7 +57,7 @@ use mlua::{Function, Lua, LuaSerdeExt, Table, Value, Variadic};
 use rsa::pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPublicKey, LineEnding};
 use rsa::{Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey};
 use sha2::{Digest, Sha512};
-use tracing::debug;
+use tracing::{debug, warn};
 
 use crate::call_chain;
 use crate::catalogue_manager::{CatalogueEntryType, ResolvedCapability, resolve_capability};
@@ -446,10 +446,10 @@ fn lua_table_to_catalogue_entries(table: Table) -> anyhow::Result<Vec<CatalogueE
     let entry_type_str: String = entry.get("entryType")?;
     let key: String = entry.get("key")?;
     let values: Option<HashMap<String, String>> = entry.get("values")?;
-    let entry_type = catalogue_entry::EntryType::from_str_name(&entry_type_str)
+    let entry_type = CatalogueEntryType::from_proto_name(&entry_type_str)
       .ok_or_else(|| anyhow!("Unknown catalogue entry type '{}'", entry_type_str))?;
     entries.push(CatalogueEntry {
-      r#type: entry_type as i32,
+      r#type: entry_type.to_proto_value(),
       key,
       values: values.unwrap_or_default(),
     });
@@ -1403,9 +1403,14 @@ impl PluginInstance for LuaPactPlugin {
       let table = lua.create_table()?;
       for entry in &request.catalogue {
         let entry_table = lua.create_table()?;
-        let entry_type = catalogue_entry::EntryType::try_from(entry.r#type)
-          .unwrap_or(catalogue_entry::EntryType::ContentMatcher);
-        entry_table.set("entryType", entry_type.as_str_name())?;
+        // An entry type this driver doesn't understand is skipped rather than passed to the
+        // script as some other type it isn't - see `register_plugin_entries`.
+        let Some(entry_type) = CatalogueEntryType::from_proto_value(entry.r#type) else {
+          warn!("Not passing catalogue entry '{}' to the plugin: {} is not a catalogue entry type this driver understands",
+            entry.key, entry.r#type);
+          continue;
+        };
+        entry_table.set("entryType", entry_type.as_proto_name())?;
         entry_table.set("key", entry.key.clone())?;
         entry_table.set("values", entry.values.clone())?;
         table.push(entry_table)?;
@@ -1648,6 +1653,56 @@ mod tests {
     assert_eq!(entries[0].key, "jwt");
     assert_eq!(entries[0].r#type, catalogue_entry::EntryType::ContentMatcher as i32);
     assert_eq!(entries[1].r#type, catalogue_entry::EntryType::ContentGenerator as i32);
+  }
+
+  #[tokio::test]
+  async fn init_accepts_matcher_and_generator_catalogue_entries() {
+    // A field-level plugin registers MATCHER/GENERATOR entries rather than content ones. GENERATOR
+    // only exists on the V2 enum, so this also covers the entry type surviving the trip through
+    // the V1-shaped CatalogueEntry message the driver uses internally.
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      r#"
+        function init(implementation, version)
+          return {
+            { entryType = "MATCHER", key = "creditcard", values = { ["config-key"] = "brand" } },
+            { entryType = "GENERATOR", key = "creditcard" }
+          }
+        end
+      "#,
+    ).unwrap();
+
+    let manifest = lua_manifest(plugin_dir.path(), "field-entries-test");
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+    let lua = plugin.runtime.lock().await;
+    let entries = call_init(&lua, "test", "0.0.0").unwrap();
+
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[0].key, "creditcard");
+    assert_eq!(entries[0].r#type, CatalogueEntryType::MATCHER.to_proto_value());
+    assert_eq!(entries[0].values.get("config-key"), Some(&"brand".to_string()));
+    assert_eq!(entries[1].r#type, CatalogueEntryType::GENERATOR.to_proto_value());
+  }
+
+  #[tokio::test]
+  async fn init_rejects_an_unknown_catalogue_entry_type() {
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      r#"
+        function init(implementation, version)
+          return { { entryType = "NOT_AN_ENTRY_TYPE", key = "nope" } }
+        end
+      "#,
+    ).unwrap();
+
+    let manifest = lua_manifest(plugin_dir.path(), "bad-entry-type-test");
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+    let lua = plugin.runtime.lock().await;
+
+    let error = call_init(&lua, "test", "0.0.0").unwrap_err().to_string();
+    assert!(error.contains("NOT_AN_ENTRY_TYPE"), "unexpected error: {}", error);
   }
 
   #[tokio::test]
