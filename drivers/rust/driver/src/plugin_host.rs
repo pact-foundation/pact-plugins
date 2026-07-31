@@ -13,8 +13,9 @@ use crate::catalogue_manager::{CatalogueEntryType, ResolvedCapability, resolve_c
 use crate::grpc_plugin::PluginClient;
 use crate::plugin_log_sink::{PluginLogEntry, PluginLogSource, emit_plugin_log};
 use crate::proto_v2::{
-  CompareContentsResponse, GenerateContentResponse, HostCompareContentsRequest,
-  HostGenerateContentRequest, LogMessage, plugin_host_server,
+  CompareContentsResponse, GenerateContentResponse, GenerateFieldResponse,
+  HostCompareContentsRequest, HostGenerateContentRequest, HostGenerateFieldRequest,
+  HostMatchFieldRequest, LogMessage, MatchFieldResponse, plugin_host_server,
 };
 
 static PLUGIN_HOST_PORT: OnceLock<u16> = OnceLock::new();
@@ -112,6 +113,34 @@ impl plugin_host_server::PluginHost for PluginHostService {
         Ok(Response::new(PluginClient::convert_message(response)?))
       }
     }
+  }
+
+  // The field-level callbacks are defined in the V2 proto (proposal 006) but not dispatched yet:
+  // that needs the field matcher/generator surface and the core field capability registries, which
+  // are step 2 of the proposal's sequencing. Answering `unimplemented` is the honest response - a
+  // plugin gets a clear, catchable error naming the entry it asked for, rather than a hang or a
+  // silent pass.
+
+  async fn match_field(
+    &self,
+    request: Request<HostMatchFieldRequest>,
+  ) -> Result<Response<MatchFieldResponse>, Status> {
+    Err(Status::unimplemented(format!(
+      "Field-level matching rules are not implemented by this driver yet (requested entry '{}'). \
+       See proposal 006 (Field-level matchers and generators).",
+      request.into_inner().entry_key
+    )))
+  }
+
+  async fn generate_field(
+    &self,
+    request: Request<HostGenerateFieldRequest>,
+  ) -> Result<Response<GenerateFieldResponse>, Status> {
+    Err(Status::unimplemented(format!(
+      "Field-level generators are not implemented by this driver yet (requested entry '{}'). \
+       See proposal 006 (Field-level matchers and generators).",
+      request.into_inner().entry_key
+    )))
   }
 }
 

@@ -38,6 +38,8 @@ message CatalogueEntry {
     MATCHER = 3;
     // Type of interaction
     INTERACTION = 4;
+    // Generator for a content field/value. See proposal 006 (Field-level matchers and generators).
+    GENERATOR = 5;
   }
   // Entry type
   EntryType type = 1;
@@ -283,6 +285,79 @@ message GenerateContentResponse {
   Body contents = 1;
 }
 
+// A single value being matched or generated at the field/element level. Binary-safe: follows the
+// same oneof pattern as MetadataValue rather than assuming every value can be represented as
+// JSON. See proposal 006 (Field-level matchers and generators).
+message FieldValue {
+  oneof value {
+    // A JSON-like value
+    google.protobuf.Value nonBinaryValue = 1;
+    // Raw bytes, for a value that is not representable as JSON
+    bytes binaryValue = 2;
+  }
+}
+
+// Request to apply a plugin-provided matching rule to a single value. The plugin sees the value,
+// its path and the rule's own configuration, but not the document that contains it - a rule that
+// needs the surrounding document is a content matcher. See proposal 006.
+message MatchFieldRequest {
+  // Catalogue entry key of the rule being applied, e.g. "creditcard" for matcher/creditcard
+  string key = 1;
+  // The rule as stored in the Pact file: its name and configured values
+  MatchingRule rule = 2;
+  // Path to the value being matched. This is the value as per the documented Pact matching rule expressions.
+  string path = 3;
+  // Part of the interaction the value came from: body, headers, metadata, query, path, status
+  string mismatchType = 4;
+  // Expected value from the Pact interaction
+  FieldValue expected = 5;
+  // Actual value received
+  FieldValue actual = 6;
+  // Additional data added to the Pact/Interaction by the plugin
+  PluginConfiguration pluginConfiguration = 7;
+  // Context data provided by the test framework (carries testRunId for log correlation)
+  google.protobuf.Struct testContext = 8;
+}
+
+// Response to the MatchFieldRequest with the result of applying the rule
+message MatchFieldResponse {
+  // Error message if the rule could not be applied at all. If this field is set, the remaining
+  // fields will be ignored and the verification marked as failed
+  string error = 1;
+  // Mismatches found. An empty list means the value matched. A mismatch with an empty path is
+  // reported against the path from the request
+  repeated ContentMismatch mismatches = 2;
+}
+
+// Request to generate a single value using a plugin-provided generator. Generators are pure
+// functions of this request: anything from the host they need arrives in testContext or is
+// fetched with an explicit callback. See proposal 006.
+message GenerateFieldRequest {
+  // Catalogue entry key of the generator being applied, e.g. "creditcard" for generator/creditcard
+  string key = 1;
+  // The generator as stored in the Pact file: its name and configured values
+  Generator generator = 2;
+  // Path to the value being generated. This is the value as per the documented Pact matching rule expressions.
+  string path = 3;
+  // The example value from the Pact interaction that the generated value replaces
+  FieldValue exampleValue = 4;
+  // Additional data added to the Pact/Interaction by the plugin
+  PluginConfiguration pluginConfiguration = 5;
+  // Context data provided by the test framework
+  google.protobuf.Struct testContext = 6;
+  // The mode of the generation, if running from a consumer test or during provider verification
+  GenerateContentRequest.TestMode testMode = 7;
+}
+
+// Response to the GenerateFieldRequest with the generated value
+message GenerateFieldResponse {
+  // Error message if the value could not be generated. If this field is set, the value will be
+  // ignored
+  string error = 1;
+  // The generated value
+  FieldValue value = 2;
+}
+
 // Request to start a mock server
 message StartMockServerRequest {
   // Interface to bind to. Will default to the loopback adapter
@@ -456,6 +531,25 @@ message HostGenerateContentRequest {
   GenerateContentRequest request = 2;
 }
 
+// Callback request from a plugin to invoke a field-level matching rule - host-provided (one of the
+// standard Pact rules) or owned by another plugin - resolved by catalogue entry key. See proposals
+// 006 (Field-level matchers and generators) and 007 (Driver-plugin callback model).
+message HostMatchFieldRequest {
+  // Catalogue entry key identifying the rule to invoke, e.g. "type" for matcher/type
+  string entryKey = 1;
+  // The match request, in the same shape as PactPlugin.MatchField
+  MatchFieldRequest request = 2;
+}
+
+// Callback request from a plugin to invoke a field-level generator - host-provided or owned by
+// another plugin - resolved by catalogue entry key. See proposals 006 and 007.
+message HostGenerateFieldRequest {
+  // Catalogue entry key identifying the generator to invoke, e.g. "date" for generator/date
+  string entryKey = 1;
+  // The generation request, in the same shape as PactPlugin.GenerateField
+  GenerateFieldRequest request = 2;
+}
+
 // Driver-side service implemented by the driver and called by plugins
 service PluginHost {
   // Forward a structured log record from the plugin to the driver's logging framework
@@ -466,6 +560,13 @@ service PluginHost {
   // Invoke a content generator capability by catalogue entry key. The driver resolves the key to
   // either a host-registered core handler or another running plugin. See proposal 007.
   rpc GenerateContent(HostGenerateContentRequest) returns (GenerateContentResponse);
+  // Invoke a field-level matching rule by catalogue entry key, resolved the same way. This is how
+  // a plugin delegates one field of a document it owns to a standard Pact rule instead of
+  // reimplementing it. See proposals 006 and 009.
+  rpc MatchField(HostMatchFieldRequest) returns (MatchFieldResponse);
+  // Invoke a field-level generator by catalogue entry key, resolved the same way.
+  // See proposals 006 and 009.
+  rpc GenerateField(HostGenerateFieldRequest) returns (GenerateFieldResponse);
 }
 
 service PactPlugin {
@@ -479,6 +580,13 @@ service PactPlugin {
   rpc ConfigureInteraction(ConfigureInteractionRequest) returns (ConfigureInteractionResponse);
   // Request to generate the content using any defined generators
   rpc GenerateContent(GenerateContentRequest) returns (GenerateContentResponse);
+
+  // Apply a plugin-provided matching rule to a single value. Required for any plugin that
+  // registers a MATCHER catalogue entry. See proposal 006 (Field-level matchers and generators).
+  rpc MatchField(MatchFieldRequest) returns (MatchFieldResponse);
+  // Apply a plugin-provided generator to a single value. Required for any plugin that registers
+  // a GENERATOR catalogue entry. See proposal 006.
+  rpc GenerateField(GenerateFieldRequest) returns (GenerateFieldResponse);
 
   // Start a mock server
   rpc StartMockServer(StartMockServerRequest) returns (StartMockServerResponse);

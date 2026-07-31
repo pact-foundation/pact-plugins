@@ -478,10 +478,20 @@ WASM plugin support at all.
 
 ## Sequencing
 
-1. ⬜ Proto: `GENERATOR` entry type, `FieldValue`, the four request/response messages, the two `PactPlugin` RPCs and
-   the two `PluginHost` RPCs. Regenerate the checked-in Rust bindings (`PACT_PLUGIN_BUILD_PROTOBUFS`).
+1. ✅ Proto: `GENERATOR` entry type, `FieldValue`, the four request/response messages, the two `PactPlugin` RPCs and
+   the two `PluginHost` RPCs, with the checked-in Rust bindings regenerated. The Rust driver's `PluginHost` service
+   answers the two new RPCs with `unimplemented` until step 2; the JVM driver needs no change for this, since
+   gRPC-Java's generated base class already answers an unimplemented method that way.
 2. ⬜ Rust driver: `field.rs`, the two `core_capabilities` traits + registries, catalogue lookups, `PluginHost`
    service methods, `grpc_plugin`/`PluginInstance` methods.
+
+   One trap here: the driver's internal catalogue representation is the **V1** proto's `EntryType`
+   (`CatalogueEntryType::to_proto_type`, and the byte-level transcode of V2 catalogue entries into V1
+   `CatalogueEntry` messages in `grpc_plugin.rs`), while `GENERATOR` only exists in V2. The raw `i32` survives the
+   transcode, but prost's generated `entry.r#type()` accessor maps an unrecognised `5` to the default
+   (`ContentMatcher`) silently, so the inbound path must read the raw field. The clean fix is to stop treating a
+   generated proto enum as the driver's own type - `CatalogueEntryType` should be the source of truth - rather than
+   adding `GENERATOR` to the frozen V1 contract.
 3. ⬜ JVM driver: the same surface (`FieldMatcher.kt`, `FieldGenerator.kt`, `CoreCapabilities.kt`,
    `PluginHostServer.kt`, `PluginRpcClient.kt`).
 4. ⬜ Lua runtime in both drivers: `match_field`/`generate_field` invocation, `host_match_field`/

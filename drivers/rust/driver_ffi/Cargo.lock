@@ -2417,7 +2417,7 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "1.1.0"
+version = "1.1.1"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2466,7 +2466,7 @@ version = "0.0.0"
 dependencies = [
  "env_logger",
  "expectest",
- "pact-plugin-driver 1.1.0",
+ "pact-plugin-driver 1.1.1",
  "pact_ffi",
  "prost",
  "reqwest 0.12.28",
