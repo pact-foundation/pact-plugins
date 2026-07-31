@@ -365,6 +365,9 @@ pub fn find_field_matcher(name: &str) -> Option<FieldMatcher>;
 pub fn find_field_generator(name: &str) -> Option<FieldGenerator>;
 ```
 
+Both operations also need a blocking wrapper, because every Rust host that applies a matching rule does so from a
+synchronous call path - see [9](#9-host-framework-integration) for why that bridge belongs in the driver.
+
 `is_core()` dispatches exactly as `content.rs` does after 007: to a handler registered in `core_capabilities`, or to
 the owning plugin over gRPC on a fresh call chain. The two new traits and their registration functions follow the
 established shape:
@@ -399,10 +402,43 @@ The work outside this repository, stated explicitly because it is most of the de
 3. Recording the providing plugin in the Pact file's `plugins` metadata when a `Plugin` rule or generator is
    serialised (see [4](#4-model-representation-and-the-pact-file)).
 
-One known implementation hazard: parts of the matching engines are synchronous (Rust's `Matches` trait, for
-instance) while the driver's plugin calls are async. The field API is async for consistency with the rest of the
-driver; hosts with a synchronous matching path will need the same bridging they already use elsewhere, and this
-should be confirmed early rather than discovered during implementation.
+**Calling an async driver from a synchronous matching path (Rust only).** The JVM driver talks to plugins over
+blocking gRPC stubs (`PactPluginBlockingStub`), so Pact-JVM has nothing to solve here. In Rust, rule application is
+synchronous - `match_values` -> `Matches::matches_with` - and the V2 matching engine's `execute_request_plan`/
+`execute_response_plan`/`execute_message_plan` are synchronous end to end, while the driver's plugin calls are async.
+
+Two approaches do **not** work at that call site:
+
+- `Handle::current().block_on(fut)` panics. Body matching is reached from the async `compare_bodies`, so the thread
+  is already inside a runtime context, and tokio's `enter_runtime` guard raises *"Cannot start a runtime from within
+  a runtime"*.
+- `task::block_in_place(|| Handle::current().block_on(fut))` is tokio's documented way to re-enter a runtime, but
+  panics on a `current_thread` runtime. Pact has `current_thread` call sites that reach matching - `pact_consumer`'s
+  `check_requests_match` drives `match_request` on one - so this would work under the verifier, the FFI and the HTTP
+  mock server and panic elsewhere.
+
+What does work is the bridge `pact_matching` already uses twice for multipart bodies (`binary_utils.rs`:
+`match_mime_multipart`, `parse_multipart_body`): run the future on a separate thread with its own runtime, and
+receive the result over a channel with a timeout. Two refinements over that existing code:
+
+- It calls `Handle::try_current()` *inside* the spawned thread. Tokio's runtime context is a thread-local that
+  `std::thread::spawn` does not inherit, so that call always returns `Err` and the "reuse the host runtime" branch
+  never actually runs. Capture the handle before spawning if reuse is the intent.
+- Reusing the host runtime is only safe when it is a multi-thread one anyway. A plugin's tonic `Channel` spawns its
+  connection task on whichever runtime was current when the plugin was loaded; if that is a `current_thread` runtime
+  whose only thread is the one now blocked inside sync matching, the connection cannot progress and the call hangs
+  until the timeout.
+
+So the driver should own a dedicated runtime for plugin calls and expose blocking wrappers next to the async
+operations, rather than leaving each host to build its own bridge:
+
+```rust
+pub fn match_field_blocking(/* same arguments as match_field */) -> Result<(), Vec<ContentMismatch>>;
+pub fn generate_field_blocking(/* same arguments as generate_field */) -> anyhow::Result<FieldValue>;
+```
+
+The wrapper's timeout should come from the existing deadline (`call_chain::default_deadline_ms`) rather than being a
+second, unrelated number.
 
 ### 10. Lua transport
 
@@ -488,6 +524,10 @@ WASM plugin support at all.
 - **Do the new operations need new capability strings under 005?** No. Registering the catalogue entry is the
   declaration; host-provided rules already surface in `hostCapabilities` via the driver's existing
   `<entry_type>/<key>` derivation from core catalogue entries.
+- **How does a synchronous Rust matching path call an async plugin operation?** Through a blocking wrapper the
+  driver owns, backed by its own runtime - not `Handle::block_on` (panics: the thread is already inside a runtime)
+  and not `block_in_place` (panics on the `current_thread` runtimes some Pact entry points use). See
+  [9](#9-host-framework-integration). The JVM driver is unaffected, since it uses blocking gRPC stubs.
 
 ## Open questions
 
@@ -499,5 +539,3 @@ WASM plugin support at all.
   cannot load the plugin. The `plugins` metadata entry makes the requirement explicit and diagnosable, but there is
   no graceful degradation (no "fall back to `type` if the plugin is unavailable"). Is that acceptable, or should a
   plugin rule be able to declare a core fallback rule for readers that cannot resolve it?
-- **Synchronous host matching paths.** See [9](#9-host-framework-integration) - needs confirming against
-  `pact_matching`'s and Pact-JVM's actual call paths before step 6.
