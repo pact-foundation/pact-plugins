@@ -1,7 +1,7 @@
 # Field-level matchers and generators (Draft)
 
 > [!NOTE]
-> **Implementation phase:** Phase 3 (new functionality). Requires [005](./005_Plugin_capability_negotiation_and_versioning.md) to be finalised. Design in parallel with [007](./007_Driver_plugin_callback_model.md); data model decisions in these two proposals must be kept consistent. See the [proposals README](./README.md) for the full delivery order.
+> **Implementation phase:** Phase 3 (new functionality). Requires [005](./005_Plugin_capability_negotiation_and_versioning.md) to be finalised. Designed in parallel with [007](./007_Driver_plugin_callback_model.md), and re-uses 007's registry, resolver and callback plumbing rather than introducing its own. Required by [009](./009_Host_provided_core_matching_and_generation.md). See the [proposals README](./README.md) for the full delivery order.
 
 ## Summary
 
@@ -17,34 +17,487 @@ generation logic for a specific field, key, header, token, or nested value.
 Without an explicit field-level API, plugin authors either cannot express these use cases at all or are pushed into
 whole-content plugins that are broader and more complex than the problem requires.
 
-## Recommended direction
+Concretely, today `CatalogueEntry.EntryType.MATCHER` can be registered by a plugin and stored in the catalogue, and
+that is all that happens - nothing in either driver ever looks a `MATCHER` entry up or calls the plugin that owns it.
+There is also no entry type at all for a field-level generator.
 
-- Define dedicated field-level matcher and generator operations rather than overloading whole-content APIs.
-- Keep the API binary-safe and context-aware:
-  - do not assume all values can be represented as JSON;
-  - include the matching path or location being evaluated;
-  - include the selected matcher/generator entry and any associated values;
-  - include plugin configuration and any mode/context needed for generation.
-- Align the mismatch/result model with existing Pact mismatch reporting so results can be surfaced consistently across
-  drivers and UIs.
+## Worked example: a credit card number
+
+The design below is derived from a reference plugin, [`plugins/creditcard`](../../plugins/creditcard), written in Lua
+(the second Lua plugin in this repository, after [`plugins/jwt`](../../plugins/jwt)). It provides one matching rule
+and one generator, both named `creditcard`:
+
+- **the matcher** asserts that the actual value is a plausible credit card number: digits only (with `-`/space
+  separators tolerated), a valid [Luhn](https://en.wikipedia.org/wiki/Luhn_algorithm) check digit, a length in range,
+  and - if the rule is configured with a `brand` - the IIN prefix and length of that brand;
+- **the generator** produces a fresh, Luhn-valid number of the same brand on every test run.
+
+This is a deliberately small example that is nonetheless not expressible with any core matching rule: `regex` can
+check the shape of a card number but not its check digit, and `type` only gets you "it's a string". It exercises
+every part of the interface - rule configuration values, an example value, a value-level mismatch, and a generator
+paired with a matcher under the same name - without needing binary values or document context, which keeps it honest
+about which parts of the design are load-bearing.
+
+A consumer test asserting on a JSON body would express it as:
+
+```json
+{
+  "card": {
+    "number": "matching(creditcard, 'visa', '4111111111111111')",
+    "expiry": "matching(regex, '\\d{2}/\\d{2}', '04/28')"
+  }
+}
+```
+
+which is persisted into the Pact file as an ordinary matching rule whose name happens to be provided by a plugin:
+
+```json
+"matchingRules": {
+  "body": {
+    "$.card.number": {
+      "combine": "AND",
+      "matchers": [ { "match": "creditcard", "brand": "visa" } ]
+    }
+  }
+}
+```
+
+## Design
+
+### 1. Catalogue entries
+
+A field-level matcher is a `MATCHER` catalogue entry (already defined, never previously used):
+`plugin/creditcard/matcher/creditcard`.
+
+A field-level generator needs a new entry type, `GENERATOR = 5`, added to `CatalogueEntry.EntryType` in
+`proto/plugin_v2.proto` and to `CatalogueEntryType` in both drivers:
+`plugin/creditcard/generator/creditcard`.
+
+Reusing `MATCHER` for both operations was considered and rejected: a separate type keeps
+`catalogue_manager::resolve_capability`'s `expected_type` check meaningful (it is what stops a callback for a
+generator resolving to an unrelated matcher of the same name), and lets a matcher and its paired generator share one
+name, which is what a plugin author actually wants.
+
+Unlike `CONTENT_MATCHER`/`CONTENT_GENERATOR`, these entries have no required `values` key - there is no content type
+to advertise. One optional convention is defined:
+
+| Key | Meaning |
+|---|---|
+| `config-key` | The name of the values key that a single positional config argument in a matching rule definition expression maps to (see [3](#3-declaring-a-plugin-rule-in-a-test)). Defaults to `value`. |
+
+The `creditcard` plugin registers `config-key = "brand"`, which is what makes `matching(creditcard, 'visa', '4111…')`
+resolve to `{ "match": "creditcard", "brand": "visa" }`.
+
+### 2. Naming and resolution
+
+The **rule name is the catalogue key**. A rule named `creditcard` resolves through the existing
+`catalogue_manager::resolve_capability` (`CatalogueManager.resolveCapability` on the JVM) with an expected type of
+`MATCHER`/`GENERATOR` - the same resolver 007 already uses for callbacks, with the same behaviour:
+
+- resolves by suffix against the full catalogue key, so a user can write `creditcard/matcher/creditcard` to
+  disambiguate if two plugins ever register the same short name;
+- a name matching more than one entry of the expected type is a hard error naming the candidates, never a silent
+  pick;
+- a name matching nothing is a hard error at match/generate time.
+
+Core rule names always win: the host resolves `type`, `regex`, `equality` and the rest of the standard set from its
+own matching engine before it ever consults the catalogue, so a plugin cannot shadow a standard rule. (Once
+[009](./009_Host_provided_core_matching_and_generation.md) registers the standard set as `CORE` entries, those become
+visible in the catalogue too - as `core/matcher/type` etc. - which is what lets a *plugin* call back for them, but
+does not change how the host resolves its own rules.)
+
+### 3. Declaring a plugin rule in a test
+
+Two forms, both existing mechanisms extended to accept a name the host does not recognise:
+
+**Matching rule definition expression.** `matching(NAME, [CONFIG,] EXAMPLE)` where `NAME` is not one of the built-in
+rule names. `CONFIG` is optional and is stored under the key the catalogue entry's `config-key` value names
+(defaulting to `value`). The grammar in [`matching-rule-definition.g4`](../matching-rule-definition.g4) gains one
+alternative in the `matchingRule` production for this; nothing else changes.
+
+**JSON form.** The existing `pact:matcher:type` mechanism already carries arbitrary attributes, and needs no change
+at all beyond the host accepting an unrecognised type:
+
+```json
+{ "pact:matcher:type": "creditcard", "brand": "visa", "value": "4111111111111111" }
+```
+
+Generators are declared the same way, by name, via `pact:generator:type`:
+
+```json
+{ "pact:matcher:type": "creditcard", "pact:generator:type": "creditcard", "brand": "visa", "value": "4111111111111111" }
+```
+
+Whether a matching rule should *implicitly* attach the same-named generator when one exists (the way `datetime`
+implies a date-time generator today) is left open - see [Open questions](#open-questions). The explicit form above is
+the design; an implicit one would be a convenience layered on top of it.
+
+### 4. Model representation and the Pact file
+
+Both the matching rule and the generator are stored in the Pact file exactly as any other rule is - the name in the
+`match`/`type` field, its configuration as sibling keys:
+
+```json
+"matchingRules": { "body": { "$.card.number": { "matchers": [ { "match": "creditcard", "brand": "visa" } ] } } },
+"generators":    { "body": { "$.card.number": { "type": "creditcard", "brand": "visa" } } }
+```
+
+This requires a carrier in the models, in `pact_models` and in Pact-JVM's model module:
+
+```rust
+MatchingRule::Plugin { name: String, values: Value }
+Generator::Plugin { name: String, values: Value }
+```
+
+with these properties:
+
+- `MatchingRule::create` falls through to `Plugin { name, values }` only for a rule name it does not recognise -
+  a malformed *known* rule (e.g. `regex` with no `regex` field) still errors exactly as it does today, so the
+  fallback cannot mask a real parse error. `Generator::from_map` does the same for an unrecognised `type` (today it
+  logs a warning and drops the generator silently, which is worse than either alternative).
+- `to_json` round-trips: `{ "match": name, ...values }` / `{ "type": name, ...values }`. There is no marker in the
+  JSON saying "this is a plugin rule" - by design, since which plugin (if any) provides a name is a property of the
+  running catalogue, not of the file.
+- `name()`/`values()` return the plugin name and its values map, which means the existing content-matcher path in
+  `content.rs` forwards a plugin field rule to a content matcher plugin unchanged, with no code change. A protobuf
+  or CSV plugin receiving `{ type: "creditcard", values: { brand: "visa" } }` in its `rules` map can then delegate
+  it back to the `creditcard` plugin through the 007 callback (see [7](#7-callbacks-and-host-provided-rules)).
+- `can_cascade()` is `false`: a plugin rule applies to the value at its path, not to that value's children.
+
+A typo'd core rule name becomes a `Plugin` rule that fails resolution at match time with
+`No catalogue entry found for key 'reges'`, which is an acceptable trade for not needing a second syntax.
+
+**Pact file plugin metadata.** A field-level rule never goes through `configure_interaction`, which is where the
+`plugins` entry in the Pact file metadata is written today. So the host must record the providing plugin (name and
+version, from the resolved catalogue entry's manifest) in the Pact metadata when it serialises a `Plugin` rule or
+generator. Without this, provider verification has no way to know it needs to load the `creditcard` plugin before it
+can interpret the file. Consumer tests must load the plugin explicitly (`usingPlugin("creditcard")` or equivalent)
+before the rule can be resolved at all.
+
+### 5. Operation shape
+
+Two new RPCs on `PactPlugin`, and their `PluginHost` counterparts for the callback direction:
+
+```proto
+// A single value being matched or generated. Binary-safe: follows the same oneof pattern as
+// MetadataValue rather than assuming everything is representable as JSON.
+message FieldValue {
+  oneof value {
+    google.protobuf.Value nonBinaryValue = 1;
+    bytes binaryValue = 2;
+  }
+}
+
+message MatchFieldRequest {
+  // Catalogue entry key of the rule being applied, e.g. "creditcard"
+  string key = 1;
+  // The rule as stored in the Pact file: its name and configured values
+  MatchingRule rule = 2;
+  // Path to the value being matched, as per the documented Pact matching rule expressions
+  string path = 3;
+  // Which part of the interaction the value came from: body, header, query, metadata, path, status
+  string mismatchType = 4;
+  // Expected value from the Pact file
+  FieldValue expected = 5;
+  // Actual value received
+  FieldValue actual = 6;
+  // Additional data added to the Pact/Interaction by the plugin
+  PluginConfiguration pluginConfiguration = 7;
+  // Context data provided by the test framework (carries testRunId for log correlation)
+  google.protobuf.Struct testContext = 8;
+}
+
+message MatchFieldResponse {
+  // Set if the match could not be performed at all. If set, mismatches is ignored and the
+  // verification is marked as failed.
+  string error = 1;
+  // Mismatches found. Empty means the value matched. A mismatch with an empty path is
+  // reported against the request's path.
+  repeated ContentMismatch mismatches = 2;
+}
+
+message GenerateFieldRequest {
+  string key = 1;
+  // The generator as stored in the Pact file: its name and configured values
+  Generator generator = 2;
+  string path = 3;
+  // The example value from the Pact file that the generated value replaces
+  FieldValue exampleValue = 4;
+  PluginConfiguration pluginConfiguration = 5;
+  google.protobuf.Struct testContext = 6;
+  // Consumer or provider side, reusing the enum already defined for content generation
+  GenerateContentRequest.TestMode testMode = 7;
+}
+
+message GenerateFieldResponse {
+  string error = 1;
+  FieldValue value = 2;
+}
+
+service PactPlugin {
+  // ... existing RPCs ...
+
+  // Apply a plugin-provided matching rule to a single value. Required for any plugin that
+  // registers a MATCHER catalogue entry.
+  rpc MatchField(MatchFieldRequest) returns (MatchFieldResponse);
+  // Apply a plugin-provided generator to a single value. Required for any plugin that
+  // registers a GENERATOR catalogue entry.
+  rpc GenerateField(GenerateFieldRequest) returns (GenerateFieldResponse);
+}
+```
+
+Notes on specific choices:
+
+- **`rule`/`generator` carry the whole rule, not just its values**, so one plugin can register several related rules
+  and dispatch on `rule.type` internally, and so the request is self-describing in a log.
+- **`ContentMismatch` is reused verbatim** for results, per this proposal's original direction - a field mismatch and
+  a content mismatch are the same thing at different granularity, and every driver, reporter and UI already
+  understands the type. `expected`/`actual` on it are bytes, so a binary value survives being reported.
+- **No `allow_unexpected_keys`**: that is a whole-content concept.
+- **Capability classification** ([005](./005_Plugin_capability_negotiation_and_versioning.md)): no new capability
+  strings. A plugin declares it provides a field rule by registering the catalogue entry, and implementing the
+  matching RPC is then part of that entry's contract. In the other direction, host-provided rules appear in
+  `hostCapabilities` automatically, since the driver already derives that list from its core catalogue entries as
+  `<entry_type>/<key>` - `matcher/type`, `generator/date`, and so on, once 009 registers them.
+
+### 6. Context available to the plugin
+
+A field-level call sees the value, its path, the rule's own configuration, the plugin's stored configuration, and the
+test context. It deliberately does **not** see the surrounding document, sibling values, or the rest of the
+interaction.
+
+This is the answer to the proposal's original open question, and the reasoning is: shipping the enclosing document
+would mean serialising it per field (potentially per element of a large collection), and would need a document model
+in the request that is neither binary-safe nor transport-neutral - reintroducing exactly the problem the `oneof`
+value model exists to avoid. A rule that genuinely needs to reason about more than one value is a *content* matcher,
+which is already supported, and which can now delegate individual fields back down to field rules. The dividing line
+is: **field rules see one value; content matchers see the document.**
+
+Generators are pure functions of `(generator config, example value, testContext, testMode)`. They may vary their
+output between calls (that is the point of a generator), but they must not depend on hidden host state: anything the
+host knows that a generator needs - the current time, provider state values, the mock server URL - arrives in
+`testContext`, or is fetched explicitly through a 007 callback. This keeps a generator reproducible from what is in
+the request, which matters for both drivers and for any future in-process runtime.
+
+### 7. Callbacks and host-provided rules
+
+Both operations are added to the `PluginHost` service as well, so a plugin can invoke a field rule it does not own -
+the host's standard `type`/`regex`/`date` implementations from
+[009](./009_Host_provided_core_matching_and_generation.md), or another plugin's rule:
+
+```proto
+message HostMatchFieldRequest {
+  string entryKey = 1;
+  MatchFieldRequest request = 2;
+}
+
+message HostGenerateFieldRequest {
+  string entryKey = 1;
+  GenerateFieldRequest request = 2;
+}
+
+service PluginHost {
+  // ... Log, CompareContents, GenerateContent ...
+  rpc MatchField(HostMatchFieldRequest) returns (MatchFieldResponse);
+  rpc GenerateField(HostGenerateFieldRequest) returns (GenerateFieldResponse);
+}
+```
+
+No new plumbing is required: this is 007's mechanism with two more capability shapes. The same `resolve_capability`
+resolver, the same `pact-call-chain-id` cycle detection and `pact-deadline-ms` propagation, the same CORE-or-forward
+dispatch.
+
+This is what makes the "plugin owns a content type, delegates most fields to the host" story work: a protobuf plugin
+matching a `CreditCard` message can apply `matcher/type` to most fields through the host and only implement what is
+actually protobuf-specific, and can hand a field carrying a `{ "match": "creditcard" }` rule straight to the
+`creditcard` plugin without knowing it exists.
+
+### 8. Driver-side model
+
+Mirroring `content.rs`'s `ContentMatcher`/`ContentGenerator`, a new `field.rs` module in the Rust driver (and
+`FieldMatcher.kt`/`FieldGenerator.kt` on the JVM):
+
+```rust
+/// A single value being matched or generated - the driver-side counterpart of the proto FieldValue.
+#[derive(Clone, Debug, PartialEq)]
+pub enum FieldValue {
+  /// A JSON-like value
+  Json(serde_json::Value),
+  /// Raw bytes
+  Binary(Bytes)
+}
+
+pub struct FieldMatcher { pub catalogue_entry: CatalogueEntry }
+
+impl FieldMatcher {
+  pub fn is_core(&self) -> bool;
+
+  pub async fn match_field(
+    &self,
+    rule: &MatchingRule,
+    path: &DocPath,
+    category: &str,
+    expected: &FieldValue,
+    actual: &FieldValue,
+    plugin_config: Option<PluginInteractionConfig>,
+    context: &HashMap<String, Value>
+  ) -> Result<(), Vec<ContentMismatch>>;
+}
+
+pub struct FieldGenerator { pub catalogue_entry: CatalogueEntry }
+
+impl FieldGenerator {
+  pub fn is_core(&self) -> bool;
+
+  pub async fn generate_field(
+    &self,
+    generator: &Generator,
+    path: &DocPath,
+    example: &FieldValue,
+    plugin_config: Option<PluginInteractionConfig>,
+    context: &HashMap<String, Value>,
+    mode: TestMode
+  ) -> anyhow::Result<FieldValue>;
+}
+
+/// Look up a field matcher/generator by rule name (not by content type, unlike find_content_matcher)
+pub fn find_field_matcher(name: &str) -> Option<FieldMatcher>;
+pub fn find_field_generator(name: &str) -> Option<FieldGenerator>;
+```
+
+`is_core()` dispatches exactly as `content.rs` does after 007: to a handler registered in `core_capabilities`, or to
+the owning plugin over gRPC on a fresh call chain. The two new traits and their registration functions follow the
+established shape:
+
+```rust
+#[async_trait]
+pub trait CoreFieldMatcher: Send + Sync {
+  async fn match_field(&self, request: MatchFieldRequest) -> anyhow::Result<MatchFieldResponse>;
+}
+
+#[async_trait]
+pub trait CoreFieldGenerator: Send + Sync {
+  async fn generate_field(&self, request: GenerateFieldRequest) -> anyhow::Result<GenerateFieldResponse>;
+}
+
+pub fn register_core_field_matcher(key: &str, handler: Arc<dyn CoreFieldMatcher>);
+pub fn register_core_field_generator(key: &str, handler: Arc<dyn CoreFieldGenerator>);
+```
+
+These four functions are the entire remaining requirement of
+[009](./009_Host_provided_core_matching_and_generation.md) step 2.
+
+### 9. Host framework integration
+
+The work outside this repository, stated explicitly because it is most of the delivery risk:
+
+1. `pact_models` / Pact-JVM model: the `Plugin` carrier variants from [4](#4-model-representation-and-the-pact-file),
+   their JSON round-trip, and the definition-expression parser change.
+2. `pact_matching` / Pact-JVM matching engine: a dispatch arm that resolves a `Plugin` rule through
+   `pact_plugin_driver::field::find_field_matcher` and calls it, and the equivalent for generators in generator
+   application. Both crates already depend on the driver, so no new dependency edge is created.
+3. Recording the providing plugin in the Pact file's `plugins` metadata when a `Plugin` rule or generator is
+   serialised (see [4](#4-model-representation-and-the-pact-file)).
+
+One known implementation hazard: parts of the matching engines are synchronous (Rust's `Matches` trait, for
+instance) while the driver's plugin calls are async. The field API is async for consistency with the rest of the
+driver; hosts with a synchronous matching path will need the same bridging they already use elsewhere, and this
+should be confirmed early rather than discovered during implementation.
+
+### 10. Lua transport
+
+A Lua plugin defines two more optional globals, required only if it registers the corresponding catalogue entry.
+Table shapes mirror the proto fields, following the existing conventions in the
+[Lua plugin reference](../lua-plugin-reference.md) - `snake_case` keys, and a field value that is either a plain Lua
+value or a `{ binary = "..." }` wrapper, exactly as metadata values already work:
+
+```lua
+-- request: { key, rule = { type, values }, path, mismatch_type, expected, actual,
+--            plugin_configuration, test_context }
+-- returns: { mismatches = { <ContentMismatch table>, ... } } or { error = "..." }
+function match_field(request) end
+
+-- request: { key, generator = { type, values }, path, example_value,
+--            plugin_configuration, test_context, test_mode }
+-- returns: { value = <any> } or { error = "..." }
+function generate_field(request) end
+```
+
+and gains two host functions alongside `host_compare_contents`/`host_generate_content`:
+
+```lua
+host_match_field(entry_key, request)     -- -> { error = "...", mismatches = { ... } }
+host_generate_field(entry_key, request)  -- -> { error = "...", value = ... }
+```
+
+Both are async host functions resolving through the same `resolve_capability` path as their content-level
+equivalents, with no call-chain ID or cycle detection needed - the same reasoning as in 007's Lua section.
+
+### WASM transport
+
+Out of scope for this design pass. The operation shape is transport-neutral by construction (the `oneof` value model
+and reused message types exist precisely so it can cross a linear-memory boundary as serialised protobuf), so the
+WASM mapping is the mechanical one 007 describes, to be filled in when [003](./003_Support_WASM_plugins.md) lands
+WASM plugin support at all.
+
+## Sequencing
+
+1. ⬜ Proto: `GENERATOR` entry type, `FieldValue`, the four request/response messages, the two `PactPlugin` RPCs and
+   the two `PluginHost` RPCs. Regenerate the checked-in Rust bindings (`PACT_PLUGIN_BUILD_PROTOBUFS`).
+2. ⬜ Rust driver: `field.rs`, the two `core_capabilities` traits + registries, catalogue lookups, `PluginHost`
+   service methods, `grpc_plugin`/`PluginInstance` methods.
+3. ⬜ JVM driver: the same surface (`FieldMatcher.kt`, `FieldGenerator.kt`, `CoreCapabilities.kt`,
+   `PluginHostServer.kt`, `PluginRpcClient.kt`).
+4. ⬜ Lua runtime in both drivers: `match_field`/`generate_field` invocation, `host_match_field`/
+   `host_generate_field` host functions, conversions in `lua_plugin.rs` / `LuaConversions.kt`.
+5. ✅ Reference plugin: [`plugins/creditcard`](../../plugins/creditcard), written against this design. Cannot run
+   until steps 1-4 land.
+6. ⬜ Host framework integration ([9](#9-host-framework-integration)), and an example consumer/provider pair under
+   `examples/creditcard` once it can actually execute.
+7. ⬜ Docs: the Lua reference and plugin writing guide gain the two new functions and the `MATCHER`/`GENERATOR`
+   entry types.
 
 ## Non-goals for this proposal
 
 - Redesigning whole-content matcher/generator flows.
-- Defining a general-purpose callback bus between plugins and the host.
-- Solving plugin runtime/version negotiation on its own.
+- Defining a general-purpose callback bus between plugins and the host (see [007](./007_Driver_plugin_callback_model.md)).
+- Solving plugin runtime/version negotiation on its own (see [005](./005_Plugin_capability_negotiation_and_versioning.md)).
+- Giving field-level plugins access to the surrounding document (see [6](#6-context-available-to-the-plugin)).
+- Rules whose semantics are collection-wide (`arrayContains`, `eachKey`/`eachValue`, `atLeast`/`atMost`). These stay
+  core: they are structural rules the matching engine has to interpret itself in order to know *which* values to
+  match, and a plugin cannot participate in that decision through a one-value-at-a-time interface.
 
-## WASM compatibility
+## Resolved questions
 
-For gRPC plugins, field-level matching and generation operations will be new RPCs in the plugin service. For WASM plugins, the same operations will be exported WASM functions that the host calls into. The data types used must be representable in both forms.
-
-In practice this means:
-- value types should follow the existing `oneof` pattern (see `MetadataValue` in the current proto) rather than assuming JSON encoding;
-- path expressions should use the existing Pact matching rule expression format already used throughout the interface;
-- mismatch results should reuse the existing `ContentMismatch` type rather than introducing a parallel structure.
+- **What value model should be used for binary-safe field-level matching and generation?** A `FieldValue` `oneof` of
+  `google.protobuf.Value` or `bytes`, the same shape as the existing `MetadataValue`. Kept as its own message rather
+  than reusing `MetadataValue` because the name would be actively misleading in this context; the two can be
+  unified later if a third use appears. In Lua, the existing metadata convention carries over unchanged: a plain
+  value, or `{ binary = "..." }`.
+- **How much of the surrounding document context should be visible to a field-level plugin call?** None. See
+  [6](#6-context-available-to-the-plugin) - the line between a field rule and a content matcher is exactly that a
+  field rule sees one value.
+- **Should field-level generators be pure functions, or can they depend on host-provided context?** Pure functions of
+  the request, where the request includes `testContext` and `testMode`. No hidden host state; anything the host knows
+  is passed in or fetched through an explicit 007 callback.
+- **How is a plugin rule named and resolved?** The rule name *is* the catalogue key, resolved through 007's existing
+  `resolve_capability` with its suffix matching, ambiguity detection and clear errors. Core rule names are resolved
+  by the host first and cannot be shadowed.
+- **Do field-level generators need their own catalogue entry type?** Yes - `GENERATOR = 5`. Reusing `MATCHER` would
+  weaken the expected-type check that stops a callback dispatching to the wrong capability shape.
+- **Do the new operations need new capability strings under 005?** No. Registering the catalogue entry is the
+  declaration; host-provided rules already surface in `hostCapabilities` via the driver's existing
+  `<entry_type>/<key>` derivation from core catalogue entries.
 
 ## Open questions
 
-- What value model should be used for binary-safe field-level matching and generation?
-- How much of the surrounding document context should be visible to a field-level plugin call?
-- Should field-level generators be pure functions, or can they depend on host-provided context?
+- **Should a matching rule implicitly attach the same-named generator when the catalogue has one?** It would match
+  how `datetime` behaves today and remove a line of boilerplate, but the definition-expression parser lives in
+  `pact_models`, which has no visibility of the catalogue - so the resolution would have to happen in a later host
+  layer that does. Explicit declaration is the design; this is a possible convenience on top.
+- **Pact file portability.** A Pact file containing a plugin rule cannot be interpreted by an implementation that
+  cannot load the plugin. The `plugins` metadata entry makes the requirement explicit and diagnosable, but there is
+  no graceful degradation (no "fall back to `type` if the plugin is unavailable"). Is that acceptable, or should a
+  plugin rule be able to declare a core fallback rule for readers that cannot resolve it?
+- **Synchronous host matching paths.** See [9](#9-host-framework-integration) - needs confirming against
+  `pact_matching`'s and Pact-JVM's actual call paths before step 6.
