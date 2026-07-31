@@ -266,28 +266,81 @@ pub enum ResolvedCapability {
   Plugin(Box<PactPluginManifest>)
 }
 
+/// Does `entry_key` name this catalogue key? Either the whole key (`core/content-matcher/xml`),
+/// or a trailing run of its `/`-separated components (`content-matcher/xml`, or just `xml`).
+///
+/// Components are compared whole, never as substrings: `"type"` does not name
+/// `core/matcher/v2-type`. That distinction is the point - the core catalogue prefixes the Pact
+/// specification version a matcher was introduced in to its name, so a substring match would let
+/// an unqualified name collide with a versioned core key it has nothing to do with (a plugin's
+/// own `matcher/date` against `core/matcher/v3-date`, say). The versioned form is handled
+/// deliberately by [`names_versioned_core_key`] instead, as a fallback rather than a coincidence.
+fn names_catalogue_key(catalogue_key: &str, entry_key: &str) -> bool {
+  let key_parts = catalogue_key.split('/').collect::<Vec<_>>();
+  let query_parts = entry_key.split('/').collect::<Vec<_>>();
+  query_parts.len() <= key_parts.len()
+    && key_parts[key_parts.len() - query_parts.len()..] == query_parts[..]
+}
+
+/// Does `entry_key` name this entry under the core catalogue's versioned naming convention - the
+/// Pact specification version the rule was introduced in, prefixed to its name (`v2-type`,
+/// `v3-date`, `v4-not-empty`)? This is what lets a caller ask for `type` and get `v2-type`
+/// without having to know which specification version introduced it.
+///
+/// Only the whole name after the version prefix counts, so `type` names `v2-type` but not
+/// `v3-content-type` or `v2-min-type` - those are the `content-type` and `min-type` rules.
+fn names_versioned_core_key(entry: &CatalogueEntry, entry_key: &str) -> bool {
+  match entry.key.split_once('-') {
+    Some((version, name)) => name == entry_key
+      && version.len() > 1
+      && version.starts_with('v')
+      && version[1..].chars().all(|c| c.is_ascii_digit()),
+    None => false
+  }
+}
+
 /// Resolve a callback's catalogue entry key to a dispatch target, the same way
 /// [`crate::content::ContentMatcher::is_core`]/[`crate::content::ContentGenerator::is_core`] do
 /// for the driver's own outbound calls.
 ///
-/// `entry_key` is matched by suffix against the full catalogue key (e.g. a plugin passing
-/// `"xml"` matches `"core/content-matcher/xml"`), the same lookup [`lookup_entry`] does - except
-/// unlike [`lookup_entry`], this does not just take the first `HashMap` hit if more than one
-/// entry matches the suffix. A short, unqualified `entry_key` could otherwise coincidentally
-/// match more than one entry of the *same* `expected_type` (e.g. a plugin registering its own
-/// `content-matcher/xml` alongside a host-registered core `content-matcher/xml`), and `HashMap`
-/// iteration order is randomised per process - silently picking one would make the dispatch
-/// target non-deterministic across restarts. `expected_type` still guards against the *wrong*
-/// capability shape (a content-generator registered under the same name as an unrelated
-/// content-matcher), mirroring the explicit `entry_type` check [`find_content_matcher`]/
-/// [`find_content_generator`] already do.
+/// `entry_key` is matched against the catalogue in two passes:
+///
+/// 1. by name - the whole catalogue key (`core/content-matcher/xml`) or a trailing run of its
+///    components (`content-matcher/xml`, `xml`), compared component by component;
+/// 2. failing that, against the core catalogue's versioned naming convention, so `type` resolves
+///    to `v2-type` and `date` to `v3-date`.
+///
+/// Naming an entry directly always wins over the versioned fallback: if a plugin registers its
+/// own `matcher/date`, `date` resolves to that plugin, and a caller that specifically wants the
+/// core rule asks for `v3-date`.
+///
+/// Unlike [`lookup_entry`], this does not just take the first `HashMap` hit when more than one
+/// entry matches. A short, unqualified `entry_key` can still match more than one entry of the
+/// *same* `expected_type` (a plugin registering its own `content-matcher/xml` alongside a
+/// host-registered core `content-matcher/xml`), and `HashMap` iteration order is randomised per
+/// process - silently picking one would make the dispatch target non-deterministic across
+/// restarts. `expected_type` still guards against the *wrong* capability shape (a
+/// content-generator registered under the same name as an unrelated content-matcher), mirroring
+/// the explicit `entry_type` check [`find_content_matcher`]/[`find_content_generator`] already do.
 pub fn resolve_capability(entry_key: &str, expected_type: CatalogueEntryType) -> anyhow::Result<ResolvedCapability> {
-  let candidates: Vec<(String, CatalogueEntry)> = {
+  let all_entries: Vec<(String, CatalogueEntry)> = {
     let inner = CATALOGUE_REGISTER.lock().unwrap();
-    inner.iter()
-      .filter(|(k, _)| k.ends_with(entry_key))
-      .map(|(k, v)| (k.clone(), v.clone()))
-      .collect()
+    inner.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+  };
+
+  let named: Vec<(String, CatalogueEntry)> = all_entries.iter()
+    .filter(|(k, _)| names_catalogue_key(k, entry_key))
+    .cloned()
+    .collect();
+  let candidates = if named.iter().any(|(_, entry)| entry.entry_type == expected_type) {
+    named
+  } else {
+    let versioned: Vec<(String, CatalogueEntry)> = all_entries.iter()
+      .filter(|(_, entry)| names_versioned_core_key(entry, entry_key))
+      .cloned()
+      .collect();
+    // Keep any wrong-typed direct matches for the diagnostic below if the fallback finds nothing
+    if versioned.is_empty() { named } else { versioned }
   };
 
   let mut of_expected_type = candidates.iter().filter(|(_, entry)| entry.entry_type == expected_type);
@@ -621,6 +674,107 @@ mod tests {
       ResolvedCapability::Plugin(_) => panic!("expected a Core resolution, got Plugin")
     };
     expect!(core_key).to(be_equal_to(key.to_string()));
+  }
+
+  /// The core matcher entries as the Pact frameworks actually register them - the Pact
+  /// specification version the rule was introduced in, prefixed to the name. Kept in sync with
+  /// `MATCHER_CATALOGUE_ENTRIES` in pact_matching and `MatcherExecutor.kt` in Pact-JVM.
+  fn register_core_matcher_entries() {
+    let entries = ["v2-regex", "v2-type", "v3-number-type", "v3-integer-type", "v3-decimal-type",
+      "v3-date", "v3-time", "v3-datetime", "v2-min-type", "v2-max-type", "v2-minmax-type",
+      "v3-includes", "v3-null", "v4-equals-ignore-order", "v4-min-equals-ignore-order",
+      "v4-max-equals-ignore-order", "v4-minmax-equals-ignore-order", "v3-content-type",
+      "v4-array-contains", "v1-equality", "v4-not-empty", "v4-semver"]
+      .iter()
+      .map(|key| CatalogueEntry {
+        entry_type: CatalogueEntryType::MATCHER,
+        provider_type: CatalogueEntryProviderType::CORE,
+        plugin: None,
+        key: key.to_string(),
+        values: hashmap!{}
+      })
+      .collect();
+    register_core_entries(&entries);
+  }
+
+  fn resolved_core_key(entry_key: &str) -> String {
+    match resolve_capability(entry_key, CatalogueEntryType::MATCHER) {
+      Ok(ResolvedCapability::Core(key)) => key,
+      other => panic!("expected '{}' to resolve to a core entry, got {:?}", entry_key, other)
+    }
+  }
+
+  #[test]
+  fn resolve_capability_falls_back_to_the_versioned_core_key() {
+    register_core_matcher_entries();
+
+    // The name a Pact file (and a plugin calling back) uses, without needing to know which
+    // specification version introduced the rule
+    expect!(resolved_core_key("type")).to(be_equal_to("v2-type".to_string()));
+    expect!(resolved_core_key("regex")).to(be_equal_to("v2-regex".to_string()));
+    expect!(resolved_core_key("date")).to(be_equal_to("v3-date".to_string()));
+    expect!(resolved_core_key("equality")).to(be_equal_to("v1-equality".to_string()));
+    expect!(resolved_core_key("semver")).to(be_equal_to("v4-semver".to_string()));
+    expect!(resolved_core_key("not-empty")).to(be_equal_to("v4-not-empty".to_string()));
+
+    // Only the whole name after the version prefix counts, so these are distinct rules and not
+    // ambiguous with `type`/`equals-ignore-order`
+    expect!(resolved_core_key("content-type")).to(be_equal_to("v3-content-type".to_string()));
+    expect!(resolved_core_key("min-type")).to(be_equal_to("v2-min-type".to_string()));
+    expect!(resolved_core_key("equals-ignore-order"))
+      .to(be_equal_to("v4-equals-ignore-order".to_string()));
+
+    // The versioned key itself still resolves, by name
+    expect!(resolved_core_key("v2-type")).to(be_equal_to("v2-type".to_string()));
+    expect!(resolved_core_key("core/matcher/v3-date")).to(be_equal_to("v3-date".to_string()));
+    expect!(resolved_core_key("matcher/v3-date")).to(be_equal_to("v3-date".to_string()));
+  }
+
+  #[test]
+  fn resolve_capability_does_not_match_a_key_component_as_a_substring() {
+    // "type" must not name `core/matcher/v2-type` by suffix - if it did, it would match all eight
+    // core keys ending in "type" and be ambiguous. It resolves through the versioned fallback to
+    // exactly one entry instead.
+    expect!(names_catalogue_key("core/matcher/v2-type", "type")).to(be_false());
+    expect!(names_catalogue_key("core/matcher/v2-type", "v2-type")).to(be_true());
+    expect!(names_catalogue_key("core/matcher/v2-type", "matcher/v2-type")).to(be_true());
+    expect!(names_catalogue_key("core/matcher/v2-type", "core/matcher/v2-type")).to(be_true());
+    expect!(names_catalogue_key("core/matcher/v2-type", "r/v2-type")).to(be_false());
+    expect!(names_catalogue_key("core/content-matcher/xml", "xml")).to(be_true());
+    expect!(names_catalogue_key("core/content-matcher/xml", "ml")).to(be_false());
+  }
+
+  #[test]
+  fn resolve_capability_prefers_an_entry_named_directly_over_the_versioned_fallback() {
+    let name = "resolve_capability_prefers_an_entry_named_directly_over_the_versioned_fallback";
+    register_core_entries(&vec![CatalogueEntry {
+      entry_type: CatalogueEntryType::MATCHER,
+      provider_type: CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: format!("v3-{}", name),
+      values: hashmap!{}
+    }]);
+    // Before the plugin registers anything, the bare name finds the core rule via the fallback
+    let core_first = resolved_core_key(name);
+
+    let manifest = PactPluginManifest { name: name.to_string(), .. PactPluginManifest::default() };
+    register_plugin_entries(&manifest, &vec![ProtoCatalogueEntry {
+      r#type: CatalogueEntryType::MATCHER.to_proto_value(),
+      key: name.to_string(),
+      values: hashmap!{}
+    }]);
+
+    let resolved = resolve_capability(name, CatalogueEntryType::MATCHER);
+    // A caller that specifically wants the core rule can still name its versioned key
+    let still_core = resolved_core_key(&format!("v3-{}", name));
+    remove_plugin_entries(name);
+
+    expect!(core_first).to(be_equal_to(format!("v3-{}", name)));
+    match resolved.expect("expected the plugin's own entry to resolve") {
+      ResolvedCapability::Plugin(resolved_manifest) => expect!(resolved_manifest.name).to(be_equal_to(name.to_string())),
+      ResolvedCapability::Core(key) => panic!("expected the plugin entry to win, got core '{}'", key)
+    };
+    expect!(still_core).to(be_equal_to(format!("v3-{}", name)));
   }
 
   #[test]

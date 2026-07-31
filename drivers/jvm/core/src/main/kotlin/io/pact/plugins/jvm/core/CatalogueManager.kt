@@ -78,23 +78,36 @@ object CatalogueManager {
    * functions ([LuaPactPlugin]) - so there is exactly one place that decides "who provides this
    * entry". See proposal 007 ("One resolver, multiple call directions").
    *
-   * `entryKey` is matched by suffix against the full catalogue key (e.g. a plugin passing `"xml"`
-   * matches `"core/content-matcher/xml"`) - the same lookup [lookupEntry] does, except unlike
-   * [lookupEntry] this does not just take the first hit if more than one entry matches the
-   * suffix. A short, unqualified `entryKey` could otherwise coincidentally match more than one
-   * entry of the *same* `expectedType` (e.g. a plugin registering its own `content-matcher/xml`
-   * alongside a host-registered core `content-matcher/xml`); silently picking one (in whatever
-   * order the backing map iterates) would make the dispatch target depend on registration order
-   * rather than being deterministic. `expectedType` still guards against the *wrong* capability
-   * shape (a content-generator registered under the same name as an unrelated content-matcher),
-   * mirroring the explicit `type` check [findContentMatcher]/[findContentGenerator] already do.
+   * `entryKey` is matched against the catalogue in two passes:
+   *
+   * 1. by name - the whole catalogue key (`core/content-matcher/xml`) or a trailing run of its
+   *    components (`content-matcher/xml`, `xml`), compared component by component;
+   * 2. failing that, against the core catalogue's versioned naming convention, so `type` resolves
+   *    to `v2-type` and `date` to `v3-date`.
+   *
+   * Naming an entry directly always wins over the versioned fallback: if a plugin registers its
+   * own `matcher/date`, `date` resolves to that plugin, and a caller that specifically wants the
+   * core rule asks for `v3-date`.
+   *
+   * Unlike [lookupEntry], this does not just take the first hit when more than one entry matches.
+   * A short, unqualified `entryKey` can still match more than one entry of the *same*
+   * `expectedType` (a plugin registering its own `content-matcher/xml` alongside a host-registered
+   * core `content-matcher/xml`); silently picking one (in whatever order the backing map iterates)
+   * would make the dispatch target depend on registration order rather than being deterministic.
+   * `expectedType` still guards against the *wrong* capability shape (a content-generator
+   * registered under the same name as an unrelated content-matcher), mirroring the explicit `type`
+   * check [findContentMatcher]/[findContentGenerator] already do.
    */
   fun resolveCapability(entryKey: String, expectedType: CatalogueEntryType): ResolvedCapability {
-    val exact = catalogue[entryKey]
-    val candidates = if (exact != null) {
-      listOf(entryKey to exact)
+    val named = catalogue.entries.filter { namesCatalogueKey(it.key, entryKey) }.map { it.key to it.value }
+    val candidates = if (named.any { (_, entry) -> entry.type == expectedType }) {
+      named
     } else {
-      catalogue.entries.filter { it.key.endsWith(entryKey) }.map { it.key to it.value }
+      val versioned = catalogue.entries
+        .filter { namesVersionedCoreKey(it.value, entryKey) }
+        .map { it.key to it.value }
+      // Keep any wrong-typed direct matches for the diagnostic below if the fallback finds nothing
+      if (versioned.isEmpty()) named else versioned
     }
 
     val ofExpectedType = candidates.filter { (_, entry) -> entry.type == expectedType }
@@ -166,6 +179,46 @@ object CatalogueManager {
 
     logger.debug { "Removed all catalogue entries for plugin $name" }
   }
+}
+
+/**
+ * Does `entryKey` name this catalogue key? Either the whole key (`core/content-matcher/xml`), or a
+ * trailing run of its `/`-separated components (`content-matcher/xml`, or just `xml`).
+ *
+ * Components are compared whole, never as substrings: `"type"` does not name
+ * `core/matcher/v2-type`. That distinction is the point - the core catalogue prefixes the Pact
+ * specification version a matcher was introduced in to its name, so a substring match would let an
+ * unqualified name collide with a versioned core key it has nothing to do with (a plugin's own
+ * `matcher/date` against `core/matcher/v3-date`, say). The versioned form is handled deliberately
+ * by [namesVersionedCoreKey] instead, as a fallback rather than a coincidence.
+ *
+ * Must stay consistent with `catalogue_manager::names_catalogue_key` in the Rust driver.
+ */
+internal fun namesCatalogueKey(catalogueKey: String, entryKey: String): Boolean {
+  val keyParts = catalogueKey.split('/')
+  val queryParts = entryKey.split('/')
+  return queryParts.size <= keyParts.size &&
+    keyParts.subList(keyParts.size - queryParts.size, keyParts.size) == queryParts
+}
+
+private val VERSION_PREFIX = Regex("^v\\d+$")
+
+/**
+ * Does `entryKey` name this entry under the core catalogue's versioned naming convention - the Pact
+ * specification version the rule was introduced in, prefixed to its name (`v2-type`, `v3-date`,
+ * `v4-not-empty`)? This is what lets a caller ask for `type` and get `v2-type` without having to
+ * know which specification version introduced it.
+ *
+ * Only the whole name after the version prefix counts, so `type` names `v2-type` but not
+ * `v3-content-type` or `v2-min-type` - those are the `content-type` and `min-type` rules.
+ *
+ * Must stay consistent with `catalogue_manager::names_versioned_core_key` in the Rust driver.
+ */
+internal fun namesVersionedCoreKey(entry: CatalogueEntry, entryKey: String): Boolean {
+  val separator = entry.key.indexOf('-')
+  if (separator <= 0) return false
+  return entry.key.substring(separator + 1) == entryKey &&
+    VERSION_PREFIX.matches(entry.key.substring(0, separator))
 }
 
 /**

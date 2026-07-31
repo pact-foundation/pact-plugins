@@ -535,7 +535,9 @@ message HostGenerateContentRequest {
 // standard Pact rules) or owned by another plugin - resolved by catalogue entry key. See proposals
 // 006 (Field-level matchers and generators) and 007 (Driver-plugin callback model).
 message HostMatchFieldRequest {
-  // Catalogue entry key identifying the rule to invoke, e.g. "type" for matcher/type
+  // Catalogue entry key identifying the rule to invoke. Either the name as a Pact file writes it
+  // ("type"), or the key as hostCapabilities advertises it ("matcher/v2-type") - the core
+  // catalogue prefixes the Pact specification version a rule was introduced in to its name.
   string entryKey = 1;
   // The match request, in the same shape as PactPlugin.MatchField
   MatchFieldRequest request = 2;
@@ -544,7 +546,8 @@ message HostMatchFieldRequest {
 // Callback request from a plugin to invoke a field-level generator - host-provided or owned by
 // another plugin - resolved by catalogue entry key. See proposals 006 and 007.
 message HostGenerateFieldRequest {
-  // Catalogue entry key identifying the generator to invoke, e.g. "date" for generator/date
+  // Catalogue entry key identifying the generator to invoke, e.g. "date" or "generator/v3-date".
+  // See HostMatchFieldRequest.entryKey.
   string entryKey = 1;
   // The generation request, in the same shape as PactPlugin.GenerateField
   GenerateFieldRequest request = 2;

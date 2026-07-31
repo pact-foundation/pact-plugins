@@ -39,7 +39,8 @@ and generator set (`type`, `regex`, `equality`, `date`/`time`, etc. — the same
 catalogue) as `CatalogueEntryProviderType::CORE` entries, each with a registered handler implementing the relevant
 trait from 007 (a content-level `CoreContentMatcher`/`CoreContentGenerator`, or the field-level equivalent 006 defines).
 A plugin that wants standard behaviour for a field it doesn't want to reimplement calls back through the mechanism 007
-already defines, naming the catalogue key for the standard rule it wants (e.g. `matcher/type`, `matcher/regex`).
+already defines, naming the catalogue key for the standard rule it wants (e.g. `matcher/v2-type`,
+`matcher/v2-regex`, or just `type`/`regex` - see [006](./006_Field_level_matchers_and_generators.md#2-naming-and-resolution)).
 
 No new protocol messages, transports, or dependency-inversion mechanism are needed beyond what 006 and 007 already
 define. This proposal's remaining job is narrower than originally scoped: registering the existing standard matcher/

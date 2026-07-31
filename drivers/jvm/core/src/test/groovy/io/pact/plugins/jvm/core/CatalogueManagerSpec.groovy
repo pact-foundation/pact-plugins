@@ -128,6 +128,99 @@ class CatalogueManagerSpec extends Specification {
     ((ResolvedCapability.Core) resolved).key == key
   }
 
+  /**
+   * The core matcher entries as the Pact frameworks actually register them - the Pact
+   * specification version the rule was introduced in, prefixed to the name. Kept in sync with
+   * MatcherExecutor.kt in Pact-JVM and MATCHER_CATALOGUE_ENTRIES in pact_matching.
+   */
+  private static void registerCoreMatcherEntries() {
+    CatalogueManager.INSTANCE.registerCoreEntries(
+      ['v2-regex', 'v2-type', 'v3-number-type', 'v3-integer-type', 'v3-decimal-type', 'v3-date',
+       'v3-time', 'v3-datetime', 'v2-min-type', 'v2-max-type', 'v2-minmax-type', 'v3-includes',
+       'v3-null', 'v4-equals-ignore-order', 'v4-min-equals-ignore-order',
+       'v4-max-equals-ignore-order', 'v4-minmax-equals-ignore-order', 'v3-content-type',
+       'v4-array-contains', 'v1-equality', 'v4-not-empty', 'v4-semver'].collect {
+        new CatalogueEntry(CatalogueEntryType.MATCHER, CatalogueEntryProviderType.CORE, 'core', it)
+      }
+    )
+  }
+
+  private static String resolvedCoreKey(String entryKey) {
+    def resolved = CatalogueManager.INSTANCE.resolveCapability(entryKey, CatalogueEntryType.MATCHER)
+    assert resolved instanceof ResolvedCapability.Core
+    ((ResolvedCapability.Core) resolved).key
+  }
+
+  def 'resolveCapability falls back to the versioned core key'() {
+    given:
+    registerCoreMatcherEntries()
+
+    expect:
+    // The name a Pact file (and a plugin calling back) uses, without needing to know which
+    // specification version introduced the rule
+    resolvedCoreKey(name) == expected
+
+    where:
+    name                  || expected
+    'type'                || 'v2-type'
+    'regex'               || 'v2-regex'
+    'date'                || 'v3-date'
+    'equality'            || 'v1-equality'
+    'semver'              || 'v4-semver'
+    'not-empty'           || 'v4-not-empty'
+    // Only the whole name after the version prefix counts, so these are distinct rules and not
+    // ambiguous with `type`/`equals-ignore-order`
+    'content-type'        || 'v3-content-type'
+    'min-type'            || 'v2-min-type'
+    'equals-ignore-order' || 'v4-equals-ignore-order'
+    // The versioned key itself still resolves, by name
+    'v2-type'             || 'v2-type'
+    'matcher/v3-date'     || 'v3-date'
+    'core/matcher/v3-date' || 'v3-date'
+  }
+
+  def 'a key component is never matched as a substring'() {
+    // "type" must not name core/matcher/v2-type - if it did, it would match all eight core keys
+    // ending in "type" and be ambiguous. It resolves through the versioned fallback instead.
+    expect:
+    !CatalogueManagerKt.namesCatalogueKey('core/matcher/v2-type', 'type')
+    CatalogueManagerKt.namesCatalogueKey('core/matcher/v2-type', 'v2-type')
+    CatalogueManagerKt.namesCatalogueKey('core/matcher/v2-type', 'matcher/v2-type')
+    CatalogueManagerKt.namesCatalogueKey('core/matcher/v2-type', 'core/matcher/v2-type')
+    !CatalogueManagerKt.namesCatalogueKey('core/matcher/v2-type', 'r/v2-type')
+    CatalogueManagerKt.namesCatalogueKey('core/content-matcher/xml', 'xml')
+    !CatalogueManagerKt.namesCatalogueKey('core/content-matcher/xml', 'ml')
+  }
+
+  def 'resolveCapability prefers an entry named directly over the versioned fallback'() {
+    given:
+    def key = 'resolveCapability prefers an entry named directly'
+    CatalogueManager.INSTANCE.registerCoreEntries([
+      new CatalogueEntry(CatalogueEntryType.MATCHER, CatalogueEntryProviderType.CORE, 'core', "v3-$key")
+    ])
+    // Before the plugin registers anything, the bare name finds the core rule via the fallback
+    def coreFirst = resolvedCoreKey(key)
+
+    def pluginEntry = Plugin.CatalogueEntry.newBuilder()
+      .setTypeValue(CatalogueEntryType.MATCHER.toEntryValue())
+      .setKey(key)
+      .build()
+    CatalogueManager.INSTANCE.registerPluginEntries('CatalogueManagerSpec-versioned', [pluginEntry])
+
+    when:
+    def resolved = CatalogueManager.INSTANCE.resolveCapability(key, CatalogueEntryType.MATCHER)
+
+    then:
+    coreFirst == "v3-$key"
+    resolved instanceof ResolvedCapability.Plugin
+    ((ResolvedCapability.Plugin) resolved).pluginName == 'CatalogueManagerSpec-versioned'
+    // A caller that specifically wants the core rule can still name its versioned key
+    resolvedCoreKey("v3-$key") == "v3-$key"
+
+    cleanup:
+    CatalogueManager.INSTANCE.removePluginEntries('CatalogueManagerSpec-versioned')
+  }
+
   def 'resolveCapability throws a clear error for an unregistered key'() {
     when:
     CatalogueManager.INSTANCE.resolveCapability(

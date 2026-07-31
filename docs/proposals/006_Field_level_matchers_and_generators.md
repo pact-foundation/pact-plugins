@@ -94,8 +94,14 @@ The **rule name is the catalogue key**. A rule named `creditcard` resolves throu
 `catalogue_manager::resolve_capability` (`CatalogueManager.resolveCapability` on the JVM) with an expected type of
 `MATCHER`/`GENERATOR` - the same resolver 007 already uses for callbacks, with the same behaviour:
 
-- resolves by suffix against the full catalogue key, so a user can write `creditcard/matcher/creditcard` to
-  disambiguate if two plugins ever register the same short name;
+- a bare name (`creditcard`) matches the entry's key; a caller can also name more of the catalogue key
+  (`matcher/creditcard`, `plugin/creditcard/matcher/creditcard`) to disambiguate if two plugins ever register the
+  same short name. Key components are compared whole, never as substrings;
+- failing that, the name is matched against the core catalogue's versioned naming convention - the Pact
+  specification version a rule was introduced in, prefixed to its name - so `type` resolves to `core/matcher/v2-type`
+  and `date` to `core/matcher/v3-date` without a caller having to know which version introduced what. Naming an entry
+  directly always wins over this fallback: a plugin registering its own `matcher/date` takes `date`, and a caller
+  that specifically wants the core rule asks for `v3-date`;
 - a name matching more than one entry of the expected type is a hard error naming the candidates, never a silent
   pick;
 - a name matching nothing is a hard error at match/generate time.
@@ -103,7 +109,7 @@ The **rule name is the catalogue key**. A rule named `creditcard` resolves throu
 Core rule names always win: the host resolves `type`, `regex`, `equality` and the rest of the standard set from its
 own matching engine before it ever consults the catalogue, so a plugin cannot shadow a standard rule. (Once
 [009](./009_Host_provided_core_matching_and_generation.md) registers the standard set as `CORE` entries, those become
-visible in the catalogue too - as `core/matcher/type` etc. - which is what lets a *plugin* call back for them, but
+visible in the catalogue too - as `core/matcher/v2-type` etc. - which is what lets a *plugin* call back for them, but
 does not change how the host resolves its own rules.)
 
 ### 3. Declaring a plugin rule in a test
@@ -258,7 +264,7 @@ Notes on specific choices:
   strings. A plugin declares it provides a field rule by registering the catalogue entry, and implementing the
   matching RPC is then part of that entry's contract. In the other direction, host-provided rules appear in
   `hostCapabilities` automatically, since the driver already derives that list from its core catalogue entries as
-  `<entry_type>/<key>` - `matcher/type`, `generator/date`, and so on, once 009 registers them.
+  `<entry_type>/<key>` - `matcher/v2-type`, `generator/v3-date`, and so on, once 009 registers them.
 
 ### 6. Context available to the plugin
 
@@ -308,7 +314,7 @@ resolver, the same `pact-call-chain-id` cycle detection and `pact-deadline-ms` p
 dispatch.
 
 This is what makes the "plugin owns a content type, delegates most fields to the host" story work: a protobuf plugin
-matching a `CreditCard` message can apply `matcher/type` to most fields through the host and only implement what is
+matching a `CreditCard` message can apply `matcher/v2-type` to most fields through the host and only implement what is
 actually protobuf-specific, and can hand a field carrying a `{ "match": "creditcard" }` rule straight to the
 `creditcard` plugin without knowing it exists.
 

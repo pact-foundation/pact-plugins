@@ -915,7 +915,9 @@ pub struct HostGenerateContentRequest {
 /// 006 (Field-level matchers and generators) and 007 (Driver-plugin callback model).
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct HostMatchFieldRequest {
-    /// Catalogue entry key identifying the rule to invoke, e.g. "type" for matcher/type
+    /// Catalogue entry key identifying the rule to invoke. Either the name as a Pact file writes it
+    /// ("type"), or the key as hostCapabilities advertises it ("matcher/v2-type") - the core
+    /// catalogue prefixes the Pact specification version a rule was introduced in to its name.
     #[prost(string, tag = "1")]
     pub entry_key: ::prost::alloc::string::String,
     /// The match request, in the same shape as PactPlugin.MatchField
@@ -926,7 +928,8 @@ pub struct HostMatchFieldRequest {
 /// another plugin - resolved by catalogue entry key. See proposals 006 and 007.
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct HostGenerateFieldRequest {
-    /// Catalogue entry key identifying the generator to invoke, e.g. "date" for generator/date
+    /// Catalogue entry key identifying the generator to invoke, e.g. "date" or "generator/v3-date".
+    /// See HostMatchFieldRequest.entryKey.
     #[prost(string, tag = "1")]
     pub entry_key: ::prost::alloc::string::String,
     /// The generation request, in the same shape as PactPlugin.GenerateField
