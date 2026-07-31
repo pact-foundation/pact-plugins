@@ -532,8 +532,10 @@ WASM plugin support at all.
    (`ContentMatcher`) silently, so the inbound path must read the raw field. The clean fix is to stop treating a
    generated proto enum as the driver's own type - `CatalogueEntryType` should be the source of truth - rather than
    adding `GENERATOR` to the frozen V1 contract.
-3. ⬜ JVM driver: the same surface (`FieldMatcher.kt`, `FieldGenerator.kt`, `CoreCapabilities.kt`,
-   `PluginHostServer.kt`, `PluginRpcClient.kt`).
+3. ✅ JVM driver: the same surface, in `Field.kt` (`FieldValue`, `FieldContext`, `FieldMatcher`/`FieldGenerator`),
+   `CoreCapabilities.kt`, `CatalogueManager.resolveCapabilityEntry`, `PluginHostServer.kt` and
+   `PluginRpcClient.kt`. No blocking wrapper is needed here - the JVM driver talks to plugins over blocking gRPC
+   stubs, so the synchronous matching path calls straight through.
 4. ⬜ Lua runtime in both drivers: `match_field`/`generate_field` invocation, `host_match_field`/
    `host_generate_field` host functions, conversions in `lua_plugin.rs` / `LuaConversions.kt`.
 5. ✅ Reference plugin: [`plugins/creditcard`](../../plugins/creditcard), written against this design. Cannot run

@@ -166,6 +166,68 @@ internal class PluginHostGrpcService : PluginHostGrpc.PluginHostImplBase() {
       responseObserver.onError(statusFor(ex).asRuntimeException())
     }
   }
+
+  override fun matchField(
+    request: PluginV2.HostMatchFieldRequest,
+    responseObserver: StreamObserver<PluginV2.MatchFieldResponse>
+  ) {
+    val (chainId, deadlineMs) = callChainContext()
+    try {
+      if (CallChain.isExpired(deadlineMs)) {
+        throw PactCallChainDeadlineExceededException(chainId)
+      }
+      CallChain.pushCall(chainId, request.entryKey).use {
+        // No conversion here, unlike the content-level callbacks: the field-level messages exist
+        // only on the V2 interface, so they are already the shape the handler expects
+        val response = when (val resolved = CatalogueManager.resolveCapability(request.entryKey, CatalogueEntryType.MATCHER)) {
+          is ResolvedCapability.Core -> {
+            val handler = CoreCapabilityRegistry.fieldMatcher(resolved.key)
+              ?: throw PactCoreCapabilityNotFoundException(resolved.key)
+            handler.matchField(request.request)
+          }
+          is ResolvedCapability.Plugin -> {
+            val plugin = DefaultPluginManager.lookupPlugin(resolved.pluginName, null)
+              ?: throw PactPluginNotFoundException(resolved.pluginName, null)
+            plugin.withRpcClient { client -> client.matchFieldWithChain(request.request, chainId, deadlineMs) }
+          }
+        }
+        responseObserver.onNext(response)
+        responseObserver.onCompleted()
+      }
+    } catch (ex: Exception) {
+      responseObserver.onError(statusFor(ex).asRuntimeException())
+    }
+  }
+
+  override fun generateField(
+    request: PluginV2.HostGenerateFieldRequest,
+    responseObserver: StreamObserver<PluginV2.GenerateFieldResponse>
+  ) {
+    val (chainId, deadlineMs) = callChainContext()
+    try {
+      if (CallChain.isExpired(deadlineMs)) {
+        throw PactCallChainDeadlineExceededException(chainId)
+      }
+      CallChain.pushCall(chainId, request.entryKey).use {
+        val response = when (val resolved = CatalogueManager.resolveCapability(request.entryKey, CatalogueEntryType.GENERATOR)) {
+          is ResolvedCapability.Core -> {
+            val handler = CoreCapabilityRegistry.fieldGenerator(resolved.key)
+              ?: throw PactCoreCapabilityNotFoundException(resolved.key)
+            handler.generateField(request.request)
+          }
+          is ResolvedCapability.Plugin -> {
+            val plugin = DefaultPluginManager.lookupPlugin(resolved.pluginName, null)
+              ?: throw PactPluginNotFoundException(resolved.pluginName, null)
+            plugin.withRpcClient { client -> client.generateFieldWithChain(request.request, chainId, deadlineMs) }
+          }
+        }
+        responseObserver.onNext(response)
+        responseObserver.onCompleted()
+      }
+    } catch (ex: Exception) {
+      responseObserver.onError(statusFor(ex).asRuntimeException())
+    }
+  }
 }
 
 /** Map a callback dispatch failure to the appropriate gRPC status code. */

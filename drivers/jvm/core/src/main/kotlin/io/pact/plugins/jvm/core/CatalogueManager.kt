@@ -105,6 +105,20 @@ object CatalogueManager {
    * check [findContentMatcher]/[findContentGenerator] already do.
    */
   fun resolveCapability(entryKey: String, expectedType: CatalogueEntryType): ResolvedCapability {
+    val entry = resolveCapabilityEntry(entryKey, expectedType)
+    return when (entry.providerType) {
+      CatalogueEntryProviderType.CORE -> ResolvedCapability.Core(entry.key)
+      CatalogueEntryProviderType.PLUGIN -> ResolvedCapability.Plugin(entry.pluginName)
+    }
+  }
+
+  /**
+   * Resolve a catalogue entry key to the entry itself, using the same two-pass matching
+   * [resolveCapability] documents. Callers that need the entry rather than a dispatch target -
+   * [findFieldMatcher] and [findFieldGenerator], which wrap it in a matcher/generator - use this
+   * directly.
+   */
+  fun resolveCapabilityEntry(entryKey: String, expectedType: CatalogueEntryType): CatalogueEntry {
     val named = catalogue.entries.filter { namesCatalogueKey(it.key, entryKey) }.map { it.key to it.value }
     val candidates = if (named.any { (_, entry) -> entry.type == expectedType }) {
       named
@@ -126,10 +140,7 @@ object CatalogueManager {
       else -> throw PactCatalogueEntryAmbiguousException(entryKey, ofExpectedType.map { it.first }.sorted())
     }
 
-    return when (entry.providerType) {
-      CatalogueEntryProviderType.CORE -> ResolvedCapability.Core(entry.key)
-      CatalogueEntryProviderType.PLUGIN -> ResolvedCapability.Plugin(entry.pluginName)
-    }
+    return entry
   }
 
   /**
