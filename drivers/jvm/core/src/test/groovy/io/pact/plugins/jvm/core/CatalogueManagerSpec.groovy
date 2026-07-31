@@ -192,6 +192,59 @@ class CatalogueManagerSpec extends Specification {
     !CatalogueManagerKt.namesCatalogueKey('core/content-matcher/xml', 'ml')
   }
 
+  def 'the versioned fallback only applies to matcher and generator entries'() {
+    given:
+    // Content matchers, content generators and transports are registered under plain names, so a
+    // leading "v<n>-" there is part of the name, not a version to be stripped.
+    def key = 'versioned fallback entry types'
+    CatalogueManager.INSTANCE.registerCoreEntries([
+      new CatalogueEntry(CatalogueEntryType.CONTENT_MATCHER, CatalogueEntryProviderType.CORE, 'core', "v2-$key"),
+      new CatalogueEntry(CatalogueEntryType.MATCHER, CatalogueEntryProviderType.CORE, 'core', "v2-matcher-$key")
+    ])
+
+    when:
+    CatalogueManager.INSTANCE.resolveCapability(key, CatalogueEntryType.CONTENT_MATCHER)
+
+    then:
+    // The content matcher is only reachable by its actual name
+    thrown(PactCatalogueEntryNotFoundException)
+    CatalogueManager.INSTANCE.lookupEntry(key) == null
+    CatalogueManager.INSTANCE.resolveCapability("v2-$key", CatalogueEntryType.CONTENT_MATCHER) != null
+    // ... while the matcher entry still gets the fallback
+    resolvedCoreKey("matcher-$key") == "v2-matcher-$key"
+  }
+
+  def 'lookupEntry matches by name, not by substring'() {
+    given:
+    def key = 'lookupEntry-matches-by-name'
+    def entry = Plugin.CatalogueEntry.newBuilder()
+      .setTypeValue(CatalogueEntryType.CONTENT_MATCHER.toEntryValue())
+      .setKey(key)
+      .build()
+    CatalogueManager.INSTANCE.registerPluginEntries('CatalogueManagerSpec-lookup', [entry])
+
+    expect:
+    CatalogueManager.INSTANCE.lookupEntry(key)?.type == CatalogueEntryType.CONTENT_MATCHER
+    CatalogueManager.INSTANCE.lookupEntry("content-matcher/$key")?.type == CatalogueEntryType.CONTENT_MATCHER
+    CatalogueManager.INSTANCE
+      .lookupEntry("plugin/CatalogueManagerSpec-lookup/content-matcher/$key")?.type == CatalogueEntryType.CONTENT_MATCHER
+    // A trailing substring of a component names nothing
+    CatalogueManager.INSTANCE.lookupEntry('matches-by-name') == null
+
+    cleanup:
+    CatalogueManager.INSTANCE.removePluginEntries('CatalogueManagerSpec-lookup')
+  }
+
+  def 'lookupEntry falls back to the versioned core key'() {
+    given:
+    registerCoreMatcherEntries()
+
+    expect:
+    CatalogueManager.INSTANCE.lookupEntry('type')?.key == 'v2-type'
+    CatalogueManager.INSTANCE.lookupEntry('v3-date')?.key == 'v3-date'
+    CatalogueManager.INSTANCE.lookupEntry('matcher/v3-date')?.key == 'v3-date'
+  }
+
   def 'resolveCapability prefers an entry named directly over the versioned fallback'() {
     given:
     def key = 'resolveCapability prefers an entry named directly'

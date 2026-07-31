@@ -245,12 +245,18 @@ pub fn register_core_entries(entries: &Vec<CatalogueEntry>) {
   }
 }
 
-/// Lookup an entry in the catalogue by the key. Will find the first entry that ends with the
-/// given key.
+/// Lookup an entry in the catalogue by the key, matched the same way [`resolve_capability`] does:
+/// by name first - the whole catalogue key, or a trailing run of its `/`-separated components -
+/// then against the core catalogue's versioned naming convention.
+///
+/// Unlike [`resolve_capability`], this takes the first match when more than one entry matches, and
+/// `HashMap` iteration order is randomised per process. Prefer [`resolve_capability`] wherever the
+/// expected entry type is known and a deterministic answer matters.
 pub fn lookup_entry(key: &str) -> Option<CatalogueEntry> {
   let inner = CATALOGUE_REGISTER.lock().unwrap();
   inner.iter()
-    .find(|(k, _)| k.ends_with(key))
+    .find(|(k, _)| names_catalogue_key(k, key))
+    .or_else(|| inner.iter().find(|(_, entry)| names_versioned_core_key(entry, key)))
     .map(|(_, v)| v.clone())
 }
 
@@ -289,7 +295,15 @@ fn names_catalogue_key(catalogue_key: &str, entry_key: &str) -> bool {
 ///
 /// Only the whole name after the version prefix counts, so `type` names `v2-type` but not
 /// `v3-content-type` or `v2-min-type` - those are the `content-type` and `min-type` rules.
+///
+/// The convention only applies to matching rules and generators. Content matchers, content
+/// generators and transports are registered under plain names (`xml`, `json`, `grpc`), so a
+/// leading `v<n>-` there is part of the name rather than a version, and stripping it would be
+/// wrong.
 fn names_versioned_core_key(entry: &CatalogueEntry, entry_key: &str) -> bool {
+  if entry.entry_type != CatalogueEntryType::MATCHER && entry.entry_type != CatalogueEntryType::GENERATOR {
+    return false;
+  }
   match entry.key.split_once('-') {
     Some((version, name)) => name == entry_key
       && version.len() > 1
@@ -742,6 +756,83 @@ mod tests {
     expect!(names_catalogue_key("core/matcher/v2-type", "r/v2-type")).to(be_false());
     expect!(names_catalogue_key("core/content-matcher/xml", "xml")).to(be_true());
     expect!(names_catalogue_key("core/content-matcher/xml", "ml")).to(be_false());
+  }
+
+  #[test]
+  fn the_versioned_fallback_only_applies_to_matcher_and_generator_entries() {
+    // Content matchers, content generators and transports are registered under plain names, so a
+    // leading "v<n>-" there is part of the name, not a version to be stripped.
+    let name = "the_versioned_fallback_only_applies_to_matcher_and_generator_entries";
+    register_core_entries(&vec![
+      CatalogueEntry {
+        entry_type: CatalogueEntryType::CONTENT_MATCHER,
+        provider_type: CatalogueEntryProviderType::CORE,
+        plugin: None,
+        key: format!("v2-{}", name),
+        values: hashmap!{}
+      },
+      CatalogueEntry {
+        entry_type: CatalogueEntryType::MATCHER,
+        provider_type: CatalogueEntryProviderType::CORE,
+        plugin: None,
+        key: format!("v2-matcher-{}", name),
+        values: hashmap!{}
+      }
+    ]);
+
+    // The content matcher is only reachable by its actual name
+    expect!(resolve_capability(name, CatalogueEntryType::CONTENT_MATCHER).is_err()).to(be_true());
+    expect!(lookup_entry(name).map(|entry| entry.key)).to(be_none());
+    expect!(resolve_capability(&format!("v2-{}", name), CatalogueEntryType::CONTENT_MATCHER).is_ok())
+      .to(be_true());
+
+    // ... while the matcher entry still gets the fallback
+    expect!(resolved_core_key(&format!("matcher-{}", name)))
+      .to(be_equal_to(format!("v2-matcher-{}", name)));
+  }
+
+  #[test]
+  fn lookup_entry_matches_by_name_not_by_substring() {
+    let name = "lookup_entry_matches_by_name_not_by_substring";
+    let manifest = PactPluginManifest { name: name.to_string(), .. PactPluginManifest::default() };
+    register_plugin_entries(&manifest, &vec![
+      ProtoCatalogueEntry {
+        r#type: CatalogueEntryType::CONTENT_MATCHER.to_proto_value(),
+        key: name.to_string(),
+        values: hashmap!{}
+      },
+      ProtoCatalogueEntry {
+        r#type: CatalogueEntryType::MATCHER.to_proto_value(),
+        key: format!("v3-{}", name),
+        values: hashmap!{}
+      }
+    ]);
+
+    let by_name = lookup_entry(name).map(|entry| entry.entry_type);
+    let by_components = lookup_entry(&format!("content-matcher/{}", name)).map(|entry| entry.entry_type);
+    let fully_qualified = lookup_entry(&format!("plugin/{}/content-matcher/{}", name, name))
+      .map(|entry| entry.entry_type);
+    // A trailing substring of a component names nothing
+    let by_substring = lookup_entry(&name[3..]);
+    // But the versioned convention still resolves for a matcher entry
+    let versioned = lookup_entry(&format!("{}-{}", "matcher-fallback", name));
+
+    remove_plugin_entries(name);
+
+    expect!(by_name).to(be_some().value(CatalogueEntryType::CONTENT_MATCHER));
+    expect!(by_components).to(be_some().value(CatalogueEntryType::CONTENT_MATCHER));
+    expect!(fully_qualified).to(be_some().value(CatalogueEntryType::CONTENT_MATCHER));
+    expect!(by_substring).to(be_none());
+    expect!(versioned).to(be_none());
+  }
+
+  #[test]
+  fn lookup_entry_falls_back_to_the_versioned_core_key() {
+    register_core_matcher_entries();
+
+    expect!(lookup_entry("type").map(|entry| entry.key)).to(be_some().value("v2-type".to_string()));
+    expect!(lookup_entry("v3-date").map(|entry| entry.key)).to(be_some().value("v3-date".to_string()));
+    expect!(lookup_entry("matcher/v3-date").map(|entry| entry.key)).to(be_some().value("v3-date".to_string()));
   }
 
   #[test]

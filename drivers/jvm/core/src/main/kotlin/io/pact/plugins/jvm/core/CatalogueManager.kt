@@ -62,12 +62,18 @@ object CatalogueManager {
   fun coreEntries() = catalogue.values.filter { it.providerType == CatalogueEntryProviderType.CORE }
 
   /**
-   * Lookup entry by key. Entries are keyed by <core|plugin>/<plugin-name>?/<entry-type>/<entry-key>
+   * Lookup entry by key. Entries are keyed by <core|plugin>/<plugin-name>?/<entry-type>/<entry-key>,
+   * and are matched the same way [resolveCapability] matches them: by name first - the whole
+   * catalogue key, or a trailing run of its `/`-separated components - then against the core
+   * catalogue's versioned naming convention.
+   *
+   * Unlike [resolveCapability], this takes the first match when more than one entry matches. Prefer
+   * [resolveCapability] wherever the expected entry type is known and a deterministic answer
+   * matters.
    */
   fun lookupEntry(key: String): CatalogueEntry? {
-    return catalogue[key] ?: catalogue.entries.firstOrNull {
-      it.key.endsWith(key)
-    }?.value
+    return catalogue.entries.firstOrNull { namesCatalogueKey(it.key, key) }?.value
+      ?: catalogue.entries.firstOrNull { namesVersionedCoreKey(it.value, key) }?.value
   }
 
   /**
@@ -212,9 +218,16 @@ private val VERSION_PREFIX = Regex("^v\\d+$")
  * Only the whole name after the version prefix counts, so `type` names `v2-type` but not
  * `v3-content-type` or `v2-min-type` - those are the `content-type` and `min-type` rules.
  *
+ * The convention only applies to matching rules and generators. Content matchers, content
+ * generators and transports are registered under plain names (`xml`, `json`, `grpc`), so a leading
+ * `v<n>-` there is part of the name rather than a version, and stripping it would be wrong.
+ *
  * Must stay consistent with `catalogue_manager::names_versioned_core_key` in the Rust driver.
  */
 internal fun namesVersionedCoreKey(entry: CatalogueEntry, entryKey: String): Boolean {
+  if (entry.type != CatalogueEntryType.MATCHER && entry.type != CatalogueEntryType.GENERATOR) {
+    return false
+  }
   val separator = entry.key.indexOf('-')
   if (separator <= 0) return false
   return entry.key.substring(separator + 1) == entryKey &&

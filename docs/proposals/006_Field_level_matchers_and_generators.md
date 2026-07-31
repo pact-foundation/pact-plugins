@@ -99,8 +99,10 @@ The **rule name is the catalogue key**. A rule named `creditcard` resolves throu
   same short name. Key components are compared whole, never as substrings;
 - failing that, the name is matched against the core catalogue's versioned naming convention - the Pact
   specification version a rule was introduced in, prefixed to its name - so `type` resolves to `core/matcher/v2-type`
-  and `date` to `core/matcher/v3-date` without a caller having to know which version introduced what. Naming an entry
-  directly always wins over this fallback: a plugin registering its own `matcher/date` takes `date`, and a caller
+  and `date` to `core/matcher/v3-date` without a caller having to know which version introduced what. This applies
+  only to `MATCHER` and `GENERATOR` entries: content matchers, content generators and transports are registered
+  under plain names (`xml`, `json`, `grpc`), where a leading `v<n>-` would be part of the name. Naming an entry
+  directly always wins over the fallback: a plugin registering its own `matcher/date` takes `date`, and a caller
   that specifically wants the core rule asks for `v3-date`;
 - a name matching more than one entry of the expected type is a hard error naming the candidates, never a silent
   pick;
