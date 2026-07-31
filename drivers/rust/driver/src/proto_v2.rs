@@ -560,24 +560,49 @@ pub struct GenerateContentResponse {
     #[prost(message, optional, tag = "1")]
     pub contents: ::core::option::Option<Body>,
 }
-/// A single value being matched or generated at the field/element level. Binary-safe: follows the
-/// same oneof pattern as MetadataValue rather than assuming every value can be represented as
-/// JSON. See proposal 006 (Field-level matchers and generators).
+/// A single value being matched or generated at the field/element level.
+///
+/// Each type Pact's matching rules discriminate has its own arm, rather than everything
+/// JSON-representable sharing a google.protobuf.Value. That type carries a single number type (a
+/// double), which would make `integer` and `decimal` indistinguishable and `type` wrong between a
+/// whole number and a decimal - and these are exactly the rules whose job is to check the runtime
+/// type of a value. Binary data has its own arm for the same reason: so it never has to be
+/// stringified into a form it does not fit.
+///
+/// See proposal 006 (Field-level matchers and generators).
 #[derive(Clone, PartialEq, ::prost::Message)]
 pub struct FieldValue {
-    #[prost(oneof = "field_value::Value", tags = "1, 2")]
+    #[prost(oneof = "field_value::Value", tags = "1, 2, 3, 4, 5, 6, 7")]
     pub value: ::core::option::Option<field_value::Value>,
 }
 /// Nested message and enum types in `FieldValue`.
 pub mod field_value {
     #[derive(Clone, PartialEq, ::prost::Oneof)]
     pub enum Value {
-        /// A JSON-like value
-        #[prost(message, tag = "1")]
-        NonBinaryValue(::prost_types::Value),
-        /// Raw bytes, for a value that is not representable as JSON
-        #[prost(bytes, tag = "2")]
+        /// A null value
+        #[prost(enumeration = "::prost_types::NullValue", tag = "1")]
+        NullValue(i32),
+        /// A boolean
+        #[prost(bool, tag = "2")]
+        BooleanValue(bool),
+        /// A string
+        #[prost(string, tag = "3")]
+        StringValue(::prost::alloc::string::String),
+        /// A whole number
+        #[prost(int64, tag = "4")]
+        IntegerValue(i64),
+        /// A number with a fractional part
+        #[prost(double, tag = "5")]
+        DecimalValue(f64),
+        /// Raw bytes, for a value that is not representable as text
+        #[prost(bytes, tag = "6")]
         BinaryValue(::prost::alloc::vec::Vec<u8>),
+        /// A map or list, for a rule applied to a collection rather than a scalar. Numbers nested
+        /// inside follow JSON semantics (every number is a double) - a collection rule only needs the
+        /// shape and size of the collection, and the values inside it are matched by their own
+        /// field-level calls, at their own paths, where they arrive under the arms above.
+        #[prost(message, tag = "7")]
+        StructuredValue(::prost_types::Value),
     }
 }
 /// Request to apply a plugin-provided matching rule to a single value. The plugin sees the value,

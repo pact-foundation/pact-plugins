@@ -22,6 +22,7 @@ pub mod grpc_plugin;
 pub(crate) mod plugin_host;
 pub mod content;
 pub mod download;
+pub mod field;
 #[cfg(feature = "lua")]
 pub mod lua_plugin;
 mod metrics;
@@ -30,7 +31,10 @@ pub mod plugin_log_sink;
 pub mod plugin_manager;
 pub mod plugin_models;
 pub mod proto;
-pub(crate) mod proto_v2;
+// Public because the V2-only message types are part of the driver's public API: the field-level
+// operations (proposal 006) have no V1 equivalent, so the embedding Pact framework needs these
+// types to implement `core_capabilities::CoreFieldMatcher`/`CoreFieldGenerator`.
+pub mod proto_v2;
 pub mod repository;
 pub mod test_context;
 pub mod utils;

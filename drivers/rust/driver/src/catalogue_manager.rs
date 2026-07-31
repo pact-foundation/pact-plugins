@@ -337,6 +337,20 @@ fn names_versioned_core_key(entry: &CatalogueEntry, entry_key: &str) -> bool {
 /// content-generator registered under the same name as an unrelated content-matcher), mirroring
 /// the explicit `entry_type` check [`find_content_matcher`]/[`find_content_generator`] already do.
 pub fn resolve_capability(entry_key: &str, expected_type: CatalogueEntryType) -> anyhow::Result<ResolvedCapability> {
+  let entry = resolve_capability_entry(entry_key, expected_type)?;
+  match entry.provider_type {
+    CatalogueEntryProviderType::CORE => Ok(ResolvedCapability::Core(entry.key.clone())),
+    CatalogueEntryProviderType::PLUGIN => entry.plugin.clone()
+      .map(|manifest| ResolvedCapability::Plugin(Box::new(manifest)))
+      .ok_or_else(|| anyhow::anyhow!("Catalogue entry '{}' has no plugin manifest", entry_key))
+  }
+}
+
+/// Resolve a catalogue entry key to the entry itself, using the same two-pass matching
+/// [`resolve_capability`] documents. Callers that need the entry rather than a dispatch target -
+/// [`crate::field::find_field_matcher`] and [`crate::field::find_field_generator`], which wrap it
+/// in a matcher/generator - use this directly.
+pub fn resolve_capability_entry(entry_key: &str, expected_type: CatalogueEntryType) -> anyhow::Result<CatalogueEntry> {
   let all_entries: Vec<(String, CatalogueEntry)> = {
     let inner = CATALOGUE_REGISTER.lock().unwrap();
     inner.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
@@ -379,12 +393,7 @@ pub fn resolve_capability(entry_key: &str, expected_type: CatalogueEntryType) ->
     }
   };
 
-  match entry.provider_type {
-    CatalogueEntryProviderType::CORE => Ok(ResolvedCapability::Core(entry.key.clone())),
-    CatalogueEntryProviderType::PLUGIN => entry.plugin.clone()
-      .map(|manifest| ResolvedCapability::Plugin(Box::new(manifest)))
-      .ok_or_else(|| anyhow::anyhow!("Catalogue entry '{}' has no plugin manifest", entry_key))
-  }
+  Ok(entry.clone())
 }
 
 /// Remove all entries for a plugin given the plugin name

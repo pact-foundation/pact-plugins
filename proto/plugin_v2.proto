@@ -285,15 +285,35 @@ message GenerateContentResponse {
   Body contents = 1;
 }
 
-// A single value being matched or generated at the field/element level. Binary-safe: follows the
-// same oneof pattern as MetadataValue rather than assuming every value can be represented as
-// JSON. See proposal 006 (Field-level matchers and generators).
+// A single value being matched or generated at the field/element level.
+//
+// Each type Pact's matching rules discriminate has its own arm, rather than everything
+// JSON-representable sharing a google.protobuf.Value. That type carries a single number type (a
+// double), which would make `integer` and `decimal` indistinguishable and `type` wrong between a
+// whole number and a decimal - and these are exactly the rules whose job is to check the runtime
+// type of a value. Binary data has its own arm for the same reason: so it never has to be
+// stringified into a form it does not fit.
+//
+// See proposal 006 (Field-level matchers and generators).
 message FieldValue {
   oneof value {
-    // A JSON-like value
-    google.protobuf.Value nonBinaryValue = 1;
-    // Raw bytes, for a value that is not representable as JSON
-    bytes binaryValue = 2;
+    // A null value
+    google.protobuf.NullValue nullValue = 1;
+    // A boolean
+    bool booleanValue = 2;
+    // A string
+    string stringValue = 3;
+    // A whole number
+    int64 integerValue = 4;
+    // A number with a fractional part
+    double decimalValue = 5;
+    // Raw bytes, for a value that is not representable as text
+    bytes binaryValue = 6;
+    // A map or list, for a rule applied to a collection rather than a scalar. Numbers nested
+    // inside follow JSON semantics (every number is a double) - a collection rule only needs the
+    // shape and size of the collection, and the values inside it are matched by their own
+    // field-level calls, at their own paths, where they arrive under the arms above.
+    google.protobuf.Value structuredValue = 7;
   }
 }
 

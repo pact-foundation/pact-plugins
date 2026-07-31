@@ -187,12 +187,18 @@ before the rule can be resolved at all.
 Two new RPCs on `PactPlugin`, and their `PluginHost` counterparts for the callback direction:
 
 ```proto
-// A single value being matched or generated. Binary-safe: follows the same oneof pattern as
-// MetadataValue rather than assuming everything is representable as JSON.
+// A single value being matched or generated. Each type Pact's matching rules discriminate has its
+// own arm - see "Value model" below for why this is not a google.protobuf.Value.
 message FieldValue {
   oneof value {
-    google.protobuf.Value nonBinaryValue = 1;
-    bytes binaryValue = 2;
+    google.protobuf.NullValue nullValue = 1;
+    bool booleanValue = 2;
+    string stringValue = 3;
+    int64 integerValue = 4;
+    double decimalValue = 5;
+    bytes binaryValue = 6;
+    // A map or list, for a rule applied to a collection rather than a scalar
+    google.protobuf.Value structuredValue = 7;
   }
 }
 
@@ -253,6 +259,21 @@ service PactPlugin {
   rpc GenerateField(GenerateFieldRequest) returns (GenerateFieldResponse);
 }
 ```
+
+**Value model.** The first draft of this proposal reused the `MetadataValue` shape - a `oneof` of
+`google.protobuf.Value` or `bytes`. That is wrong here, and the difference matters: `google.protobuf.Value` has a
+single number type (a double), so `100` and `100.0` are indistinguishable once a value crosses the interface, for
+every plugin implementation. The rules that would break are exactly the ones whose job is to check a value's runtime
+type - `integer` and `decimal` could never tell their two cases apart, and `type` would wrongly pass an actual
+decimal against an expected whole number. Under [009](./009_Host_provided_core_matching_and_generation.md) those are
+*host* handlers being called *by* a plugin, so the host cannot recover what the boundary erased.
+
+Hence an explicit arm per type. Metadata can afford the loose model because nothing type-checks a metadata value;
+a matching interface cannot.
+
+The one accepted imprecision: numbers nested inside `structuredValue` still follow JSON semantics. A rule applied to
+a collection only needs its shape and size - the values inside it are matched by their own field-level calls, at
+their own paths, where they arrive under the scalar arms.
 
 Notes on specific choices:
 
@@ -327,12 +348,22 @@ Mirroring `content.rs`'s `ContentMatcher`/`ContentGenerator`, a new `field.rs` m
 
 ```rust
 /// A single value being matched or generated - the driver-side counterpart of the proto FieldValue.
+/// serde_json::Value already distinguishes a whole number from a decimal, so the driver-side type
+/// stays simple; it is the conversion to the proto form that keeps the distinction on the wire.
 #[derive(Clone, Debug, PartialEq)]
 pub enum FieldValue {
   /// A JSON-like value
   Json(serde_json::Value),
   /// Raw bytes
   Binary(Bytes)
+}
+
+/// Where a value sits and what is known about it, shared by matching and generation
+pub struct FieldContext {
+  pub path: DocPath,
+  pub category: String,
+  pub plugin_config: Option<PluginInteractionConfig>,
+  pub test_context: HashMap<String, Value>
 }
 
 pub struct FieldMatcher { pub catalogue_entry: CatalogueEntry }
@@ -343,12 +374,9 @@ impl FieldMatcher {
   pub async fn match_field(
     &self,
     rule: &MatchingRule,
-    path: &DocPath,
-    category: &str,
     expected: &FieldValue,
     actual: &FieldValue,
-    plugin_config: Option<PluginInteractionConfig>,
-    context: &HashMap<String, Value>
+    context: &FieldContext
   ) -> Result<(), Vec<ContentMismatch>>;
 }
 
@@ -360,17 +388,17 @@ impl FieldGenerator {
   pub async fn generate_field(
     &self,
     generator: &Generator,
-    path: &DocPath,
     example: &FieldValue,
-    plugin_config: Option<PluginInteractionConfig>,
-    context: &HashMap<String, Value>,
-    mode: TestMode
+    mode: TestMode,
+    context: &FieldContext
   ) -> anyhow::Result<FieldValue>;
 }
 
-/// Look up a field matcher/generator by rule name (not by content type, unlike find_content_matcher)
-pub fn find_field_matcher(name: &str) -> Option<FieldMatcher>;
-pub fn find_field_generator(name: &str) -> Option<FieldGenerator>;
+/// Look up a field matcher/generator by rule name (not by content type, unlike
+/// find_content_matcher). Returns a descriptive error rather than None, since "no such rule",
+/// "ambiguous rule" and "that name is a generator, not a matcher" all need to reach the user.
+pub fn find_field_matcher(name: &str) -> anyhow::Result<FieldMatcher>;
+pub fn find_field_generator(name: &str) -> anyhow::Result<FieldGenerator>;
 ```
 
 Both operations also need a blocking wrapper, because every Rust host that applies a matching rule does so from a
@@ -490,8 +518,12 @@ WASM plugin support at all.
    the two `PluginHost` RPCs, with the checked-in Rust bindings regenerated. The Rust driver's `PluginHost` service
    answers the two new RPCs with `unimplemented` until step 2; the JVM driver needs no change for this, since
    gRPC-Java's generated base class already answers an unimplemented method that way.
-2. ⬜ Rust driver: `field.rs`, the two `core_capabilities` traits + registries, catalogue lookups, `PluginHost`
-   service methods, `grpc_plugin`/`PluginInstance` methods.
+2. ✅ Rust driver: `field.rs` (`FieldValue`, `FieldContext`, `FieldMatcher`/`FieldGenerator` and their blocking
+   wrappers), the two `core_capabilities` traits + registries, catalogue lookups via
+   `catalogue_manager::resolve_capability_entry`, the `PluginHost` service methods, and the
+   `grpc_plugin`/`PluginInstance` methods (V2-only - a V1 plugin gets a clear error, since the operations do not
+   exist on that interface). `proto_v2` had to become a public module: the embedding framework needs those types to
+   implement `CoreFieldMatcher`/`CoreFieldGenerator`.
 
    One trap here: the driver's internal catalogue representation is the **V1** proto's `EntryType`
    (`CatalogueEntryType::to_proto_type`, and the byte-level transcode of V2 catalogue entries into V1
@@ -523,11 +555,12 @@ WASM plugin support at all.
 
 ## Resolved questions
 
-- **What value model should be used for binary-safe field-level matching and generation?** A `FieldValue` `oneof` of
-  `google.protobuf.Value` or `bytes`, the same shape as the existing `MetadataValue`. Kept as its own message rather
-  than reusing `MetadataValue` because the name would be actively misleading in this context; the two can be
-  unified later if a third use appears. In Lua, the existing metadata convention carries over unchanged: a plain
-  value, or `{ binary = "..." }`.
+- **What value model should be used for binary-safe field-level matching and generation?** A `FieldValue` `oneof`
+  with an explicit arm per type Pact's matching rules discriminate - null, boolean, string, integer, decimal, bytes,
+  and a `google.protobuf.Value` for collections. Not the `MetadataValue` shape this proposal originally specified:
+  see [5](#5-operation-shape) for why a single JSON-ish value type breaks the type-checking rules. In Lua, the
+  existing metadata convention carries over for the scalar/binary split (a plain value, or `{ binary = "..." }`),
+  with Lua 5.4's own integer/float distinction (`math.type`) carrying the numeric one.
 - **How much of the surrounding document context should be visible to a field-level plugin call?** None. See
   [6](#6-context-available-to-the-plugin) - the line between a field rule and a content matcher is exactly that a
   field rule sees one value.
