@@ -85,7 +85,8 @@ pub(crate) fn send_metrics(manifest: &PactPluginManifest) {
             "ev" => "1"                                       // Value
           };
           debug!("Sending event to GA - {:?}", event_payload);
-          let result = Client::new().post("https://www.google-analytics.com/collect")
+          let result = Client::new()
+            .post("https://www.google-analytics.com/collect")
             .form(&event_payload)
             .send()
             .await;
