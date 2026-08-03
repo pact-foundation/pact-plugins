@@ -270,7 +270,7 @@ fn register_host_functions(lua: &Lua, plugin_name: &str, log: &Arc<LuaPluginLog>
 
   globals.set(
     "rsa_sign",
-    lua.create_function(|_, (data, key): (mlua::String, String)| {
+    lua.create_function(|_, (data, key): (mlua::LuaString, String)| {
       let private_key = RsaPrivateKey::from_pkcs1_pem(&key).map_err(mlua::Error::external)?;
       let digest = Sha512::digest(data.as_bytes().as_ref());
       let signature = private_key
@@ -496,7 +496,7 @@ fn lua_to_body(value: Value) -> anyhow::Result<Option<Body>> {
     Value::Nil => Ok(None),
     Value::Table(table) => {
       let content_type: String = table.get("content_type")?;
-      let contents: Option<mlua::String> = table.get("contents")?;
+      let contents: Option<mlua::LuaString> = table.get("contents")?;
       let content_type_hint: Option<String> = table.get("content_type_hint")?;
       Ok(Some(Body {
         content_type,
@@ -940,7 +940,7 @@ fn lua_to_metadata(lua: &Lua, table: Option<Table>) -> anyhow::Result<HashMap<St
   if let Some(table) = table {
     for pair in table.pairs::<String, Value>() {
       let (key, value) = pair?;
-      let binary: Option<mlua::String> = match &value {
+      let binary: Option<mlua::LuaString> = match &value {
         Value::Table(wrapper) => wrapper.get("binary")?,
         _ => None,
       };
@@ -2239,7 +2239,7 @@ mod tests {
     let captured: Table = lua.globals().get("VERIFY_REQUEST").unwrap();
     let interaction_data: Table = captured.get("interaction_data").unwrap();
     let body: Table = interaction_data.get("body").unwrap();
-    assert_eq!(body.get::<mlua::String>("contents").unwrap().to_str().unwrap(), "request-body");
+    assert_eq!(body.get::<mlua::LuaString>("contents").unwrap().to_str().unwrap(), "request-body");
     let interaction_contents: Table = captured.get("interaction_contents").unwrap();
     assert_eq!(interaction_contents.get::<String>("consumer").unwrap(), "test-consumer");
   }
