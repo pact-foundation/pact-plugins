@@ -550,8 +550,14 @@ WASM plugin support at all.
    consumer test until step 6.
 6. ⬜ Host framework integration ([9](#9-host-framework-integration)), and an example consumer/provider pair under
    `examples/creditcard` once it can actually execute.
-7. ⬜ Docs: the Lua reference and plugin writing guide gain the two new functions and the `MATCHER`/`GENERATOR`
-   entry types.
+
+   Blocked on releasing the drivers first: this step lands in `pact-reference` and Pact-JVM, which consume the
+   drivers as published dependencies, so there is nothing for them to build against until steps 1-5 ship in a
+   driver release.
+7. ✅ Docs: the [Lua reference](../lua-plugin-reference.md) and [plugin writing guide](../writing-plugin-guide.md)
+   gain the two new functions, the `MATCHER`/`GENERATOR` entry types and the field value shape. They also gain
+   007's `host_compare_contents`/`host_generate_content`, which had never been documented - leaving those out
+   while documenting their field-level counterparts would have made the set look arbitrary.
 
 ## Non-goals for this proposal
 

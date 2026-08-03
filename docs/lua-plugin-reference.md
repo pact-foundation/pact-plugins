@@ -18,7 +18,7 @@ compiled/`exec` plugin would send and receive, so the shapes are identical on ei
 - **Enum-like string values are `SCREAMING_CASE` or `PascalCase`,** matching the underlying protobuf enum name
   exactly - see each function's description for the exact allowed values (e.g. `content_type_hint` is one of
   `"DEFAULT"`/`"TEXT"`/`"BINARY"`; `entryType` is one of `"CONTENT_MATCHER"`/`"CONTENT_GENERATOR"`/`"TRANSPORT"`/
-  `"MATCHER"`/`"INTERACTION"`; `generate_content`'s `test_mode` is `"Consumer"`/`"Provider"`/`"Unknown"`).
+  `"MATCHER"`/`"GENERATOR"`/`"INTERACTION"`; `test_mode` is `"Consumer"`/`"Provider"`/`"Unknown"`).
 - **A missing/absent table field is equivalent to Lua `nil`** unless stated otherwise - you don't need to set keys
   you have nothing to put in.
 - **V1 vs V2 requests.** `pluginInterfaceVersion` in your `pact-plugin.json` manifest (1 or 2) is a static,
@@ -36,6 +36,8 @@ compiled/`exec` plugin would send and receive, so the shapes are identical on ei
 | [`configure_interaction(content_type, config)`](#configure_interactioncontent_type-config---table) | Yes, if you register a `CONTENT_MATCHER`/`CONTENT_GENERATOR` entry | Content-matcher plugins |
 | [`match_contents(request)`](#match_contentsrequest---table) | Yes, if you register a `CONTENT_MATCHER` entry | Content-matcher plugins |
 | [`generate_content(contents, generators, test_mode)`](#generate_contentcontents-generators-test_mode---table-optional) | No (passthrough default) | Content-generator plugins |
+| [`match_field(request)`](#match_fieldrequest---table) | Yes, if you register a `MATCHER` entry | Field-level matcher plugins |
+| [`generate_field(request)`](#generate_fieldrequest---table) | Yes, if you register a `GENERATOR` entry | Field-level generator plugins |
 | [`update_catalogue(catalogue)`](#update_cataloguecatalogue-optional) | No (no-op default) | Every plugin |
 | [`start_mock_server(request)`](#start_mock_serverrequest---table) | Yes, if you register a `TRANSPORT` entry | Transport plugins |
 | [`shutdown_mock_server(server_key)`](#shutdown_mock_serverserver_key---table-and-get_mock_server_resultsserver_key---table) | Yes, if you register a `TRANSPORT` entry | Transport plugins |
@@ -43,8 +45,14 @@ compiled/`exec` plugin would send and receive, so the shapes are identical on ei
 | [`prepare_interaction_for_verification(request)`](#prepare_interaction_for_verificationrequest---table) | Yes, if you register a `TRANSPORT` entry | Transport plugins |
 | [`verify_interaction(request)`](#verify_interactionrequest---table) | Yes, if you register a `TRANSPORT` entry | Transport plugins |
 
-A plugin can register both a `CONTENT_MATCHER`/`CONTENT_GENERATOR` entry and a `TRANSPORT` entry from the same
-`init` call, in which case it must define all the functions both roles require.
+A plugin can register entries for more than one role from the same `init` call - a `CONTENT_MATCHER`/
+`CONTENT_GENERATOR` entry and a `TRANSPORT` entry, say - in which case it must define all the functions each role
+requires. The three roles are independent:
+
+- a **content matcher/generator** owns a whole content type (`match_contents`/`generate_content`);
+- a **field matcher/generator** contributes one rule applied to a single *value* inside somebody else's content -
+  a field in a JSON body, a header, a message metadata value (`match_field`/`generate_field`);
+- a **transport** carries a whole interaction (the mock-server and verification functions).
 
 ---
 
@@ -63,15 +71,28 @@ Called once, immediately after your script is loaded (before any other function)
 
 | Field | Type | Required | Description |
 |---|---|---|---|
-| `entryType` | string | Yes | One of `"CONTENT_MATCHER"`, `"CONTENT_GENERATOR"`, `"TRANSPORT"`, `"MATCHER"`, `"INTERACTION"`. Note the `camelCase` - this is the one exception to the snake_case convention. |
-| `key` | string | Yes | Your plugin's catalogue key for this entry (typically your plugin name). |
-| `values` | table (string -> string) | No | Free-form metadata. For a `CONTENT_MATCHER`/`CONTENT_GENERATOR` entry, convention is a `content-types` key whose value is a semicolon-separated list of MIME types you handle, each one matched as a regex **anchored at both ends** against an actual content type - escape any regex metacharacter (most commonly `+`, as in a `+json` structured syntax suffix) for a literal match. |
+| `entryType` | string | Yes | One of `"CONTENT_MATCHER"`, `"CONTENT_GENERATOR"`, `"TRANSPORT"`, `"MATCHER"`, `"GENERATOR"`, `"INTERACTION"`. Note the `camelCase` - this is the one exception to the snake_case convention. |
+| `key` | string | Yes | Your plugin's catalogue key for this entry. For a content matcher/generator or a transport, typically your plugin name. For a `MATCHER`/`GENERATOR` entry the key **is** the rule name a test writes, so pick the name of the rule rather than the name of your plugin. |
+| `values` | table (string -> string) | No | Free-form metadata. For a `CONTENT_MATCHER`/`CONTENT_GENERATOR` entry, convention is a `content-types` key whose value is a semicolon-separated list of MIME types you handle, each one matched as a regex **anchored at both ends** against an actual content type - escape any regex metacharacter (most commonly `+`, as in a `+json` structured syntax suffix) for a literal match. For a `MATCHER`/`GENERATOR` entry, a `config-key` key names the values key a single positional argument in a rule definition expression maps to. |
 
 ```lua
 function init(implementation, version)
   return {
     { entryType = "CONTENT_MATCHER", key = "jwt", values = { ["content-types"] = "application/jwt;application/jwt\\+json" } },
     { entryType = "CONTENT_GENERATOR", key = "jwt", values = { ["content-types"] = "application/jwt;application/jwt\\+json" } }
+  }
+end
+```
+
+A field-level plugin registers a `MATCHER` and/or a `GENERATOR` entry instead. Both can share one key - the entry
+type is what tells them apart - so the same name works as a matching rule and as a generator:
+
+```lua
+function init(implementation, version)
+  local params = { ["config-key"] = "brand" }
+  return {
+    { entryType = "MATCHER", key = "creditcard", values = params },
+    { entryType = "GENERATOR", key = "creditcard", values = params }
   }
 end
 ```
@@ -163,6 +184,61 @@ Called to generate contents using any defined generators. If you don't define th
 | `test_mode` | string | One of `"Consumer"`, `"Provider"`, `"Unknown"`. |
 
 **Return value**: a [`Body`](#body-table), or `nil`.
+
+---
+
+### `match_field(request) -> table`
+
+Called to apply your plugin's matching rule to a single value. Unlike `match_contents`, you see the one value and
+its path, not the document that contains it - a rule that needs the surrounding document is a content matcher, not
+a field matcher.
+
+**Parameters** (`request`)
+
+| Field | Type | Description |
+|---|---|---|
+| `key` | string | The catalogue key of the rule being applied - the `key` you registered the `MATCHER` entry under. Only useful if one plugin registers several rules. |
+| `rule` | table | The rule as stored in the Pact file: `{ type = "...", values = {...} }` - a [`MatchingRules`](#matchingrules-table) rule table. Always present, even with no `values`. |
+| `path` | string | Where the value lives, as a matching-rule expression (e.g. `"$.card.number"`). |
+| `mismatch_type` | string | Which part of the interaction the value came from: `"body"`, `"header"`, `"metadata"`, `"query"`, `"path"`, `"status"`. |
+| `expected` | [field value](#field-value) | The example value from the Pact file. |
+| `actual` | [field value](#field-value) | The value received. |
+| `plugin_configuration` | table or nil | A [`PluginConfiguration`](#pluginconfiguration-table) - anything your plugin persisted into the Pact file. |
+| `test_context` | table or nil | Context data from the test framework. |
+
+**Return value**: one of
+
+- `{ error = "..." }` - the rule itself could not be applied (e.g. it was configured with a brand this plugin
+  doesn't know). This is the test author's mistake rather than the provider's, and fails the test outright rather
+  than being reported as a mismatch.
+- `{ mismatches = { ... } }` - an **array** (not a path-keyed table, unlike `match_contents`) whose entries are
+  each a plain string or a [`ContentMismatch`](#contentmismatch-table) table. A mismatch that doesn't set its own
+  `path` is reported against the request's `path`. An empty or absent array means the value matched.
+
+---
+
+### `generate_field(request) -> table`
+
+Called to generate a single value, replacing the example value from the Pact file. A generator is a pure function
+of its request: everything it needs arrives in the request or is fetched with an explicit
+[host function](#host-functions-available-to-your-script) call.
+
+**Parameters** (`request`)
+
+| Field | Type | Description |
+|---|---|---|
+| `key` | string | The catalogue key of the generator being applied. See `match_field`. |
+| `generator` | table | The generator as stored in the Pact file: `{ type = "...", values = {...} }` - a [`Generator`](#generator-table) table. Always present, even with no `values`. |
+| `path` | string | Where the value lives, as a matching-rule expression. |
+| `example_value` | [field value](#field-value) | The example value from the Pact file that the generated value replaces. |
+| `plugin_configuration` | table or nil | A [`PluginConfiguration`](#pluginconfiguration-table). |
+| `test_context` | table or nil | Context data from the test framework. |
+| `test_mode` | string | One of `"Consumer"`, `"Provider"`, `"Unknown"`. |
+
+**Return value**: one of
+
+- `{ error = "..." }` - the value could not be generated.
+- `{ value = ... }` - the generated [field value](#field-value).
 
 ---
 
@@ -331,7 +407,8 @@ Used for request/response/message contents throughout (`configure_interaction`, 
 ### `MatchingRules` table
 
 The `rules` field of a `match_contents` request: a table keyed by matching-rule expression path (e.g. `"$"`,
-`"$.body.field"`), where each value is an array of rule tables:
+`"$.body.field"`), where each value is an array of rule tables. `match_field`'s `rule` field is a single one of
+these tables rather than a path-keyed table of arrays, since it is applied to exactly one value:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
@@ -340,12 +417,35 @@ The `rules` field of a `match_contents` request: a table keyed by matching-rule 
 
 ### `Generator` table
 
-Each value in the `generators` table passed to `generate_content`:
+Each value in the `generators` table passed to `generate_content`, and `generate_field`'s `generator` field:
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `type` | string | Yes | The generator type (e.g. `"RandomInt"`, `"Uuid"`). |
 | `values` | table or nil | No | Generator-specific configuration data. |
+
+### Field value
+
+A single value being matched or generated, used for `match_field`'s `expected`/`actual`, and `generate_field`'s
+`example_value` and returned `value`. Not a table shape of its own - it's whatever plain Lua value the value
+actually is:
+
+| Value | Arrives as | Notes |
+|---|---|---|
+| null | `nil` | |
+| boolean | boolean | |
+| string | string | |
+| whole number | integer | `math.type(v) == "integer"`. |
+| number with a fractional part | float | `math.type(v) == "float"`. |
+| bytes | `{ binary = "..." }` | A wrapper table whose `binary` field is a Lua string of raw bytes - the same convention the [metadata table](#metadata-table) uses. |
+| map or list | table | For a rule applied to a collection rather than a scalar. |
+
+The integer/float distinction is preserved in both directions, deliberately: rules like `integer`, `decimal` and
+`type` are built on it. So `math.type()` tells you whether the value in the Pact file was `100` or `100.0`, and a
+number you return keeps whichever subtype you gave it.
+
+A table is read as a binary value if it has a `binary` key, and as a map or list otherwise. That means a plain map
+of your own that happens to have a `binary` key would be misread - name the key something else.
 
 ### `PluginConfiguration` table
 
@@ -413,10 +513,48 @@ The driver registers these as Lua globals before loading your script:
 | `rsa_validate(tokenParts, algorithm, publicKeyPem)` | Verifies a 3-part token (`{header, payload, signature}`) against an RSA public key PEM. Only `"RS512"` is supported for `algorithm`. Returns a boolean. |
 | `b64_decode_no_pad(data)` | Decodes URL-safe base64 (with or without padding), returns the raw bytes as a Lua string. |
 
-These exist specifically to support the JWT reference plugin. If your plugin needs different cryptographic,
-encoding, or networking primitives, either implement them in pure Lua or pull in a
+The RSA and base64 functions exist specifically to support the JWT reference plugin. If your plugin needs different
+cryptographic, encoding, or networking primitives, either implement them in pure Lua or pull in a
 [pure-Lua LuaRocks package](writing-plugin-guide.md#luarocks-support) that provides them - packages with compiled C
 extensions are not supported.
+
+### Calling back into another capability
+
+These four let your script delegate to a capability it doesn't implement itself - one the host Pact framework
+provides (the standard Pact matching rules and generators), or one another loaded plugin registered - instead of
+reimplementing it. Each takes a catalogue entry key naming the capability to invoke, and the driver resolves that
+key the same way it resolves any other.
+
+| Function | Description |
+|---|---|
+| `host_compare_contents(entry_key, request)` | Invokes a content matcher. `request` and the returned table are shaped exactly like [`match_contents`](#match_contentsrequest---table)'s, so you can pass the request you were given straight in and its result straight back out. |
+| `host_generate_content(entry_key, contents, generators, test_mode)` | Invokes a content generator. Same arguments and return value as [`generate_content`](#generate_contentcontents-generators-test_mode---table-optional). |
+| `host_match_field(entry_key, request)` | Invokes a field-level matching rule. Same request and return shapes as [`match_field`](#match_fieldrequest---table). |
+| `host_generate_field(entry_key, request)` | Invokes a field-level generator. Same request and return shapes as [`generate_field`](#generate_fieldrequest---table). |
+
+The two field-level ones are how a content matcher applies a standard Pact rule to one value inside the content it
+owns - the plugin keeps ownership of parsing and traversing its content type, and hands off the actual comparison
+of a leaf value.
+
+An `entry_key` is either the bare name of the capability (`"type"`, `"creditcard"`) or its full catalogue key
+(`"matcher/v2-type"`, `"plugin/creditcard/matcher/creditcard"`). The bare name is the usual choice: core matching
+rules are registered under a key with the Pact specification version they were introduced in prefixed to the name
+(`v2-type`, `v3-date`), and resolving a bare name finds those without you having to know which version that was.
+A key that matches nothing, or matches more than one capability, is an error rather than a silent no-op.
+
+```lua
+function match_contents(request)
+  -- Compare one claim inside a JWT with the core date matcher, rather than parsing dates here
+  local result = host_match_field("date", {
+    rule = { type = "date", values = { format = "yyyy-MM-dd" } },
+    path = "$.claims.iat",
+    mismatch_type = "body",
+    expected = expected_claims.iat,
+    actual = actual_claims.iat
+  })
+  ...
+end
+```
 
 Lua's built-in `print(...)` is also redirected into the same per-instance log file as `logger(...)`, rather than
 the driver's own real stdout - see [Output and logging](writing-plugin-guide.md#output-and-logging).
