@@ -12,9 +12,10 @@ runs embedded in the driver's own process rather than as a separate gRPC server 
 [Writing plugins in Lua](../../docs/writing-plugin-guide.md#writing-plugins-in-lua).
 
 > [!IMPORTANT]
-> Field-level matchers and generators are **not implemented in either driver yet** - proposal 006 is still a draft.
-> This plugin cannot be loaded and run against a real test today. Until it can, [`test.lua`](test.lua) exercises it
-> directly. See [Compatibility](#compatibility) below.
+> Both drivers can now load this plugin and call its rule and generator - the driver-side tests do exactly that -
+> but no host Pact framework can yet resolve a plugin-provided rule from a test, so it cannot be used in a real
+> consumer test. See [Compatibility](#compatibility) below. [`test.lua`](test.lua) also exercises the plugin
+> standalone, with no driver involved.
 
 ## What it does
 
@@ -120,14 +121,20 @@ Installed the creditcard plugin into /home/you/.pact/plugins/creditcard-0.0.0
 ## Compatibility
 
 Requires a driver that implements field-level matchers and generators
-([proposal 006](../../docs/proposals/006_Field_level_matchers_and_generators.md)), and a host Pact framework that can
-resolve a plugin-provided matching rule. Neither exists yet - the proposal's sequencing section tracks what has to
-land first:
+([proposal 006](../../docs/proposals/006_Field_level_matchers_and_generators.md)), and a host Pact framework that
+can resolve a plugin-provided matching rule from a test. The driver half is done; the host half is not.
+
+In place:
 
 - the `GENERATOR` catalogue entry type and the `MatchField`/`GenerateField` operations in `proto/plugin_v2.proto`;
 - the field matcher/generator surface in the Rust and JVM drivers, including the Lua `match_field`/`generate_field`
-  entry points this plugin defines;
-- carrier variants for plugin-provided rules and generators in `pact_models` and the Pact-JVM model, plus dispatch
-  from the matching engines.
+  entry points this plugin defines. Both drivers' test suites load this plugin and exercise it end to end
+  (`lua_plugin.rs` and `LuaPactPluginTest.kt`).
 
-Until then this plugin is a design artefact and a test fixture, not something you can run in a consumer test.
+Still to come:
+
+- carrier variants for plugin-provided rules and generators in `pact_models` and the Pact-JVM model, plus dispatch
+  from the matching engines - without these there is no way to *write* `matching(creditcard, ...)` in a test and
+  have it reach this plugin.
+
+Until that lands, this plugin runs, but only from a driver test rather than from a consumer test.

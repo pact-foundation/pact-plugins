@@ -88,14 +88,31 @@ class LuaPluginRpcClient(private val engine: LuaEngine) : PactPluginRpcClient {
     }
     val contents = bodyToLua(if (request.hasContents()) request.contents else null)
     val generators = request.generatorsMap.mapValues { (_, g) -> generatorToLua(g) }
-    val testMode = when (request.testMode) {
-      Plugin.GenerateContentRequest.TestMode.Consumer -> "Consumer"
-      Plugin.GenerateContentRequest.TestMode.Provider -> "Provider"
-      else -> "Unknown"
-    }
-    val result = engine.callFunction("generate_content", listOf(contents, generators, testMode))
+    val result = engine.callFunction(
+      "generate_content",
+      listOf(contents, generators, testModeToLua(request.testMode))
+    )
     luaToBody(result)?.let { builder.contents = it }
     return builder.build()
+  }
+
+  /**
+   * `match_field` and `generate_field` are optional globals - a plugin only defines them if it
+   * registered a `MATCHER` or `GENERATOR` catalogue entry (proposal 006). Reaching here without
+   * one is a real error (the driver resolved an entry the plugin registered), so [LuaEngine] is
+   * left to report the missing function rather than the call being silently treated as a match.
+   */
+  override fun matchField(request: PluginV2.MatchFieldRequest): PluginV2.MatchFieldResponse {
+    val result = engine.callFunction("match_field", listOf(matchFieldRequestToLua(request)))
+    @Suppress("UNCHECKED_CAST")
+    return luaToMatchFieldResponse(result as? Map<String, Any?> ?: emptyMap(), request.path)
+  }
+
+  /** See [matchField]. */
+  override fun generateField(request: PluginV2.GenerateFieldRequest): PluginV2.GenerateFieldResponse {
+    val result = engine.callFunction("generate_field", listOf(generateFieldRequestToLua(request)))
+    @Suppress("UNCHECKED_CAST")
+    return luaToGenerateFieldResponse(result as? Map<String, Any?> ?: emptyMap())
   }
 
   override fun startMockServer(request: Plugin.StartMockServerRequest): Plugin.StartMockServerResponse {

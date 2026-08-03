@@ -2,6 +2,7 @@ package io.pact.plugins.jvm.core
 
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.pact.plugin.Plugin
+import io.pact.plugin.v2.PluginV2
 import io.pact.plugins.jvm.core.lua.LuaEngine
 import io.pact.plugins.jvm.core.lua.LuaJavaEngine
 import org.bouncycastle.asn1.pkcs.RSAPublicKey as Pkcs1RsaPublicKey
@@ -37,6 +38,12 @@ private val logger = KotlinLogging.logger {}
  * - `generate_content(contents, generators, test_mode)` (optional; passthrough default)
  * - `update_catalogue(catalogue)` (optional; no-op default)
  *
+ * A plugin that contributes a single matching rule or generator applied to one *value* inside
+ * somebody else's content - rather than owning a whole content type - registers a `MATCHER` or
+ * `GENERATOR` catalogue entry and defines these instead (proposal 006):
+ * - `match_field(request) -> table` - `{ mismatches = { ... } }` or `{ error = "..." }`
+ * - `generate_field(request) -> table` - `{ value = ... }` or `{ error = "..." }`
+ *
  * A Lua plugin that registers a `TRANSPORT` catalogue entry (instead of, or as well as, a
  * `CONTENT_MATCHER`/`CONTENT_GENERATOR` one) must also define these functions. The plugin
  * itself is responsible for whatever the transport actually requires (opening sockets, making
@@ -56,6 +63,9 @@ private val logger = KotlinLogging.logger {}
  *   `match_contents` itself, so a result can be returned straight through.
  * - `host_generate_content(entry_key, contents, generators, test_mode) -> body` - same arguments
  *   and return shape as `generate_content` itself.
+ * - `host_match_field(entry_key, request) -> table` - the field-level equivalent, so a content
+ *   matcher can apply a standard Pact rule to one value inside the content it owns.
+ * - `host_generate_field(entry_key, request) -> table`
  */
 class LuaPactPlugin(
   override val manifest: PactPluginManifest,
@@ -179,6 +189,20 @@ class LuaPactPlugin(
       val request = luaToGenerateRequest(args.getOrNull(1), args.getOrNull(2), args.getOrNull(3) as? String)
       bodyToLua(callHostGenerateContent(args[0] as String, request).let { if (it.hasContents()) it.contents else null })
     }
+
+    // The field-level equivalents (proposal 006, "Lua transport"): let a plugin that owns a
+    // content type delegate one value inside it to a standard Pact rule - or to another plugin's
+    // rule - instead of reimplementing it. Cycle-free for the same reason as the two above.
+    engine.registerFunction("host_match_field") { args ->
+      @Suppress("UNCHECKED_CAST")
+      val request = luaToMatchFieldRequest(args[1] as Map<String, Any?>)
+      matchFieldResponseToLua(callHostMatchField(args[0] as String, request))
+    }
+    engine.registerFunction("host_generate_field") { args ->
+      @Suppress("UNCHECKED_CAST")
+      val request = luaToGenerateFieldRequest(args[1] as Map<String, Any?>)
+      generateFieldResponseToLua(callHostGenerateField(args[0] as String, request))
+    }
   }
 
   /**
@@ -227,6 +251,54 @@ class LuaPactPlugin(
         val chainId = CallChain.newCallChainId()
         val deadlineMs = CallChain.defaultDeadlineMs()
         plugin.withRpcClient { client -> client.generateContentWithChain(request, chainId, deadlineMs) }
+      }
+    }
+  }
+
+  /**
+   * Resolve [entryKey] to a field-level matching rule and dispatch to it. See
+   * [callHostCompareContents]; backs the `host_match_field` Lua host function.
+   */
+  private fun callHostMatchField(
+    entryKey: String,
+    request: PluginV2.MatchFieldRequest
+  ): PluginV2.MatchFieldResponse {
+    return when (val resolved = CatalogueManager.resolveCapability(entryKey, CatalogueEntryType.MATCHER)) {
+      is ResolvedCapability.Core -> {
+        val handler = CoreCapabilityRegistry.fieldMatcher(resolved.key)
+          ?: throw PactCoreCapabilityNotFoundException(resolved.key)
+        handler.matchField(request)
+      }
+      is ResolvedCapability.Plugin -> {
+        val plugin = DefaultPluginManager.lookupPlugin(resolved.pluginName, null)
+          ?: throw PactPluginNotFoundException(resolved.pluginName, null)
+        val chainId = CallChain.newCallChainId()
+        val deadlineMs = CallChain.defaultDeadlineMs()
+        plugin.withRpcClient { client -> client.matchFieldWithChain(request, chainId, deadlineMs) }
+      }
+    }
+  }
+
+  /**
+   * Resolve [entryKey] to a field-level generator and dispatch to it. See
+   * [callHostCompareContents]; backs the `host_generate_field` Lua host function.
+   */
+  private fun callHostGenerateField(
+    entryKey: String,
+    request: PluginV2.GenerateFieldRequest
+  ): PluginV2.GenerateFieldResponse {
+    return when (val resolved = CatalogueManager.resolveCapability(entryKey, CatalogueEntryType.GENERATOR)) {
+      is ResolvedCapability.Core -> {
+        val handler = CoreCapabilityRegistry.fieldGenerator(resolved.key)
+          ?: throw PactCoreCapabilityNotFoundException(resolved.key)
+        handler.generateField(request)
+      }
+      is ResolvedCapability.Plugin -> {
+        val plugin = DefaultPluginManager.lookupPlugin(resolved.pluginName, null)
+          ?: throw PactPluginNotFoundException(resolved.pluginName, null)
+        val chainId = CallChain.newCallChainId()
+        val deadlineMs = CallChain.defaultDeadlineMs()
+        plugin.withRpcClient { client -> client.generateFieldWithChain(request, chainId, deadlineMs) }
       }
     }
   }

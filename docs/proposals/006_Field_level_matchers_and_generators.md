@@ -536,10 +536,18 @@ WASM plugin support at all.
    `CoreCapabilities.kt`, `CatalogueManager.resolveCapabilityEntry`, `PluginHostServer.kt` and
    `PluginRpcClient.kt`. No blocking wrapper is needed here - the JVM driver talks to plugins over blocking gRPC
    stubs, so the synchronous matching path calls straight through.
-4. ⬜ Lua runtime in both drivers: `match_field`/`generate_field` invocation, `host_match_field`/
+4. ✅ Lua runtime in both drivers: `match_field`/`generate_field` invocation, `host_match_field`/
    `host_generate_field` host functions, conversions in `lua_plugin.rs` / `LuaConversions.kt`.
-5. ✅ Reference plugin: [`plugins/creditcard`](../../plugins/creditcard), written against this design. Cannot run
-   until steps 1-4 land.
+
+   The JVM driver needed a fix one level down, in `LuaJavaEngine`. luajava's `toObject` returns every Lua number
+   as a `Double` and every Lua string as a Java `String`, so a whole number came back as a decimal and a binary
+   value was truncated at its first NUL byte - the two things `FieldValue`'s per-type arms exist to prevent.
+   Reading the stack directly (`isInteger`/`toInteger`, and `toBuffer` for a `{ binary = ... }` wrapper) fixes
+   both, for the existing metadata path as well as for field values. The Rust driver needed no equivalent: mlua
+   distinguishes `Value::Integer` from `Value::Number`, and its strings are byte-safe.
+5. ✅ Reference plugin: [`plugins/creditcard`](../../plugins/creditcard), written against this design. Now runs -
+   both drivers' test suites load it and exercise its rule and generator end to end - but cannot be reached from a
+   consumer test until step 6.
 6. ⬜ Host framework integration ([9](#9-host-framework-integration)), and an example consumer/provider pair under
    `examples/creditcard` once it can actually execute.
 7. ⬜ Docs: the Lua reference and plugin writing guide gain the two new functions and the `MATCHER`/`GENERATOR`

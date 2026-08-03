@@ -365,6 +365,27 @@ fn register_host_functions(lua: &Lua, plugin_name: &str, log: &Arc<LuaPluginLog>
     })?,
   )?;
 
+  // The field-level equivalents (proposal 006, "Lua transport"): let a plugin that owns a content
+  // type delegate one value inside it to a standard Pact rule - or to another plugin's rule -
+  // instead of reimplementing it. Async and cycle-free for the same reasons as the two above.
+  globals.set(
+    "host_match_field",
+    lua.create_async_function(move |lua, (entry_key, request): (String, Table)| async move {
+      let request = lua_to_match_field_request(&lua, request).map_err(mlua::Error::external)?;
+      let response = call_host_match_field(&entry_key, request).await.map_err(mlua::Error::external)?;
+      match_field_response_to_lua(&lua, &response)
+    })?,
+  )?;
+
+  globals.set(
+    "host_generate_field",
+    lua.create_async_function(move |lua, (entry_key, request): (String, Table)| async move {
+      let request = lua_to_generate_field_request(&lua, request).map_err(mlua::Error::external)?;
+      let response = call_host_generate_field(&entry_key, request).await.map_err(mlua::Error::external)?;
+      generate_field_response_to_lua(&lua, &response)
+    })?,
+  )?;
+
   Ok(())
 }
 
@@ -411,6 +432,50 @@ async fn call_host_generate_content(
       let chain_id = call_chain::new_call_chain_id();
       let deadline_ms = call_chain::default_deadline_ms();
       plugin.generate_content_with_chain(request, &chain_id, deadline_ms).await
+    }
+  }
+}
+
+/// Resolve `entry_key` to a field-level matching rule and dispatch to it. See
+/// [`call_host_compare_contents`]; backs the `host_match_field` Lua host function.
+async fn call_host_match_field(
+  entry_key: &str,
+  request: proto_v2::MatchFieldRequest
+) -> anyhow::Result<proto_v2::MatchFieldResponse> {
+  match resolve_capability(entry_key, CatalogueEntryType::MATCHER)? {
+    ResolvedCapability::Core(core_key) => {
+      let handler = crate::core_capabilities::lookup_core_field_matcher(&core_key)
+        .ok_or_else(|| anyhow!("No core field matcher registered for '{}'", core_key))?;
+      handler.match_field(request).await
+    }
+    ResolvedCapability::Plugin(manifest) => {
+      let plugin = lookup_plugin(&manifest.as_dependency())
+        .ok_or_else(|| anyhow!("Plugin '{}' for entry '{}' is not currently running", manifest.name, entry_key))?;
+      let chain_id = call_chain::new_call_chain_id();
+      let deadline_ms = call_chain::default_deadline_ms();
+      plugin.match_field_with_chain(request, &chain_id, deadline_ms).await
+    }
+  }
+}
+
+/// Resolve `entry_key` to a field-level generator and dispatch to it. See
+/// [`call_host_compare_contents`]; backs the `host_generate_field` Lua host function.
+async fn call_host_generate_field(
+  entry_key: &str,
+  request: proto_v2::GenerateFieldRequest
+) -> anyhow::Result<proto_v2::GenerateFieldResponse> {
+  match resolve_capability(entry_key, CatalogueEntryType::GENERATOR)? {
+    ResolvedCapability::Core(core_key) => {
+      let handler = crate::core_capabilities::lookup_core_field_generator(&core_key)
+        .ok_or_else(|| anyhow!("No core field generator registered for '{}'", core_key))?;
+      handler.generate_field(request).await
+    }
+    ResolvedCapability::Plugin(manifest) => {
+      let plugin = lookup_plugin(&manifest.as_dependency())
+        .ok_or_else(|| anyhow!("Plugin '{}' for entry '{}' is not currently running", manifest.name, entry_key))?;
+      let chain_id = call_chain::new_call_chain_id();
+      let deadline_ms = call_chain::default_deadline_ms();
+      plugin.generate_field_with_chain(request, &chain_id, deadline_ms).await
     }
   }
 }
@@ -809,17 +874,312 @@ fn lua_to_generate_request(
       generator_map.insert(path, Generator { r#type, values });
     }
   }
-  let test_mode = match test_mode.as_deref() {
-    Some("Consumer") => generate_content_request::TestMode::Consumer,
-    Some("Provider") => generate_content_request::TestMode::Provider,
-    _ => generate_content_request::TestMode::Unknown,
-  };
   Ok(GenerateContentRequest {
     contents: lua_to_body(contents)?,
     generators: generator_map,
-    test_mode: test_mode as i32,
+    test_mode: str_to_test_mode(test_mode.as_deref()),
     .. GenerateContentRequest::default()
   })
+}
+
+/// The test mode name a Lua script sees. The V1 and V2 `GenerateContentRequest.TestMode` enums
+/// have the same values, so one pair of helpers covers content generation on either interface as
+/// well as field-level generation (which is V2-only).
+fn test_mode_to_str(test_mode: i32) -> &'static str {
+  match generate_content_request::TestMode::try_from(test_mode)
+    .unwrap_or(generate_content_request::TestMode::Unknown)
+  {
+    generate_content_request::TestMode::Consumer => "Consumer",
+    generate_content_request::TestMode::Provider => "Provider",
+    generate_content_request::TestMode::Unknown => "Unknown",
+  }
+}
+
+/// Reverse of [`test_mode_to_str`]. Anything unrecognised (including a missing value) is
+/// `Unknown`, rather than an error - the mode is context for the plugin, not a contract.
+fn str_to_test_mode(test_mode: Option<&str>) -> i32 {
+  match test_mode {
+    Some("Consumer") => generate_content_request::TestMode::Consumer as i32,
+    Some("Provider") => generate_content_request::TestMode::Provider as i32,
+    _ => generate_content_request::TestMode::Unknown as i32,
+  }
+}
+
+// ---- MatchField / GenerateField <-> Lua ----
+
+/// Converts a single field value to a plain Lua value, following the convention message metadata
+/// values already use (see [`metadata_to_lua`]): everything crosses as a plain Lua value except
+/// binary data, which arrives as a `{ binary = <lua string> }` wrapper table so a script can tell
+/// a string of text from a blob of bytes.
+///
+/// Lua 5.4 has separate integer and float subtypes, so a whole number stays whole across the
+/// boundary. That distinction is what the `integer`, `decimal` and `type` rules are built on, and
+/// is the reason `FieldValue` has an arm per scalar type in the first place - see proposal 006,
+/// section 5.
+fn field_value_to_lua(lua: &Lua, value: &Option<proto_v2::FieldValue>) -> mlua::Result<Value> {
+  use proto_v2::field_value::Value as FieldValue;
+  match value.as_ref().and_then(|value| value.value.as_ref()) {
+    None | Some(FieldValue::NullValue(_)) => Ok(Value::Nil),
+    Some(FieldValue::BooleanValue(value)) => Ok(Value::Boolean(*value)),
+    Some(FieldValue::StringValue(value)) => Ok(Value::String(lua.create_string(value)?)),
+    Some(FieldValue::IntegerValue(value)) => Ok(Value::Integer(*value)),
+    Some(FieldValue::DecimalValue(value)) => Ok(Value::Number(*value)),
+    Some(FieldValue::BinaryValue(bytes)) => {
+      let wrapper = lua.create_table()?;
+      wrapper.set("binary", lua.create_string(bytes)?)?;
+      Ok(Value::Table(wrapper))
+    }
+    Some(FieldValue::StructuredValue(value)) => lua.to_value(&proto_value_to_json(value)),
+  }
+}
+
+/// Reverse of [`field_value_to_lua`]. A table is a binary wrapper if it has a `binary` key, and a
+/// map or list otherwise - the same test [`lua_to_metadata`] applies.
+fn lua_to_field_value(lua: &Lua, value: Value) -> anyhow::Result<proto_v2::FieldValue> {
+  use proto_v2::field_value::Value as FieldValue;
+  let value = match value {
+    Value::Nil => FieldValue::NullValue(0),
+    Value::Boolean(value) => FieldValue::BooleanValue(value),
+    Value::Integer(value) => FieldValue::IntegerValue(value),
+    Value::Number(value) => FieldValue::DecimalValue(value),
+    Value::String(value) => FieldValue::StringValue(value.to_str()?.to_string()),
+    Value::Table(table) => match table.get::<Option<mlua::String>>("binary")? {
+      Some(binary) => FieldValue::BinaryValue(binary.as_bytes().to_vec()),
+      None => FieldValue::StructuredValue(to_proto_value(&lua.from_value(Value::Table(table))?)),
+    },
+    other => return Err(anyhow!("Expected a field value from Lua, got {}", other.type_name())),
+  };
+  Ok(proto_v2::FieldValue { value: Some(value) })
+}
+
+/// Converts a matching rule or a generator - each is a name plus an optional struct of configured
+/// values - into the `{ type = "...", values = { ... } }` table a script already sees for the
+/// rules and generators passed to `match_contents`/`generate_content`. Always a table, even with
+/// no values, so a script can read `rule.values` without checking `rule` first.
+fn typed_values_to_lua(
+  lua: &Lua,
+  r#type: &str,
+  values: &Option<prost_types::Struct>
+) -> mlua::Result<Table> {
+  let table = lua.create_table()?;
+  table.set("type", r#type.to_string())?;
+  if let Some(values) = values {
+    table.set("values", lua.to_value(&proto_struct_to_json(values))?)?;
+  }
+  Ok(table)
+}
+
+/// Reverse of [`typed_values_to_lua`], returning the name and values separately so the caller can
+/// build either a `MatchingRule` or a `Generator` from them.
+fn lua_to_typed_values(
+  lua: &Lua,
+  table: Option<Table>,
+  what: &str
+) -> anyhow::Result<(String, Option<prost_types::Struct>)> {
+  let table = table.ok_or_else(|| anyhow!("Expected a '{}' table from Lua", what))?;
+  let r#type: String = table.get("type")
+    .map_err(|_| anyhow!("Expected the '{}' table from Lua to have a 'type'", what))?;
+  let values: Option<Value> = table.get("values")?;
+  let values = match values {
+    Some(Value::Nil) | None => None,
+    Some(value) => Some(to_proto_struct(&as_json_map(lua.from_value(value)?))),
+  };
+  Ok((r#type, values))
+}
+
+/// V2's `PluginConfiguration` carries the same two `Struct` fields as the V1 message the rest of
+/// this module converts, so the field-level requests reuse those conversions rather than
+/// duplicating them. The conversion is needed at all only because field-level operations exist
+/// solely on the V2 interface (proposal 006).
+fn v2_plugin_configuration_to_v1(
+  config: &Option<proto_v2::PluginConfiguration>
+) -> Option<PluginConfiguration> {
+  config.as_ref().map(|config| PluginConfiguration {
+    interaction_configuration: config.interaction_configuration.clone(),
+    pact_configuration: config.pact_configuration.clone(),
+  })
+}
+
+/// Reverse of [`v2_plugin_configuration_to_v1`].
+fn v1_plugin_configuration_to_v2(
+  config: Option<PluginConfiguration>
+) -> Option<proto_v2::PluginConfiguration> {
+  config.map(|config| proto_v2::PluginConfiguration {
+    interaction_configuration: config.interaction_configuration,
+    pact_configuration: config.pact_configuration,
+  })
+}
+
+/// See [`v2_plugin_configuration_to_v1`] - `ContentMismatch` is likewise identical between the two
+/// interfaces, so the existing mismatch conversions are reused for the V2-only field messages.
+fn v1_content_mismatch_to_v2(mismatch: ContentMismatch) -> proto_v2::ContentMismatch {
+  proto_v2::ContentMismatch {
+    expected: mismatch.expected,
+    actual: mismatch.actual,
+    mismatch: mismatch.mismatch,
+    path: mismatch.path,
+    diff: mismatch.diff,
+    mismatch_type: mismatch.mismatch_type,
+  }
+}
+
+/// Reverse of [`v1_content_mismatch_to_v2`].
+fn v2_content_mismatch_to_v1(mismatch: &proto_v2::ContentMismatch) -> ContentMismatch {
+  ContentMismatch {
+    expected: mismatch.expected.clone(),
+    actual: mismatch.actual.clone(),
+    mismatch: mismatch.mismatch.clone(),
+    path: mismatch.path.clone(),
+    diff: mismatch.diff.clone(),
+    mismatch_type: mismatch.mismatch_type.clone(),
+  }
+}
+
+/// Builds the request table a plugin's own `match_field(request)` function receives.
+fn match_field_request_to_lua(lua: &Lua, request: &proto_v2::MatchFieldRequest) -> mlua::Result<Table> {
+  let table = lua.create_table()?;
+  table.set("key", request.key.clone())?;
+  let rule = request.rule.clone().unwrap_or_default();
+  table.set("rule", typed_values_to_lua(lua, &rule.r#type, &rule.values)?)?;
+  table.set("path", request.path.clone())?;
+  table.set("mismatch_type", request.mismatch_type.clone())?;
+  table.set("expected", field_value_to_lua(lua, &request.expected)?)?;
+  table.set("actual", field_value_to_lua(lua, &request.actual)?)?;
+  table.set(
+    "plugin_configuration",
+    plugin_configuration_to_lua(lua, &v2_plugin_configuration_to_v1(&request.plugin_configuration))?,
+  )?;
+  table.set("test_context", struct_to_lua(lua, &request.test_context)?)?;
+  Ok(table)
+}
+
+/// Reverse of [`match_field_request_to_lua`] - the table a script builds when calling
+/// `host_match_field(entry_key, request)` is the same shape its own `match_field` receives, so it
+/// can forward the request it was given after adjusting whatever it needs to.
+fn lua_to_match_field_request(lua: &Lua, table: Table) -> anyhow::Result<proto_v2::MatchFieldRequest> {
+  let (r#type, values) = lua_to_typed_values(lua, table.get("rule")?, "rule")?;
+  let plugin_configuration: Option<Value> = table.get("plugin_configuration")?;
+  let test_context: Option<Value> = table.get("test_context")?;
+  Ok(proto_v2::MatchFieldRequest {
+    key: table.get::<Option<String>>("key")?.unwrap_or_default(),
+    rule: Some(proto_v2::MatchingRule { r#type, values }),
+    path: table.get::<Option<String>>("path")?.unwrap_or_default(),
+    mismatch_type: table.get::<Option<String>>("mismatch_type")?.unwrap_or_default(),
+    expected: Some(lua_to_field_value(lua, table.get("expected")?)?),
+    actual: Some(lua_to_field_value(lua, table.get("actual")?)?),
+    plugin_configuration: v1_plugin_configuration_to_v2(
+      lua_to_plugin_configuration(lua, plugin_configuration)?
+    ),
+    test_context: lua_to_struct(lua, test_context)?,
+  })
+}
+
+/// Parses the table a plugin's `match_field` function returns: `{ error = "..." }`, or
+/// `{ mismatches = { ... } }` where each entry is a mismatch table or a bare description string
+/// (the same leniency `match_contents` responses get - see [`lua_value_to_content_mismatches`]).
+/// An absent or empty list means the value matched.
+fn lua_to_match_field_response(table: Table, path: &str) -> anyhow::Result<proto_v2::MatchFieldResponse> {
+  let error: Option<String> = table.get("error")?;
+  if let Some(error) = error {
+    return Ok(proto_v2::MatchFieldResponse { error, mismatches: vec![] });
+  }
+
+  let mismatches: Option<Value> = table.get("mismatches")?;
+  let mismatches = match mismatches {
+    Some(value) => lua_value_to_content_mismatches(path, value)?
+      .into_iter()
+      .map(v1_content_mismatch_to_v2)
+      .collect(),
+    None => vec![],
+  };
+  Ok(proto_v2::MatchFieldResponse { error: String::new(), mismatches })
+}
+
+/// Reverse of [`lua_to_match_field_response`], so a script can return the result of a
+/// `host_match_field` call straight through as its own response.
+fn match_field_response_to_lua(lua: &Lua, response: &proto_v2::MatchFieldResponse) -> mlua::Result<Table> {
+  let table = lua.create_table()?;
+  if !response.error.is_empty() {
+    table.set("error", response.error.clone())?;
+    return Ok(table);
+  }
+  let mismatches: Vec<ContentMismatch> = response.mismatches.iter()
+    .map(v2_content_mismatch_to_v1)
+    .collect();
+  table.set("mismatches", content_mismatches_to_lua(lua, &mismatches)?)?;
+  Ok(table)
+}
+
+/// Builds the request table a plugin's own `generate_field(request)` function receives.
+fn generate_field_request_to_lua(lua: &Lua, request: &proto_v2::GenerateFieldRequest) -> mlua::Result<Table> {
+  let table = lua.create_table()?;
+  table.set("key", request.key.clone())?;
+  let generator = request.generator.clone().unwrap_or_default();
+  table.set("generator", typed_values_to_lua(lua, &generator.r#type, &generator.values)?)?;
+  table.set("path", request.path.clone())?;
+  table.set("example_value", field_value_to_lua(lua, &request.example_value)?)?;
+  table.set(
+    "plugin_configuration",
+    plugin_configuration_to_lua(lua, &v2_plugin_configuration_to_v1(&request.plugin_configuration))?,
+  )?;
+  table.set("test_context", struct_to_lua(lua, &request.test_context)?)?;
+  table.set("test_mode", test_mode_to_str(request.test_mode))?;
+  Ok(table)
+}
+
+/// Reverse of [`generate_field_request_to_lua`] - the table a script passes to
+/// `host_generate_field(entry_key, request)`.
+fn lua_to_generate_field_request(lua: &Lua, table: Table) -> anyhow::Result<proto_v2::GenerateFieldRequest> {
+  let (r#type, values) = lua_to_typed_values(lua, table.get("generator")?, "generator")?;
+  let plugin_configuration: Option<Value> = table.get("plugin_configuration")?;
+  let test_context: Option<Value> = table.get("test_context")?;
+  let test_mode: Option<String> = table.get("test_mode")?;
+  Ok(proto_v2::GenerateFieldRequest {
+    key: table.get::<Option<String>>("key")?.unwrap_or_default(),
+    generator: Some(proto_v2::Generator { r#type, values }),
+    path: table.get::<Option<String>>("path")?.unwrap_or_default(),
+    example_value: Some(lua_to_field_value(lua, table.get("example_value")?)?),
+    plugin_configuration: v1_plugin_configuration_to_v2(
+      lua_to_plugin_configuration(lua, plugin_configuration)?
+    ),
+    test_context: lua_to_struct(lua, test_context)?,
+    test_mode: str_to_test_mode(test_mode.as_deref()),
+  })
+}
+
+/// Parses the table a plugin's `generate_field` function returns: `{ value = ... }` or
+/// `{ error = "..." }`.
+fn lua_to_generate_field_response(lua: &Lua, table: Table) -> anyhow::Result<proto_v2::GenerateFieldResponse> {
+  let error: Option<String> = table.get("error")?;
+  if let Some(error) = error {
+    return Ok(proto_v2::GenerateFieldResponse { error, value: None });
+  }
+  Ok(proto_v2::GenerateFieldResponse {
+    error: String::new(),
+    value: Some(lua_to_field_value(lua, table.get("value")?)?),
+  })
+}
+
+/// Reverse of [`lua_to_generate_field_response`], so a script can return the result of a
+/// `host_generate_field` call straight through as its own response.
+fn generate_field_response_to_lua(lua: &Lua, response: &proto_v2::GenerateFieldResponse) -> mlua::Result<Table> {
+  let table = lua.create_table()?;
+  if !response.error.is_empty() {
+    table.set("error", response.error.clone())?;
+  } else {
+    table.set("value", field_value_to_lua(lua, &response.value)?)?;
+  }
+  Ok(table)
+}
+
+/// Converts a plain Lua value back into a `google.protobuf.Struct`, the reverse of
+/// [`struct_to_lua`]. A `nil` (or a non-map value, which a `Struct` cannot represent) becomes no
+/// struct at all rather than an error.
+fn lua_to_struct(lua: &Lua, value: Option<Value>) -> anyhow::Result<Option<prost_types::Struct>> {
+  match value {
+    None | Some(Value::Nil) => Ok(None),
+    Some(value) => Ok(Some(to_proto_struct(&as_json_map(lua.from_value(value)?)))),
+  }
 }
 
 // ---- ConfigureInteraction <-> Lua ----
@@ -1215,13 +1575,7 @@ impl PluginInstance for LuaPactPlugin {
           }
           generators.set(path.clone(), generator_table)?;
         }
-        let test_mode = match generate_content_request::TestMode::try_from(request.test_mode)
-          .unwrap_or(generate_content_request::TestMode::Unknown)
-        {
-          generate_content_request::TestMode::Consumer => "Consumer",
-          generate_content_request::TestMode::Provider => "Provider",
-          generate_content_request::TestMode::Unknown => "Unknown",
-        };
+        let test_mode = test_mode_to_str(request.test_mode);
         let result: Value = generate_fn
           .call_async((contents, generators, test_mode))
           .await
@@ -1231,6 +1585,50 @@ impl PluginInstance for LuaPactPlugin {
         })
       }
     }
+  }
+
+  /// `match_field` and `generate_field` are optional globals - a plugin only defines them if it
+  /// registered a `MATCHER` or `GENERATOR` catalogue entry. Reaching here without one is a real
+  /// error (the driver resolved an entry the plugin registered), so it is reported rather than
+  /// silently treated as a match.
+  ///
+  /// Called via `call_async` for the same reason as `match_contents`: the script may reach a host
+  /// function, and mlua only allows an async host function to be called from a chain started with
+  /// `call_async`.
+  async fn match_field(
+    &self,
+    request: proto_v2::MatchFieldRequest,
+  ) -> anyhow::Result<proto_v2::MatchFieldResponse> {
+    let lua = self.runtime.lock().await;
+    let match_fn: Function = lua
+      .globals()
+      .get("match_field")
+      .map_err(|_| anyhow!("Lua plugin does not define a global 'match_field' function"))?;
+    let path = request.path.clone();
+    let request_table = match_field_request_to_lua(&lua, &request)?;
+    let result: Table = match_fn
+      .call_async(request_table)
+      .await
+      .map_err(|err| anyhow!("Lua match_field() function failed - {}", err))?;
+    lua_to_match_field_response(result, &path)
+  }
+
+  /// See [`LuaPactPlugin::match_field`].
+  async fn generate_field(
+    &self,
+    request: proto_v2::GenerateFieldRequest,
+  ) -> anyhow::Result<proto_v2::GenerateFieldResponse> {
+    let lua = self.runtime.lock().await;
+    let generate_fn: Function = lua
+      .globals()
+      .get("generate_field")
+      .map_err(|_| anyhow!("Lua plugin does not define a global 'generate_field' function"))?;
+    let request_table = generate_field_request_to_lua(&lua, &request)?;
+    let result: Table = generate_fn
+      .call_async(request_table)
+      .await
+      .map_err(|err| anyhow!("Lua generate_field() function failed - {}", err))?;
+    lua_to_generate_field_response(&lua, result)
   }
 
   async fn start_mock_server(
@@ -2347,6 +2745,447 @@ mod tests {
       result.is_err(),
       "expected a wrong-typed 'path' field (a table, not a string) to be a hard error, not silently default, got {:?}",
       result
+    );
+  }
+
+  // ---- Field-level matchers and generators (proposal 006) ----
+
+  fn creditcard_manifest() -> PactPluginManifest {
+    // See jwt_manifest() for why this path is deliberately not canonicalized.
+    let plugin_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../plugins/creditcard");
+    assert!(plugin_dir.exists(), "plugins/creditcard directory should exist at {:?}", plugin_dir);
+    PactPluginManifest {
+      plugin_dir: plugin_dir.to_string_lossy().to_string(),
+      plugin_interface_version: 2,
+      name: "creditcard".to_string(),
+      version: "0.0.0".to_string(),
+      executable_type: "lua".to_string(),
+      minimum_required_version: None,
+      entry_point: "plugin.lua".to_string(),
+      entry_points: HashMap::new(),
+      args: None,
+      dependencies: None,
+      plugin_config: HashMap::new(),
+    }
+  }
+
+  fn text_field(value: &str) -> proto_v2::FieldValue {
+    proto_v2::FieldValue {
+      value: Some(proto_v2::field_value::Value::StringValue(value.to_string()))
+    }
+  }
+
+  /// A `MatchFieldRequest` for the `creditcard` rule, optionally configured with a brand.
+  fn creditcard_match_request(brand: Option<&str>, expected: &str, actual: &str) -> proto_v2::MatchFieldRequest {
+    let values = brand.map(|brand| {
+      let mut fields = HashMap::new();
+      fields.insert("brand".to_string(), serde_json::Value::String(brand.to_string()));
+      to_proto_struct(&fields)
+    });
+    proto_v2::MatchFieldRequest {
+      key: "creditcard".to_string(),
+      rule: Some(proto_v2::MatchingRule { r#type: "creditcard".to_string(), values }),
+      path: "$.card.number".to_string(),
+      mismatch_type: "body".to_string(),
+      expected: Some(text_field(expected)),
+      actual: Some(text_field(actual)),
+      plugin_configuration: None,
+      test_context: None,
+    }
+  }
+
+  fn creditcard_generate_request(brand: Option<&str>, example: &str) -> proto_v2::GenerateFieldRequest {
+    let values = brand.map(|brand| {
+      let mut fields = HashMap::new();
+      fields.insert("brand".to_string(), serde_json::Value::String(brand.to_string()));
+      to_proto_struct(&fields)
+    });
+    proto_v2::GenerateFieldRequest {
+      key: "creditcard".to_string(),
+      generator: Some(proto_v2::Generator { r#type: "creditcard".to_string(), values }),
+      path: "$.card.number".to_string(),
+      example_value: Some(text_field(example)),
+      plugin_configuration: None,
+      test_context: None,
+      test_mode: proto_v2::generate_content_request::TestMode::Consumer as i32,
+    }
+  }
+
+  #[tokio::test]
+  async fn creditcard_plugin_registers_a_matcher_and_a_generator_under_the_same_key() {
+    let manifest = creditcard_manifest();
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+    let lua = plugin.runtime.lock().await;
+    let entries = call_init(&lua, "test", "0.0.0").unwrap();
+
+    assert_eq!(entries.len(), 2);
+    assert_eq!(entries[0].key, "creditcard");
+    assert_eq!(entries[0].r#type, proto_v2::catalogue_entry::EntryType::Matcher as i32);
+    assert_eq!(entries[1].key, "creditcard");
+    assert_eq!(entries[1].r#type, proto_v2::catalogue_entry::EntryType::Generator as i32);
+    // The values key that maps a single positional config argument in a rule definition
+    assert_eq!(entries[0].values.get("config-key"), Some(&"brand".to_string()));
+  }
+
+  #[tokio::test]
+  async fn creditcard_plugin_accepts_a_valid_card_number() {
+    let plugin = start_lua_plugin(&creditcard_manifest(), "test-instance".to_string()).unwrap();
+
+    let response = plugin
+      .match_field(creditcard_match_request(Some("visa"), "4111111111111111", "4012888888881881"))
+      .await
+      .unwrap();
+
+    assert_eq!(response.error, "");
+    assert!(response.mismatches.is_empty(), "expected no mismatches, got {:?}", response.mismatches);
+  }
+
+  #[tokio::test]
+  async fn creditcard_plugin_reports_a_number_that_fails_the_luhn_check() {
+    let plugin = start_lua_plugin(&creditcard_manifest(), "test-instance".to_string()).unwrap();
+
+    let response = plugin
+      .match_field(creditcard_match_request(None, "4111111111111111", "4111111111111112"))
+      .await
+      .unwrap();
+
+    assert_eq!(response.error, "");
+    assert_eq!(response.mismatches.len(), 1);
+    let mismatch = &response.mismatches[0];
+    assert!(
+      mismatch.mismatch.contains("Luhn check"),
+      "unexpected mismatch description: {}", mismatch.mismatch
+    );
+    // The plugin places its own mismatches, echoing back the path and part it was given
+    assert_eq!(mismatch.path, "$.card.number");
+    assert_eq!(mismatch.mismatch_type, "body");
+    assert_eq!(mismatch.expected.as_deref(), Some("4111111111111111".as_bytes()));
+    assert_eq!(mismatch.actual.as_deref(), Some("4111111111111112".as_bytes()));
+  }
+
+  #[tokio::test]
+  async fn creditcard_plugin_reports_a_number_from_the_wrong_brand() {
+    let plugin = start_lua_plugin(&creditcard_manifest(), "test-instance".to_string()).unwrap();
+
+    // A valid Visa number, but the rule asks for a Mastercard
+    let response = plugin
+      .match_field(creditcard_match_request(Some("mastercard"), "5555555555554444", "4012888888881881"))
+      .await
+      .unwrap();
+
+    assert_eq!(response.mismatches.len(), 1);
+    assert!(
+      response.mismatches[0].mismatch.contains("Mastercard"),
+      "unexpected mismatch description: {}", response.mismatches[0].mismatch
+    );
+  }
+
+  #[tokio::test]
+  async fn creditcard_plugin_reports_a_misconfigured_brand_as_an_error_not_a_mismatch() {
+    // The test author's mistake, not the provider's - so it fails the test outright rather than
+    // being reported as the provider sending the wrong value.
+    let plugin = start_lua_plugin(&creditcard_manifest(), "test-instance".to_string()).unwrap();
+
+    let response = plugin
+      .match_field(creditcard_match_request(Some("amx"), "4111111111111111", "4111111111111111"))
+      .await
+      .unwrap();
+
+    assert!(
+      response.error.contains("'amx' is not a credit card brand"),
+      "unexpected error: {}", response.error
+    );
+    assert!(response.mismatches.is_empty());
+  }
+
+  #[tokio::test]
+  async fn creditcard_plugin_generates_a_number_for_the_configured_brand() {
+    let plugin = start_lua_plugin(&creditcard_manifest(), "test-instance".to_string()).unwrap();
+
+    let response = plugin
+      .generate_field(creditcard_generate_request(Some("amex"), "4111111111111111"))
+      .await
+      .unwrap();
+
+    assert_eq!(response.error, "");
+    let generated = match response.value.and_then(|value| value.value) {
+      Some(proto_v2::field_value::Value::StringValue(value)) => value,
+      other => panic!("expected a generated string value, got {:?}", other)
+    };
+    assert_eq!(generated.len(), 15, "an Amex number has 15 digits, got '{}'", generated);
+    assert!(generated.starts_with("34") || generated.starts_with("37"), "got '{}'", generated);
+
+    // And the number it generated is one it will accept back
+    let match_response = plugin
+      .match_field(creditcard_match_request(Some("amex"), "371449635398431", &generated))
+      .await
+      .unwrap();
+    assert!(
+      match_response.mismatches.is_empty(),
+      "the plugin should accept its own generated number, got {:?}", match_response.mismatches
+    );
+  }
+
+  #[tokio::test]
+  async fn creditcard_plugin_reports_a_generator_error() {
+    let plugin = start_lua_plugin(&creditcard_manifest(), "test-instance".to_string()).unwrap();
+
+    let response = plugin
+      .generate_field(creditcard_generate_request(Some("amx"), "4111111111111111"))
+      .await
+      .unwrap();
+
+    assert!(response.error.contains("amx"), "unexpected error: {}", response.error);
+    assert!(response.value.is_none());
+  }
+
+  /// Starts a Lua plugin whose entry point is the given script source.
+  fn start_field_plugin(name: &str, script: &str) -> (tempdir::TempDir, LuaPactPlugin) {
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    std::fs::write(plugin_dir.path().join("entry.lua"), script).unwrap();
+    let manifest = lua_manifest(plugin_dir.path(), name);
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+    // The temp dir is returned so it outlives the plugin - dropping it deletes the script
+    (plugin_dir, plugin)
+  }
+
+  #[tokio::test]
+  async fn each_field_value_type_survives_the_round_trip_through_lua() {
+    use proto_v2::field_value::Value as FieldValue;
+
+    let (_dir, plugin) = start_field_plugin(
+      "field-value-round-trip-test",
+      r#"
+        function generate_field(request)
+          return { value = request.example_value }
+        end
+      "#,
+    );
+
+    let values = vec![
+      FieldValue::NullValue(0),
+      FieldValue::BooleanValue(true),
+      FieldValue::StringValue("4111111111111111".to_string()),
+      FieldValue::IntegerValue(100),
+      FieldValue::DecimalValue(100.5),
+      FieldValue::BinaryValue(vec![0, 159, 146, 150]),
+    ];
+
+    for value in values {
+      let request = proto_v2::GenerateFieldRequest {
+        generator: Some(proto_v2::Generator::default()),
+        example_value: Some(proto_v2::FieldValue { value: Some(value.clone()) }),
+        .. proto_v2::GenerateFieldRequest::default()
+      };
+      let response = plugin.generate_field(request).await.unwrap();
+      assert_eq!(
+        response.value.and_then(|response| response.value), Some(value.clone()),
+        "{:?} did not survive the round trip through Lua", value
+      );
+    }
+  }
+
+  #[tokio::test]
+  async fn a_whole_number_reaches_lua_as_an_integer_and_a_decimal_as_a_float() {
+    // The distinction the integer, decimal and type rules are built on. Lua 5.4 has separate
+    // integer and float subtypes, so it can be checked from inside the script itself.
+    let (_dir, plugin) = start_field_plugin(
+      "field-value-lua-type-test",
+      r#"
+        function generate_field(request)
+          return { value = math.type(request.example_value) }
+        end
+      "#,
+    );
+
+    let lua_type_of = async |value: proto_v2::field_value::Value| {
+      let request = proto_v2::GenerateFieldRequest {
+        example_value: Some(proto_v2::FieldValue { value: Some(value) }),
+        .. proto_v2::GenerateFieldRequest::default()
+      };
+      match plugin.generate_field(request).await.unwrap().value.and_then(|value| value.value) {
+        Some(proto_v2::field_value::Value::StringValue(value)) => value,
+        other => panic!("expected math.type() to return a string, got {:?}", other)
+      }
+    };
+
+    assert_eq!(lua_type_of(proto_v2::field_value::Value::IntegerValue(100)).await, "integer");
+    assert_eq!(lua_type_of(proto_v2::field_value::Value::DecimalValue(100.0)).await, "float");
+  }
+
+  #[tokio::test]
+  async fn a_mismatch_that_does_not_place_itself_is_reported_against_the_request_path() {
+    let (_dir, plugin) = start_field_plugin(
+      "field-mismatch-path-test",
+      r#"
+        function match_field(request)
+          return { mismatches = { "not a card number" } }
+        end
+      "#,
+    );
+
+    let response = plugin
+      .match_field(creditcard_match_request(None, "4111111111111111", "nope"))
+      .await
+      .unwrap();
+
+    assert_eq!(response.mismatches.len(), 1);
+    assert_eq!(response.mismatches[0].mismatch, "not a card number");
+    assert_eq!(response.mismatches[0].path, "$.card.number");
+  }
+
+  #[tokio::test]
+  async fn a_plugin_that_does_not_define_the_field_functions_says_so() {
+    let (_dir, plugin) = start_field_plugin("field-functions-missing-test", "-- nothing here");
+
+    let match_error = plugin.match_field(proto_v2::MatchFieldRequest::default()).await
+      .expect_err("expected an error when the plugin does not define match_field");
+    assert!(
+      match_error.to_string().contains("does not define a global 'match_field' function"),
+      "unexpected error: {}", match_error
+    );
+
+    let generate_error = plugin.generate_field(proto_v2::GenerateFieldRequest::default()).await
+      .expect_err("expected an error when the plugin does not define generate_field");
+    assert!(
+      generate_error.to_string().contains("does not define a global 'generate_field' function"),
+      "unexpected error: {}", generate_error
+    );
+  }
+
+  fn core_field_matcher_entry(key: &str) -> crate::catalogue_manager::CatalogueEntry {
+    crate::catalogue_manager::CatalogueEntry {
+      entry_type: crate::catalogue_manager::CatalogueEntryType::MATCHER,
+      provider_type: crate::catalogue_manager::CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: key.to_string(),
+      values: HashMap::new()
+    }
+  }
+
+  fn core_field_generator_entry(key: &str) -> crate::catalogue_manager::CatalogueEntry {
+    crate::catalogue_manager::CatalogueEntry {
+      entry_type: crate::catalogue_manager::CatalogueEntryType::GENERATOR,
+      provider_type: crate::catalogue_manager::CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: key.to_string(),
+      values: HashMap::new()
+    }
+  }
+
+  /// A core field matcher that reports what it was handed, so the test can check the request the
+  /// script built actually arrived intact.
+  struct EchoCoreFieldMatcher;
+
+  #[async_trait]
+  impl crate::core_capabilities::CoreFieldMatcher for EchoCoreFieldMatcher {
+    async fn match_field(&self, request: proto_v2::MatchFieldRequest) -> anyhow::Result<proto_v2::MatchFieldResponse> {
+      let rule = request.rule.unwrap_or_default();
+      Ok(proto_v2::MatchFieldResponse {
+        error: String::new(),
+        mismatches: vec![proto_v2::ContentMismatch {
+          expected: None,
+          actual: None,
+          mismatch: format!("core matcher saw rule '{}' at {}", rule.r#type, request.path),
+          path: request.path,
+          diff: String::new(),
+          mismatch_type: request.mismatch_type,
+        }]
+      })
+    }
+  }
+
+  #[tokio::test]
+  async fn match_field_calls_host_match_field_for_a_registered_core_capability() {
+    // A plugin that owns a content type delegating one value inside it to a standard Pact rule,
+    // rather than reimplementing it - the point of the host callbacks (proposal 006 section 7).
+    let key = "match_field_calls_host_match_field_for_a_registered_core_capability";
+    crate::catalogue_manager::register_core_entries(&vec![core_field_matcher_entry(key)]);
+    crate::core_capabilities::register_core_field_matcher(key, Arc::new(EchoCoreFieldMatcher));
+
+    let (_dir, plugin) = start_field_plugin(
+      "host-match-field-test",
+      &format!(r#"
+        function match_field(request)
+          return host_match_field("{key}", request)
+        end
+      "#, key = key),
+    );
+
+    let response = plugin
+      .match_field(creditcard_match_request(Some("visa"), "4111111111111111", "4012888888881881"))
+      .await
+      .unwrap();
+
+    crate::core_capabilities::deregister_core_field_matcher(key);
+
+    assert_eq!(response.mismatches.len(), 1);
+    assert_eq!(
+      response.mismatches[0].mismatch,
+      "core matcher saw rule 'creditcard' at $.card.number"
+    );
+    assert_eq!(response.mismatches[0].mismatch_type, "body");
+  }
+
+  #[tokio::test]
+  async fn host_match_field_surfaces_a_clear_error_when_the_entry_is_not_registered() {
+    let key = "host_match_field_surfaces_a_clear_error_when_the_entry_is_not_registered";
+    let (_dir, plugin) = start_field_plugin(
+      "host-match-field-missing-test",
+      &format!(r#"
+        function match_field(request)
+          return host_match_field("{key}", request)
+        end
+      "#, key = key),
+    );
+
+    let err = plugin.match_field(creditcard_match_request(None, "4111111111111111", "4111111111111111"))
+      .await
+      .expect_err("expected an error when the target entry is not registered");
+    assert!(
+      err.to_string().contains("No catalogue entry found"),
+      "unexpected error message: {}", err
+    );
+  }
+
+  struct FixedCoreFieldGenerator;
+
+  #[async_trait]
+  impl crate::core_capabilities::CoreFieldGenerator for FixedCoreFieldGenerator {
+    async fn generate_field(&self, _request: proto_v2::GenerateFieldRequest) -> anyhow::Result<proto_v2::GenerateFieldResponse> {
+      Ok(proto_v2::GenerateFieldResponse {
+        error: String::new(),
+        value: Some(text_field("generated by the host"))
+      })
+    }
+  }
+
+  #[tokio::test]
+  async fn generate_field_calls_host_generate_field_for_a_registered_core_capability() {
+    let key = "generate_field_calls_host_generate_field_for_a_registered_core_capability";
+    crate::catalogue_manager::register_core_entries(&vec![core_field_generator_entry(key)]);
+    crate::core_capabilities::register_core_field_generator(key, Arc::new(FixedCoreFieldGenerator));
+
+    let (_dir, plugin) = start_field_plugin(
+      "host-generate-field-test",
+      &format!(r#"
+        function generate_field(request)
+          return host_generate_field("{key}", request)
+        end
+      "#, key = key),
+    );
+
+    let response = plugin
+      .generate_field(creditcard_generate_request(Some("visa"), "4111111111111111"))
+      .await
+      .unwrap();
+
+    crate::core_capabilities::deregister_core_field_generator(key);
+
+    assert_eq!(response.error, "");
+    assert_eq!(
+      response.value.and_then(|value| value.value),
+      Some(proto_v2::field_value::Value::StringValue("generated by the host".to_string()))
     );
   }
 }

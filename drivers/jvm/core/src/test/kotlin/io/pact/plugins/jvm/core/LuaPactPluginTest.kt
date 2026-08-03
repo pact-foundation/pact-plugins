@@ -679,4 +679,422 @@ class LuaPactPluginTest {
       pluginDir.deleteRecursively()
     }
   }
+
+  // ---- Field-level matchers and generators (proposal 006) ----
+
+  private fun creditcardManifest(): PactPluginManifest {
+    val pluginDir = File("../../../plugins/creditcard").canonicalFile
+    require(pluginDir.exists()) { "plugins/creditcard directory should exist at $pluginDir" }
+    return DefaultPactPluginManifest(
+      pluginDir = pluginDir,
+      pluginInterfaceVersion = 2,
+      name = "creditcard",
+      version = "0.0.0",
+      executableType = "lua",
+      minimumRequiredVersion = null,
+      entryPoint = "plugin.lua",
+      entryPoints = emptyMap(),
+      args = emptyList(),
+      dependencies = emptyList()
+    )
+  }
+
+  private fun textField(value: String): PluginV2.FieldValue =
+    PluginV2.FieldValue.newBuilder().setStringValue(value).build()
+
+  private fun brandValues(brand: String?): com.google.protobuf.Struct? =
+    brand?.let { Utils.mapToProtoStruct(mapOf("brand" to it)) }
+
+  /** A `MatchFieldRequest` for the `creditcard` rule, optionally configured with a brand. */
+  private fun creditcardMatchRequest(brand: String?, expected: String, actual: String): PluginV2.MatchFieldRequest {
+    val rule = PluginV2.MatchingRule.newBuilder().setType("creditcard")
+    brandValues(brand)?.let { rule.values = it }
+    return PluginV2.MatchFieldRequest.newBuilder()
+      .setKey("creditcard")
+      .setRule(rule.build())
+      .setPath("$.card.number")
+      .setMismatchType("body")
+      .setExpected(textField(expected))
+      .setActual(textField(actual))
+      .build()
+  }
+
+  private fun creditcardGenerateRequest(brand: String?, example: String): PluginV2.GenerateFieldRequest {
+    val generator = PluginV2.Generator.newBuilder().setType("creditcard")
+    brandValues(brand)?.let { generator.values = it }
+    return PluginV2.GenerateFieldRequest.newBuilder()
+      .setKey("creditcard")
+      .setGenerator(generator.build())
+      .setPath("$.card.number")
+      .setExampleValue(textField(example))
+      .setTestMode(PluginV2.GenerateContentRequest.TestMode.Consumer)
+      .build()
+  }
+
+  @Test
+  fun `creditcard plugin registers a matcher and a generator under the same key`() {
+    val plugin = LuaPactPlugin(creditcardManifest())
+    try {
+      val response = plugin.withRpcClient {
+        it.initPlugin(PluginInitRequest(implementation = "test", version = "0.0.0"))
+      }
+      assertEquals(2, response.catalogueEntries.size)
+      assertEquals("creditcard", response.catalogueEntries[0].key)
+      assertEquals(CatalogueEntryType.MATCHER.toEntryValue(), response.catalogueEntries[0].typeValue)
+      assertEquals("creditcard", response.catalogueEntries[1].key)
+      assertEquals(CatalogueEntryType.GENERATOR.toEntryValue(), response.catalogueEntries[1].typeValue)
+      // The values key that maps a single positional config argument in a rule definition
+      assertEquals("brand", response.catalogueEntries[0].valuesMap["config-key"])
+    } finally {
+      plugin.shutdown()
+    }
+  }
+
+  @Test
+  fun `creditcard plugin accepts a valid card number`() {
+    val plugin = LuaPactPlugin(creditcardManifest())
+    try {
+      val response = plugin.withRpcClient {
+        it.matchField(creditcardMatchRequest("visa", "4111111111111111", "4012888888881881"))
+      }
+      assertEquals("", response.error)
+      assertTrue(
+        response.mismatchesList.isEmpty(),
+        "expected no mismatches, got ${response.mismatchesList}"
+      )
+    } finally {
+      plugin.shutdown()
+    }
+  }
+
+  @Test
+  fun `creditcard plugin reports a number that fails the Luhn check`() {
+    val plugin = LuaPactPlugin(creditcardManifest())
+    try {
+      val response = plugin.withRpcClient {
+        it.matchField(creditcardMatchRequest(null, "4111111111111111", "4111111111111112"))
+      }
+      assertEquals("", response.error)
+      assertEquals(1, response.mismatchesCount)
+      val mismatch = response.getMismatches(0)
+      assertTrue(
+        mismatch.mismatch.contains("Luhn check"),
+        "unexpected mismatch description: ${mismatch.mismatch}"
+      )
+      // The plugin places its own mismatches, echoing back the path and part it was given
+      assertEquals("$.card.number", mismatch.path)
+      assertEquals("body", mismatch.mismatchType)
+      assertEquals("4111111111111111", mismatch.expected.value.toStringUtf8())
+      assertEquals("4111111111111112", mismatch.actual.value.toStringUtf8())
+    } finally {
+      plugin.shutdown()
+    }
+  }
+
+  @Test
+  fun `creditcard plugin reports a number from the wrong brand`() {
+    val plugin = LuaPactPlugin(creditcardManifest())
+    try {
+      // A valid Visa number, but the rule asks for a Mastercard
+      val response = plugin.withRpcClient {
+        it.matchField(creditcardMatchRequest("mastercard", "5555555555554444", "4012888888881881"))
+      }
+      assertEquals(1, response.mismatchesCount)
+      assertTrue(
+        response.getMismatches(0).mismatch.contains("Mastercard"),
+        "unexpected mismatch description: ${response.getMismatches(0).mismatch}"
+      )
+    } finally {
+      plugin.shutdown()
+    }
+  }
+
+  @Test
+  fun `creditcard plugin reports a misconfigured brand as an error not a mismatch`() {
+    // The test author's mistake, not the provider's - so it fails the test outright rather than
+    // being reported as the provider sending the wrong value.
+    val plugin = LuaPactPlugin(creditcardManifest())
+    try {
+      val response = plugin.withRpcClient {
+        it.matchField(creditcardMatchRequest("amx", "4111111111111111", "4111111111111111"))
+      }
+      assertTrue(
+        response.error.contains("'amx' is not a credit card brand"),
+        "unexpected error: ${response.error}"
+      )
+      assertTrue(response.mismatchesList.isEmpty())
+    } finally {
+      plugin.shutdown()
+    }
+  }
+
+  @Test
+  fun `creditcard plugin generates a number for the configured brand`() {
+    val plugin = LuaPactPlugin(creditcardManifest())
+    try {
+      val response = plugin.withRpcClient {
+        it.generateField(creditcardGenerateRequest("amex", "4111111111111111"))
+      }
+      assertEquals("", response.error)
+      assertEquals(PluginV2.FieldValue.ValueCase.STRINGVALUE, response.value.valueCase)
+      val generated = response.value.stringValue
+      assertEquals(15, generated.length, "an Amex number has 15 digits, got '$generated'")
+      assertTrue(generated.startsWith("34") || generated.startsWith("37"), "got '$generated'")
+
+      // And the number it generated is one it will accept back
+      val matchResponse = plugin.withRpcClient {
+        it.matchField(creditcardMatchRequest("amex", "371449635398431", generated))
+      }
+      assertTrue(
+        matchResponse.mismatchesList.isEmpty(),
+        "the plugin should accept its own generated number, got ${matchResponse.mismatchesList}"
+      )
+    } finally {
+      plugin.shutdown()
+    }
+  }
+
+  @Test
+  fun `creditcard plugin reports a generator error`() {
+    val plugin = LuaPactPlugin(creditcardManifest())
+    try {
+      val response = plugin.withRpcClient {
+        it.generateField(creditcardGenerateRequest("amx", "4111111111111111"))
+      }
+      assertTrue(response.error.contains("amx"), "unexpected error: ${response.error}")
+      assertFalse(response.hasValue())
+    } finally {
+      plugin.shutdown()
+    }
+  }
+
+  @Test
+  fun `each field value type survives the round trip through Lua`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-field-value-round-trip-test").toFile()
+    val manifest = hostCallbackManifest(
+      pluginDir,
+      "field-value-round-trip-test",
+      """
+        function generate_field(request)
+          return { value = request.example_value }
+        end
+      """.trimIndent()
+    )
+    val plugin = LuaPactPlugin(manifest)
+    try {
+      val values = listOf(
+        PluginV2.FieldValue.newBuilder().setNullValueValue(0).build(),
+        PluginV2.FieldValue.newBuilder().setBooleanValue(true).build(),
+        PluginV2.FieldValue.newBuilder().setStringValue("4111111111111111").build(),
+        PluginV2.FieldValue.newBuilder().setIntegerValue(100).build(),
+        PluginV2.FieldValue.newBuilder().setDecimalValue(100.5).build(),
+        // Deliberately starts with a NUL and is not valid UTF-8: a Lua string is an arbitrary
+        // byte array, and reading one back as a Java String would truncate this to nothing
+        PluginV2.FieldValue.newBuilder()
+          .setBinaryValue(com.google.protobuf.ByteString.copyFrom(byteArrayOf(0, -97, -110, -106)))
+          .build()
+      )
+      for (value in values) {
+        val request = PluginV2.GenerateFieldRequest.newBuilder().setExampleValue(value).build()
+        val response = plugin.withRpcClient { it.generateField(request) }
+        assertEquals(value, response.value, "$value did not survive the round trip through Lua")
+      }
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `a whole number reaches Lua as an integer and a decimal as a float`() {
+    // The distinction the integer, decimal and type rules are built on. Lua 5.4 has separate
+    // integer and float subtypes, so it can be checked from inside the script itself.
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-field-value-type-test").toFile()
+    val manifest = hostCallbackManifest(
+      pluginDir,
+      "field-value-lua-type-test",
+      """
+        function generate_field(request)
+          return { value = math.type(request.example_value) }
+        end
+      """.trimIndent()
+    )
+    val plugin = LuaPactPlugin(manifest)
+    try {
+      val luaTypeOf = { value: PluginV2.FieldValue ->
+        val request = PluginV2.GenerateFieldRequest.newBuilder().setExampleValue(value).build()
+        plugin.withRpcClient { it.generateField(request) }.value.stringValue
+      }
+      assertEquals("integer", luaTypeOf(PluginV2.FieldValue.newBuilder().setIntegerValue(100).build()))
+      assertEquals("float", luaTypeOf(PluginV2.FieldValue.newBuilder().setDecimalValue(100.0).build()))
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `a mismatch that does not place itself is reported against the request path`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-field-mismatch-path-test").toFile()
+    val manifest = hostCallbackManifest(
+      pluginDir,
+      "field-mismatch-path-test",
+      """
+        function match_field(request)
+          return { mismatches = { "not a card number" } }
+        end
+      """.trimIndent()
+    )
+    val plugin = LuaPactPlugin(manifest)
+    try {
+      val response = plugin.withRpcClient {
+        it.matchField(creditcardMatchRequest(null, "4111111111111111", "nope"))
+      }
+      assertEquals(1, response.mismatchesCount)
+      assertEquals("not a card number", response.getMismatches(0).mismatch)
+      assertEquals("$.card.number", response.getMismatches(0).path)
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `a plugin that does not define the field functions says so`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-field-functions-missing-test").toFile()
+    val manifest = hostCallbackManifest(pluginDir, "field-functions-missing-test", "-- nothing here")
+    val plugin = LuaPactPlugin(manifest)
+    try {
+      val matchError = assertThrows(RuntimeException::class.java) {
+        plugin.withRpcClient { it.matchField(PluginV2.MatchFieldRequest.newBuilder().build()) }
+      }
+      assertTrue(
+        matchError.message?.contains("does not define a global 'match_field' function") == true,
+        "unexpected error: ${matchError.message}"
+      )
+
+      val generateError = assertThrows(RuntimeException::class.java) {
+        plugin.withRpcClient { it.generateField(PluginV2.GenerateFieldRequest.newBuilder().build()) }
+      }
+      assertTrue(
+        generateError.message?.contains("does not define a global 'generate_field' function") == true,
+        "unexpected error: ${generateError.message}"
+      )
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `match_field calls host_match_field for a registered core capability`() {
+    // A plugin that owns a content type delegating one value inside it to a standard Pact rule,
+    // rather than reimplementing it - the point of the host callbacks (proposal 006 section 7).
+    val key = "match_field-calls-host_match_field-for-a-registered-core-capability"
+    CatalogueManager.registerCoreEntries(listOf(
+      CatalogueEntry(CatalogueEntryType.MATCHER, CatalogueEntryProviderType.CORE, "", key)
+    ))
+    CoreCapabilityRegistry.registerFieldMatcher(key) { request ->
+      PluginV2.MatchFieldResponse.newBuilder()
+        .addMismatches(
+          PluginV2.ContentMismatch.newBuilder()
+            .setMismatch("core matcher saw rule '${request.rule.type}' at ${request.path}")
+            .setPath(request.path)
+            .setMismatchType(request.mismatchType)
+            .build()
+        )
+        .build()
+    }
+
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-host-match-field-test").toFile()
+    val manifest = hostCallbackManifest(
+      pluginDir,
+      "host-match-field-test",
+      """
+        function match_field(request)
+          return host_match_field("$key", request)
+        end
+      """.trimIndent()
+    )
+    val plugin = LuaPactPlugin(manifest)
+    try {
+      val response = plugin.withRpcClient {
+        it.matchField(creditcardMatchRequest("visa", "4111111111111111", "4012888888881881"))
+      }
+      assertEquals(1, response.mismatchesCount)
+      assertEquals(
+        "core matcher saw rule 'creditcard' at $.card.number",
+        response.getMismatches(0).mismatch
+      )
+      assertEquals("body", response.getMismatches(0).mismatchType)
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+      CoreCapabilityRegistry.deregisterFieldMatcher(key)
+    }
+  }
+
+  @Test
+  fun `host_match_field surfaces a clear error when the entry is not registered`() {
+    val key = "host_match_field-surfaces-a-clear-error-when-the-entry-is-not-registered"
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-host-match-field-missing-test").toFile()
+    val manifest = hostCallbackManifest(
+      pluginDir,
+      "host-match-field-missing-test",
+      """
+        function match_field(request)
+          return host_match_field("$key", request)
+        end
+      """.trimIndent()
+    )
+    val plugin = LuaPactPlugin(manifest)
+    try {
+      val ex = assertThrows(RuntimeException::class.java) {
+        plugin.withRpcClient {
+          it.matchField(creditcardMatchRequest(null, "4111111111111111", "4111111111111111"))
+        }
+      }
+      assertTrue(
+        ex.message?.contains("No catalogue entry found") == true,
+        "expected a 'No catalogue entry found' error, got: ${ex.message}"
+      )
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+    }
+  }
+
+  @Test
+  fun `generate_field calls host_generate_field for a registered core capability`() {
+    val key = "generate_field-calls-host_generate_field-for-a-registered-core-capability"
+    CatalogueManager.registerCoreEntries(listOf(
+      CatalogueEntry(CatalogueEntryType.GENERATOR, CatalogueEntryProviderType.CORE, "", key)
+    ))
+    CoreCapabilityRegistry.registerFieldGenerator(key) {
+      PluginV2.GenerateFieldResponse.newBuilder().setValue(textField("generated by the host")).build()
+    }
+
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-host-generate-field-test").toFile()
+    val manifest = hostCallbackManifest(
+      pluginDir,
+      "host-generate-field-test",
+      """
+        function generate_field(request)
+          return host_generate_field("$key", request)
+        end
+      """.trimIndent()
+    )
+    val plugin = LuaPactPlugin(manifest)
+    try {
+      val response = plugin.withRpcClient {
+        it.generateField(creditcardGenerateRequest("visa", "4111111111111111"))
+      }
+      assertEquals("", response.error)
+      assertEquals("generated by the host", response.value.stringValue)
+    } finally {
+      plugin.shutdown()
+      pluginDir.deleteRecursively()
+      CoreCapabilityRegistry.deregisterFieldGenerator(key)
+    }
+  }
 }
