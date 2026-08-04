@@ -1,5 +1,12 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.1.1 - Maintenance Release
+
+* ab72a39 - chore(rust-driver): update mlua to 0.12.0 (Ronald Holshausen, Mon Aug 3 17:32:40 2026 +1000)
+* af4adc5 - chore: Update reqwest to 0.13.4 and set rustls-no-provider (Ronald Holshausen, Mon Aug 3 17:29:08 2026 +1000)
+* f1f2032 - chore: Update dependencies (Ronald Holshausen, Mon Aug 3 17:24:02 2026 +1000)
+* fcc170c - chore: bump version to 1.1.1 [skip ci] (Ronald Holshausen, Wed Jul 22 09:44:01 2026 +1000)
+
 # 1.1.0 - Host-provided matching and generation interface
 
 * 4e4e46c - chore: remove libc pin as libc has been updated (Ronald Holshausen, Wed Jul 22 09:14:35 2026 +1000)
