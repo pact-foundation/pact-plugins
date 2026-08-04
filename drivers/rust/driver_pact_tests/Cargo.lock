@@ -261,9 +261,9 @@ checksum = "72b3254f16251a8381aa12e40e3c4d2f0199f8c6508fbecb9d91f575e0fbb8c6"
 
 [[package]]
 name = "base64"
-version = "0.23.0"
+version = "0.23.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b25655df2c3cdd83c5e5b293b88acd880332b2ddadd7c30ac43144fdc0033da9"
+checksum = "ac07cdecf99051d9a5238b80f35af32cdeba5b336e55d957b318b50137e18da5"
 
 [[package]]
 name = "base64ct"
@@ -2281,7 +2281,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "backtrace",
- "base64 0.23.0",
+ "base64 0.23.1",
  "bytes",
  "chrono",
  "flate2",
@@ -2321,8 +2321,8 @@ dependencies = [
 
 [[package]]
 name = "pact_consumer"
-version = "1.4.8"
-source = "git+https://github.com/pact-foundation/pact-reference.git#956679cadb667d9afa1d28642257cec5231b3d2b"
+version = "1.4.10"
+source = "git+https://github.com/pact-foundation/pact-reference.git#1d8bfcbff06f0d2902c9a14d8d0c74ae70760e67"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2334,6 +2334,7 @@ dependencies = [
  "pact_mock_server",
  "pact_models",
  "regex",
+ "rustls",
  "serde_json",
  "termsize",
  "tokio",
@@ -2346,7 +2347,7 @@ dependencies = [
 [[package]]
 name = "pact_matching"
 version = "2.0.10"
-source = "git+https://github.com/pact-foundation/pact-reference.git#956679cadb667d9afa1d28642257cec5231b3d2b"
+source = "git+https://github.com/pact-foundation/pact-reference.git#1d8bfcbff06f0d2902c9a14d8d0c74ae70760e67"
 dependencies = [
  "ansi_term",
  "anyhow",
@@ -2424,7 +2425,7 @@ checksum = "bf146a86e154ed07c12c2ff3a1fca0d07208a48f0edb8caec73caa92fbac9db0"
 dependencies = [
  "anyhow",
  "ariadne",
- "base64 0.23.0",
+ "base64 0.23.1",
  "bytes",
  "chrono",
  "chrono-tz",
@@ -2894,9 +2895,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.4.16"
+version = "0.4.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8fcfdb36bda0c880c5931cdc7a2bcdc8ba4556847b9d912bca70bc94708711ad"
+checksum = "ad8553b9b26413251cbf30e620595c7a41b3887f03da04579c0e6b0d6a06b4b2"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -3034,6 +3035,7 @@ version = "0.23.43"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0283386ce02abc0151e1761d08802dfe86c173b0b494af5cbc086574e453da06"
 dependencies = [
+ "log",
  "once_cell",
  "ring",
  "rustls-pki-types",
