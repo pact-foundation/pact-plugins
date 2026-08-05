@@ -25,6 +25,7 @@ mod tests {
     pactffi_sync_message_get_response_contents_bin,
     pactffi_sync_message_get_response_contents_length
   };
+  use pact_ffi::pactffi_init;
   use pact_ffi::plugins::{pactffi_cleanup_plugins, pactffi_interaction_contents, pactffi_using_plugin};
   use prost::Message;
   use reqwest::blocking::Client;
@@ -35,6 +36,8 @@ mod tests {
   
   #[test_log::test]
   fn test_csv_client() {
+    unsafe { pactffi_init(null()); }
+
     let consumer_name = CString::new("csv-consumer").unwrap();
     let provider_name = CString::new("csv-provider").unwrap();
     let plugin_name = CString::new("csv").unwrap();
