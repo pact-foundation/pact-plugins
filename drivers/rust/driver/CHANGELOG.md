@@ -1,5 +1,17 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.0 - Support for field-level matchers and generators in v2 plugins
+
+* b8cecf6 - chore(rust-driver): Bump version to 1.2.0 (Ronald Holshausen, Wed Aug 5 13:57:37 2026 +1000)
+* 99b3d10 - Merge branch 'main' into feat/field-level-matchers (Ronald Holshausen, Wed Aug 5 09:41:22 2026 +1000)
+* 589f57f - chore: bump version to 1.1.2 [skip ci] (Ronald Holshausen, Mon Aug 3 17:55:57 2026 +1000)
+* 3bb7e2c - feat(drivers): run field-level rules and generators in Lua plugins (Ronald Holshausen, Mon Aug 3 10:19:52 2026 +1000)
+* d5da67a - feat(rust-driver): add the field-level matcher and generator surface (Ronald Holshausen, Fri Jul 31 17:12:09 2026 +1000)
+* 842de5a - fix(drivers): match lookup_entry by name too, and scope the versioned fallback (Ronald Holshausen, Fri Jul 31 16:33:52 2026 +1000)
+* 98ff8c0 - fix(drivers): resolve catalogue entry keys by name, not by substring (Ronald Holshausen, Fri Jul 31 16:19:58 2026 +1000)
+* 6c82a44 - fix(drivers): make CatalogueEntryType the driver's own type, not the V1 proto enum (Ronald Holshausen, Fri Jul 31 15:43:30 2026 +1000)
+* 7b076dc - feat(proto): add field-level matcher and generator operations to the V2 interface (Ronald Holshausen, Fri Jul 31 15:21:54 2026 +1000)
+
 # 1.1.1 - Maintenance Release
 
 * ab72a39 - chore(rust-driver): update mlua to 0.12.0 (Ronald Holshausen, Mon Aug 3 17:32:40 2026 +1000)
