@@ -2,17 +2,23 @@ package io.pact.plugins.jvm.core
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.BytesValue
+import com.google.protobuf.NullValue
+import com.google.protobuf.Struct
 import io.pact.plugin.Plugin
+import io.pact.plugin.v2.PluginV2
+import io.pact.plugins.jvm.core.Utils.fromProtoValue
 import io.pact.plugins.jvm.core.Utils.mapToProtoStruct
 import io.pact.plugins.jvm.core.Utils.structToMap
+import io.pact.plugins.jvm.core.Utils.toProtoValue
 import java.nio.ByteBuffer
 
 /**
- * Shared Body/MatchingRules/PluginConfiguration/CompareContents <-> Lua conversions, used by both
- * [LuaPluginRpcClient] (the driver calling into a plugin's own `match_contents`/`generate_content`)
- * and [LuaPactPlugin]'s `host_compare_contents`/`host_generate_content` host functions (a plugin
- * calling back into a host-provided or another plugin's capability - see proposal 007). Both
- * directions use the same Lua table shapes, so the same conversions apply either way.
+ * Shared Body/MatchingRules/PluginConfiguration/CompareContents/field <-> Lua conversions, used by
+ * both [LuaPluginRpcClient] (the driver calling into a plugin's own `match_contents`/
+ * `generate_content`/`match_field`/`generate_field`) and [LuaPactPlugin]'s `host_*` host functions
+ * (a plugin calling back into a host-provided or another plugin's capability - see proposals 006
+ * and 007). Both directions use the same Lua table shapes, so the same conversions apply either
+ * way.
  */
 
 // ---- Body <-> Lua ----
@@ -250,10 +256,257 @@ internal fun luaToGenerateRequest(contents: Any?, generators: Any?, testMode: St
   val builder = Plugin.GenerateContentRequest.newBuilder()
   luaToBody(contents)?.let { builder.contents = it }
   builder.putAllGenerators(luaToGenerators(generators))
-  builder.testMode = when (testMode) {
-    "Consumer" -> Plugin.GenerateContentRequest.TestMode.Consumer
-    "Provider" -> Plugin.GenerateContentRequest.TestMode.Provider
-    else -> Plugin.GenerateContentRequest.TestMode.Unknown
+  builder.testMode = luaToTestMode(testMode)
+  return builder.build()
+}
+
+/** The test mode name a Lua script sees. */
+internal fun testModeToLua(testMode: Plugin.GenerateContentRequest.TestMode?): String = when (testMode) {
+  Plugin.GenerateContentRequest.TestMode.Consumer -> "Consumer"
+  Plugin.GenerateContentRequest.TestMode.Provider -> "Provider"
+  else -> "Unknown"
+}
+
+/** Reverse of [testModeToLua]. Anything unrecognised (including a missing value) is `Unknown`,
+ * rather than an error - the mode is context for the plugin, not a contract. */
+internal fun luaToTestMode(testMode: String?): Plugin.GenerateContentRequest.TestMode = when (testMode) {
+  "Consumer" -> Plugin.GenerateContentRequest.TestMode.Consumer
+  "Provider" -> Plugin.GenerateContentRequest.TestMode.Provider
+  else -> Plugin.GenerateContentRequest.TestMode.Unknown
+}
+
+// ---- MatchField / GenerateField <-> Lua ----
+//
+// The field-level messages exist only on the V2 interface (proposal 006), while the conversions
+// above are written against the V1 message types. `PluginConfiguration` and `ContentMismatch` are
+// identical between the two, so those conversions are reused through the small mappers below
+// rather than being duplicated.
+
+/**
+ * Converts a single field value to a plain Lua value, following the convention message metadata
+ * values already use (see `LuaPluginRpcClient.metadataToLua`): everything crosses as a plain value
+ * except binary data, which arrives as a `{ binary = <string> }` wrapper so a script can tell a
+ * string of text from a blob of bytes.
+ *
+ * A whole number crosses as a `Long`, which luajava pushes as a real Lua integer, so `math.type()`
+ * in the script reports `"integer"`. That distinction is what the `integer`, `decimal` and `type`
+ * rules are built on - see [FieldValue] and `LuaJavaEngine.readValue` for the other direction.
+ */
+internal fun fieldValueToLua(value: PluginV2.FieldValue?): Any? = when (value?.valueCase) {
+  null, PluginV2.FieldValue.ValueCase.NULLVALUE, PluginV2.FieldValue.ValueCase.VALUE_NOT_SET -> null
+  PluginV2.FieldValue.ValueCase.BOOLEANVALUE -> value.booleanValue
+  PluginV2.FieldValue.ValueCase.STRINGVALUE -> value.stringValue
+  PluginV2.FieldValue.ValueCase.INTEGERVALUE -> value.integerValue
+  PluginV2.FieldValue.ValueCase.DECIMALVALUE -> value.decimalValue
+  PluginV2.FieldValue.ValueCase.BINARYVALUE -> mapOf("binary" to ByteBuffer.wrap(value.binaryValue.toByteArray()))
+  PluginV2.FieldValue.ValueCase.STRUCTUREDVALUE -> fromProtoValue(value.structuredValue)
+}
+
+/** Reverse of [fieldValueToLua]. A map is a binary wrapper if it has a `binary` key, and a
+ * map or list otherwise - the same test `LuaPluginRpcClient.luaToMetadata` applies. */
+internal fun luaToFieldValue(value: Any?): PluginV2.FieldValue {
+  val builder = PluginV2.FieldValue.newBuilder()
+  when (value) {
+    null -> builder.nullValue = NullValue.NULL_VALUE
+    is Boolean -> builder.booleanValue = value
+    is String -> builder.stringValue = value
+    // Long is what a Lua integer arrives as; Int/Short/Byte for a value the host built directly
+    is Long, is Int, is Short, is Byte -> builder.integerValue = (value as Number).toLong()
+    is Number -> builder.decimalValue = value.toDouble()
+    is ByteBuffer -> builder.binaryValue = ByteString.copyFrom(luaContentToByteArray(value))
+    is Map<*, *> -> {
+      val binary = value["binary"]
+      if (binary != null) {
+        builder.binaryValue = ByteString.copyFrom(luaContentToByteArray(binary))
+      } else {
+        builder.structuredValue = toProtoValue(value)
+      }
+    }
+    else -> builder.structuredValue = toProtoValue(value)
   }
   return builder.build()
+}
+
+/**
+ * Converts a matching rule or a generator - each is a name plus optional configured values - into
+ * the `{ type = "...", values = { ... } }` map a script already sees for the rules and generators
+ * passed to `match_contents`/`generate_content`. Always a map, even with no values, so a script
+ * can read `rule.values` without checking `rule` first.
+ */
+private fun typedValuesToLua(type: String, values: Struct?): Map<String, Any?> =
+  mapOf("type" to type, "values" to values?.let { structToMap(it) })
+
+internal fun matchingRuleToLua(rule: PluginV2.MatchingRule?): Map<String, Any?> =
+  typedValuesToLua(rule?.type ?: "", if (rule != null && rule.hasValues()) rule.values else null)
+
+internal fun fieldGeneratorToLua(generator: PluginV2.Generator?): Map<String, Any?> =
+  typedValuesToLua(generator?.type ?: "", if (generator != null && generator.hasValues()) generator.values else null)
+
+private fun luaToMatchingRule(value: Any?): PluginV2.MatchingRule {
+  @Suppress("UNCHECKED_CAST")
+  val map = value as? Map<String, Any?>
+    ?: throw IllegalStateException("Expected a 'rule' table from Lua, got $value")
+  val builder = PluginV2.MatchingRule.newBuilder().setType(map["type"] as? String ?: "")
+  @Suppress("UNCHECKED_CAST")
+  (map["values"] as? Map<String, Any?>)?.let { builder.values = mapToProtoStruct(it) }
+  return builder.build()
+}
+
+private fun luaToFieldGenerator(value: Any?): PluginV2.Generator {
+  @Suppress("UNCHECKED_CAST")
+  val map = value as? Map<String, Any?>
+    ?: throw IllegalStateException("Expected a 'generator' table from Lua, got $value")
+  val builder = PluginV2.Generator.newBuilder().setType(map["type"] as? String ?: "")
+  @Suppress("UNCHECKED_CAST")
+  (map["values"] as? Map<String, Any?>)?.let { builder.values = mapToProtoStruct(it) }
+  return builder.build()
+}
+
+/** V2's `PluginConfiguration` carries the same two `Struct` fields as the V1 message
+ * [pluginConfigurationToLua] converts, so the field-level requests reuse that conversion. */
+internal fun v2PluginConfigurationToLua(config: PluginV2.PluginConfiguration?): Map<String, Any?>? {
+  if (config == null) return null
+  val builder = Plugin.PluginConfiguration.newBuilder()
+  if (config.hasInteractionConfiguration()) builder.interactionConfiguration = config.interactionConfiguration
+  if (config.hasPactConfiguration()) builder.pactConfiguration = config.pactConfiguration
+  return pluginConfigurationToLua(builder.build())
+}
+
+/** Reverse of [v2PluginConfigurationToLua]. */
+internal fun luaToV2PluginConfiguration(value: Any?): PluginV2.PluginConfiguration? {
+  val config = luaToPluginConfiguration(value) ?: return null
+  val builder = PluginV2.PluginConfiguration.newBuilder()
+  if (config.hasInteractionConfiguration()) builder.interactionConfiguration = config.interactionConfiguration
+  if (config.hasPactConfiguration()) builder.pactConfiguration = config.pactConfiguration
+  return builder.build()
+}
+
+/** See [v2PluginConfigurationToLua] - `ContentMismatch` is likewise identical between the two
+ * interfaces, so [luaValueToContentMismatches] is reused for the V2-only field messages. */
+private fun v1ContentMismatchToV2(mismatch: Plugin.ContentMismatch): PluginV2.ContentMismatch {
+  val builder = PluginV2.ContentMismatch.newBuilder()
+    .setMismatch(mismatch.mismatch)
+    .setPath(mismatch.path)
+    .setDiff(mismatch.diff)
+    .setMismatchType(mismatch.mismatchType)
+  if (mismatch.hasExpected()) builder.expected = mismatch.expected
+  if (mismatch.hasActual()) builder.actual = mismatch.actual
+  return builder.build()
+}
+
+/** Reverse of [v1ContentMismatchToV2]. */
+private fun v2ContentMismatchToV1(mismatch: PluginV2.ContentMismatch): Plugin.ContentMismatch {
+  val builder = Plugin.ContentMismatch.newBuilder()
+    .setMismatch(mismatch.mismatch)
+    .setPath(mismatch.path)
+    .setDiff(mismatch.diff)
+    .setMismatchType(mismatch.mismatchType)
+  if (mismatch.hasExpected()) builder.expected = mismatch.expected
+  if (mismatch.hasActual()) builder.actual = mismatch.actual
+  return builder.build()
+}
+
+/** Builds the request map a plugin's own `match_field(request)` function receives. */
+internal fun matchFieldRequestToLua(request: PluginV2.MatchFieldRequest): Map<String, Any?> = mapOf(
+  "key" to request.key,
+  "rule" to matchingRuleToLua(if (request.hasRule()) request.rule else null),
+  "path" to request.path,
+  "mismatch_type" to request.mismatchType,
+  "expected" to fieldValueToLua(if (request.hasExpected()) request.expected else null),
+  "actual" to fieldValueToLua(if (request.hasActual()) request.actual else null),
+  "plugin_configuration" to v2PluginConfigurationToLua(
+    if (request.hasPluginConfiguration()) request.pluginConfiguration else null
+  ),
+  "test_context" to if (request.hasTestContext()) structToMap(request.testContext) else null
+)
+
+/** Reverse of [matchFieldRequestToLua] - the map a script builds when calling
+ * `host_match_field(entry_key, request)` is the same shape its own `match_field` receives, so it
+ * can forward the request it was given after adjusting whatever it needs to. */
+internal fun luaToMatchFieldRequest(map: Map<String, Any?>): PluginV2.MatchFieldRequest {
+  val builder = PluginV2.MatchFieldRequest.newBuilder()
+    .setKey(map["key"] as? String ?: "")
+    .setRule(luaToMatchingRule(map["rule"]))
+    .setPath(map["path"] as? String ?: "")
+    .setMismatchType(map["mismatch_type"] as? String ?: "")
+    .setExpected(luaToFieldValue(map["expected"]))
+    .setActual(luaToFieldValue(map["actual"]))
+  luaToV2PluginConfiguration(map["plugin_configuration"])?.let { builder.pluginConfiguration = it }
+  @Suppress("UNCHECKED_CAST")
+  (map["test_context"] as? Map<String, Any?>)?.let { builder.testContext = mapToProtoStruct(it) }
+  return builder.build()
+}
+
+/**
+ * Parses the map a plugin's `match_field` function returns: `{ error = "..." }`, or
+ * `{ mismatches = { ... } }` where each entry is a mismatch table or a bare description string
+ * (the same leniency `match_contents` responses get - see [luaValueToContentMismatches]). An
+ * absent or empty list means the value matched.
+ */
+internal fun luaToMatchFieldResponse(result: Map<String, Any?>, path: String): PluginV2.MatchFieldResponse {
+  val error = result["error"] as? String
+  if (error != null) {
+    return PluginV2.MatchFieldResponse.newBuilder().setError(error).build()
+  }
+  return PluginV2.MatchFieldResponse.newBuilder()
+    .addAllMismatches(luaValueToContentMismatches(path, result["mismatches"]).map { v1ContentMismatchToV2(it) })
+    .build()
+}
+
+/** Reverse of [luaToMatchFieldResponse], so a script can return the result of a `host_match_field`
+ * call straight through as its own response. */
+internal fun matchFieldResponseToLua(response: PluginV2.MatchFieldResponse): Map<String, Any?> {
+  if (response.error.isNotEmpty()) {
+    return mapOf("error" to response.error)
+  }
+  return mapOf("mismatches" to response.mismatchesList.map { contentMismatchToLua(v2ContentMismatchToV1(it)) })
+}
+
+/** Builds the request map a plugin's own `generate_field(request)` function receives. */
+internal fun generateFieldRequestToLua(request: PluginV2.GenerateFieldRequest): Map<String, Any?> = mapOf(
+  "key" to request.key,
+  "generator" to fieldGeneratorToLua(if (request.hasGenerator()) request.generator else null),
+  "path" to request.path,
+  "example_value" to fieldValueToLua(if (request.hasExampleValue()) request.exampleValue else null),
+  "plugin_configuration" to v2PluginConfigurationToLua(
+    if (request.hasPluginConfiguration()) request.pluginConfiguration else null
+  ),
+  "test_context" to if (request.hasTestContext()) structToMap(request.testContext) else null,
+  "test_mode" to testModeToLua(
+    Plugin.GenerateContentRequest.TestMode.forNumber(request.testModeValue)
+  )
+)
+
+/** Reverse of [generateFieldRequestToLua] - the map a script passes to
+ * `host_generate_field(entry_key, request)`. */
+internal fun luaToGenerateFieldRequest(map: Map<String, Any?>): PluginV2.GenerateFieldRequest {
+  val builder = PluginV2.GenerateFieldRequest.newBuilder()
+    .setKey(map["key"] as? String ?: "")
+    .setGenerator(luaToFieldGenerator(map["generator"]))
+    .setPath(map["path"] as? String ?: "")
+    .setExampleValue(luaToFieldValue(map["example_value"]))
+    .setTestModeValue(luaToTestMode(map["test_mode"] as? String).number)
+  luaToV2PluginConfiguration(map["plugin_configuration"])?.let { builder.pluginConfiguration = it }
+  @Suppress("UNCHECKED_CAST")
+  (map["test_context"] as? Map<String, Any?>)?.let { builder.testContext = mapToProtoStruct(it) }
+  return builder.build()
+}
+
+/** Parses the map a plugin's `generate_field` function returns: `{ value = ... }` or
+ * `{ error = "..." }`. */
+internal fun luaToGenerateFieldResponse(result: Map<String, Any?>): PluginV2.GenerateFieldResponse {
+  val error = result["error"] as? String
+  if (error != null) {
+    return PluginV2.GenerateFieldResponse.newBuilder().setError(error).build()
+  }
+  return PluginV2.GenerateFieldResponse.newBuilder().setValue(luaToFieldValue(result["value"])).build()
+}
+
+/** Reverse of [luaToGenerateFieldResponse], so a script can return the result of a
+ * `host_generate_field` call straight through as its own response. */
+internal fun generateFieldResponseToLua(response: PluginV2.GenerateFieldResponse): Map<String, Any?> {
+  if (response.error.isNotEmpty()) {
+    return mapOf("error" to response.error)
+  }
+  return mapOf("value" to fieldValueToLua(if (response.hasValue()) response.value else null))
 }

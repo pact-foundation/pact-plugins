@@ -18,6 +18,7 @@ use async_trait::async_trait;
 use lazy_static::lazy_static;
 
 use crate::proto::{CompareContentsRequest, CompareContentsResponse, GenerateContentRequest, GenerateContentResponse};
+use crate::proto_v2::{GenerateFieldRequest, GenerateFieldResponse, MatchFieldRequest, MatchFieldResponse};
 
 /// A host-provided handler for the `CompareContents` capability shape. Implemented by the
 /// embedding Pact framework and registered via [`register_core_content_matcher`].
@@ -25,6 +26,28 @@ use crate::proto::{CompareContentsRequest, CompareContentsResponse, GenerateCont
 pub trait CoreContentMatcher: Send + Sync {
   /// Compare the actual contents against the expected contents, returning any mismatches.
   async fn compare_contents(&self, request: CompareContentsRequest) -> anyhow::Result<CompareContentsResponse>;
+}
+
+/// A host-provided handler for the `MatchField` capability shape - one of the standard Pact
+/// matching rules applied to a single value. Implemented by the embedding Pact framework and
+/// registered via [`register_core_field_matcher`]. See proposals 006 (Field-level matchers and
+/// generators) and 009 (Host-provided core matching and generation).
+///
+/// The request and response are the V2 interface types: field-level operations were introduced in
+/// V2 and have no V1 equivalent.
+#[async_trait]
+pub trait CoreFieldMatcher: Send + Sync {
+  /// Apply the matching rule to a single value, returning any mismatches.
+  async fn match_field(&self, request: MatchFieldRequest) -> anyhow::Result<MatchFieldResponse>;
+}
+
+/// A host-provided handler for the `GenerateField` capability shape - one of the standard Pact
+/// generators applied to a single value. Implemented by the embedding Pact framework and registered
+/// via [`register_core_field_generator`]. See [`CoreFieldMatcher`].
+#[async_trait]
+pub trait CoreFieldGenerator: Send + Sync {
+  /// Generate a single value, replacing the example value from the Pact interaction.
+  async fn generate_field(&self, request: GenerateFieldRequest) -> anyhow::Result<GenerateFieldResponse>;
 }
 
 /// A host-provided handler for the `GenerateContent` capability shape. Implemented by the
@@ -38,6 +61,8 @@ pub trait CoreContentGenerator: Send + Sync {
 lazy_static! {
   static ref CORE_CONTENT_MATCHERS: Mutex<HashMap<String, Arc<dyn CoreContentMatcher>>> = Mutex::new(HashMap::new());
   static ref CORE_CONTENT_GENERATORS: Mutex<HashMap<String, Arc<dyn CoreContentGenerator>>> = Mutex::new(HashMap::new());
+  static ref CORE_FIELD_MATCHERS: Mutex<HashMap<String, Arc<dyn CoreFieldMatcher>>> = Mutex::new(HashMap::new());
+  static ref CORE_FIELD_GENERATORS: Mutex<HashMap<String, Arc<dyn CoreFieldGenerator>>> = Mutex::new(HashMap::new());
 }
 
 /// Register a handler for a host-provided content matcher capability, keyed by the catalogue
@@ -72,6 +97,52 @@ pub fn lookup_core_content_generator(key: &str) -> Option<Arc<dyn CoreContentGen
     .get(key).cloned()
 }
 
+/// Register a handler for a host-provided field matching rule, keyed by the catalogue entry key
+/// (e.g. `"v2-type"` for the `core/matcher/v2-type` entry). Replaces any handler previously
+/// registered under the same key.
+pub fn register_core_field_matcher(key: &str, handler: Arc<dyn CoreFieldMatcher>) {
+  CORE_FIELD_MATCHERS.lock()
+    .expect("CORE_FIELD_MATCHERS mutex poisoned")
+    .insert(key.to_string(), handler);
+}
+
+/// Register a handler for a host-provided field generator, keyed by the catalogue entry key
+/// (e.g. `"v3-date"` for the `core/generator/v3-date` entry). Replaces any handler previously
+/// registered under the same key.
+pub fn register_core_field_generator(key: &str, handler: Arc<dyn CoreFieldGenerator>) {
+  CORE_FIELD_GENERATORS.lock()
+    .expect("CORE_FIELD_GENERATORS mutex poisoned")
+    .insert(key.to_string(), handler);
+}
+
+/// Look up a registered core field matcher handler by catalogue entry key.
+pub fn lookup_core_field_matcher(key: &str) -> Option<Arc<dyn CoreFieldMatcher>> {
+  CORE_FIELD_MATCHERS.lock()
+    .expect("CORE_FIELD_MATCHERS mutex poisoned")
+    .get(key).cloned()
+}
+
+/// Look up a registered core field generator handler by catalogue entry key.
+pub fn lookup_core_field_generator(key: &str) -> Option<Arc<dyn CoreFieldGenerator>> {
+  CORE_FIELD_GENERATORS.lock()
+    .expect("CORE_FIELD_GENERATORS mutex poisoned")
+    .get(key).cloned()
+}
+
+/// Remove a registered core field matcher handler. Mainly useful for tests.
+pub fn deregister_core_field_matcher(key: &str) {
+  CORE_FIELD_MATCHERS.lock()
+    .expect("CORE_FIELD_MATCHERS mutex poisoned")
+    .remove(key);
+}
+
+/// Remove a registered core field generator handler. Mainly useful for tests.
+pub fn deregister_core_field_generator(key: &str) {
+  CORE_FIELD_GENERATORS.lock()
+    .expect("CORE_FIELD_GENERATORS mutex poisoned")
+    .remove(key);
+}
+
 /// Remove a registered core content matcher handler. Mainly useful for tests.
 pub fn deregister_core_content_matcher(key: &str) {
   CORE_CONTENT_MATCHERS.lock()
@@ -91,6 +162,7 @@ mod tests {
   use expectest::prelude::*;
 
   use crate::proto::{CompareContentsRequest, CompareContentsResponse, GenerateContentRequest, GenerateContentResponse};
+  use crate::proto_v2::{GenerateFieldRequest, GenerateFieldResponse, MatchFieldRequest, MatchFieldResponse};
 
   use super::*;
 
@@ -148,5 +220,62 @@ mod tests {
   fn deregister_is_a_no_op_for_an_unknown_key() {
     deregister_core_content_matcher("never-registered");
     deregister_core_content_generator("never-registered");
+    deregister_core_field_matcher("never-registered");
+    deregister_core_field_generator("never-registered");
+  }
+
+  #[derive(Debug)]
+  struct TestFieldMatcher;
+
+  #[async_trait]
+  impl CoreFieldMatcher for TestFieldMatcher {
+    async fn match_field(&self, request: MatchFieldRequest) -> anyhow::Result<MatchFieldResponse> {
+      Ok(MatchFieldResponse { error: request.key, .. MatchFieldResponse::default() })
+    }
+  }
+
+  #[derive(Debug)]
+  struct TestFieldGenerator;
+
+  #[async_trait]
+  impl CoreFieldGenerator for TestFieldGenerator {
+    async fn generate_field(&self, request: GenerateFieldRequest) -> anyhow::Result<GenerateFieldResponse> {
+      Ok(GenerateFieldResponse { error: request.key, .. GenerateFieldResponse::default() })
+    }
+  }
+
+  #[test_log::test]
+  fn returns_none_for_an_unregistered_field_key() {
+    expect!(lookup_core_field_matcher("unregistered-field-matcher-key").is_none()).to(be_true());
+    expect!(lookup_core_field_generator("unregistered-field-generator-key").is_none()).to(be_true());
+  }
+
+  #[test_log::test(tokio::test)]
+  async fn registers_and_looks_up_a_field_matcher() {
+    register_core_field_matcher("test-field-matcher-key", Arc::new(TestFieldMatcher));
+
+    let handler = lookup_core_field_matcher("test-field-matcher-key");
+    deregister_core_field_matcher("test-field-matcher-key");
+
+    expect!(handler.is_some()).to(be_true());
+    let response = handler.unwrap()
+      .match_field(MatchFieldRequest { key: "v2-type".to_string(), .. MatchFieldRequest::default() })
+      .await;
+    // The stub echoes the request key back, so this also proves the request reached the handler
+    expect!(response.unwrap().error).to(be_equal_to("v2-type".to_string()));
+  }
+
+  #[test_log::test(tokio::test)]
+  async fn registers_and_looks_up_a_field_generator() {
+    register_core_field_generator("test-field-generator-key", Arc::new(TestFieldGenerator));
+
+    let handler = lookup_core_field_generator("test-field-generator-key");
+    deregister_core_field_generator("test-field-generator-key");
+
+    expect!(handler.is_some()).to(be_true());
+    let response = handler.unwrap()
+      .generate_field(GenerateFieldRequest { key: "v3-date".to_string(), .. GenerateFieldRequest::default() })
+      .await;
+    expect!(response.unwrap().error).to(be_equal_to("v3-date".to_string()));
   }
 }

@@ -232,6 +232,52 @@ pub trait PluginInstance: std::fmt::Debug + Send + Sync {
     self.generate_content(request).await
   }
 
+  /// Apply a plugin-provided matching rule to a single value (see proposal 006). Field-level
+  /// operations exist only on the V2 interface, so the default reports that this plugin cannot
+  /// provide them - the same shape as the other V2-only operations below.
+  async fn match_field(
+    &self,
+    request: proto_v2::MatchFieldRequest,
+  ) -> anyhow::Result<proto_v2::MatchFieldResponse> {
+    let _ = request;
+    Err(anyhow!("Field-level matching rules are not supported by this plugin"))
+  }
+
+  /// Apply a plugin-provided matching rule to a single value, propagating call-chain cycle
+  /// detection and deadline metadata (see [`crate::call_chain`]) for transports that support it.
+  /// See [`PluginInstance::compare_contents_with_chain`] for the default/override split.
+  async fn match_field_with_chain(
+    &self,
+    request: proto_v2::MatchFieldRequest,
+    chain_id: &str,
+    deadline_ms: u64,
+  ) -> anyhow::Result<proto_v2::MatchFieldResponse> {
+    let _ = (chain_id, deadline_ms);
+    self.match_field(request).await
+  }
+
+  /// Apply a plugin-provided generator to a single value (see proposal 006). See
+  /// [`PluginInstance::match_field`].
+  async fn generate_field(
+    &self,
+    request: proto_v2::GenerateFieldRequest,
+  ) -> anyhow::Result<proto_v2::GenerateFieldResponse> {
+    let _ = request;
+    Err(anyhow!("Field-level generators are not supported by this plugin"))
+  }
+
+  /// Apply a plugin-provided generator to a single value, propagating call-chain cycle detection
+  /// and deadline metadata. See [`PluginInstance::match_field_with_chain`].
+  async fn generate_field_with_chain(
+    &self,
+    request: proto_v2::GenerateFieldRequest,
+    chain_id: &str,
+    deadline_ms: u64,
+  ) -> anyhow::Result<proto_v2::GenerateFieldResponse> {
+    let _ = (chain_id, deadline_ms);
+    self.generate_field(request).await
+  }
+
   /// Start a mock server
   async fn start_mock_server(
     &self,

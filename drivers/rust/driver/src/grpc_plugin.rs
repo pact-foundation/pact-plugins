@@ -259,6 +259,72 @@ impl PluginClient {
     }
   }
 
+  async fn match_field(
+    &mut self,
+    request: proto_v2::MatchFieldRequest,
+  ) -> Result<proto_v2::MatchFieldResponse, Status> {
+    match self {
+      PluginClient::V1(_) => Err(Status::unimplemented(
+        "Field-level matching rules require the V2 plugin interface, and this plugin uses V1"
+      )),
+      PluginClient::V2(client) => client
+        .match_field(Request::new(request))
+        .await
+        .map(|response| response.into_inner()),
+    }
+  }
+
+  async fn match_field_with_metadata(
+    &mut self,
+    request: proto_v2::MatchFieldRequest,
+    chain_id: &str,
+    deadline_ms: u64,
+  ) -> Result<proto_v2::MatchFieldResponse, Status> {
+    match self {
+      PluginClient::V1(_) => Err(Status::unimplemented(
+        "Field-level matching rules require the V2 plugin interface, and this plugin uses V1"
+      )),
+      PluginClient::V2(client) => {
+        let mut req = Request::new(request);
+        insert_chain_metadata(&mut req, chain_id, deadline_ms)?;
+        client.match_field(req).await.map(|response| response.into_inner())
+      }
+    }
+  }
+
+  async fn generate_field(
+    &mut self,
+    request: proto_v2::GenerateFieldRequest,
+  ) -> Result<proto_v2::GenerateFieldResponse, Status> {
+    match self {
+      PluginClient::V1(_) => Err(Status::unimplemented(
+        "Field-level generators require the V2 plugin interface, and this plugin uses V1"
+      )),
+      PluginClient::V2(client) => client
+        .generate_field(Request::new(request))
+        .await
+        .map(|response| response.into_inner()),
+    }
+  }
+
+  async fn generate_field_with_metadata(
+    &mut self,
+    request: proto_v2::GenerateFieldRequest,
+    chain_id: &str,
+    deadline_ms: u64,
+  ) -> Result<proto_v2::GenerateFieldResponse, Status> {
+    match self {
+      PluginClient::V1(_) => Err(Status::unimplemented(
+        "Field-level generators require the V2 plugin interface, and this plugin uses V1"
+      )),
+      PluginClient::V2(client) => {
+        let mut req = Request::new(request);
+        insert_chain_metadata(&mut req, chain_id, deadline_ms)?;
+        client.generate_field(req).await.map(|response| response.into_inner())
+      }
+    }
+  }
+
   async fn start_mock_server_v2(
     &mut self,
     request: proto_v2::StartMockServerRequest,
@@ -531,6 +597,48 @@ impl PluginInstance for GrpcPactPlugin {
     let mut client = self.get_plugin_client().await?;
     client
       .generate_content_with_metadata(request, chain_id, deadline_ms)
+      .await
+      .map_err(anyhow::Error::from)
+  }
+
+  async fn match_field(
+    &self,
+    request: proto_v2::MatchFieldRequest,
+  ) -> anyhow::Result<proto_v2::MatchFieldResponse> {
+    let mut client = self.get_plugin_client().await?;
+    client.match_field(request).await.map_err(anyhow::Error::from)
+  }
+
+  async fn match_field_with_chain(
+    &self,
+    request: proto_v2::MatchFieldRequest,
+    chain_id: &str,
+    deadline_ms: u64,
+  ) -> anyhow::Result<proto_v2::MatchFieldResponse> {
+    let mut client = self.get_plugin_client().await?;
+    client
+      .match_field_with_metadata(request, chain_id, deadline_ms)
+      .await
+      .map_err(anyhow::Error::from)
+  }
+
+  async fn generate_field(
+    &self,
+    request: proto_v2::GenerateFieldRequest,
+  ) -> anyhow::Result<proto_v2::GenerateFieldResponse> {
+    let mut client = self.get_plugin_client().await?;
+    client.generate_field(request).await.map_err(anyhow::Error::from)
+  }
+
+  async fn generate_field_with_chain(
+    &self,
+    request: proto_v2::GenerateFieldRequest,
+    chain_id: &str,
+    deadline_ms: u64,
+  ) -> anyhow::Result<proto_v2::GenerateFieldResponse> {
+    let mut client = self.get_plugin_client().await?;
+    client
+      .generate_field_with_metadata(request, chain_id, deadline_ms)
       .await
       .map_err(anyhow::Error::from)
   }

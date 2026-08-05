@@ -13,8 +13,9 @@ use crate::catalogue_manager::{CatalogueEntryType, ResolvedCapability, resolve_c
 use crate::grpc_plugin::PluginClient;
 use crate::plugin_log_sink::{PluginLogEntry, PluginLogSource, emit_plugin_log};
 use crate::proto_v2::{
-  CompareContentsResponse, GenerateContentResponse, HostCompareContentsRequest,
-  HostGenerateContentRequest, LogMessage, plugin_host_server,
+  CompareContentsResponse, GenerateContentResponse, GenerateFieldResponse,
+  HostCompareContentsRequest, HostGenerateContentRequest, HostGenerateFieldRequest,
+  HostMatchFieldRequest, LogMessage, MatchFieldResponse, plugin_host_server,
 };
 
 static PLUGIN_HOST_PORT: OnceLock<u16> = OnceLock::new();
@@ -110,6 +111,78 @@ impl plugin_host_server::PluginHost for PluginHostService {
         let response = plugin.generate_content_with_chain(v1_request, &chain_id, deadline_ms).await
           .map_err(|err| Status::internal(format!("Call to plugin '{}' failed: {}", manifest.name, err)))?;
         Ok(Response::new(PluginClient::convert_message(response)?))
+      }
+    }
+  }
+
+  async fn match_field(
+    &self,
+    request: Request<HostMatchFieldRequest>,
+  ) -> Result<Response<MatchFieldResponse>, Status> {
+    let (metadata, _, msg) = request.into_parts();
+    let (chain_id, deadline_ms) = call_chain_context(&metadata);
+    let entry_key = msg.entry_key;
+    let inner_request = msg.request
+      .ok_or_else(|| Status::invalid_argument("HostMatchFieldRequest.request is required"))?;
+
+    if call_chain::is_expired(deadline_ms) {
+      return Err(Status::deadline_exceeded(format!(
+        "Call chain {} deadline has already passed", chain_id
+      )));
+    }
+    let _guard = call_chain::push_call(&chain_id, &entry_key).map_err(Status::already_exists)?;
+
+    match resolve_capability(&entry_key, CatalogueEntryType::MATCHER)
+      .map_err(|err| Status::not_found(err.to_string()))? {
+      ResolvedCapability::Core(core_key) => {
+        let handler = crate::core_capabilities::lookup_core_field_matcher(&core_key)
+          .ok_or_else(|| Status::not_found(format!("No core field matcher registered for '{}'", core_key)))?;
+        let response = handler.match_field(inner_request).await
+          .map_err(|err| Status::internal(format!("Core field matcher for '{}' failed: {}", core_key, err)))?;
+        Ok(Response::new(response))
+      }
+      ResolvedCapability::Plugin(manifest) => {
+        let plugin = crate::plugin_manager::lookup_plugin(&manifest.as_dependency())
+          .ok_or_else(|| Status::not_found(format!("Plugin '{}' for entry '{}' is not currently running", manifest.name, entry_key)))?;
+        let response = plugin.match_field_with_chain(inner_request, &chain_id, deadline_ms).await
+          .map_err(|err| Status::internal(format!("Call to plugin '{}' failed: {}", manifest.name, err)))?;
+        Ok(Response::new(response))
+      }
+    }
+  }
+
+  async fn generate_field(
+    &self,
+    request: Request<HostGenerateFieldRequest>,
+  ) -> Result<Response<GenerateFieldResponse>, Status> {
+    let (metadata, _, msg) = request.into_parts();
+    let (chain_id, deadline_ms) = call_chain_context(&metadata);
+    let entry_key = msg.entry_key;
+    let inner_request = msg.request
+      .ok_or_else(|| Status::invalid_argument("HostGenerateFieldRequest.request is required"))?;
+
+    if call_chain::is_expired(deadline_ms) {
+      return Err(Status::deadline_exceeded(format!(
+        "Call chain {} deadline has already passed", chain_id
+      )));
+    }
+    let _guard = call_chain::push_call(&chain_id, &entry_key).map_err(Status::already_exists)?;
+
+    match resolve_capability(&entry_key, CatalogueEntryType::GENERATOR)
+      .map_err(|err| Status::not_found(err.to_string()))? {
+      ResolvedCapability::Core(core_key) => {
+        let handler = crate::core_capabilities::lookup_core_field_generator(&core_key)
+          .ok_or_else(|| Status::not_found(format!("No core field generator registered for '{}'", core_key)))?;
+        let response = handler.generate_field(inner_request).await
+          .map_err(|err| Status::internal(format!("Core field generator for '{}' failed: {}", core_key, err)))?;
+        Ok(Response::new(response))
+      }
+      ResolvedCapability::Plugin(manifest) => {
+        let plugin = crate::plugin_manager::lookup_plugin(&manifest.as_dependency())
+          .ok_or_else(|| Status::not_found(format!("Plugin '{}' for entry '{}' is not currently running", manifest.name, entry_key)))?;
+        let response = plugin.generate_field_with_chain(inner_request, &chain_id, deadline_ms).await
+          .map_err(|err| Status::internal(format!("Call to plugin '{}' failed: {}", manifest.name, err)))?;
+        Ok(Response::new(response))
       }
     }
   }

@@ -458,7 +458,7 @@ pub async fn publish_updated_catalogue() {
     catalogue: all_entries()
       .iter()
       .map(|entry| crate::proto::CatalogueEntry {
-        r#type: entry.entry_type.to_proto_type() as i32,
+        r#type: entry.entry_type.to_proto_value(),
         key: entry.key.clone(),
         values: entry.values.clone(),
       })

@@ -24,11 +24,16 @@ class LuaPluginRpcClient(private val engine: LuaEngine) : PactPluginRpcClient {
     val entries = items.map { item ->
       @Suppress("UNCHECKED_CAST")
       val map = item as Map<String, Any?>
-      val entryType = Plugin.CatalogueEntry.EntryType.valueOf(map["entryType"] as String)
+      val entryTypeName = map["entryType"] as String
+      // Not Plugin.CatalogueEntry.EntryType.valueOf: that is the V1 enum, which throws on an entry
+      // type only the V2 interface has (GENERATOR), even though the message field itself carries
+      // the value fine.
+      val entryType = CatalogueEntryType.fromEntryName(entryTypeName)
+        ?: throw IllegalArgumentException("Unknown catalogue entry type '$entryTypeName'")
       @Suppress("UNCHECKED_CAST")
       val values = (map["values"] as? Map<String, Any?>)?.mapValues { it.value.toString() } ?: emptyMap()
       Plugin.CatalogueEntry.newBuilder()
-        .setType(entryType)
+        .setTypeValue(entryType.toEntryValue())
         .setKey(map["key"] as String)
         .putAllValues(values)
         .build()
@@ -38,8 +43,15 @@ class LuaPluginRpcClient(private val engine: LuaEngine) : PactPluginRpcClient {
 
   override fun updateCatalogue(request: Plugin.Catalogue) {
     if (!engine.hasFunction("update_catalogue")) return
-    val entries = request.catalogueList.map { entry ->
-      mapOf("entryType" to entry.type.name, "key" to entry.key, "values" to entry.valuesMap)
+    // An entry type this driver doesn't understand is skipped rather than passed to the script as
+    // some other type it isn't - see CatalogueManager.registerPluginEntries.
+    val entries = request.catalogueList.mapNotNull { entry ->
+      val entryType = CatalogueEntryType.fromEntryValue(entry.typeValue)
+      if (entryType == null) {
+        null
+      } else {
+        mapOf("entryType" to entryType.toEntryName(), "key" to entry.key, "values" to entry.valuesMap)
+      }
     }
     engine.callFunction("update_catalogue", listOf(entries))
   }
@@ -76,14 +88,31 @@ class LuaPluginRpcClient(private val engine: LuaEngine) : PactPluginRpcClient {
     }
     val contents = bodyToLua(if (request.hasContents()) request.contents else null)
     val generators = request.generatorsMap.mapValues { (_, g) -> generatorToLua(g) }
-    val testMode = when (request.testMode) {
-      Plugin.GenerateContentRequest.TestMode.Consumer -> "Consumer"
-      Plugin.GenerateContentRequest.TestMode.Provider -> "Provider"
-      else -> "Unknown"
-    }
-    val result = engine.callFunction("generate_content", listOf(contents, generators, testMode))
+    val result = engine.callFunction(
+      "generate_content",
+      listOf(contents, generators, testModeToLua(request.testMode))
+    )
     luaToBody(result)?.let { builder.contents = it }
     return builder.build()
+  }
+
+  /**
+   * `match_field` and `generate_field` are optional globals - a plugin only defines them if it
+   * registered a `MATCHER` or `GENERATOR` catalogue entry (proposal 006). Reaching here without
+   * one is a real error (the driver resolved an entry the plugin registered), so [LuaEngine] is
+   * left to report the missing function rather than the call being silently treated as a match.
+   */
+  override fun matchField(request: PluginV2.MatchFieldRequest): PluginV2.MatchFieldResponse {
+    val result = engine.callFunction("match_field", listOf(matchFieldRequestToLua(request)))
+    @Suppress("UNCHECKED_CAST")
+    return luaToMatchFieldResponse(result as? Map<String, Any?> ?: emptyMap(), request.path)
+  }
+
+  /** See [matchField]. */
+  override fun generateField(request: PluginV2.GenerateFieldRequest): PluginV2.GenerateFieldResponse {
+    val result = engine.callFunction("generate_field", listOf(generateFieldRequestToLua(request)))
+    @Suppress("UNCHECKED_CAST")
+    return luaToGenerateFieldResponse(result as? Map<String, Any?> ?: emptyMap())
   }
 
   override fun startMockServer(request: Plugin.StartMockServerRequest): Plugin.StartMockServerResponse {

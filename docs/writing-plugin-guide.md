@@ -136,12 +136,21 @@ See the [JWT plugin](../plugins/jwt) for a complete, working reference implement
 
 ### Scope
 
-A Lua plugin can register any combination of `CONTENT_MATCHER`/`CONTENT_GENERATOR` and `TRANSPORT` catalogue
-entries from its `init` function - the same way an `exec` (gRPC) plugin does. For a content-matcher/generator
-plugin, only `compareContents`, `configureInteraction`, and `generateContent` are ever called (see
-[Content Matchers and Generators](content-matcher-design.md)); a Lua plugin gets full provider-verification support
-for free through `compareContents`/`generateContent` alone, since the core verifier makes the real request to the
-provider and then reuses ordinary content matching to compare the actual response against the expected one.
+A Lua plugin can register any combination of `CONTENT_MATCHER`/`CONTENT_GENERATOR`, `MATCHER`/`GENERATOR` and
+`TRANSPORT` catalogue entries from its `init` function - the same way an `exec` (gRPC) plugin does. For a
+content-matcher/generator plugin, only `compareContents`, `configureInteraction`, and `generateContent` are ever
+called (see [Content Matchers and Generators](content-matcher-design.md)); a Lua plugin gets full
+provider-verification support for free through `compareContents`/`generateContent` alone, since the core verifier
+makes the real request to the provider and then reuses ordinary content matching to compare the actual response
+against the expected one.
+
+A `MATCHER`/`GENERATOR`-registered plugin is a smaller thing than a content matcher: rather than owning a whole
+content type, it contributes one matching rule and/or generator that applies to a single *value* inside somebody
+else's content - a field in a JSON body, a header, a message metadata value. It defines `match_field` and/or
+`generate_field` and nothing else; `configure_interaction`/`match_contents` belong to content matchers, and a
+field-level plugin never owns the content its value appears in. See the
+[credit card plugin](../plugins/creditcard) for a complete reference implementation, and
+[proposal 006](proposals/006_Field_level_matchers_and_generators.md) for the design.
 
 For a `TRANSPORT`-registered plugin, the mock-server (`start_mock_server`/`shutdown_mock_server`/
 `get_mock_server_results`) and provider-verification (`prepare_interaction_for_verification`/`verify_interaction`)
@@ -224,6 +233,28 @@ field-by-field reference of every function and table shape mentioned below, see 
 - **`update_catalogue(catalogue)` (optional)** - called whenever another plugin loads and the combined catalogue
   changes. If you don't define this function, it's a no-op.
 
+If your plugin registers a `MATCHER` or `GENERATOR` catalogue entry, it defines these instead. Note that for these
+entries the catalogue `key` **is** the name of the rule a test writes, not your plugin's name, and a `MATCHER` and
+a `GENERATOR` entry can share one key - the entry type is what tells them apart.
+
+- **`match_field(request) -> table`** - called to apply your matching rule to a single value. `request` has `key`,
+  `rule` (`{ type = "...", values = {...} }`), `path` (a matching-rule expression like `"$.card.number"`),
+  `mismatch_type` (which part of the interaction the value came from: `"body"`, `"header"`, and so on),
+  `expected`/`actual` (the values themselves), `plugin_configuration` and `test_context`. Return one of:
+  - `{ error = "..." }` - the rule itself couldn't be applied, e.g. it was misconfigured. That's the test author's
+    mistake rather than the provider's, so it fails the test outright rather than being reported as a mismatch.
+  - `{ mismatches = { ... } }` - an array (not a path-keyed table, unlike `match_contents`) of mismatch strings or
+    tables. A mismatch that doesn't set its own `path` is reported against the request's `path`. Empty or absent
+    means the value matched.
+- **`generate_field(request) -> table`** - called to generate a value replacing the example one in the Pact file.
+  `request` has `key`, `generator` (`{ type = "...", values = {...} }`), `path`, `example_value`,
+  `plugin_configuration`, `test_context` and `test_mode`. Return `{ value = ... }` or `{ error = "..." }`.
+
+A value crossing this boundary is a plain Lua value - `nil`, boolean, string, number, or table - except for raw
+bytes, which are wrapped as `{ binary = "..." }` the same way a binary metadata value is. Lua 5.4's integer/float
+distinction is preserved in both directions, so `math.type(v)` tells you whether the Pact file held `100` or
+`100.0`; rules like `integer`, `decimal` and `type` depend on that.
+
 If your plugin registers a `TRANSPORT` catalogue entry, it must also define these functions. Each is called with
 either a V1-shaped or a V2-shaped request table, never both, depending on your manifest's `pluginInterfaceVersion`
 (the same static, per-plugin-instance choice the driver makes for a gRPC transport plugin) - a V2 request replaces
@@ -269,6 +300,14 @@ The driver registers a few host (native) functions as Lua globals before loading
   decoding primitives, since Lua has no built-in crypto support. These exist specifically to support the JWT
   reference plugin; if your plugin needs different cryptographic or encoding primitives, either implement them in
   pure Lua or pull in a [LuaRocks package](#luarocks-support) that provides them.
+- **`host_compare_contents(entry_key, request)`**, **`host_generate_content(entry_key, contents, generators,
+  test_mode)`**, **`host_match_field(entry_key, request)`**, **`host_generate_field(entry_key, request)`** - call
+  back into a capability your plugin doesn't implement itself: one the host Pact framework provides (the standard
+  Pact matching rules and generators), or one another loaded plugin registered. Each takes a catalogue entry key
+  naming what to invoke, and otherwise has the same request and return shapes as the plugin function of the same
+  name, so you can pass a request straight through and return its result unchanged. The field-level pair is how a
+  content matcher applies a standard Pact rule to one value inside the content it owns, instead of reimplementing
+  the rule.
 
 ### Vendoring dependencies (preferred)
 

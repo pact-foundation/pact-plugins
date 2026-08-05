@@ -1,6 +1,7 @@
 package io.pact.plugins.jvm.core
 
 import io.pact.plugin.Plugin
+import io.pact.plugin.v2.PluginV2
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -20,6 +21,28 @@ fun interface CoreContentGenerator {
 }
 
 /**
+ * A host-provided handler for the `MatchField` capability shape - one of the standard Pact matching
+ * rules applied to a single value. Implemented by the embedding Pact framework and registered via
+ * [CoreCapabilityRegistry.registerFieldMatcher]. See proposals 006 (Field-level matchers and
+ * generators) and 009 (Host-provided core matching and generation).
+ *
+ * The request and response are the V2 interface types: field-level operations were introduced in V2
+ * and have no V1 equivalent.
+ */
+fun interface CoreFieldMatcher {
+  fun matchField(request: PluginV2.MatchFieldRequest): PluginV2.MatchFieldResponse
+}
+
+/**
+ * A host-provided handler for the `GenerateField` capability shape - one of the standard Pact
+ * generators applied to a single value. Implemented by the embedding Pact framework and registered
+ * via [CoreCapabilityRegistry.registerFieldGenerator]. See [CoreFieldMatcher].
+ */
+fun interface CoreFieldGenerator {
+  fun generateField(request: PluginV2.GenerateFieldRequest): PluginV2.GenerateFieldResponse
+}
+
+/**
  * Registry of host-provided ("core") capability handlers, keyed by catalogue entry key.
  *
  * This mirrors [PluginHostServer]'s instance registry, generalised from a single lookup to one
@@ -36,6 +59,8 @@ fun interface CoreContentGenerator {
 object CoreCapabilityRegistry {
   private val contentMatchers = ConcurrentHashMap<String, CoreContentMatcher>()
   private val contentGenerators = ConcurrentHashMap<String, CoreContentGenerator>()
+  private val fieldMatchers = ConcurrentHashMap<String, CoreFieldMatcher>()
+  private val fieldGenerators = ConcurrentHashMap<String, CoreFieldGenerator>()
 
   /**
    * Register a handler for a host-provided content matcher capability, keyed by the catalogue
@@ -77,5 +102,47 @@ object CoreCapabilityRegistry {
    */
   fun deregisterContentGenerator(key: String) {
     contentGenerators.remove(key)
+  }
+
+  /**
+   * Register a handler for a host-provided field matching rule, keyed by the catalogue entry key
+   * (e.g. `"v2-type"` for the `core/matcher/v2-type` entry). Replaces any handler previously
+   * registered under the same key.
+   */
+  fun registerFieldMatcher(key: String, handler: CoreFieldMatcher) {
+    fieldMatchers[key] = handler
+  }
+
+  /**
+   * Register a handler for a host-provided field generator, keyed by the catalogue entry key
+   * (e.g. `"v3-date"` for the `core/generator/v3-date` entry). Replaces any handler previously
+   * registered under the same key.
+   */
+  fun registerFieldGenerator(key: String, handler: CoreFieldGenerator) {
+    fieldGenerators[key] = handler
+  }
+
+  /**
+   * Look up a registered core field matcher handler by catalogue entry key.
+   */
+  fun fieldMatcher(key: String): CoreFieldMatcher? = fieldMatchers[key]
+
+  /**
+   * Look up a registered core field generator handler by catalogue entry key.
+   */
+  fun fieldGenerator(key: String): CoreFieldGenerator? = fieldGenerators[key]
+
+  /**
+   * Remove a registered core field matcher handler. Mainly useful for tests.
+   */
+  fun deregisterFieldMatcher(key: String) {
+    fieldMatchers.remove(key)
+  }
+
+  /**
+   * Remove a registered core field generator handler. Mainly useful for tests.
+   */
+  fun deregisterFieldGenerator(key: String) {
+    fieldGenerators.remove(key)
   }
 }

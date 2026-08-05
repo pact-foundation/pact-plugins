@@ -1096,7 +1096,7 @@ object DefaultPluginManager: PluginManager {
     CatalogueManager.entries().forEach { (_, entry) ->
       requestBuilder.addCatalogue(Plugin.CatalogueEntry.newBuilder()
         .setKey(entry.key)
-        .setType(entry.type.toEntry())
+        .setTypeValue(entry.type.toEntryValue())
         .putAllValues(entry.values)
         .build())
     }

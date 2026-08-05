@@ -10,12 +10,13 @@ use maplit::hashset;
 use pact_models::content_types::ContentType;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use tracing::{debug, error, instrument, trace};
+use tracing::{debug, error, instrument, trace, warn};
 
 use crate::content::{ContentGenerator, ContentMatcher};
 use crate::plugin_models::PactPluginManifest;
 use crate::proto::catalogue_entry::EntryType;
 use crate::proto::CatalogueEntry as ProtoCatalogueEntry;
+use crate::proto_v2::catalogue_entry::EntryType as EntryTypeV2;
 
 lazy_static! {
   static ref CATALOGUE_REGISTER: Mutex<HashMap<String, CatalogueEntry>> = Mutex::new(HashMap::new());
@@ -31,22 +32,87 @@ pub enum CatalogueEntryType {
   CONTENT_GENERATOR,
   /// Network transport
   TRANSPORT,
-  /// Matching rule
+  /// Matching rule for a content field/value
   MATCHER,
-  /// Generator
-  INTERACTION
+  /// Type of interaction
+  INTERACTION,
+  /// Generator for a content field/value. Only representable on the V2 plugin interface - the V1
+  /// `EntryType` enum has no equivalent. See proposal 006 (Field-level matchers and generators).
+  GENERATOR
 }
 
 impl CatalogueEntryType {
-  /// Return the protobuf type for this entry type
+  /// Return the protobuf type for this entry type.
+  ///
+  /// This maps to the *V1* enum, which cannot represent every entry type: `GENERATOR` has no V1
+  /// equivalent and is reported as `Matcher`. Use [`CatalogueEntryType::to_proto_value`] instead,
+  /// which returns the wire value and is lossless for both interface versions.
+  #[deprecated(
+    since = "1.2.0",
+    note = "Use to_proto_value, which can represent entry types that only exist on the V2 interface"
+  )]
   pub fn to_proto_type(&self) -> EntryType {
     match self {
       CatalogueEntryType::CONTENT_MATCHER => EntryType::ContentMatcher,
       CatalogueEntryType::CONTENT_GENERATOR => EntryType::ContentGenerator,
       CatalogueEntryType::TRANSPORT => EntryType::Transport,
       CatalogueEntryType::MATCHER => EntryType::Matcher,
-      CatalogueEntryType::INTERACTION => EntryType::Interaction
+      CatalogueEntryType::INTERACTION => EntryType::Interaction,
+      CatalogueEntryType::GENERATOR => EntryType::Matcher
     }
+  }
+
+  /// The V2 protobuf enum for this entry type. V2 is the canonical source of the wire values: it
+  /// mirrors V1 for the entry types both versions share, and adds the ones V1 never had.
+  fn to_proto_enum(self) -> EntryTypeV2 {
+    match self {
+      CatalogueEntryType::CONTENT_MATCHER => EntryTypeV2::ContentMatcher,
+      CatalogueEntryType::CONTENT_GENERATOR => EntryTypeV2::ContentGenerator,
+      CatalogueEntryType::TRANSPORT => EntryTypeV2::Transport,
+      CatalogueEntryType::MATCHER => EntryTypeV2::Matcher,
+      CatalogueEntryType::INTERACTION => EntryTypeV2::Interaction,
+      CatalogueEntryType::GENERATOR => EntryTypeV2::Generator
+    }
+  }
+
+  fn from_proto_enum(entry_type: EntryTypeV2) -> CatalogueEntryType {
+    match entry_type {
+      EntryTypeV2::ContentMatcher => CatalogueEntryType::CONTENT_MATCHER,
+      EntryTypeV2::ContentGenerator => CatalogueEntryType::CONTENT_GENERATOR,
+      EntryTypeV2::Transport => CatalogueEntryType::TRANSPORT,
+      EntryTypeV2::Matcher => CatalogueEntryType::MATCHER,
+      EntryTypeV2::Interaction => CatalogueEntryType::INTERACTION,
+      EntryTypeV2::Generator => CatalogueEntryType::GENERATOR
+    }
+  }
+
+  /// The protobuf enum value for this entry type, for setting the `type` field of a
+  /// `CatalogueEntry` message. Lossless for every entry type, including those a V1 plugin will
+  /// not recognise - a V1 plugin decodes an unknown value as an unrecognised enum and ignores the
+  /// entry, which is the correct outcome, whereas mapping it onto some other V1 type would have
+  /// the plugin act on an entry that is not what it thinks it is.
+  pub fn to_proto_value(self) -> i32 {
+    self.to_proto_enum() as i32
+  }
+
+  /// The entry type for a protobuf enum value, or `None` if the value is not one this driver
+  /// understands (an entry type added by a later interface version). Deliberately not defaulting
+  /// to `CONTENT_MATCHER` the way prost's generated accessor does: silently mis-typing an entry
+  /// is worse than ignoring one.
+  pub fn from_proto_value(value: i32) -> Option<CatalogueEntryType> {
+    EntryTypeV2::try_from(value).ok().map(CatalogueEntryType::from_proto_enum)
+  }
+
+  /// The protobuf enum value name for this entry type, e.g. `"CONTENT_MATCHER"`. This is the form
+  /// a Lua plugin uses in the catalogue entries returned from its `init` function.
+  pub fn as_proto_name(&self) -> &'static str {
+    self.to_proto_enum().as_str_name()
+  }
+
+  /// The entry type for a protobuf enum value name, e.g. `"CONTENT_MATCHER"`, or `None` if the
+  /// name is not one this driver understands.
+  pub fn from_proto_name(name: &str) -> Option<CatalogueEntryType> {
+    EntryTypeV2::from_str_name(name).map(CatalogueEntryType::from_proto_enum)
   }
 }
 
@@ -58,6 +124,7 @@ impl Display for CatalogueEntryType {
       CatalogueEntryType::TRANSPORT => write!(f, "transport"),
       CatalogueEntryType::MATCHER => write!(f, "matcher"),
       CatalogueEntryType::INTERACTION => write!(f, "interaction"),
+      CatalogueEntryType::GENERATOR => write!(f, "generator"),
     }
   }
 }
@@ -70,6 +137,7 @@ impl From<&str> for CatalogueEntryType {
       "interaction" => CatalogueEntryType::INTERACTION,
       "matcher" => CatalogueEntryType::MATCHER,
       "transport" => CatalogueEntryType::TRANSPORT,
+      "generator" => CatalogueEntryType::GENERATOR,
       _ => {
         let message = format!("'{}' is not a valid CatalogueEntryType value", s);
         error!("{}", message);
@@ -130,7 +198,20 @@ pub fn register_plugin_entries(plugin: &PactPluginManifest, catalogue_list: &Vec
   let mut guard = CATALOGUE_REGISTER.lock().unwrap();
 
   for entry in catalogue_list {
-    let entry_type = CatalogueEntryType::from(entry.r#type());
+    // Deliberately reading the raw field rather than prost's `entry.r#type()` accessor: the
+    // accessor is generated against the V1 enum and maps anything it doesn't recognise to the
+    // default (`CONTENT_MATCHER`), which would silently register a V2-only entry type - a
+    // `GENERATOR`, say - as a content matcher.
+    let entry_type = match CatalogueEntryType::from_proto_value(entry.r#type) {
+      Some(entry_type) => entry_type,
+      None => {
+        warn!(
+          "Ignoring catalogue entry '{}' from plugin '{}': {} is not a catalogue entry type this driver understands",
+          entry.key, plugin.name, entry.r#type
+        );
+        continue;
+      }
+    };
     let key = format!("plugin/{}/{}/{}", plugin.name, entry_type, entry.key);
     guard.insert(key.clone(), CatalogueEntry {
       entry_type,
@@ -164,12 +245,18 @@ pub fn register_core_entries(entries: &Vec<CatalogueEntry>) {
   }
 }
 
-/// Lookup an entry in the catalogue by the key. Will find the first entry that ends with the
-/// given key.
+/// Lookup an entry in the catalogue by the key, matched the same way [`resolve_capability`] does:
+/// by name first - the whole catalogue key, or a trailing run of its `/`-separated components -
+/// then against the core catalogue's versioned naming convention.
+///
+/// Unlike [`resolve_capability`], this takes the first match when more than one entry matches, and
+/// `HashMap` iteration order is randomised per process. Prefer [`resolve_capability`] wherever the
+/// expected entry type is known and a deterministic answer matters.
 pub fn lookup_entry(key: &str) -> Option<CatalogueEntry> {
   let inner = CATALOGUE_REGISTER.lock().unwrap();
   inner.iter()
-    .find(|(k, _)| k.ends_with(key))
+    .find(|(k, _)| names_catalogue_key(k, key))
+    .or_else(|| inner.iter().find(|(_, entry)| names_versioned_core_key(entry, key)))
     .map(|(_, v)| v.clone())
 }
 
@@ -185,28 +272,103 @@ pub enum ResolvedCapability {
   Plugin(Box<PactPluginManifest>)
 }
 
+/// Does `entry_key` name this catalogue key? Either the whole key (`core/content-matcher/xml`),
+/// or a trailing run of its `/`-separated components (`content-matcher/xml`, or just `xml`).
+///
+/// Components are compared whole, never as substrings: `"type"` does not name
+/// `core/matcher/v2-type`. That distinction is the point - the core catalogue prefixes the Pact
+/// specification version a matcher was introduced in to its name, so a substring match would let
+/// an unqualified name collide with a versioned core key it has nothing to do with (a plugin's
+/// own `matcher/date` against `core/matcher/v3-date`, say). The versioned form is handled
+/// deliberately by [`names_versioned_core_key`] instead, as a fallback rather than a coincidence.
+fn names_catalogue_key(catalogue_key: &str, entry_key: &str) -> bool {
+  let key_parts = catalogue_key.split('/').collect::<Vec<_>>();
+  let query_parts = entry_key.split('/').collect::<Vec<_>>();
+  query_parts.len() <= key_parts.len()
+    && key_parts[key_parts.len() - query_parts.len()..] == query_parts[..]
+}
+
+/// Does `entry_key` name this entry under the core catalogue's versioned naming convention - the
+/// Pact specification version the rule was introduced in, prefixed to its name (`v2-type`,
+/// `v3-date`, `v4-not-empty`)? This is what lets a caller ask for `type` and get `v2-type`
+/// without having to know which specification version introduced it.
+///
+/// Only the whole name after the version prefix counts, so `type` names `v2-type` but not
+/// `v3-content-type` or `v2-min-type` - those are the `content-type` and `min-type` rules.
+///
+/// The convention only applies to matching rules and generators. Content matchers, content
+/// generators and transports are registered under plain names (`xml`, `json`, `grpc`), so a
+/// leading `v<n>-` there is part of the name rather than a version, and stripping it would be
+/// wrong.
+fn names_versioned_core_key(entry: &CatalogueEntry, entry_key: &str) -> bool {
+  if entry.entry_type != CatalogueEntryType::MATCHER && entry.entry_type != CatalogueEntryType::GENERATOR {
+    return false;
+  }
+  match entry.key.split_once('-') {
+    Some((version, name)) => name == entry_key
+      && version.len() > 1
+      && version.starts_with('v')
+      && version[1..].chars().all(|c| c.is_ascii_digit()),
+    None => false
+  }
+}
+
 /// Resolve a callback's catalogue entry key to a dispatch target, the same way
 /// [`crate::content::ContentMatcher::is_core`]/[`crate::content::ContentGenerator::is_core`] do
 /// for the driver's own outbound calls.
 ///
-/// `entry_key` is matched by suffix against the full catalogue key (e.g. a plugin passing
-/// `"xml"` matches `"core/content-matcher/xml"`), the same lookup [`lookup_entry`] does - except
-/// unlike [`lookup_entry`], this does not just take the first `HashMap` hit if more than one
-/// entry matches the suffix. A short, unqualified `entry_key` could otherwise coincidentally
-/// match more than one entry of the *same* `expected_type` (e.g. a plugin registering its own
-/// `content-matcher/xml` alongside a host-registered core `content-matcher/xml`), and `HashMap`
-/// iteration order is randomised per process - silently picking one would make the dispatch
-/// target non-deterministic across restarts. `expected_type` still guards against the *wrong*
-/// capability shape (a content-generator registered under the same name as an unrelated
-/// content-matcher), mirroring the explicit `entry_type` check [`find_content_matcher`]/
-/// [`find_content_generator`] already do.
+/// `entry_key` is matched against the catalogue in two passes:
+///
+/// 1. by name - the whole catalogue key (`core/content-matcher/xml`) or a trailing run of its
+///    components (`content-matcher/xml`, `xml`), compared component by component;
+/// 2. failing that, against the core catalogue's versioned naming convention, so `type` resolves
+///    to `v2-type` and `date` to `v3-date`.
+///
+/// Naming an entry directly always wins over the versioned fallback: if a plugin registers its
+/// own `matcher/date`, `date` resolves to that plugin, and a caller that specifically wants the
+/// core rule asks for `v3-date`.
+///
+/// Unlike [`lookup_entry`], this does not just take the first `HashMap` hit when more than one
+/// entry matches. A short, unqualified `entry_key` can still match more than one entry of the
+/// *same* `expected_type` (a plugin registering its own `content-matcher/xml` alongside a
+/// host-registered core `content-matcher/xml`), and `HashMap` iteration order is randomised per
+/// process - silently picking one would make the dispatch target non-deterministic across
+/// restarts. `expected_type` still guards against the *wrong* capability shape (a
+/// content-generator registered under the same name as an unrelated content-matcher), mirroring
+/// the explicit `entry_type` check [`find_content_matcher`]/[`find_content_generator`] already do.
 pub fn resolve_capability(entry_key: &str, expected_type: CatalogueEntryType) -> anyhow::Result<ResolvedCapability> {
-  let candidates: Vec<(String, CatalogueEntry)> = {
+  let entry = resolve_capability_entry(entry_key, expected_type)?;
+  match entry.provider_type {
+    CatalogueEntryProviderType::CORE => Ok(ResolvedCapability::Core(entry.key.clone())),
+    CatalogueEntryProviderType::PLUGIN => entry.plugin.clone()
+      .map(|manifest| ResolvedCapability::Plugin(Box::new(manifest)))
+      .ok_or_else(|| anyhow::anyhow!("Catalogue entry '{}' has no plugin manifest", entry_key))
+  }
+}
+
+/// Resolve a catalogue entry key to the entry itself, using the same two-pass matching
+/// [`resolve_capability`] documents. Callers that need the entry rather than a dispatch target -
+/// [`crate::field::find_field_matcher`] and [`crate::field::find_field_generator`], which wrap it
+/// in a matcher/generator - use this directly.
+pub fn resolve_capability_entry(entry_key: &str, expected_type: CatalogueEntryType) -> anyhow::Result<CatalogueEntry> {
+  let all_entries: Vec<(String, CatalogueEntry)> = {
     let inner = CATALOGUE_REGISTER.lock().unwrap();
-    inner.iter()
-      .filter(|(k, _)| k.ends_with(entry_key))
-      .map(|(k, v)| (k.clone(), v.clone()))
-      .collect()
+    inner.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+  };
+
+  let named: Vec<(String, CatalogueEntry)> = all_entries.iter()
+    .filter(|(k, _)| names_catalogue_key(k, entry_key))
+    .cloned()
+    .collect();
+  let candidates = if named.iter().any(|(_, entry)| entry.entry_type == expected_type) {
+    named
+  } else {
+    let versioned: Vec<(String, CatalogueEntry)> = all_entries.iter()
+      .filter(|(_, entry)| names_versioned_core_key(entry, entry_key))
+      .cloned()
+      .collect();
+    // Keep any wrong-typed direct matches for the diagnostic below if the fallback finds nothing
+    if versioned.is_empty() { named } else { versioned }
   };
 
   let mut of_expected_type = candidates.iter().filter(|(_, entry)| entry.entry_type == expected_type);
@@ -231,12 +393,7 @@ pub fn resolve_capability(entry_key: &str, expected_type: CatalogueEntryType) ->
     }
   };
 
-  match entry.provider_type {
-    CatalogueEntryProviderType::CORE => Ok(ResolvedCapability::Core(entry.key.clone())),
-    CatalogueEntryProviderType::PLUGIN => entry.plugin.clone()
-      .map(|manifest| ResolvedCapability::Plugin(Box::new(manifest)))
-      .ok_or_else(|| anyhow::anyhow!("Catalogue entry '{}' has no plugin manifest", entry_key))
-  }
+  Ok(entry.clone())
 }
 
 /// Remove all entries for a plugin given the plugin name
@@ -416,6 +573,84 @@ mod tests {
   }
 
   #[test]
+  fn entry_type_proto_values_and_names_round_trip() {
+    for entry_type in [
+      CatalogueEntryType::CONTENT_MATCHER,
+      CatalogueEntryType::CONTENT_GENERATOR,
+      CatalogueEntryType::TRANSPORT,
+      CatalogueEntryType::MATCHER,
+      CatalogueEntryType::INTERACTION,
+      CatalogueEntryType::GENERATOR
+    ] {
+      expect!(CatalogueEntryType::from_proto_value(entry_type.to_proto_value()))
+        .to(be_some().value(entry_type));
+      expect!(CatalogueEntryType::from_proto_name(entry_type.as_proto_name()))
+        .to(be_some().value(entry_type));
+      // The Display form round-trips too - it is what catalogue keys are built from
+      expect!(CatalogueEntryType::from(entry_type.to_string().as_str())).to(be_equal_to(entry_type));
+    }
+
+    expect!(CatalogueEntryType::from_proto_value(99)).to(be_none());
+    expect!(CatalogueEntryType::from_proto_name("NOT_AN_ENTRY_TYPE")).to(be_none());
+  }
+
+  #[test]
+  fn entry_types_shared_with_v1_keep_their_v1_wire_values() {
+    // The wire values come from the V2 enum, but the driver publishes one catalogue to every
+    // running plugin, V1 ones included - so the values V1 knows about must not shift.
+    expect!(CatalogueEntryType::CONTENT_MATCHER.to_proto_value())
+      .to(be_equal_to(EntryType::ContentMatcher as i32));
+    expect!(CatalogueEntryType::CONTENT_GENERATOR.to_proto_value())
+      .to(be_equal_to(EntryType::ContentGenerator as i32));
+    expect!(CatalogueEntryType::TRANSPORT.to_proto_value())
+      .to(be_equal_to(EntryType::Transport as i32));
+    expect!(CatalogueEntryType::MATCHER.to_proto_value())
+      .to(be_equal_to(EntryType::Matcher as i32));
+    expect!(CatalogueEntryType::INTERACTION.to_proto_value())
+      .to(be_equal_to(EntryType::Interaction as i32));
+  }
+
+  #[test]
+  fn registers_a_generator_entry_under_its_own_entry_type() {
+    let name = "registers_a_generator_entry_under_its_own_entry_type";
+    let manifest = PactPluginManifest { name: name.to_string(), .. PactPluginManifest::default() };
+    // GENERATOR only exists on the V2 enum. This is exactly the case where prost's generated
+    // `entry.r#type()` accessor - built against V1 - would report CONTENT_MATCHER instead.
+    let entries = vec![
+      ProtoCatalogueEntry {
+        r#type: CatalogueEntryType::GENERATOR.to_proto_value(),
+        key: name.to_string(),
+        values: hashmap!{}
+      }
+    ];
+
+    register_plugin_entries(&manifest, &entries);
+
+    let entry = lookup_entry(&format!("generator/{}", name));
+    let as_a_content_matcher = lookup_entry(&format!("content-matcher/{}", name));
+    remove_plugin_entries(name);
+
+    expect!(entry.map(|entry| entry.entry_type)).to(be_some().value(CatalogueEntryType::GENERATOR));
+    expect!(as_a_content_matcher).to(be_none());
+  }
+
+  #[test]
+  fn ignores_a_catalogue_entry_whose_type_this_driver_does_not_understand() {
+    let name = "ignores_a_catalogue_entry_whose_type_this_driver_does_not_understand";
+    let manifest = PactPluginManifest { name: name.to_string(), .. PactPluginManifest::default() };
+    let entries = vec![
+      ProtoCatalogueEntry { r#type: 99, key: name.to_string(), values: hashmap!{} }
+    ];
+
+    register_plugin_entries(&manifest, &entries);
+
+    let registered = all_entries().into_iter().find(|entry| entry.key == name);
+    remove_plugin_entries(name);
+
+    expect!(registered).to(be_none());
+  }
+
+  #[test]
   fn find_content_matcher_requires_the_whole_base_type_to_match() {
     let manifest = PactPluginManifest {
       name: "find_content_matcher_requires_the_whole_base_type_to_match".to_string(),
@@ -462,6 +697,184 @@ mod tests {
       ResolvedCapability::Plugin(_) => panic!("expected a Core resolution, got Plugin")
     };
     expect!(core_key).to(be_equal_to(key.to_string()));
+  }
+
+  /// The core matcher entries as the Pact frameworks actually register them - the Pact
+  /// specification version the rule was introduced in, prefixed to the name. Kept in sync with
+  /// `MATCHER_CATALOGUE_ENTRIES` in pact_matching and `MatcherExecutor.kt` in Pact-JVM.
+  fn register_core_matcher_entries() {
+    let entries = ["v2-regex", "v2-type", "v3-number-type", "v3-integer-type", "v3-decimal-type",
+      "v3-date", "v3-time", "v3-datetime", "v2-min-type", "v2-max-type", "v2-minmax-type",
+      "v3-includes", "v3-null", "v4-equals-ignore-order", "v4-min-equals-ignore-order",
+      "v4-max-equals-ignore-order", "v4-minmax-equals-ignore-order", "v3-content-type",
+      "v4-array-contains", "v1-equality", "v4-not-empty", "v4-semver"]
+      .iter()
+      .map(|key| CatalogueEntry {
+        entry_type: CatalogueEntryType::MATCHER,
+        provider_type: CatalogueEntryProviderType::CORE,
+        plugin: None,
+        key: key.to_string(),
+        values: hashmap!{}
+      })
+      .collect();
+    register_core_entries(&entries);
+  }
+
+  fn resolved_core_key(entry_key: &str) -> String {
+    match resolve_capability(entry_key, CatalogueEntryType::MATCHER) {
+      Ok(ResolvedCapability::Core(key)) => key,
+      other => panic!("expected '{}' to resolve to a core entry, got {:?}", entry_key, other)
+    }
+  }
+
+  #[test]
+  fn resolve_capability_falls_back_to_the_versioned_core_key() {
+    register_core_matcher_entries();
+
+    // The name a Pact file (and a plugin calling back) uses, without needing to know which
+    // specification version introduced the rule
+    expect!(resolved_core_key("type")).to(be_equal_to("v2-type".to_string()));
+    expect!(resolved_core_key("regex")).to(be_equal_to("v2-regex".to_string()));
+    expect!(resolved_core_key("date")).to(be_equal_to("v3-date".to_string()));
+    expect!(resolved_core_key("equality")).to(be_equal_to("v1-equality".to_string()));
+    expect!(resolved_core_key("semver")).to(be_equal_to("v4-semver".to_string()));
+    expect!(resolved_core_key("not-empty")).to(be_equal_to("v4-not-empty".to_string()));
+
+    // Only the whole name after the version prefix counts, so these are distinct rules and not
+    // ambiguous with `type`/`equals-ignore-order`
+    expect!(resolved_core_key("content-type")).to(be_equal_to("v3-content-type".to_string()));
+    expect!(resolved_core_key("min-type")).to(be_equal_to("v2-min-type".to_string()));
+    expect!(resolved_core_key("equals-ignore-order"))
+      .to(be_equal_to("v4-equals-ignore-order".to_string()));
+
+    // The versioned key itself still resolves, by name
+    expect!(resolved_core_key("v2-type")).to(be_equal_to("v2-type".to_string()));
+    expect!(resolved_core_key("core/matcher/v3-date")).to(be_equal_to("v3-date".to_string()));
+    expect!(resolved_core_key("matcher/v3-date")).to(be_equal_to("v3-date".to_string()));
+  }
+
+  #[test]
+  fn resolve_capability_does_not_match_a_key_component_as_a_substring() {
+    // "type" must not name `core/matcher/v2-type` by suffix - if it did, it would match all eight
+    // core keys ending in "type" and be ambiguous. It resolves through the versioned fallback to
+    // exactly one entry instead.
+    expect!(names_catalogue_key("core/matcher/v2-type", "type")).to(be_false());
+    expect!(names_catalogue_key("core/matcher/v2-type", "v2-type")).to(be_true());
+    expect!(names_catalogue_key("core/matcher/v2-type", "matcher/v2-type")).to(be_true());
+    expect!(names_catalogue_key("core/matcher/v2-type", "core/matcher/v2-type")).to(be_true());
+    expect!(names_catalogue_key("core/matcher/v2-type", "r/v2-type")).to(be_false());
+    expect!(names_catalogue_key("core/content-matcher/xml", "xml")).to(be_true());
+    expect!(names_catalogue_key("core/content-matcher/xml", "ml")).to(be_false());
+  }
+
+  #[test]
+  fn the_versioned_fallback_only_applies_to_matcher_and_generator_entries() {
+    // Content matchers, content generators and transports are registered under plain names, so a
+    // leading "v<n>-" there is part of the name, not a version to be stripped.
+    let name = "the_versioned_fallback_only_applies_to_matcher_and_generator_entries";
+    register_core_entries(&vec![
+      CatalogueEntry {
+        entry_type: CatalogueEntryType::CONTENT_MATCHER,
+        provider_type: CatalogueEntryProviderType::CORE,
+        plugin: None,
+        key: format!("v2-{}", name),
+        values: hashmap!{}
+      },
+      CatalogueEntry {
+        entry_type: CatalogueEntryType::MATCHER,
+        provider_type: CatalogueEntryProviderType::CORE,
+        plugin: None,
+        key: format!("v2-matcher-{}", name),
+        values: hashmap!{}
+      }
+    ]);
+
+    // The content matcher is only reachable by its actual name
+    expect!(resolve_capability(name, CatalogueEntryType::CONTENT_MATCHER).is_err()).to(be_true());
+    expect!(lookup_entry(name).map(|entry| entry.key)).to(be_none());
+    expect!(resolve_capability(&format!("v2-{}", name), CatalogueEntryType::CONTENT_MATCHER).is_ok())
+      .to(be_true());
+
+    // ... while the matcher entry still gets the fallback
+    expect!(resolved_core_key(&format!("matcher-{}", name)))
+      .to(be_equal_to(format!("v2-matcher-{}", name)));
+  }
+
+  #[test]
+  fn lookup_entry_matches_by_name_not_by_substring() {
+    let name = "lookup_entry_matches_by_name_not_by_substring";
+    let manifest = PactPluginManifest { name: name.to_string(), .. PactPluginManifest::default() };
+    register_plugin_entries(&manifest, &vec![
+      ProtoCatalogueEntry {
+        r#type: CatalogueEntryType::CONTENT_MATCHER.to_proto_value(),
+        key: name.to_string(),
+        values: hashmap!{}
+      },
+      ProtoCatalogueEntry {
+        r#type: CatalogueEntryType::MATCHER.to_proto_value(),
+        key: format!("v3-{}", name),
+        values: hashmap!{}
+      }
+    ]);
+
+    let by_name = lookup_entry(name).map(|entry| entry.entry_type);
+    let by_components = lookup_entry(&format!("content-matcher/{}", name)).map(|entry| entry.entry_type);
+    let fully_qualified = lookup_entry(&format!("plugin/{}/content-matcher/{}", name, name))
+      .map(|entry| entry.entry_type);
+    // A trailing substring of a component names nothing
+    let by_substring = lookup_entry(&name[3..]);
+    // But the versioned convention still resolves for a matcher entry
+    let versioned = lookup_entry(&format!("{}-{}", "matcher-fallback", name));
+
+    remove_plugin_entries(name);
+
+    expect!(by_name).to(be_some().value(CatalogueEntryType::CONTENT_MATCHER));
+    expect!(by_components).to(be_some().value(CatalogueEntryType::CONTENT_MATCHER));
+    expect!(fully_qualified).to(be_some().value(CatalogueEntryType::CONTENT_MATCHER));
+    expect!(by_substring).to(be_none());
+    expect!(versioned).to(be_none());
+  }
+
+  #[test]
+  fn lookup_entry_falls_back_to_the_versioned_core_key() {
+    register_core_matcher_entries();
+
+    expect!(lookup_entry("type").map(|entry| entry.key)).to(be_some().value("v2-type".to_string()));
+    expect!(lookup_entry("v3-date").map(|entry| entry.key)).to(be_some().value("v3-date".to_string()));
+    expect!(lookup_entry("matcher/v3-date").map(|entry| entry.key)).to(be_some().value("v3-date".to_string()));
+  }
+
+  #[test]
+  fn resolve_capability_prefers_an_entry_named_directly_over_the_versioned_fallback() {
+    let name = "resolve_capability_prefers_an_entry_named_directly_over_the_versioned_fallback";
+    register_core_entries(&vec![CatalogueEntry {
+      entry_type: CatalogueEntryType::MATCHER,
+      provider_type: CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: format!("v3-{}", name),
+      values: hashmap!{}
+    }]);
+    // Before the plugin registers anything, the bare name finds the core rule via the fallback
+    let core_first = resolved_core_key(name);
+
+    let manifest = PactPluginManifest { name: name.to_string(), .. PactPluginManifest::default() };
+    register_plugin_entries(&manifest, &vec![ProtoCatalogueEntry {
+      r#type: CatalogueEntryType::MATCHER.to_proto_value(),
+      key: name.to_string(),
+      values: hashmap!{}
+    }]);
+
+    let resolved = resolve_capability(name, CatalogueEntryType::MATCHER);
+    // A caller that specifically wants the core rule can still name its versioned key
+    let still_core = resolved_core_key(&format!("v3-{}", name));
+    remove_plugin_entries(name);
+
+    expect!(core_first).to(be_equal_to(format!("v3-{}", name)));
+    match resolved.expect("expected the plugin's own entry to resolve") {
+      ResolvedCapability::Plugin(resolved_manifest) => expect!(resolved_manifest.name).to(be_equal_to(name.to_string())),
+      ResolvedCapability::Core(key) => panic!("expected the plugin entry to win, got core '{}'", key)
+    };
+    expect!(still_core).to(be_equal_to(format!("v3-{}", name)));
   }
 
   #[test]

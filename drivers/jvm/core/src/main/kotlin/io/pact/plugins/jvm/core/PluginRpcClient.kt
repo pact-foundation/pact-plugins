@@ -94,6 +94,44 @@ interface PactPluginRpcClient {
   ): Plugin.VerificationPreparationResponse
   fun verifyInteraction(request: Plugin.VerifyInteractionRequest): Plugin.VerifyInteractionResponse
 
+  /**
+   * Apply a plugin-provided matching rule to a single value (see proposal 006). Field-level
+   * operations exist only on the V2 interface, so the default reports that this plugin cannot
+   * provide them - the same shape as the other V2-only operations here.
+   */
+  fun matchField(request: PluginV2.MatchFieldRequest): PluginV2.MatchFieldResponse =
+    throw UnsupportedOperationException(
+      "Field-level matching rules require the V2 plugin interface, and this plugin uses V1"
+    )
+
+  /**
+   * Apply a plugin-provided matching rule to a single value, propagating call-chain cycle detection
+   * and deadline metadata. See [compareContentsWithChain] for the default/override split.
+   */
+  fun matchFieldWithChain(
+    request: PluginV2.MatchFieldRequest,
+    chainId: String,
+    deadlineMs: Long
+  ): PluginV2.MatchFieldResponse = matchField(request)
+
+  /**
+   * Apply a plugin-provided generator to a single value (see proposal 006). See [matchField].
+   */
+  fun generateField(request: PluginV2.GenerateFieldRequest): PluginV2.GenerateFieldResponse =
+    throw UnsupportedOperationException(
+      "Field-level generators require the V2 plugin interface, and this plugin uses V1"
+    )
+
+  /**
+   * Apply a plugin-provided generator to a single value, propagating call-chain cycle detection and
+   * deadline metadata. See [matchFieldWithChain].
+   */
+  fun generateFieldWithChain(
+    request: PluginV2.GenerateFieldRequest,
+    chainId: String,
+    deadlineMs: Long
+  ): PluginV2.GenerateFieldResponse = generateField(request)
+
   fun startMockServerV2(request: PluginV2.StartMockServerRequest): Plugin.StartMockServerResponse =
     throw UnsupportedOperationException("V2 interface not supported by this plugin")
   fun prepareInteractionForVerificationV2(
@@ -292,4 +330,22 @@ class PactPluginV2RpcClient(
     request: PluginV2.VerifyInteractionRequest
   ): Plugin.VerifyInteractionResponse =
     convertMessage(stub.verifyInteraction(request), Plugin.VerifyInteractionResponse.parser())
+
+  override fun matchField(request: PluginV2.MatchFieldRequest): PluginV2.MatchFieldResponse =
+    stub.matchField(request)
+
+  override fun matchFieldWithChain(
+    request: PluginV2.MatchFieldRequest,
+    chainId: String,
+    deadlineMs: Long
+  ): PluginV2.MatchFieldResponse = stub.withChainContext(chainId, deadlineMs).matchField(request)
+
+  override fun generateField(request: PluginV2.GenerateFieldRequest): PluginV2.GenerateFieldResponse =
+    stub.generateField(request)
+
+  override fun generateFieldWithChain(
+    request: PluginV2.GenerateFieldRequest,
+    chainId: String,
+    deadlineMs: Long
+  ): PluginV2.GenerateFieldResponse = stub.withChainContext(chainId, deadlineMs).generateField(request)
 }
