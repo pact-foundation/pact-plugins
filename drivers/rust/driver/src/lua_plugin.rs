@@ -943,7 +943,7 @@ fn lua_to_field_value(lua: &Lua, value: Value) -> anyhow::Result<proto_v2::Field
     Value::Integer(value) => FieldValue::IntegerValue(value),
     Value::Number(value) => FieldValue::DecimalValue(value),
     Value::String(value) => FieldValue::StringValue(value.to_str()?.to_string()),
-    Value::Table(table) => match table.get::<Option<mlua::String>>("binary")? {
+    Value::Table(table) => match table.get::<Option<mlua::LuaString>>("binary")? {
       Some(binary) => FieldValue::BinaryValue(binary.as_bytes().to_vec()),
       None => FieldValue::StructuredValue(to_proto_value(&lua.from_value(Value::Table(table))?)),
     },

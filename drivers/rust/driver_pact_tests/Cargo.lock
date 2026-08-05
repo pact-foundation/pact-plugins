@@ -741,7 +741,7 @@ dependencies = [
  "async-trait",
  "env_logger",
  "expectest",
- "pact-plugin-driver 1.1.2",
+ "pact-plugin-driver 1.2.0",
  "pact_consumer",
  "prost",
  "prost-types",
@@ -2276,7 +2276,7 @@ dependencies = [
 
 [[package]]
 name = "pact-plugin-driver"
-version = "1.1.2"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2322,7 +2322,7 @@ dependencies = [
 [[package]]
 name = "pact_consumer"
 version = "1.4.10"
-source = "git+https://github.com/pact-foundation/pact-reference.git#1d8bfcbff06f0d2902c9a14d8d0c74ae70760e67"
+source = "git+https://github.com/pact-foundation/pact-reference.git#409f3213792b67c7a8a3d1b31562d5764b0d73d3"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -2347,7 +2347,7 @@ dependencies = [
 [[package]]
 name = "pact_matching"
 version = "2.0.10"
-source = "git+https://github.com/pact-foundation/pact-reference.git#1d8bfcbff06f0d2902c9a14d8d0c74ae70760e67"
+source = "git+https://github.com/pact-foundation/pact-reference.git#409f3213792b67c7a8a3d1b31562d5764b0d73d3"
 dependencies = [
  "ansi_term",
  "anyhow",
