@@ -1,5 +1,39 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.0 - Support for field-level matchers and generators in v2 plugins
+
+* 7e22b0e - chore(jvm-driver): Bump version to 1.2.0 (Ronald Holshausen, Wed Aug 5 15:20:10 2026 +1000)
+* a78e1cd - chore: bump version to 1.2.1 [skip ci] (Ronald Holshausen, Wed Aug 5 15:13:30 2026 +1000)
+* e74a42c - chore: update changelog for release 1.2.0 [skip ci] (Ronald Holshausen, Wed Aug 5 15:13:03 2026 +1000)
+* 4218c4e - chore: Update driver version in examples (Ronald Holshausen, Wed Aug 5 14:58:58 2026 +1000)
+* b8cecf6 - chore(rust-driver): Bump version to 1.2.0 (Ronald Holshausen, Wed Aug 5 13:57:37 2026 +1000)
+* 7500916 - chore(rust-driver): Update FFI tests to use Pact FFI 0.5.6 (Ronald Holshausen, Wed Aug 5 11:46:59 2026 +1000)
+* bf044bd - Merge pull request #110 from pact-foundation/feat/field-level-matchers (Ronald Holshausen, Wed Aug 5 10:22:28 2026 +1000)
+* 99b3d10 - Merge branch 'main' into feat/field-level-matchers (Ronald Holshausen, Wed Aug 5 09:41:22 2026 +1000)
+* 7734c5f - chore(rust-driver): Update pact tests to use latest pact-consumer crate (Ronald Holshausen, Wed Aug 5 09:20:23 2026 +1000)
+* dc36dd5 - chore(rust-driver): Update pact-consumer in pact tests (Ronald Holshausen, Tue Aug 4 12:03:40 2026 +1000)
+* 589f57f - chore: bump version to 1.1.2 [skip ci] (Ronald Holshausen, Mon Aug 3 17:55:57 2026 +1000)
+* 91091ca - chore: update changelog for release 1.1.1 [skip ci] (Ronald Holshausen, Mon Aug 3 17:55:27 2026 +1000)
+* ab72a39 - chore(rust-driver): update mlua to 0.12.0 (Ronald Holshausen, Mon Aug 3 17:32:40 2026 +1000)
+* af4adc5 - chore: Update reqwest to 0.13.4 and set rustls-no-provider (Ronald Holshausen, Mon Aug 3 17:29:08 2026 +1000)
+* f1f2032 - chore: Update dependencies (Ronald Holshausen, Mon Aug 3 17:24:02 2026 +1000)
+* 6b7f439 - docs: document field-level matchers and generators for Lua plugins (Ronald Holshausen, Mon Aug 3 10:33:36 2026 +1000)
+* 3bb7e2c - feat(drivers): run field-level rules and generators in Lua plugins (Ronald Holshausen, Mon Aug 3 10:19:52 2026 +1000)
+* 6ca034c - feat(jvm-driver): add the field-level matcher and generator surface (Ronald Holshausen, Fri Jul 31 17:34:38 2026 +1000)
+* d5da67a - feat(rust-driver): add the field-level matcher and generator surface (Ronald Holshausen, Fri Jul 31 17:12:09 2026 +1000)
+* 842de5a - fix(drivers): match lookup_entry by name too, and scope the versioned fallback (Ronald Holshausen, Fri Jul 31 16:33:52 2026 +1000)
+* 98ff8c0 - fix(drivers): resolve catalogue entry keys by name, not by substring (Ronald Holshausen, Fri Jul 31 16:19:58 2026 +1000)
+* 6c82a44 - fix(drivers): make CatalogueEntryType the driver's own type, not the V1 proto enum (Ronald Holshausen, Fri Jul 31 15:43:30 2026 +1000)
+* 7b076dc - feat(proto): add field-level matcher and generator operations to the V2 interface (Ronald Holshausen, Fri Jul 31 15:21:54 2026 +1000)
+* 022d4e9 - Merge pull request #109 from stan-is-hate/chore/neutral-examples-arraycontains (Ronald Holshausen, Fri Jul 31 14:01:18 2026 +1000)
+* b6dff87 - doc: resolve proposal 006's sync/async question with the verified mechanism (Ronald Holshausen, Fri Jul 31 13:56:30 2026 +1000)
+* 481104b - doc: flesh out proposal 006 (field-level matchers and generators) (Ronald Holshausen, Fri Jul 31 11:49:15 2026 +1000)
+* 3a8d3d6 - chore(docs): use neutral examples in the arrayContains section (Stan Vodetskyi, Mon Jul 27 17:15:07 2026 -0700)
+* 5d7bc89 - fix: expose protobuf-java as an api dependency of the JVM driver (Ronald Holshausen, Wed Jul 22 10:56:28 2026 +1000)
+* fcc170c - chore: bump version to 1.1.1 [skip ci] (Ronald Holshausen, Wed Jul 22 09:44:01 2026 +1000)
+* 8398326 - chore: update changelog for release 1.1.0 [skip ci] (Ronald Holshausen, Wed Jul 22 09:43:34 2026 +1000)
+* 37bb954 - chore: bump version to 1.1.1 [skip ci] (Ronald Holshausen, Wed Jul 22 09:39:40 2026 +1000)
+
 # 1.1.0 - Host-provided matching and generation interface
 
 * 4e4e46c - chore: remove libc pin as libc has been updated (Ronald Holshausen, Wed Jul 22 09:14:35 2026 +1000)
