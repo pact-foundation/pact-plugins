@@ -2,7 +2,7 @@ plugins {
     id 'java-library'
     id 'com.google.protobuf' version '0.9.5'
     id 'groovy'
-    id 'au.com.dius.pact' version '4.7.4'
+    id 'au.com.dius.pact' version '4.5.14'
 }
 
 ext {
