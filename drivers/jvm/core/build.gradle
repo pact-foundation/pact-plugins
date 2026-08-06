@@ -2,7 +2,7 @@ plugins {
     id 'java-library'
     id 'com.google.protobuf' version '0.9.5'
     id 'groovy'
-    id 'au.com.dius.pact' version '4.5.13'
+    id 'au.com.dius.pact' version '4.5.14'
 }
 
 ext {
@@ -16,8 +16,8 @@ ext {
 dependencies {
     compileOnly 'org.apache.tomcat:annotations-api:6.0.53'
 
-    implementation 'au.com.dius.pact.core:model:4.5.13'
-    implementation 'au.com.dius.pact.core:support:4.5.13'
+    implementation 'au.com.dius.pact.core:model:4.5.14'
+    implementation 'au.com.dius.pact.core:support:4.5.14'
     implementation 'com.google.guava:guava:33.4.8-jre'
     implementation 'com.vdurmont:semver4j:3.1.0'
     implementation 'commons-codec:commons-codec:1.18.0'
@@ -36,8 +36,8 @@ dependencies {
     implementation 'org.apache.commons:commons-lang3:3.17.0'
     implementation 'org.apache.httpcomponents.client5:httpclient5-fluent:5.5'
     implementation 'org.apache.tika:tika-core:2.9.4'
-    implementation 'org.jetbrains.kotlin:kotlin-reflect:2.3.10'
-    implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.3.10'
+    implementation 'org.jetbrains.kotlin:kotlin-reflect:2.3.21'
+    implementation 'org.jetbrains.kotlin:kotlin-stdlib:2.3.21'
     implementation 'io.github.compress4j:compress4j:2.1.2'
     implementation 'org.apache.commons:commons-compress:1.27.1'
 
@@ -55,8 +55,8 @@ dependencies {
     testImplementation 'org.apache.groovy:groovy-json:4.0.26'
     testImplementation 'org.apache.groovy:groovy:4.0.26'
 
-    testImplementation 'au.com.dius.pact.consumer:junit5:4.5.13'
-    testImplementation('au.com.dius.pact.consumer:groovy:4.5.13') {
+    testImplementation 'au.com.dius.pact.consumer:junit5:4.5.14'
+    testImplementation('au.com.dius.pact.consumer:groovy:4.5.14') {
         transitive = false
     }
     testImplementation 'ch.qos.logback:logback-classic:1.5.18'
