@@ -149,7 +149,8 @@ content type, it contributes one matching rule and/or generator that applies to 
 else's content - a field in a JSON body, a header, a message metadata value. It defines `match_field` and/or
 `generate_field` and nothing else; `configure_interaction`/`match_contents` belong to content matchers, and a
 field-level plugin never owns the content its value appears in. See the
-[credit card plugin](../plugins/creditcard) for a complete reference implementation, and
+[credit card plugin](../plugins/creditcard) for a complete reference implementation,
+[examples/creditcard](../examples/creditcard) for consumer tests using it, and
 [proposal 006](proposals/006_Field_level_matchers_and_generators.md) for the design.
 
 For a `TRANSPORT`-registered plugin, the mock-server (`start_mock_server`/`shutdown_mock_server`/

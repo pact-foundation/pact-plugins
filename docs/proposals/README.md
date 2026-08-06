@@ -11,7 +11,7 @@ Here is the current list of proposed changes to the Pact Plugin architecture. Pr
 | [Verification contract cleanup](./004_Verification_contract_cleanup.md) | Phase 1    | Implemented |  |
 | [Plugin capability negotiation and versioning](./005_Plugin_capability_negotiation_and_versioning.md) | Phase 1    | Implemented |  |
 | [Plugin observability and logging](./008_Plugin_observability_and_logging.md) | Phase 2    | Implemented |  |
-| [Field-level matchers and generators](./006_Field_level_matchers_and_generators.md) | Phase 3    | Draft       |  |
+| [Field-level matchers and generators](./006_Field_level_matchers_and_generators.md) | Phase 3    | Implemented |  |
 | [Driver-plugin callback model](./007_Driver_plugin_callback_model.md) | Phase 3    | Draft       |  |
 | [Host-provided core matching and generation](./009_Host_provided_core_matching_and_generation.md) | Phase 4    | Draft       |  |
 

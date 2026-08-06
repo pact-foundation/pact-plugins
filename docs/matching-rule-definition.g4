@@ -35,6 +35,10 @@ matchingRule :
   | 'boolean' COMMA BOOLEAN_LITERAL
   | 'semver' COMMA string
   | 'contentType' COMMA string COMMA string
+  // A rule name the core framework does not know, provided by a plugin. The optional configuration
+  // value is stored under the key named by the `config-key` value on the rule's catalogue entry,
+  // defaulting to `value`. See proposal 006 (Field-level matchers and generators).
+  | name=ID COMMA ( primitiveValue COMMA )? primitiveValue
   | DOLLAR string
   ;
 
@@ -65,5 +69,6 @@ STRING_LITERAL  : '\'' (~['])* '\'' ;
 BOOLEAN_LITERAL : 'true' | 'false' ;
 COMMA           : ',' ;
 DOLLAR          : '$';
+ID              : [a-zA-Z]+ ;
 
 WS : [ \t\n\r] + -> skip ;

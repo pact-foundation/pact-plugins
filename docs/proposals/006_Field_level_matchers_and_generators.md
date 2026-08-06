@@ -1,4 +1,4 @@
-# Field-level matchers and generators (Draft)
+# Field-level matchers and generators
 
 > [!NOTE]
 > **Implementation phase:** Phase 3 (new functionality). Requires [005](./005_Plugin_capability_negotiation_and_versioning.md) to be finalised. Designed in parallel with [007](./007_Driver_plugin_callback_model.md), and re-uses 007's registry, resolver and callback plumbing rather than introducing its own. Required by [009](./009_Host_provided_core_matching_and_generation.md). See the [proposals README](./README.md) for the full delivery order.
@@ -548,12 +548,34 @@ WASM plugin support at all.
 5. ✅ Reference plugin: [`plugins/creditcard`](../../plugins/creditcard), written against this design. Now runs -
    both drivers' test suites load it and exercise its rule and generator end to end - but cannot be reached from a
    consumer test until step 6.
-6. ⬜ Host framework integration ([9](#9-host-framework-integration)), and an example consumer/provider pair under
-   `examples/creditcard` once it can actually execute.
+6. ✅ Host framework integration ([9](#9-host-framework-integration)), and an example consumer/provider pair under
+   [`examples/creditcard`](../../examples/creditcard), which both hosts generate a Pact from and the same provider
+   verifies.
 
-   Blocked on releasing the drivers first: this step lands in `pact-reference` and Pact-JVM, which consume the
-   drivers as published dependencies, so there is nothing for them to build against until steps 1-5 ship in a
-   driver release.
+   In `pact-reference`: the `Plugin` carrier variants and their JSON round-trip in `pact_models`, the
+   definition-expression production, dispatch from the `DoMatch` implementations in `pact_matching`, a
+   `PluginRule` pattern and `body_generator` in `pact_consumer`, and rule id 24 in `pact_ffi`. In Pact-JVM:
+   `PluginMatcher`/`PluginGenerator` in `core:model`, a `domatch` branch and `PluginFieldSupport` in
+   `core:matchers`, and `PluginRuleMatcher`/`PactDslJsonBody.pluginValue` in `consumer`.
+
+   Two things had to be solved that section 9 did not anticipate:
+
+   - **`values()` can not describe a plugin rule.** `MatchingRule::values()` and `Generator::values()` return
+     `HashMap<&'static str, Value>`, and a plugin rule's configuration keys are only known at runtime. Both enums
+     gained `value_map() -> HashMap<String, Value>` and `values()` is deprecated; the driver's `field.rs` and
+     `content.rs` read the new one, so a plugin rule's configuration survives being forwarded either to its own
+     plugin or to a content matcher.
+   - **Neither host passes the path down to where a rule is applied.** `DoMatch::match_value` takes the two values
+     and nothing else, and `GenerateValue::generate_value` takes neither the path nor the test mode - but a
+     field-level request carries all three. Rather than change traits with a dozen implementations each, the places
+     that do know push a scope for the duration of the call: `match_values` and the matching engine's interpreter
+     in `pact_matching`, `apply_generators` and the `ContentTypeHandler`s in `pact_models`, and
+     `JsonContentTypeHandler.applyKey` on the JVM.
+
+   A consequence worth stating plainly: an unrecognised rule or generator name is no longer dropped or downgraded.
+   `MatchingRule::create` used to error, `Generator::from_map` used to warn and drop, and Pact-JVM used to fall back
+   to `EqualsMatcher` - all three now produce a `Plugin` carrier, so a typo'd rule name fails at match time with
+   `No catalogue entry found for key 'reges'` rather than silently matching everything.
 7. ✅ Docs: the [Lua reference](../lua-plugin-reference.md) and [plugin writing guide](../writing-plugin-guide.md)
    gain the two new functions, the `MATCHER`/`GENERATOR` entry types and the field value shape. They also gain
    007's `host_compare_contents`/`host_generate_content`, which had never been documented - leaving those out
