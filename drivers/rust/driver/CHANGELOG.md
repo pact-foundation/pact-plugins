@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.1 - Maintenance Release
+
+* 95a9912 - chore(rust-driver): Update pact_models to 1.3.14 (Ronald Holshausen, Thu Aug 6 12:00:38 2026 +1000)
+* a78e1cd - chore: bump version to 1.2.1 [skip ci] (Ronald Holshausen, Wed Aug 5 15:13:30 2026 +1000)
+
 # 1.2.0 - Support for field-level matchers and generators in v2 plugins
 
 * b8cecf6 - chore(rust-driver): Bump version to 1.2.0 (Ronald Holshausen, Wed Aug 5 13:57:37 2026 +1000)
