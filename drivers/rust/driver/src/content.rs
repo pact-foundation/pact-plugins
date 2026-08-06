@@ -376,7 +376,7 @@ impl ContentMatcher {
           rule: r.rules.iter().map(|rule|{
             crate::proto::MatchingRule {
               r#type: rule.name(),
-              values: Some(to_proto_struct(&rule.values().iter().map(|(k, v)| (k.to_string(), v.clone())).collect())),
+              values: Some(to_proto_struct(&rule.value_map())),
             }
           }).collect()
         })
@@ -569,8 +569,7 @@ impl ContentGenerator {
       generators: generators.iter().map(|(k, v)| {
         (k.clone(), crate::proto::Generator {
           r#type: v.name(),
-          values: Some(to_proto_struct(&v.values().iter()
-            .map(|(k, v)| (k.to_string(), v.clone())).collect())),
+          values: Some(to_proto_struct(&v.value_map())),
         })
       }).collect(),
       plugin_configuration: Some(ProtoPluginConfiguration {

@@ -508,18 +508,14 @@ fn mismatch_for(message: String, context: &FieldContext) -> ContentMismatch {
 fn to_proto_matching_rule(rule: &MatchingRule) -> ProtoMatchingRule {
   ProtoMatchingRule {
     r#type: rule.name(),
-    values: Some(to_proto_struct(&rule.values().iter()
-      .map(|(k, v)| (k.to_string(), v.clone()))
-      .collect()))
+    values: Some(to_proto_struct(&rule.value_map()))
   }
 }
 
 fn to_proto_generator(generator: &Generator) -> ProtoGenerator {
   ProtoGenerator {
     r#type: generator.name(),
-    values: Some(to_proto_struct(&generator.values().iter()
-      .map(|(k, v)| (k.to_string(), v.clone()))
-      .collect()))
+    values: Some(to_proto_struct(&generator.value_map()))
   }
 }
 
@@ -621,6 +617,35 @@ mod tests {
       .to(be_equal_to(FieldValue::Json(Value::Null)));
   }
 
+  #[test]
+  fn a_plugin_rules_configuration_crosses_the_boundary() {
+    // A plugin rule's configuration keys are only known at runtime, which is why this reads
+    // value_map rather than values - the latter can only carry keys known at compile time, and
+    // returns nothing for a plugin rule
+    let rule = MatchingRule::Plugin {
+      name: "creditcard".to_string(),
+      values: serde_json::json!({ "brand": "visa" })
+    };
+
+    let proto = to_proto_matching_rule(&rule);
+    expect!(proto.r#type.as_str()).to(be_equal_to("creditcard"));
+    expect!(proto.values.unwrap().fields.get("brand").cloned()).to(
+      be_some().value(crate::utils::to_proto_value(&Value::String("visa".to_string()))));
+  }
+
+  #[test]
+  fn a_plugin_generators_configuration_crosses_the_boundary() {
+    let generator = Generator::Plugin {
+      name: "creditcard".to_string(),
+      values: serde_json::json!({ "brand": "visa" })
+    };
+
+    let proto = to_proto_generator(&generator);
+    expect!(proto.r#type.as_str()).to(be_equal_to("creditcard"));
+    expect!(proto.values.unwrap().fields.get("brand").cloned()).to(
+      be_some().value(crate::utils::to_proto_value(&Value::String("visa".to_string()))));
+  }
+
   /// Records the request it was given, and answers with the mismatches it was built with
   #[derive(Debug)]
   struct TestCoreMatcher {
@@ -667,9 +692,9 @@ mod tests {
     }]);
   }
 
-  /// The driver forwards whatever rule the host hands it - `rule.name()` and `rule.values()` -
-  /// so any rule exercises the plumbing. Once pact_models grows the `Plugin` carrier variant
-  /// (proposal 006 section 4), a plugin's own rule name arrives here by exactly this path.
+  /// The driver forwards whatever rule the host hands it - `rule.name()` and `rule.value_map()` -
+  /// so any rule exercises the plumbing. A plugin's own rule arrives here as
+  /// `MatchingRule::Plugin`, by exactly this path.
   fn a_rule() -> MatchingRule {
     MatchingRule::Regex("\\d{16}".to_string())
   }
