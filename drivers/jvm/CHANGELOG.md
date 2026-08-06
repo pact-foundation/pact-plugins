@@ -1,5 +1,18 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.1 - Maintenance Release
+
+* f1805f1 - Revert "chore(jvm-driver): correct release script" (Ronald Holshausen, Thu Aug 6 15:06:30 2026 +1000)
+* fe5a9fb - chore: bump version to 1.2.2 [skip ci] (Ronald Holshausen, Thu Aug 6 15:00:52 2026 +1000)
+* 7310f1c - chore: update changelog for release 1.2.1 [skip ci] (Ronald Holshausen, Thu Aug 6 15:00:24 2026 +1000)
+* b71a36d - chore(jvm-driver): Revert gradle update (Ronald Holshausen, Thu Aug 6 14:53:23 2026 +1000)
+* 48f06b7 - chore(rust-driver): Update FFI and Pact test dependencies (Ronald Holshausen, Thu Aug 6 14:48:59 2026 +1000)
+* 7b35d9e - chore(jvm-driver): remove JDK 11 from CI (Ronald Holshausen, Thu Aug 6 14:45:22 2026 +1000)
+* 3cac183 - chore(jvm-driver): correct release script (Ronald Holshausen, Thu Aug 6 14:06:32 2026 +1000)
+* f80a543 - chore: Upgrade Gradle, Pact-JVM and Kotlin (Ronald Holshausen, Thu Aug 6 14:02:46 2026 +1000)
+* 95a9912 - chore(rust-driver): Update pact_models to 1.3.14 (Ronald Holshausen, Thu Aug 6 12:00:38 2026 +1000)
+* e15e362 - chore: bump version to 1.2.1 [skip ci] (Ronald Holshausen, Wed Aug 5 15:37:26 2026 +1000)
+
 # 1.2.0 - Support for field-level matchers and generators in v2 plugins
 
 * 7e22b0e - chore(jvm-driver): Bump version to 1.2.0 (Ronald Holshausen, Wed Aug 5 15:20:10 2026 +1000)
