@@ -106,7 +106,7 @@ object CoreCapabilityRegistry {
 
   /**
    * Register a handler for a host-provided field matching rule, keyed by the catalogue entry key
-   * (e.g. `"v2-type"` for the `core/matcher/v2-type` entry). Replaces any handler previously
+   * (e.g. `"type"` for the `core/matcher/type` entry). Replaces any handler previously
    * registered under the same key.
    */
   fun registerFieldMatcher(key: String, handler: CoreFieldMatcher) {
@@ -115,7 +115,7 @@ object CoreCapabilityRegistry {
 
   /**
    * Register a handler for a host-provided field generator, keyed by the catalogue entry key
-   * (e.g. `"v3-date"` for the `core/generator/v3-date` entry). Replaces any handler previously
+   * (e.g. `"date"` for the `core/generator/date` entry). Replaces any handler previously
    * registered under the same key.
    */
   fun registerFieldGenerator(key: String, handler: CoreFieldGenerator) {

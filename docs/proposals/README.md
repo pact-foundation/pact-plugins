@@ -13,7 +13,7 @@ Here is the current list of proposed changes to the Pact Plugin architecture. Pr
 | [Plugin observability and logging](./008_Plugin_observability_and_logging.md) | Phase 2    | Implemented |  |
 | [Field-level matchers and generators](./006_Field_level_matchers_and_generators.md) | Phase 3    | Implemented |  |
 | [Driver-plugin callback model](./007_Driver_plugin_callback_model.md) | Phase 3    | Draft       |  |
-| [Host-provided core matching and generation](./009_Host_provided_core_matching_and_generation.md) | Phase 4    | Draft       |  |
+| [Host-provided core matching and generation](./009_Host_provided_core_matching_and_generation.md) | Phase 4    | In progress |  |
 
 ## Implementation phases
 
@@ -27,7 +27,10 @@ These two proposals are independent of each other and establish the groundwork f
 006 and 007 can be designed in parallel. 007 (the callback model) must define its logical interface first; the concrete gRPC and WASM transport mappings follow from that definition. 006 (field-level matchers and generators) aligns with 007's data model but does not depend on it being fully implemented first.
 
 **Phase 4 — Host-provided matching (009)**
-009 depends on 005, 006, and 007 all being finalised and cannot ship before them.
+009 depends on 005, 006, and 007 all being finalised; all three are now implemented. Both hosts register the standard
+matching rules and generators as core catalogue entries with handlers behind them, at content and field level, so a
+plugin can delegate a standard rule or generator to the host it is running under. What remains is the WASM transport,
+which is blocked on 003.
 
 ## WASM compatibility
 

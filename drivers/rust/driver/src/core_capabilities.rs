@@ -98,7 +98,7 @@ pub fn lookup_core_content_generator(key: &str) -> Option<Arc<dyn CoreContentGen
 }
 
 /// Register a handler for a host-provided field matching rule, keyed by the catalogue entry key
-/// (e.g. `"v2-type"` for the `core/matcher/v2-type` entry). Replaces any handler previously
+/// (e.g. `"type"` for the `core/matcher/type` entry). Replaces any handler previously
 /// registered under the same key.
 pub fn register_core_field_matcher(key: &str, handler: Arc<dyn CoreFieldMatcher>) {
   CORE_FIELD_MATCHERS.lock()
@@ -107,7 +107,7 @@ pub fn register_core_field_matcher(key: &str, handler: Arc<dyn CoreFieldMatcher>
 }
 
 /// Register a handler for a host-provided field generator, keyed by the catalogue entry key
-/// (e.g. `"v3-date"` for the `core/generator/v3-date` entry). Replaces any handler previously
+/// (e.g. `"date"` for the `core/generator/date` entry). Replaces any handler previously
 /// registered under the same key.
 pub fn register_core_field_generator(key: &str, handler: Arc<dyn CoreFieldGenerator>) {
   CORE_FIELD_GENERATORS.lock()
@@ -259,10 +259,10 @@ mod tests {
 
     expect!(handler.is_some()).to(be_true());
     let response = handler.unwrap()
-      .match_field(MatchFieldRequest { key: "v2-type".to_string(), .. MatchFieldRequest::default() })
+      .match_field(MatchFieldRequest { key: "type".to_string(), .. MatchFieldRequest::default() })
       .await;
     // The stub echoes the request key back, so this also proves the request reached the handler
-    expect!(response.unwrap().error).to(be_equal_to("v2-type".to_string()));
+    expect!(response.unwrap().error).to(be_equal_to("type".to_string()));
   }
 
   #[test_log::test(tokio::test)]
@@ -274,8 +274,8 @@ mod tests {
 
     expect!(handler.is_some()).to(be_true());
     let response = handler.unwrap()
-      .generate_field(GenerateFieldRequest { key: "v3-date".to_string(), .. GenerateFieldRequest::default() })
+      .generate_field(GenerateFieldRequest { key: "date".to_string(), .. GenerateFieldRequest::default() })
       .await;
-    expect!(response.unwrap().error).to(be_equal_to("v3-date".to_string()));
+    expect!(response.unwrap().error).to(be_equal_to("date".to_string()));
   }
 }

@@ -173,7 +173,7 @@ pub struct FieldGenerator {
 /// Find the field-level matching rule with the given name. The name is resolved against the
 /// catalogue the same way any other capability key is - see
 /// [`crate::catalogue_manager::resolve_capability`] - so `creditcard` finds a plugin's own rule and
-/// `type` finds the core `v2-type` rule. Returns a descriptive error if the name matches nothing,
+/// `type` finds the core `type` rule. Returns a descriptive error if the name matches nothing,
 /// matches more than one rule, or names something that is not a matching rule.
 pub fn find_field_matcher(name: &str) -> anyhow::Result<FieldMatcher> {
   resolve_capability_entry(name, CatalogueEntryType::MATCHER)

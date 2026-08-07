@@ -148,7 +148,7 @@ enum class FieldTestMode {
 /**
  * Find the field-level matching rule with the given name. The name is resolved against the
  * catalogue the same way any other capability key is - see [CatalogueManager.resolveCapability] - so
- * `creditcard` finds a plugin's own rule and `type` finds the core `v2-type` rule. Throws if the
+ * `creditcard` finds a plugin's own rule and `type` finds the core `type` rule. Throws if the
  * name matches nothing, matches more than one rule, or names something that is not a matching rule.
  */
 fun findFieldMatcher(name: String): FieldMatcher =
