@@ -48,7 +48,7 @@ function configure_interaction(content_type, config)
     local public_key = config["public-key"] or rsa_public_key(private_key)
 
     local header = jwt.build_header(config)
-    local payload = jwt.build_payload(config)
+    local payload, claim_rules = jwt.build_payload(config)
 
     local base64 = require "base64"
     local encoded_header = base64.encode(json.encode(header))
@@ -67,9 +67,20 @@ function configure_interaction(content_type, config)
         }
     }
 
+    -- Matching rules declared on a claim are returned as the interaction's ordinary matching
+    -- rules, keyed by a path into the token's claims. They are written to the Pact file's
+    -- matchingRules like any other rule, and handed back to match_contents (below) on both sides
+    -- of the test - the framework can not traverse a signed token itself, but the rules are still
+    -- the interaction's, not this plugin's private configuration.
+    local rules = {}
+    for claim, rule in pairs(claim_rules) do
+        rules["$.claims." .. claim] = { rule }
+    end
+
     return {
         interactions = {
             {
+                rules = rules,
                 contents = {
                     contents = signed_token,
                     content_type = "application/jwt+json",
@@ -85,6 +96,23 @@ function configure_interaction(content_type, config)
         },
         plugin_config = plugin_config
     }
+end
+
+-- Picks the claim rules back out of the interaction's matching rules. `rules` is keyed by path
+-- expression, as it is for any content matcher; this plugin writes claim rules under
+-- "$.claims.<name>" (see configure_interaction), and only the first rule for a path is used - a
+-- claim is one value, so an AND of several rules has no meaning the plugin could act on.
+function claim_rules_from(rules)
+    local claim_rules = {}
+    for path, rule_list in pairs(rules or {}) do
+        local claim = string.match(path, "^%$%.claims%.(.+)$")
+        if claim and rule_list[1] then
+            claim_rules[claim] = rule_list[1]
+        else
+            logger("Ignoring a matching rule at '" .. path .. "': not a claim path")
+        end
+    end
+    return claim_rules
 end
 
 -- Compares the actual JWT received against the expected one from the Pact interaction.
@@ -123,7 +151,8 @@ function match_contents(match_request)
         mismatches["header:" .. k] = v
     end
 
-    local claim_mismatches = matching.match_claims(expected_jwt.payload, actual_jwt.payload)
+    local claim_mismatches = matching.match_claims(expected_jwt.payload, actual_jwt.payload,
+        claim_rules_from(match_request.rules))
     for k, v in pairs(claim_mismatches) do
         mismatches["claims:" .. k] = v
     end

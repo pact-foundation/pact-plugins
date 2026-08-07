@@ -15,15 +15,46 @@ function jwt.build_header(config)
     return header
 end
 
+-- A claim value can be given either directly, or as an integration-JSON matcher table:
+--
+--   customer_id = { ["pact:matcher:type"] = "regex", regex = "CUST-%d+", value = "CUST-123456" }
+--
+-- in which case the example value goes into the token and the rule is returned separately, to be
+-- persisted with the interaction and applied when the token is matched (see plugin.lua). Returns
+-- the value to use, and the rule table (or nil when the value was given directly).
+local function claim_value_and_rule(value)
+    if type(value) == "table" and value["pact:matcher:type"] then
+        local values = {}
+        for k, v in pairs(value) do
+            if k ~= "pact:matcher:type" and k ~= "value" then
+                values[k] = v
+            end
+        end
+        return value["value"], { type = value["pact:matcher:type"], values = values }
+    end
+    return value, nil
+end
+
+-- Builds the token payload from the test's configuration. Returns the claims, and the matching
+-- rules any of them were declared with, keyed by claim name.
 function jwt.build_payload(config)
     local claims = {
         jti = utils.random_hex(16),
         iat = os.time()
     }
+    local rules = {}
 
-    claims["sub"] = config["subject"] or "sub_" .. utils.random_str(4)
-    claims["iss"] = config["issuer"] or "iss_" .. utils.random_str(4)
-    claims["aud"] = config["audience"] or "aud_" .. utils.random_str(4)
+    local function set_claim(claim, configured, default)
+        local value, rule = claim_value_and_rule(configured)
+        claims[claim] = value or default
+        if rule then
+            rules[claim] = rule
+        end
+    end
+
+    set_claim("sub", config["subject"], "sub_" .. utils.random_str(4))
+    set_claim("iss", config["issuer"], "iss_" .. utils.random_str(4))
+    set_claim("aud", config["audience"], "aud_" .. utils.random_str(4))
 
     -- exp: now + expiryInMinutes * 60, // Current time + STS_TOKEN_EXPIRY_MINUTES minutes
     claims["exp"] = os.time() + 5 * 60
@@ -38,11 +69,11 @@ function jwt.build_payload(config)
     config["public-key"] = nil
     for k, v in pairs(config) do
         if v then
-            claims[k] = v
+            set_claim(k, v)
         end
     end
 
-    return claims
+    return claims, rules
 end
 
 function jwt.sign_token(config, header, private_key, base_token)

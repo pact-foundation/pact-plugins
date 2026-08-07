@@ -122,8 +122,13 @@ Each entry in `interactions`:
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `contents` | table or nil | No | A [`Body`](#body-table). |
+| `rules` | table (path -> array of rule tables) | No | Matching rules for this part, in the same shape `match_contents` receives them - see [`MatchingRules`](#matchingrules-table). These are the interaction's ordinary matching rules: they are written to the Pact file's `matchingRules` and handed back to you as `rules` in later `match_contents` calls, on both sides of the test. Use them for a rule the *test author* declared on something inside your content type; use `plugin_config` for data of your own that you need back later (a key, a schema). |
 | `part_name` | string | No | Which part this is for (e.g. `"request"`/`"response"`), or `""` for a plain body. |
 | `plugin_config` | table or nil | No | Interaction-level plugin config - see [`PluginConfiguration`](#pluginconfiguration-table). This is handed back to you as `plugin_configuration` in later `match_contents` calls for the same interaction. |
+
+The paths in `rules` only have to mean something to you: the framework can not traverse a content type it does not
+understand, so it stores and returns them without interpreting them. The [JWT plugin](../plugins/jwt) keys a rule
+on a claim as `$.claims.<name>`, for instance.
 
 ```lua
 function configure_interaction(content_type, config)
@@ -131,6 +136,7 @@ function configure_interaction(content_type, config)
     interactions = {
       {
         contents = { contents = "signed-token-string", content_type = "application/jwt+json", content_type_hint = "BINARY" },
+        rules = { ["$.claims.customer_id"] = { { type = "regex", values = { regex = "CUST-\\d{6}" } } } },
         part_name = "",
         plugin_config = { interaction_configuration = { ["public-key"] = "...", algorithm = "RS512" } }
       }
@@ -536,11 +542,12 @@ The two field-level ones are how a content matcher applies a standard Pact rule 
 owns - the plugin keeps ownership of parsing and traversing its content type, and hands off the actual comparison
 of a leaf value.
 
-An `entry_key` is either the bare name of the capability (`"type"`, `"creditcard"`) or its full catalogue key
-(`"matcher/v2-type"`, `"plugin/creditcard/matcher/creditcard"`). The bare name is the usual choice: core matching
-rules are registered under a key with the Pact specification version they were introduced in prefixed to the name
-(`v2-type`, `v3-date`), and resolving a bare name finds those without you having to know which version that was.
-A key that matches nothing, or matches more than one capability, is an error rather than a silent no-op.
+An `entry_key` is either the bare name of the capability (`"type"`, `"creditcard"`) or more of its catalogue key
+(`"matcher/type"`, `"plugin/creditcard/matcher/creditcard"`). The bare name is the usual choice: core matching rules
+are registered under the name the rule carries in a request, so the `type` field of a rule you were handed is
+already a usable `entry_key`. A key that matches nothing, or matches more than one capability, is an error rather
+than a silent no-op - name more of the key (`"core/matcher/date"`) if a plugin has registered a rule under a name
+you also want from the host.
 
 ```lua
 function match_contents(request)

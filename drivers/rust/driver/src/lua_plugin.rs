@@ -1185,19 +1185,27 @@ fn lua_to_struct(lua: &Lua, value: Option<Value>) -> anyhow::Result<Option<prost
 // ---- ConfigureInteraction <-> Lua ----
 
 /// Converts a single Lua interaction-contents table (shaped as
-/// `{ contents = <body>, part_name = "...", plugin_config = <table> }`) into an
+/// `{ contents = <body>, rules = <table>, part_name = "...", plugin_config = <table> }`) into an
 /// `InteractionResponse`.
+///
+/// `rules` is keyed by matching rule expression path, in the same shape a plugin's own
+/// `match_contents` receives them (see [`matching_rules_to_lua`]). They are the interaction's
+/// ordinary matching rules - they end up in the Pact file's `matchingRules` for the part, and come
+/// back to the plugin in a later `CompareContentsRequest`. A plugin that owns a content type the
+/// framework can not itself traverse still decides what the paths mean, but they belong in the
+/// standard place rather than in the plugin's own configuration.
 fn lua_to_interaction_response(lua: &Lua, table: Table) -> anyhow::Result<InteractionResponse> {
   let contents: Option<Value> = table.get("contents")?;
   let body = match contents {
     Some(value) => lua_to_body(value)?,
     None => None,
   };
+  let rules: Option<Table> = table.get("rules")?;
   let plugin_config: Option<Value> = table.get("plugin_config")?;
   let part_name: Option<String> = table.get("part_name")?;
   Ok(InteractionResponse {
     contents: body,
-    rules: HashMap::new(),
+    rules: lua_to_matching_rules(lua, rules)?,
     generators: HashMap::new(),
     message_metadata: None,
     plugin_configuration: lua_to_plugin_configuration(lua, plugin_config)?,
@@ -1825,6 +1833,11 @@ impl PluginInstance for LuaPactPlugin {
 mod tests {
   use std::collections::HashMap;
 
+  use maplit::hashmap;
+  use crate::catalogue_manager::{CatalogueEntry, CatalogueEntryProviderType};
+  use crate::field::FieldValue;
+  use crate::utils::proto_struct_to_json;
+
   use super::*;
 
   fn jwt_manifest() -> PactPluginManifest {
@@ -2177,6 +2190,247 @@ mod tests {
     };
     let compare_response = plugin.compare_contents(compare_request).await.unwrap();
     assert!(!compare_response.results.is_empty(), "expected a mismatch to be detected");
+  }
+
+  /// A claim declared with a matching rule is handed to the host framework rather than compared
+  /// here - proposal 009 from the plugin's side. The host is stubbed in this crate (the driver has
+  /// no matching engine of its own to register); what is under test is that the plugin carries the
+  /// rule from the test config, through the Pact file's plugin configuration, to a `host_match_field`
+  /// call with the right request, and honours the answer.
+  #[derive(Debug)]
+  struct StubHostRule {
+    requests: Arc<Mutex<Vec<proto_v2::MatchFieldRequest>>>,
+    mismatches: Vec<proto_v2::ContentMismatch>
+  }
+
+  #[async_trait]
+  impl crate::core_capabilities::CoreFieldMatcher for StubHostRule {
+    async fn match_field(&self, request: proto_v2::MatchFieldRequest) -> anyhow::Result<proto_v2::MatchFieldResponse> {
+      self.requests.lock().unwrap().push(request);
+      Ok(proto_v2::MatchFieldResponse {
+        error: String::default(),
+        mismatches: self.mismatches.clone()
+      })
+    }
+  }
+
+  /// Configures a JWT interaction, so a test can mint an "expected" and an "actual" token that
+  /// differ. Returns the whole interaction: its matching rules go into the compare request the
+  /// same way the framework routes them, via the Pact file rather than the plugin's configuration.
+  async fn configure_jwt(plugin: &LuaPactPlugin, claim: serde_json::Value) -> InteractionResponse {
+    let mut config_fields = HashMap::new();
+    config_fields.insert("private-key".to_string(), serde_json::Value::String(PRIVATE_KEY.to_string()));
+    config_fields.insert("algorithm".to_string(), serde_json::Value::String("RS512".to_string()));
+    config_fields.insert("subject".to_string(), serde_json::Value::String("test-subject".to_string()));
+    config_fields.insert("issuer".to_string(), serde_json::Value::String("test-issuer".to_string()));
+    config_fields.insert("audience".to_string(), serde_json::Value::String("test-audience".to_string()));
+    config_fields.insert("customer_id".to_string(), claim);
+
+    let response = plugin.configure_interaction(ConfigureInteractionRequest {
+      content_type: "application/jwt+json".to_string(),
+      contents_config: Some(to_proto_struct(&config_fields)),
+    }).await.unwrap();
+    assert_eq!(response.error, "");
+    response.interaction[0].clone()
+  }
+
+  fn rule_claim() -> serde_json::Value {
+    serde_json::json!({
+      "pact:matcher:type": "regex",
+      "regex": "CUST-\\d{6}",
+      "value": "CUST-123456"
+    })
+  }
+
+  #[tokio::test]
+  async fn match_contents_delegates_a_claim_rule_to_the_host() {
+    let key = "regex";
+    let requests = Arc::new(Mutex::new(vec![]));
+    crate::core_capabilities::register_core_field_matcher(key, Arc::new(StubHostRule {
+      requests: requests.clone(),
+      mismatches: vec![]
+    }));
+    crate::catalogue_manager::register_core_entries(&vec![CatalogueEntry {
+      entry_type: CatalogueEntryType::MATCHER,
+      provider_type: CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: key.to_string(),
+      values: hashmap!{}
+    }]);
+
+    let manifest = jwt_manifest();
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+    // The expected token carries the example value, the actual one a different value: without the
+    // rule this is a plain claim mismatch
+    let expected = configure_jwt(&plugin, rule_claim()).await;
+    let actual = configure_jwt(&plugin, serde_json::json!("CUST-999999")).await;
+
+    // The rule is an ordinary matching rule on the interaction, keyed by a path into the claims
+    let rule_paths: Vec<&String> = expected.rules.keys().collect();
+    assert_eq!(rule_paths, vec!["$.claims.customer_id"]);
+
+    let response = plugin.compare_contents(CompareContentsRequest {
+      expected: expected.contents.clone(),
+      actual: actual.contents.clone(),
+      allow_unexpected_keys: false,
+      rules: expected.rules.clone(),
+      plugin_configuration: expected.plugin_configuration.clone()
+    }).await.unwrap();
+
+    crate::core_capabilities::deregister_core_field_matcher(key);
+
+    assert_eq!(response.error, "");
+    assert!(response.results.is_empty(), "expected the host rule to accept the claim, got {:?}",
+      response.results);
+
+    let requests = requests.lock().unwrap();
+    assert_eq!(requests.len(), 1, "expected exactly one callback for the one claim with a rule");
+    let request = &requests[0];
+    let rule = request.rule.clone().expect("expected the rule to be sent");
+    assert_eq!(rule.r#type, "regex");
+    assert_eq!(
+      proto_struct_to_json(&rule.values.unwrap()).get("regex").and_then(|v| v.as_str()),
+      Some("CUST-\\d{6}")
+    );
+    assert_eq!(request.path, "$.customer_id");
+    assert_eq!(request.mismatch_type, "body");
+    assert_eq!(
+      FieldValue::from_proto(&request.expected.clone().unwrap()),
+      FieldValue::Json(serde_json::Value::String("CUST-123456".to_string()))
+    );
+    assert_eq!(
+      FieldValue::from_proto(&request.actual.clone().unwrap()),
+      FieldValue::Json(serde_json::Value::String("CUST-999999".to_string()))
+    );
+  }
+
+  /// The control for [`match_contents_delegates_a_claim_rule_to_the_host`]: the same two tokens
+  /// with the claim given as a plain value are a mismatch, so it really is the rule that makes the
+  /// difference and not something else about the pair.
+  #[tokio::test]
+  async fn a_claim_without_a_rule_is_still_compared_for_equality() {
+    let manifest = jwt_manifest();
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+    let expected = configure_jwt(&plugin, serde_json::json!("CUST-123456")).await;
+    let actual = configure_jwt(&plugin, serde_json::json!("CUST-999999")).await;
+
+    assert!(expected.rules.is_empty(), "a claim given as a plain value has no rule");
+
+    let response = plugin.compare_contents(CompareContentsRequest {
+      expected: expected.contents.clone(),
+      actual: actual.contents.clone(),
+      allow_unexpected_keys: false,
+      rules: expected.rules.clone(),
+      plugin_configuration: expected.plugin_configuration.clone()
+    }).await.unwrap();
+
+    assert!(
+      response.results.contains_key("claims:customer_id"),
+      "expected the differing claim to mismatch, got {:?}",
+      response.results
+    );
+  }
+
+  #[tokio::test]
+  async fn match_contents_reports_a_mismatch_the_host_rule_found() {
+    let key = "regex-mismatching";
+    crate::core_capabilities::register_core_field_matcher(key, Arc::new(StubHostRule {
+      requests: Arc::new(Mutex::new(vec![])),
+      mismatches: vec![proto_v2::ContentMismatch {
+        mismatch: "Expected 'CUST-999999' to match 'CUST-\\d{6}'".to_string(),
+        .. proto_v2::ContentMismatch::default()
+      }]
+    }));
+    crate::catalogue_manager::register_core_entries(&vec![CatalogueEntry {
+      entry_type: CatalogueEntryType::MATCHER,
+      provider_type: CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: key.to_string(),
+      values: hashmap!{}
+    }]);
+
+    let manifest = jwt_manifest();
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+    let mut claim = rule_claim();
+    claim["pact:matcher:type"] = serde_json::Value::String(key.to_string());
+    let expected = configure_jwt(&plugin, claim).await;
+    let actual = configure_jwt(&plugin, serde_json::json!("CUST-999999")).await;
+
+    let response = plugin.compare_contents(CompareContentsRequest {
+      expected: expected.contents.clone(),
+      actual: actual.contents.clone(),
+      allow_unexpected_keys: false,
+      rules: expected.rules.clone(),
+      plugin_configuration: expected.plugin_configuration.clone()
+    }).await.unwrap();
+
+    crate::core_capabilities::deregister_core_field_matcher(key);
+
+    assert_eq!(response.error, "");
+    let mismatches = response.results.get("claims:customer_id")
+      .unwrap_or_else(|| panic!("expected a mismatch for the claim, got {:?}", response.results));
+    assert_eq!(mismatches.mismatches.len(), 1);
+    assert!(
+      mismatches.mismatches[0].mismatch.contains("to match"),
+      "expected the host's mismatch description to be reported, got {:?}",
+      mismatches.mismatches[0].mismatch
+    );
+  }
+
+  /// A plugin can return the interaction's matching rules from `configure_interaction`, so a rule
+  /// on something inside a content type the framework can not traverse still ends up in the Pact
+  /// file's `matchingRules` rather than in the plugin's own configuration.
+  #[tokio::test]
+  async fn configure_interaction_carries_matching_rules_from_the_plugin() {
+    let plugin_dir = tempdir::TempDir::new("lua-plugin-test").unwrap();
+    std::fs::write(
+      plugin_dir.path().join("entry.lua"),
+      r#"
+        function configure_interaction(content_type, config)
+          return {
+            interactions = {
+              {
+                contents = { contents = "a-body", content_type = content_type },
+                rules = {
+                  ["$.one"] = { { type = "regex", values = { regex = "\\d+" } } },
+                  ["$.two"] = { { type = "type" } }
+                }
+              }
+            }
+          }
+        end
+      "#,
+    ).unwrap();
+
+    let manifest = PactPluginManifest {
+      plugin_dir: plugin_dir.path().to_string_lossy().to_string(),
+      plugin_interface_version: 1,
+      name: "configure-rules-test".to_string(),
+      version: "0.0.0".to_string(),
+      executable_type: "lua".to_string(),
+      minimum_required_version: None,
+      entry_point: "entry.lua".to_string(),
+      entry_points: HashMap::new(),
+      args: None,
+      dependencies: None,
+      plugin_config: HashMap::new(),
+    };
+    let plugin = start_lua_plugin(&manifest, "test-instance".to_string()).unwrap();
+
+    let response = plugin.configure_interaction(ConfigureInteractionRequest {
+      content_type: "application/x-test".to_string(),
+      contents_config: None,
+    }).await.unwrap();
+
+    let interaction = &response.interaction[0];
+    let regex_rule = &interaction.rules.get("$.one").expect("expected a rule at $.one").rule[0];
+    assert_eq!(regex_rule.r#type, "regex");
+    assert_eq!(
+      proto_struct_to_json(regex_rule.values.as_ref().unwrap()).get("regex").and_then(|v| v.as_str()),
+      Some("\\d+")
+    );
+    let type_rule = &interaction.rules.get("$.two").expect("expected a rule at $.two").rule[0];
+    assert_eq!(type_rule.r#type, "type");
   }
 
   #[tokio::test]

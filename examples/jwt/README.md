@@ -4,6 +4,22 @@ These examples demonstrate using the [JWT plugin](../../plugins/jwt) (written in
 responses signed as JSON Web Tokens. There are two consumer projects, one written in Rust and the other in Java,
 and one provider, written in Rust.
 
+They also demonstrate a plugin **delegating a matching rule back to the host Pact framework**. Both consumer tests
+declare a `customer_id` claim with a `regex` rule rather than a fixed value:
+
+```json
+"customer_id": { "pact:matcher:type": "regex", "regex": "CUST-\\d{6}", "value": "CUST-123456" }
+```
+
+The JWT plugin implements no matching rules of its own - it decodes and validates the token, then hands that one
+claim to whoever owns `regex` in the running catalogue, which is the Pact framework doing the verifying (see
+proposals [006](../../docs/proposals/006_Field_level_matchers_and_generators.md) and
+[009](../../docs/proposals/009_Host_provided_core_matching_and_generation.md)). It is worth checking that this is
+really doing something: the token the consumer test's client sends carries `CUST-987654`, and the provider issues
+a different customer id on every request, so neither would match the example value under the plugin's usual
+equality check. Change the client's value to something outside the pattern and the test fails with the framework's
+own message, `Expected 'not-a-customer' to match 'CUST-\d{6}'`.
+
 The provider supports one endpoint:
 * `POST /token` - returns a freshly-signed JWT.
 
@@ -73,13 +89,18 @@ checkout of [pact-reference](https://github.com/pact-foundation/pact-reference):
 2. `pact_verifier`'s own dependency on `pact-plugin-driver` is `default-features = false` and doesn't request the
    `lua` feature, so add an explicit dependency in `rust/pact_verifier_cli/Cargo.toml` to turn it on:
    ```toml
-   pact-plugin-driver = { version = "~1.1.0", default-features = false, features = ["lua"] }
+   pact-plugin-driver = { version = "~1.2.2", default-features = false, features = ["lua"] }
    ```
 3. Build it:
    ```console
    $ cargo build -p pact_verifier_cli
    ```
    The binary ends up at `target/debug/pact-verifier` (hyphenated, not `pact_verifier_cli`).
+
+The `customer_id` claim's `regex` rule additionally needs a host that registers the standard matching rules as
+core catalogue capabilities - `pact_matching` 2.0.11+ (so a locally-built `pact_verifier_cli` picks it up
+automatically) and Pact-JVM 4.7.5+. Against an older host the claim is reported as a mismatch saying the rule
+could not be resolved, rather than being silently skipped.
 
 Once Lua plugin support is released, none of the above will be necessary - just use the normal released
 `pact_verifier_cli`/pact-jvm provider verifier.

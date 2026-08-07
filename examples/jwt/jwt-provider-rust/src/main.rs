@@ -41,6 +41,7 @@ struct Claims {
     exp: u64,
     iss: String,
     sub: String,
+    customer_id: String,
 }
 
 #[post("/token")]
@@ -53,6 +54,10 @@ async fn issue_token(_req_body: String) -> HttpResponse {
         exp: now + 5 * 60,
         iss: "ldsdkdalds".to_string(),
         sub: "slksjkdjkdks".to_string(),
+        // A different customer id on every issued token: verification passes because the
+        // interaction pins this claim with a regex rule, which the jwt plugin applies by calling
+        // back into the verifier's own matching engine
+        customer_id: format!("CUST-{:06}", now % 1_000_000),
     };
 
     let encoding_key = EncodingKey::from_rsa_pem(PRIVATE_KEY.as_bytes()).unwrap();

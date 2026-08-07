@@ -44,6 +44,9 @@ xGgMNbvImsticz5CUjXC1IkCnbdLrC16YFKMKguaRvTDDOF+
     exp: u64,
     iss: String,
     sub: String,
+    // A claim whose value is not fixed between the consumer and the provider - the test pins its
+    // shape with a matching rule instead of its value
+    customer_id: String,
   }
 
   #[test_log::test(tokio::test(flavor = "multi_thread", worker_threads = 1))]
@@ -60,7 +63,15 @@ xGgMNbvImsticz5CUjXC1IkCnbdLrC16YFKMKguaRvTDDOF+
           "issuer": "ldsdkdalds",
           "algorithm": "RS512",
           "key-id": "key-112345564",
-          "private-key": PRIVATE_KEY
+          "private-key": PRIVATE_KEY,
+          // The plugin does not implement `regex` - it hands this claim back to the Pact
+          // framework's own regex rule through the host callback (proposals 006 and 009). The
+          // value here is just the example that goes into the token.
+          "customer_id": {
+            "pact:matcher:type": "regex",
+            "regex": "CUST-\\d{6}",
+            "value": "CUST-123456"
+          }
         })).await;
       i.response
         .ok()
@@ -70,7 +81,15 @@ xGgMNbvImsticz5CUjXC1IkCnbdLrC16YFKMKguaRvTDDOF+
           "issuer": "ldsdkdalds",
           "algorithm": "RS512",
           "key-id": "key-112345564",
-          "private-key": PRIVATE_KEY
+          "private-key": PRIVATE_KEY,
+          // The plugin does not implement `regex` - it hands this claim back to the Pact
+          // framework's own regex rule through the host callback (proposals 006 and 009). The
+          // value here is just the example that goes into the token.
+          "customer_id": {
+            "pact:matcher:type": "regex",
+            "regex": "CUST-\\d{6}",
+            "value": "CUST-123456"
+          }
         })).await;
       i
     }).await;
@@ -86,6 +105,9 @@ xGgMNbvImsticz5CUjXC1IkCnbdLrC16YFKMKguaRvTDDOF+
                       // time the plugin validates it
       iss: "ldsdkdalds".to_string(),
       sub: "slksjkdjkdks".to_string(),
+      // Deliberately not the example value from the interaction: the request only matches
+      // because the regex rule is applied to this claim rather than an equality check
+      customer_id: "CUST-987654".to_string(),
     };
 
     let encoding_key = EncodingKey::from_rsa_pem(PRIVATE_KEY.as_bytes()).unwrap();
