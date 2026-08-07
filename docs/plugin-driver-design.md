@@ -157,33 +157,55 @@ messages (one off or fire and forget) and synchronous messages (request/response
 
 ### Core catalogue entries
 
-The driver must provide the following entries from the Pact framework:
+The driver must provide the following entries from the Pact framework. Matching rule entries are keyed by the name
+the rule carries in a request (the same string a `MatchFieldRequest` puts in `rule.type`); the Pact specification
+version the rule was introduced in is a `spec-version` value on the entry rather than part of the key. Frameworks
+register the rules and generators they implement, so the exact list varies - Pact-JVM adds the `ignore-order`,
+`min-ignore-order`, `max-ignore-order` and `min-max-ignore-order` matching rules and the `Null` generator (all V4),
+which the Rust implementation does not have. Generator keys are `PascalCase` because that is the `type` a generator
+carries in a Pact file and in a request, the same way matching rule keys are the `MatchingRule` name.
 
 | Key | Description |
 | --- | ----------- |
 | `core/interaction/http` | Support Http/1.1 interactions (request/response) | 
 | `core/interaction/https` | Support Http/1.1 + TLS interactions (request/response) |
 | `core/interaction/message` | Support message interactions |
-| `core/matcher/v2-regex` | V2 spec regex matcher |
-| `core/matcher/v2-type` | V2 spec type matcher |
-| `core/matcher/v3-number-type` | V3 spec number matcher |
-| `core/matcher/v3-integer-type` | V3 spec integer matcher |
-| `core/matcher/v3-decimal-type` | V3 spec decimal matcher |
-| `core/matcher/v3-date` | V3 spec date matcher |
-| `core/matcher/v3-time` | V3 spec time matcher |
-| `core/matcher/v3-datetime` | V3 spec DateTime matcher |
-| `core/matcher/v2-min-type` | V2 spec minimum type matcher |
-| `core/matcher/v2-max-type` | V2 spec maximum type matcher |
-| `core/matcher/v2-minmax-type` | V2 spec minimum/maximum type matcher |
-| `core/matcher/v3-includes` | V3 spec includes matcher |
-| `core/matcher/v3-null` | V3 spec null matcher |
-| `core/matcher/v4-equals-ignore-order` | V4 spec ignore array order matcher matcher |
-| `core/matcher/v4-min-equals-ignore-order` | V4 spec ignore array order matcher matcher |
-| `core/matcher/v4-max-equals-ignore-order` | V4 spec ignore array order matcher matcher |
-| `core/matcher/v4-minmax-equals-ignore-order` | V4 spec ignore array order matcher matcher |
-| `core/matcher/v3-content-type` | V3 spec content type matcher |
-| `core/matcher/v4-array-contains` | V4 spec array contains matcher |
-| `core/matcher/v1-equality` | V1 spec equality matcher |
+| `core/matcher/equality` | Equality matcher (V1) |
+| `core/matcher/regex` | Regex matcher (V2) |
+| `core/matcher/type` | Type matcher (V2) |
+| `core/matcher/min-type` | Minimum type matcher (V2) |
+| `core/matcher/max-type` | Maximum type matcher (V2) |
+| `core/matcher/min-max-type` | Minimum/maximum type matcher (V2) |
+| `core/matcher/include` | Includes matcher (V3) |
+| `core/matcher/number` | Number matcher (V3) |
+| `core/matcher/integer` | Integer matcher (V3) |
+| `core/matcher/decimal` | Decimal matcher (V3) |
+| `core/matcher/null` | Null matcher (V3) |
+| `core/matcher/date` | Date matcher (V3) |
+| `core/matcher/time` | Time matcher (V3) |
+| `core/matcher/datetime` | DateTime matcher (V3) |
+| `core/matcher/content-type` | Content type matcher (V3) |
+| `core/matcher/values` | Values matcher (V3) |
+| `core/matcher/array-contains` | Array contains matcher (V4) |
+| `core/matcher/boolean` | Boolean matcher (V4) |
+| `core/matcher/status-code` | Status code matcher (V4) |
+| `core/matcher/not-empty` | Not empty matcher (V4) |
+| `core/matcher/semver` | Semantic version matcher (V4) |
+| `core/matcher/each-key` | Each key matcher (V4) |
+| `core/matcher/each-value` | Each value matcher (V4) |
+| `core/generator/RandomInt` | Random integer generator (V3) |
+| `core/generator/RandomDecimal` | Random decimal generator (V3) |
+| `core/generator/RandomHexadecimal` | Random hexadecimal generator (V3) |
+| `core/generator/RandomString` | Random string generator (V3) |
+| `core/generator/RandomBoolean` | Random boolean generator (V3) |
+| `core/generator/Regex` | Regex generator (V3) |
+| `core/generator/Uuid` | UUID generator (V3) |
+| `core/generator/Date` | Date generator (V3) |
+| `core/generator/Time` | Time generator (V3) |
+| `core/generator/DateTime` | DateTime generator (V3) |
+| `core/generator/ProviderState` | Provider state generator (V3) |
+| `core/generator/MockServerURL` | Mock server URL generator (V4) |
+| `core/generator/ArrayContains` | Array contains generator (V4) |
 | `core/content-matcher/xml` | Matcher for XML content types |
 | `core/content-matcher/json` | Matcher for JSON content types |
 | `core/content-matcher/text` | Matcher for Text content types |
