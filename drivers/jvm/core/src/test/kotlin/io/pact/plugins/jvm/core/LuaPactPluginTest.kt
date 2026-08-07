@@ -161,6 +161,48 @@ class LuaPactPluginTest {
     )
   }
 
+  /**
+   * A plugin can return the interaction's matching rules from `configure_interaction`, so a rule on
+   * something inside a content type the framework can not traverse still ends up in the Pact file's
+   * `matchingRules` rather than in the plugin's own configuration.
+   */
+  @Test
+  fun `configure_interaction carries matching rules from the plugin`() {
+    val pluginDir = kotlin.io.path.createTempDirectory("lua-configure-rules-test").toFile()
+    val manifest = hostCallbackManifest(pluginDir, "configure-rules-test", """
+      function configure_interaction(content_type, config)
+        return {
+          interactions = {
+            {
+              contents = { contents = "a-body", content_type = content_type },
+              rules = {
+                ["${'$'}.one"] = { { type = "regex", values = { regex = "\\d+" } } },
+                ["${'$'}.two"] = { { type = "type" } }
+              }
+            }
+          }
+        }
+      end
+    """.trimIndent())
+    val plugin = LuaPactPlugin(manifest)
+
+    try {
+      val response = plugin.withRpcClient {
+        it.configureInteraction(Plugin.ConfigureInteractionRequest.newBuilder()
+          .setContentType("application/x-test")
+          .build())
+      }
+
+      val interaction = response.getInteraction(0)
+      val regexRule = interaction.rulesMap["${'$'}.one"]!!.getRule(0)
+      assertEquals("regex", regexRule.type)
+      assertEquals("\\d+", Utils.structToMap(regexRule.values)["regex"])
+      assertEquals("type", interaction.rulesMap["${'$'}.two"]!!.getRule(0).type)
+    } finally {
+      plugin.shutdown()
+    }
+  }
+
   @Test
   fun `match_contents calls host_compare_contents for a registered core capability`() {
     val key = "match_contents-calls-host_compare_contents-for-a-registered-core-capability"

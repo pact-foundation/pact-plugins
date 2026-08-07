@@ -71,7 +71,15 @@ class JwtClientTest {
           "issuer", "ldsdkdalds",
           "algorithm", "RS512",
           "key-id", "key-112345564",
-          "private-key", PRIVATE_KEY
+          "private-key", PRIVATE_KEY,
+          // The plugin does not implement `regex` - it hands this claim back to Pact-JVM's own
+          // regex rule through the host callback (proposals 006 and 009). The value here is just
+          // the example that goes into the token.
+          "customer_id", Map.of(
+            "pact:matcher:type", "regex",
+            "regex", "CUST-\\d{6}",
+            "value", "CUST-123456"
+          )
         ),
         "response.status", "200",
         "response.contents", Map.of(
@@ -81,7 +89,12 @@ class JwtClientTest {
           "issuer", "ldsdkdalds",
           "algorithm", "RS512",
           "key-id", "key-112345564",
-          "private-key", PRIVATE_KEY
+          "private-key", PRIVATE_KEY,
+          "customer_id", Map.of(
+            "pact:matcher:type", "regex",
+            "regex", "CUST-\\d{6}",
+            "value", "CUST-123456"
+          )
         )
       ))
       .toPact();
@@ -96,7 +109,10 @@ class JwtClientTest {
       .claims(Map.of(
         "aud", "1234566778",
         "sub", "slksjkdjkdks",
-        "iss", "ldsdkdalds"
+        "iss", "ldsdkdalds",
+        // Deliberately not the example value from the interaction: the request only matches
+        // because the regex rule is applied to this claim rather than an equality check
+        "customer_id", "CUST-987654"
       ))
       .expiration(new Date(System.currentTimeMillis() + 300_000))
       .signWith(privateKey, Jwts.SIG.RS512)

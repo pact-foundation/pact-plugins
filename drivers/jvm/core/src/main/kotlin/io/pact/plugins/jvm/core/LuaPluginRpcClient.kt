@@ -222,9 +222,22 @@ class LuaPluginRpcClient(private val engine: LuaEngine) : PactPluginRpcClient {
     return builder.build()
   }
 
+  /**
+   * Converts a single Lua interaction-contents map (shaped as
+   * `{ contents = <body>, rules = <table>, part_name = "...", plugin_config = <table> }`) into an
+   * `InteractionResponse`.
+   *
+   * `rules` is keyed by matching rule expression path, in the same shape a plugin's own
+   * `match_contents` receives them (see [matchingRulesToLua]). They are the interaction's ordinary
+   * matching rules - they end up in the Pact file's `matchingRules` for the part, and come back to
+   * the plugin in a later `CompareContentsRequest`. A plugin that owns a content type the framework
+   * can not itself traverse still decides what the paths mean, but they belong in the standard
+   * place rather than in the plugin's own configuration.
+   */
   private fun luaToInteractionResponse(item: Map<String, Any?>): Plugin.InteractionResponse {
     val builder = Plugin.InteractionResponse.newBuilder()
     luaToBody(item["contents"])?.let { builder.contents = it }
+    builder.putAllRules(luaToMatchingRules(item["rules"]))
     item["plugin_config"]?.let { builder.pluginConfiguration = luaToPluginConfiguration(it) }
     (item["part_name"] as? String)?.let { builder.partName = it }
     return builder.build()

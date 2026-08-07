@@ -10,8 +10,11 @@ repositories {
 dependencies {
   testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.2'
   testImplementation 'org.junit.jupiter:junit-jupiter:5.10.2'
-  testImplementation 'au.com.dius.pact.consumer:junit5:4.7.3'
-  testImplementation 'io.pact.plugin.driver:core:1.0.0-beta.6'
+  // A claim with a matching rule needs a Pact-JVM that registers the standard rules as core
+  // catalogue capabilities (4.7.5+) and a driver with the field-level Lua host functions (1.2.2+).
+  // Both are resolved from mavenLocal() until they are released - see ../README.md.
+  testImplementation 'au.com.dius.pact.consumer:junit5:4.7.5'
+  testImplementation 'io.pact.plugin.driver:core:1.2.2'
   testImplementation 'ch.qos.logback:logback-classic:1.4.11'
   testImplementation 'org.hamcrest:hamcrest:2.2'
   testImplementation 'io.jsonwebtoken:jjwt-api:0.12.6'
