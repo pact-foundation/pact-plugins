@@ -233,7 +233,7 @@ impl FieldMatcher {
       expected: Some(expected.to_proto()),
       actual: Some(actual.to_proto()),
       plugin_configuration: context.plugin_config.clone().map(to_proto_plugin_config),
-      test_context: Some(to_proto_struct(&context.test_context))
+      test_context: Some(to_proto_struct(&with_test_run_id(&context.test_context)))
     };
 
     let response = if self.is_core() {
@@ -327,7 +327,7 @@ impl FieldGenerator {
       path: context.path.to_string(),
       example_value: Some(example.to_proto()),
       plugin_configuration: context.plugin_config.clone().map(to_proto_plugin_config),
-      test_context: Some(to_proto_struct(&context.test_context)),
+      test_context: Some(to_proto_struct(&with_test_run_id(&context.test_context))),
       test_mode: mode.to_proto() as i32
     };
 
@@ -505,6 +505,24 @@ fn mismatch_for(message: String, context: &FieldContext) -> ContentMismatch {
   }
 }
 
+/// The test context a field-level request carries, with the current test run ID added if the host
+/// did not supply one.
+///
+/// The host has no test context to hand at the point a matching rule is applied - it is deep
+/// inside matching, several layers below anything that knows about the test - so without this the
+/// `testContext` on a field request would always be empty and a plugin could not correlate what it
+/// logs with the test that caused it. The gRPC content-level path does the same thing for the same
+/// reason (see `grpc_plugin::PluginClient::compare_contents`); doing it here rather than there
+/// covers every transport a field rule can be dispatched through, including an in-process core
+/// handler and Lua. See proposals 006 and 008.
+fn with_test_run_id(test_context: &HashMap<String, Value>) -> HashMap<String, Value> {
+  let mut context = test_context.clone();
+  if let Some(id) = crate::test_context::current_test_run_id() {
+    context.entry("testRunId".to_string()).or_insert_with(|| Value::String(id));
+  }
+  context
+}
+
 fn to_proto_matching_rule(rule: &MatchingRule) -> ProtoMatchingRule {
   ProtoMatchingRule {
     r#type: rule.name(),
@@ -644,6 +662,56 @@ mod tests {
     expect!(proto.r#type.as_str()).to(be_equal_to("creditcard"));
     expect!(proto.values.unwrap().fields.get("brand").cloned()).to(
       be_some().value(crate::utils::to_proto_value(&Value::String("visa".to_string()))));
+  }
+
+  /// A plugin correlates what it logs with the test that caused it via `testRunId` in the request's
+  /// test context (proposal 008). The host has nothing to put there at the point a rule is applied,
+  /// so the driver fills it in - for every transport, not just gRPC.
+  #[tokio::test]
+  async fn a_field_request_carries_the_current_test_run_id() {
+    #[derive(Debug)]
+    struct CapturingMatcher {
+      test_run_ids: Arc<Mutex<Vec<Option<String>>>>
+    }
+
+    #[async_trait]
+    impl CoreFieldMatcher for CapturingMatcher {
+      async fn match_field(&self, request: MatchFieldRequest) -> anyhow::Result<MatchFieldResponse> {
+        let id = request.test_context.as_ref()
+          .and_then(|context| context.fields.get("testRunId"))
+          .and_then(|value| match &value.kind {
+            Some(prost_types::value::Kind::StringValue(value)) => Some(value.clone()),
+            _ => None
+          });
+        self.test_run_ids.lock().unwrap().push(id);
+        Ok(MatchFieldResponse::default())
+      }
+    }
+
+    let key = "a_field_request_carries_the_current_test_run_id";
+    let test_run_ids = Arc::new(Mutex::new(vec![]));
+    register_core_field_matcher(key, Arc::new(CapturingMatcher { test_run_ids: test_run_ids.clone() }));
+    register_core_entries(&vec![CatalogueEntry {
+      entry_type: CatalogueEntryType::MATCHER,
+      provider_type: CatalogueEntryProviderType::CORE,
+      plugin: None,
+      key: key.to_string(),
+      values: hashmap!{}
+    }]);
+    let matcher = find_field_matcher(key).unwrap();
+    let context = FieldContext::new(&DocPath::new_unwrap("$.one"), "body");
+
+    crate::test_context::set_test_run_id(Some("test-run-1".to_string()));
+    let _ = matcher.match_field(&MatchingRule::Type, &FieldValue::Json(Value::Null),
+      &FieldValue::Json(Value::Null), &context).await;
+    crate::test_context::set_test_run_id(None);
+    let _ = matcher.match_field(&MatchingRule::Type, &FieldValue::Json(Value::Null),
+      &FieldValue::Json(Value::Null), &context).await;
+
+    deregister_core_field_matcher(key);
+
+    let ids = test_run_ids.lock().unwrap().clone();
+    expect!(ids).to(be_equal_to(vec![Some("test-run-1".to_string()), None]));
   }
 
   /// Records the request it was given, and answers with the mismatches it was built with

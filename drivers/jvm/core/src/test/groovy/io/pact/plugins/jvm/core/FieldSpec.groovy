@@ -78,6 +78,35 @@ class FieldSpec extends Specification {
     FieldValue.fromJson(JsonValue.Null.INSTANCE) == FieldValue.Null.INSTANCE
   }
 
+  /**
+   * A plugin correlates what it logs with the test that caused it via `testRunId` in the request's
+   * test context (proposal 008). The host has nothing to put there at the point a rule is applied,
+   * so the driver fills it in.
+   */
+  def 'a field request carries the current test run id'() {
+    given:
+    def key = 'a-field-request-carries-the-current-test-run-id'
+    def seen = []
+    registerCoreEntry(key, CatalogueEntryType.MATCHER)
+    CoreCapabilityRegistry.INSTANCE.registerFieldMatcher(key, { request ->
+      seen << (request.hasTestContext() ? request.testContext.fieldsMap['testRunId']?.stringValue : null)
+      PluginV2.MatchFieldResponse.newBuilder().build()
+    } as CoreFieldMatcher)
+    def matcher = FieldKt.findFieldMatcher(key)
+
+    when:
+    TestContext.setTestRunId('test-run-1')
+    matcher.matchField(aRule(), new FieldValue.Text('a'), new FieldValue.Text('a'), context())
+    TestContext.setTestRunId(null)
+    matcher.matchField(aRule(), new FieldValue.Text('a'), new FieldValue.Text('a'), context())
+
+    then:
+    seen == ['test-run-1', null]
+
+    cleanup:
+    TestContext.setTestRunId(null)
+  }
+
   def 'matchField dispatches to a registered core handler'() {
     given:
     def key = 'matchField dispatches to a registered core handler'

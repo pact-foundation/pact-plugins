@@ -210,7 +210,7 @@ a field matcher.
 | `expected` | [field value](#field-value) | The example value from the Pact file. |
 | `actual` | [field value](#field-value) | The value received. |
 | `plugin_configuration` | table or nil | A [`PluginConfiguration`](#pluginconfiguration-table) - anything your plugin persisted into the Pact file. |
-| `test_context` | table or nil | Context data from the test framework. |
+| `test_context` | table or nil | Context data from the test framework. The driver adds `testRunId` if the host did not supply one, so you can correlate what you log with the test that caused it (see [008](proposals/008_Plugin_observability_and_logging.md)). |
 
 **Return value**: one of
 
@@ -238,7 +238,7 @@ of its request: everything it needs arrives in the request or is fetched with an
 | `path` | string | Where the value lives, as a matching-rule expression. |
 | `example_value` | [field value](#field-value) | The example value from the Pact file that the generated value replaces. |
 | `plugin_configuration` | table or nil | A [`PluginConfiguration`](#pluginconfiguration-table). |
-| `test_context` | table or nil | Context data from the test framework. |
+| `test_context` | table or nil | Context data from the test framework. The driver adds `testRunId` if the host did not supply one, so you can correlate what you log with the test that caused it (see [008](proposals/008_Plugin_observability_and_logging.md)). |
 | `test_mode` | string | One of `"Consumer"`, `"Provider"`, `"Unknown"`. |
 
 **Return value**: one of

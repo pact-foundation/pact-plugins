@@ -198,7 +198,7 @@ data class FieldMatcher(val catalogueEntry: CatalogueEntry) {
       .setMismatchType(context.category)
       .setExpected(expected.toProto())
       .setActual(actual.toProto())
-      .setTestContext(toProtoStruct(context.testContext))
+      .setTestContext(toProtoStruct(withTestRunId(context.testContext)))
       .also { builder ->
         if (context.pluginConfiguration != null) {
           builder.pluginConfiguration = toProtoPluginConfiguration(context.pluginConfiguration)
@@ -272,7 +272,7 @@ data class FieldGenerator(val catalogueEntry: CatalogueEntry) {
       .setGenerator(toProtoGenerator(generator))
       .setPath(context.path)
       .setExampleValue(example.toProto())
-      .setTestContext(toProtoStruct(context.testContext))
+      .setTestContext(toProtoStruct(withTestRunId(context.testContext)))
       .setTestMode(mode.toProto())
       .also { builder ->
         if (context.pluginConfiguration != null) {
@@ -311,6 +311,24 @@ private fun mismatchFor(message: String, context: FieldContext) = ContentMismatc
   path = context.path,
   type = context.category
 )
+
+/**
+ * The test context a field-level request carries, with the current test run ID added if the host
+ * did not supply one.
+ *
+ * The host has no test context to hand at the point a matching rule is applied - it is deep inside
+ * matching, several layers below anything that knows about the test - so without this the
+ * `testContext` on a field request would always be empty and a plugin could not correlate what it
+ * logs with the test that caused it. See proposals 006 and 008.
+ */
+private fun withTestRunId(testContext: Map<String, JsonValue>): Map<String, JsonValue> {
+  val testRunId = TestContext.currentTestRunId()
+  return if (testRunId != null && !testContext.containsKey("testRunId")) {
+    testContext + ("testRunId" to JsonValue.StringValue(testRunId))
+  } else {
+    testContext
+  }
+}
 
 private fun toProtoMatchingRule(rule: MatchingRule): PluginV2.MatchingRule {
   val builder = PluginV2.MatchingRule.newBuilder()
