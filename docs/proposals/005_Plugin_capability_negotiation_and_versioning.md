@@ -98,3 +98,40 @@ already rely on.
     V2 interaction and content APIs.
   - Why first: it is a genuine plugin-side optional feature that can be exercised today without waiting for the later
     callback proposals.
+
+## Outstanding items
+
+The negotiation *mechanism* is implemented in both drivers: `hostCapabilities` goes out on the `InitPlugin`
+request, `pluginCapabilities` comes back on the response, and a plugin that returns an `InitPluginFailure` naming
+missing host capabilities fails startup with those names in the error. What is not implemented is the capability
+set above, in either direction. Both items below were found reviewing the proposals against the code in August
+2026, and both need a decision rather than only code - which is why they are recorded here rather than fixed
+alongside the rest of that review (see 004, 006, 007 and 009 for the parts that were).
+
+### 1. No host advertises `interaction/request-response`
+
+Both drivers derive `hostCapabilities` from the `CatalogueEntryProviderType::CORE` catalogue entries, as
+`<entry_type>/<key>` (`plugin_manager::host_capabilities` in the Rust driver, `PluginManager` on the JVM). No host
+registers an entry with that key. Pact-JVM registers `transport/http`, `transport/https`, `interaction/message`
+and `interaction/synchronous-message`; `pact_matching` registers the same four (it registered none until the same
+review). So the one capability this proposal names as the Phase 1 host capability is advertised by nobody, and a
+plugin that declares it requires it would fail startup against every host - by this proposal's own compatibility
+rule.
+
+The decision: is `interaction/request-response` still the right name for "the driver provides request/response
+scoped interaction sections", given the entries the hosts grew in the meantime are named after transports and
+interaction types? Either register it as a core entry in both hosts, or replace this proposal's initial capability
+set with the entries that actually exist and pick a different first pair.
+
+### 2. A plugin's declared capabilities are never consulted
+
+`pluginCapabilities` from the handshake is captured and exposed (`plugin_capabilities` and `has_capability` on the
+Rust driver's plugin models, and the JVM equivalent), but nothing calls it: no driver or host code path behaves
+differently based on what a plugin declared. "The result determines which V2 features are active for the lifetime
+of this plugin instance" is therefore not true yet - the driver→plugin direction of negotiation is complete, and
+the plugin→driver direction is inert.
+
+The decision: what should branch on it first? The CSV V2 plugin's request/response-scoped sections are the obvious
+candidate, which makes this the same decision as item 1 seen from the other side. Until something branches on a
+declared capability, a plugin declaring one and a plugin declaring none are treated identically, and the
+"optional capability" category in this document describes an intent rather than a behaviour.
