@@ -167,9 +167,10 @@ carries in a Pact file and in a request, the same way matching rule keys are the
 
 | Key | Description |
 | --- | ----------- |
-| `core/interaction/http` | Support Http/1.1 interactions (request/response) | 
-| `core/interaction/https` | Support Http/1.1 + TLS interactions (request/response) |
+| `core/transport/http` | Support Http/1.1 interactions (request/response) |
+| `core/transport/https` | Support Http/1.1 + TLS interactions (request/response) |
 | `core/interaction/message` | Support message interactions |
+| `core/interaction/synchronous-message` | Support synchronous message interactions |
 | `core/matcher/equality` | Equality matcher (V1) |
 | `core/matcher/regex` | Regex matcher (V2) |
 | `core/matcher/type` | Type matcher (V2) |

@@ -179,11 +179,17 @@ A typo'd core rule name becomes a `Plugin` rule that fails resolution at match t
 `No catalogue entry found for key 'reges'`, which is an acceptable trade for not needing a second syntax.
 
 **Pact file plugin metadata.** A field-level rule never goes through `configure_interaction`, which is where the
-`plugins` entry in the Pact file metadata is written today. So the host must record the providing plugin (name and
-version, from the resolved catalogue entry's manifest) in the Pact metadata when it serialises a `Plugin` rule or
-generator. Without this, provider verification has no way to know it needs to load the `creditcard` plugin before it
-can interpret the file. Consumer tests must load the plugin explicitly (`usingPlugin("creditcard")` or equivalent)
-before the rule can be resolved at all.
+`plugins` entry in the Pact file metadata is written today. Without that entry, provider verification has no way to
+know it needs to load the `creditcard` plugin before it can interpret the file.
+
+This proposal originally called for the host to record the providing plugin (from the resolved catalogue entry's
+manifest) at the point it serialises a `Plugin` rule or generator. That is not what was built, and on reflection it
+is not needed: a rule can only be resolved at all if its plugin is loaded, and loading it is what writes the
+metadata. A consumer test must say `usingPlugin("creditcard")` (or equivalent) before it can use the rule, and both
+hosts record the plugin there - verified in the generated Pact files of both
+[`examples/creditcard`](../../examples/creditcard) consumers. The two mechanisms have the same outcome for every
+flow that can actually produce a plugin rule; a serialisation-time hook would only differ for a Pact file assembled
+without the plugin, which cannot happen.
 
 ### 5. Operation shape
 
@@ -438,8 +444,9 @@ The work outside this repository, stated explicitly because it is most of the de
 2. `pact_matching` / Pact-JVM matching engine: a dispatch arm that resolves a `Plugin` rule through
    `pact_plugin_driver::field::find_field_matcher` and calls it, and the equivalent for generators in generator
    application. Both crates already depend on the driver, so no new dependency edge is created.
-3. Recording the providing plugin in the Pact file's `plugins` metadata when a `Plugin` rule or generator is
-   serialised (see [4](#4-model-representation-and-the-pact-file)).
+3. ~~Recording the providing plugin in the Pact file's `plugins` metadata when a `Plugin` rule or generator is
+   serialised.~~ Not needed - loading the plugin is what records it, and the rule cannot resolve without the plugin
+   being loaded. See [4](#4-model-representation-and-the-pact-file).
 
 **Calling an async driver from a synchronous matching path (Rust only).** The JVM driver talks to plugins over
 blocking gRPC stubs (`PactPluginBlockingStub`), so Pact-JVM has nothing to solve here. In Rust, rule application is

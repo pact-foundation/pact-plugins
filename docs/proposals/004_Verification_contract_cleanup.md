@@ -57,8 +57,19 @@ The structured interaction model defined by this proposal must be transport-neut
 
 The same pact-as-JSON problem exists in the mock server flow: `StartMockServerRequest` also passes the full Pact as a JSON string. Any solution defined here should be applied consistently to the mock server API to avoid leaving a parallel coupling in place.
 
-## Open questions
+## Resolved questions
 
-- What is the smallest interaction model that still supports transport plugins cleanly? The fields listed above are candidates; implementation experience may show some can be dropped.
-- Are consumer and provider names sufficient context, or does the plugin need additional Pact-level metadata (e.g. Pact specification version)?
-- How should the structured interaction model be represented for the mock server case, where the plugin receives all interactions upfront rather than one at a time?
+These were open while the proposal was being written; implementing it settled all three.
+
+- **What is the smallest interaction model that still supports transport plugins cleanly?** Exactly the fields listed
+  above, all of which were kept: `InteractionContents` carries the interaction type, the consumer and provider names,
+  and the plugin's own interaction- and Pact-level configuration, alongside the `config` and `testContext` fields on
+  the request itself. Nothing has needed to be dropped or added since.
+- **Are consumer and provider names sufficient context, or does the plugin need additional Pact-level metadata?**
+  Sufficient so far. None of the plugins in this repository have needed the Pact specification version at
+  verification time - a plugin owns its own content, and the parts of the interaction the specification version
+  affects are the host's to interpret. Adding it later is a field on `InteractionContents`, not a reshape.
+- **How should the structured interaction model be represented for the mock server case, where the plugin receives
+  all interactions upfront?** As a repeated field of the same message: `StartMockServerRequest` carries a list of
+  `InteractionContents` where the verification requests carry one. The plugin sees the same shape either way, which
+  is what stopped transport plugins needing a Pact parser in any code path.

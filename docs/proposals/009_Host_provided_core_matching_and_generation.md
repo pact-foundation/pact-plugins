@@ -209,8 +209,10 @@ required.
   with a message saying the rule applies to a collection as a whole. That is a bare string, so a plugin that wants
   to fall back to its own handling has to match on the text. A typed reason on the response would be better, but it
   is a proto change for a case no plugin has hit yet.
-- **Do `ProviderState` and `MockServerURL` generators need anything beyond `testContext`?** Both are registered and
-  both read what they need from the request's test context, so a caller that populates it gets the right answer -
-  but nothing yet checks that every host path which applies a field generator *does* populate it. A plugin calling
-  `ProviderState` from a verification where the context was not passed through would get a generation error rather
-  than a wrong value, so this is a diagnosability question rather than a correctness one.
+- **Do `ProviderState` and `MockServerURL` generators need anything beyond `testContext`?** No, and both host
+  paths now carry it: Pact-JVM's `DriverPluginSupport.generate` used to drop the generation context and always
+  report `testMode = UNKNOWN`, which made these two the only registered generators that could not work there.
+  Both hosts now pass the context and the side of the test through, and a request whose mode is genuinely unknown
+  applies the generator rather than guessing a side - guessing "provider" turned `MockServerURL` into a silent
+  no-op in a consumer test. Body generation is the path that knows the mode; the header/query/path generator
+  application paths still do not, so they report it as unknown.

@@ -1,7 +1,7 @@
-# Driver-plugin callback model (Draft)
+# Driver-plugin callback model (In progress)
 
 > [!NOTE]
-> **Implementation phase:** Phase 3 (new functionality). Requires [005](./005_Plugin_capability_negotiation_and_versioning.md) to be finalised. Design in parallel with [006](./006_Field_level_matchers_and_generators.md). Required by [009](./009_Host_provided_core_matching_and_generation.md). See the [proposals README](./README.md) for the full delivery order.
+> **Implementation phase:** Phase 3 (new functionality). The mechanism is implemented in both drivers - the registry and traits, the extended `PluginHost` service with cycle detection and deadlines, the `is_core()` dispatch, and the Lua host functions - and [006](./006_Field_level_matchers_and_generators.md) and [009](./009_Host_provided_core_matching_and_generation.md) are both built on it. What remains is the WASM transport, which is blocked on [003](./003_Support_WASM_plugins.md). See [Sequencing](#sequencing) for the current state and the [proposals README](./README.md) for the full delivery order.
 
 ## Summary
 
