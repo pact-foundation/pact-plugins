@@ -1,5 +1,16 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.2 - Bugfix Release
+
+* 067c923 - docs: Record the two capability-negotiation gaps left open by the review (Ronald Holshausen, Fri Aug 7 17:12:25 2026 +1000)
+* ac0738c - docs: Correct proposal drift found reviewing 004-009 against the code (Ronald Holshausen, Fri Aug 7 17:05:09 2026 +1000)
+* 0f417ee - feat(drivers): Carry the test run ID on field-level requests (Ronald Holshausen, Fri Aug 7 17:05:09 2026 +1000)
+* ba229f5 - feat(jwt-plugin): Delegate a claim's matching rule back to the host framework (Ronald Holshausen, Fri Aug 7 16:09:37 2026 +1000)
+* 70b4ed3 - feat(drivers): Key core matching rules and generators by their rule name (Ronald Holshausen, Fri Aug 7 16:09:06 2026 +1000)
+* 6717591 - chore: Add a example that uses the credit card matcher (Ronald Holshausen, Thu Aug 6 16:41:24 2026 +1000)
+* 249b7ae - docs: Update docs with Host framework integration details (Ronald Holshausen, Thu Aug 6 16:01:53 2026 +1000)
+* cc2f0dd - chore: bump version to 1.2.2 [skip ci] (Ronald Holshausen, Thu Aug 6 15:15:32 2026 +1000)
+
 # 1.2.1 - Maintenance Release
 
 * f1805f1 - Revert "chore(jvm-driver): correct release script" (Ronald Holshausen, Thu Aug 6 15:06:30 2026 +1000)
