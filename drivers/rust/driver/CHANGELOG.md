@@ -1,5 +1,12 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.2 - Bugfix Release
+
+* 0f417ee - feat(drivers): Carry the test run ID on field-level requests (Ronald Holshausen, Fri Aug 7 17:05:09 2026 +1000)
+* ba229f5 - feat(jwt-plugin): Delegate a claim's matching rule back to the host framework (Ronald Holshausen, Fri Aug 7 16:09:37 2026 +1000)
+* 70b4ed3 - feat(drivers): Key core matching rules and generators by their rule name (Ronald Holshausen, Fri Aug 7 16:09:06 2026 +1000)
+* fe5a9fb - chore: bump version to 1.2.2 [skip ci] (Ronald Holshausen, Thu Aug 6 15:00:52 2026 +1000)
+
 # 1.2.1 - Maintenance Release
 
 * 95a9912 - chore(rust-driver): Update pact_models to 1.3.14 (Ronald Holshausen, Thu Aug 6 12:00:38 2026 +1000)
