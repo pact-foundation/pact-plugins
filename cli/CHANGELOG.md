@@ -1,5 +1,12 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.3.0 - Update dependencies + support v2 plugins
+
+* baa5af0 - chore: update repository.index (Ronald Holshausen, Mon Aug 10 11:35:25 2026 +1000)
+* 3ca946b - chore(plugin-cli): Update dependencies + support v2 plugins (Ronald Holshausen, Mon Aug 10 11:12:58 2026 +1000)
+* 840fe24 - chore(plugin-cli): Updated lock file (Ronald Holshausen, Wed May 13 11:46:47 2026 +1000)
+* 3201483 - chore: update readme for docusaurus update (Kevin Rohan Vaz, Fri Mar 27 00:12:01 2026 +0530)
+
 # 0.2.0 - [Feature Release]
 
 * 77baf74 - chore: rename bin/pact-plugin (not pact-plugin-cli) (Yousaf Nabi, Fri Oct 31 16:16:53 2025 +0000)
