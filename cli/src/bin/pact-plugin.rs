@@ -1,6 +1,6 @@
 use std::process::ExitCode;
 
-use tracing::Level;
+use tracing::{warn, Level};
 use pact_plugin_cli::{Cli, handle_matches, setup_logger};
 use clap::Parser;
 
@@ -15,5 +15,10 @@ fn main() -> Result<(), ExitCode> {
     Level::WARN
   };
   setup_logger(log_level);
+
+  if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+    warn!("failed to installed the default crypto provider");
+  }
+
   handle_matches(&cli)
 }

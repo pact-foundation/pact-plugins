@@ -92,7 +92,7 @@ fn validate_repository_file(filename: &String) -> anyhow::Result<()> {
 
     let mut table = Table::new();
     table
-      .load_preset(UTF8_FULL)
+      .load_style(UTF8_FULL)
       .set_header(vec!["Key", "Value", ""]);
 
     table.add_row(vec![ "Format Version", index.format_version.to_string().as_str(), "" ]);
@@ -242,7 +242,7 @@ fn list_versions(filename: &String, plugin_name: &String) -> anyhow::Result<()> 
   let index = load_index_file(&repository_file)?;
   let mut table = Table::new();
   table
-    .load_preset(UTF8_FULL)
+    .load_style(UTF8_FULL)
     .set_header(vec!["Name", "Version", "Source", "Value"]);
 
   if let Some(entry) = index.entries.get(plugin_name.as_str()) {
@@ -267,7 +267,7 @@ fn list_entries(filename: &String) -> anyhow::Result<()> {
 
   let mut table = Table::new();
   table
-    .load_preset(UTF8_FULL)
+    .load_style(UTF8_FULL)
     .set_header(vec!["Key", "Name", "Latest Version", "Versions"]);
 
   for (key, entry) in index.entries.iter().sorted_by_key(|(k, _)| k.as_str()) {

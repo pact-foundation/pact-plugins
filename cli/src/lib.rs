@@ -217,7 +217,9 @@ impl FromStr for InstallationSource {
 
 pub fn setup_logger(log_level: Level) {
   let subscriber = FmtSubscriber::builder()
+    .pretty()
     .with_max_level(log_level)
+    .with_ansi(true)
     .finish();
 
   if let Err(err) = tracing::subscriber::set_global_default(subscriber) {
@@ -366,7 +368,7 @@ fn print_env() -> anyhow::Result<()> {
   let (plugin_src, plugin_dir) = resolve_plugin_dir();
 
   table
-    .load_preset(UTF8_FULL)
+    .load_style(UTF8_FULL)
     .set_header(vec!["Configuration", "Source", "Value"])
     .add_row(vec!["Plugin Directory", plugin_src.as_str(), plugin_dir.as_str()]);
 

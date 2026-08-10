@@ -37,7 +37,7 @@ fn list_known_plugins(show_all_versions: &bool) -> anyhow::Result<()> {
   let mut table = Table::new();
   if *show_all_versions {
     table
-      .load_preset(UTF8_FULL)
+      .load_style(UTF8_FULL)
       .set_header(vec!["Name", "Version", "Source", "Value"]);
 
     for entry in index.entries.values() {
@@ -52,7 +52,7 @@ fn list_known_plugins(show_all_versions: &bool) -> anyhow::Result<()> {
     }
   } else {
     table
-      .load_preset(UTF8_FULL)
+      .load_style(UTF8_FULL)
       .set_header(vec!["Name", "Latest Version", "Num Versions"]);
 
     for entry in index.entries.values() {
@@ -72,14 +72,15 @@ fn list_known_plugins(show_all_versions: &bool) -> anyhow::Result<()> {
 fn list_installed_plugins() -> anyhow::Result<()> {
   let mut table = Table::new();
   table
-    .load_preset(UTF8_FULL)
-    .set_header(vec!["Name", "Version", "Interface Version", "Directory", "Status"]);
+    .load_style(UTF8_FULL)
+    .set_header(vec!["Name", "Version", "Interface Version", "Type", "Directory", "Status"]);
 
   for (manifest, _, status) in plugin_list()?.iter().sorted_by(manifest_sort_fn) {
     table.add_row(vec![
       manifest.name.as_str(),
       manifest.version.as_str(),
       manifest.plugin_interface_version.to_string().as_str(),
+      manifest.executable_type.as_str(),
       manifest.plugin_dir.to_string().as_str(),
       if *status { "enabled" } else { "disabled" }
     ]);

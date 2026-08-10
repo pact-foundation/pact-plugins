@@ -5,7 +5,7 @@ use std::path::PathBuf;
 
 use anyhow::{anyhow, bail, Context};
 use itertools::Itertools;
-use pact_plugin_driver::plugin_manager::load_plugin;
+use pact_plugin_driver::plugin_manager::{load_plugin, lookup_plugin};
 use pact_plugin_driver::plugin_models::PactPluginManifest;
 use requestty::OnEsc;
 use reqwest::Client;
@@ -57,7 +57,7 @@ async fn install_known_plugin(
   version: &Option<String>,
   skip_load: bool,
 ) -> anyhow::Result<()> {
-  let index = fetch_repository_index(&http_client, Some(DEFAULT_INDEX)).await?;
+  let index = fetch_repository_index(http_client, Some(DEFAULT_INDEX)).await?;
   if let Some(entry) = index.entries.get(name) {
     let version = if let Some(version) = version {
       debug!("Installing plugin {}/{} from index", name, version);
@@ -67,7 +67,7 @@ async fn install_known_plugin(
       entry.latest_version.as_str()
     };
     if let Some(version_entry) = entry.versions.iter().find(|v| v.version == version) {
-      install_plugin_from_url(&http_client, version_entry.source.value().as_str(), override_prompt, skip_if_installed,skip_load).await
+      install_plugin_from_url(http_client, version_entry.source.value().as_str(), override_prompt, skip_if_installed,skip_load).await
     } else {
       Err(anyhow!("'{}' is not a valid version for plugin '{}'", version, name))
     }
@@ -83,7 +83,7 @@ async fn install_plugin_from_url(
   skip_if_installed: bool,
   skip_load: bool
 ) -> anyhow::Result<()> {
-  let response = fetch_json_from_url(source_url, &http_client).await?;
+  let response = fetch_json_from_url(source_url, http_client).await?;
   if let Some(map) = response.as_object() {
     if let Some(tag) = map.get("tag_name") {
       let tag = json_to_string(tag);
@@ -94,7 +94,7 @@ async fn install_plugin_from_url(
         let suffix = format!("/tag/{}", tag);
         source_url.strip_suffix(suffix.as_str()).unwrap_or(source_url)
       };
-      let manifest_json = download_json_from_github(&http_client, url, &tag, "pact-plugin.json")
+      let manifest_json = download_json_from_github(http_client, url, &tag, "pact-plugin.json")
         .await.context("Downloading manifest file from GitHub")?;
       let manifest: PactPluginManifest = serde_json::from_value(manifest_json)
         .context("Parsing JSON manifest file from GitHub")?;
@@ -104,20 +104,22 @@ async fn install_plugin_from_url(
         println!("Installing plugin {} version {}", manifest.name, manifest.version);
         let plugin_dir = create_plugin_dir(&manifest, override_prompt)
           .context("Creating plugins directory")?;
-        download_plugin_executable(&manifest, &plugin_dir, &http_client, url, &tag, true).await?;
+        download_plugin_executable(&manifest, &plugin_dir, http_client, url, &tag, true).await?;
 
         env::set_var("pact_do_not_track", "true");
         if !skip_load {
-            load_plugin(&manifest.as_dependency())
+          load_plugin(&manifest.as_dependency())
           .await
           .and_then(|plugin| {
-              println!("Installed plugin {} version {} OK", manifest.name, manifest.version);
+            println!("Installed plugin {} version {} OK", manifest.name, manifest.version);
+            if let Some(plugin) = lookup_plugin(&plugin.manifest.as_dependency()) {
               plugin.kill();
-              Ok(())
-          }) }
-          else {
-            return Ok(())
-          }
+            }
+            Ok(())
+          })
+        } else {
+          Ok(())
+        }
       } else {
         println!("Skipping installing plugin {} version {} as it is already installed", manifest.name, manifest.version);
         Ok(())
