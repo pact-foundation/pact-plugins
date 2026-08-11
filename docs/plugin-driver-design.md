@@ -152,8 +152,12 @@ Implementation of a matching rule. Mainly used to match the fields and attribute
 
 #### Interaction (interaction) 
 
-Provides a type of interaction. The standard interaction types are synchronous request/response (HTTP), asynchronous
-messages (one off or fire and forget) and synchronous messages (request/response, like gRPC).
+Provides a type of interaction. There is one entry per interaction type a Pact file can record: synchronous
+request/response (`request-response`), asynchronous messages (one off or fire and forget, `message`) and synchronous
+messages (request/response, like gRPC, `synchronous-message`).
+
+The transport an interaction is carried over is a separate concern, covered by the `transport` entries - it is only
+history that the request/response interaction is the original Pact one carried over HTTP or HTTPS.
 
 ### Core catalogue entries
 
@@ -169,6 +173,7 @@ carries in a Pact file and in a request, the same way matching rule keys are the
 | --- | ----------- |
 | `core/transport/http` | Support Http/1.1 interactions (request/response) |
 | `core/transport/https` | Support Http/1.1 + TLS interactions (request/response) |
+| `core/interaction/request-response` | Support synchronous request/response interactions |
 | `core/interaction/message` | Support message interactions |
 | `core/interaction/synchronous-message` | Support synchronous message interactions |
 | `core/matcher/equality` | Equality matcher (V1) |

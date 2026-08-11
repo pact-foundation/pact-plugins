@@ -85,53 +85,49 @@ Future proposals must state which category each new capability belongs to.
 
 ## Initial capability set for Phase 1
 
-Phase 1 needs one real capability pair so the negotiation path is exercised end to end before later proposals add more
-behaviour. The first capability set is intentionally small and based on behaviour the current drivers and CSV plugin
-already rely on.
+Phase 1 needs one real capability set so the negotiation path is exercised end to end, in both directions, before
+later proposals add more behaviour. The first set is the interaction types themselves: there are three interaction
+types a Pact file can record, so there are three capabilities, one per type.
 
-- **Host capability: `interaction/request-response`**
-  - Meaning: the driver provides request/response-scoped interaction sections to V2 plugins where appropriate, instead
-    of flattening everything into one unscoped interaction block.
-  - Why first: the local CSV V2 plugin already relies on this shape for request-body matching and generation.
-- **Plugin capability: `interaction/request-response`**
-  - Meaning: the plugin understands request/response-scoped interaction sections and can safely consume them for its
-    V2 interaction and content APIs.
-  - Why first: it is a genuine plugin-side optional feature that can be exercised today without waiting for the later
-    callback proposals.
+| Capability | Interaction type | V4 type string |
+| --- | --- | --- |
+| `interaction/request-response` | Synchronous request/response | `Synchronous/HTTP` |
+| `interaction/message` | Asynchronous messages (one off or fire and forget) | `Asynchronous/Messages` |
+| `interaction/synchronous-message` | Synchronous messages (request/response, like gRPC) | `Synchronous/Messages` |
 
-## Outstanding items
+The transport an interaction is carried over is a separate concern, covered by the `transport/*` catalogue entries -
+it is only history that the request/response interaction is the original Pact one carried over HTTP or HTTPS. A
+plugin that provides a transport says so with a `TRANSPORT` catalogue entry, independently of which interaction
+types it can handle.
 
-The negotiation *mechanism* is implemented in both drivers: `hostCapabilities` goes out on the `InitPlugin`
-request, `pluginCapabilities` comes back on the response, and a plugin that returns an `InitPluginFailure` naming
-missing host capabilities fails startup with those names in the error. What is not implemented is the capability
-set above, in either direction. Both items below were found reviewing the proposals against the code in August
-2026, and both need a decision rather than only code - which is why they are recorded here rather than fixed
-alongside the rest of that review (see 004, 006, 007 and 009 for the parts that were).
+- **As host capabilities** they mean: the host can record interactions of this type in a Pact file, and so may hand
+  the plugin one. Each host registers them as `INTERACTION` catalogue entries, which is what `hostCapabilities` is
+  derived from.
+- **As plugin capabilities** they mean: the plugin understands interactions of this type and can consume them in its
+  V2 interaction, verification and content APIs.
 
-### 1. No host advertises `interaction/request-response`
+These are **optional** capabilities under the classification above, in both directions: a plugin that declares none
+still works, and a host that carries only some interaction types is limited rather than broken.
 
-Both drivers derive `hostCapabilities` from the `CatalogueEntryProviderType::CORE` catalogue entries, as
-`<entry_type>/<key>` (`plugin_manager::host_capabilities` in the Rust driver, `PluginManager` on the JVM). No host
-registers an entry with that key. Pact-JVM registers `transport/http`, `transport/https`, `interaction/message`
-and `interaction/synchronous-message`; `pact_matching` registers the same four (it registered none until the same
-review). So the one capability this proposal names as the Phase 1 host capability is advertised by nobody, and a
-plugin that declares it requires it would fail startup against every host - by this proposal's own compatibility
-rule.
+## How the negotiated capabilities are used
 
-The decision: is `interaction/request-response` still the right name for "the driver provides request/response
-scoped interaction sections", given the entries the hosts grew in the meantime are named after transports and
-interaction types? Either register it as a core entry in both hosts, or replace this proposal's initial capability
-set with the entries that actually exist and pick a different first pair.
+Both drivers check a plugin's declared interaction capabilities before handing it an interaction for verification -
+`prepare_validation_for_interaction` and `verify_interaction` in the Rust driver, `prepareValidationForInteraction`
+and `verifyInteraction` on the JVM. If the plugin is a V2 plugin that declared at least one interaction capability
+and the interaction's type is not among them, the driver fails with an error naming the plugin, the interaction type
+and the missing capability, rather than sending the interaction and letting the plugin fail further in with a less
+obvious error.
 
-### 2. A plugin's declared capabilities are never consulted
+A V2 plugin that declares no interaction capability at all is treated as supporting every type. That keeps V2
+plugins written before these capabilities existed working unchanged; declaring one is opting in to the check for all
+three.
 
-`pluginCapabilities` from the handshake is captured and exposed (`plugin_capabilities` and `has_capability` on the
-Rust driver's plugin models, and the JVM equivalent), but nothing calls it: no driver or host code path behaves
-differently based on what a plugin declared. "The result determines which V2 features are active for the lifetime
-of this plugin instance" is therefore not true yet - the driver→plugin direction of negotiation is complete, and
-the plugin→driver direction is inert.
+The verification calls are the right place because they are per-interaction. `ConfigureInteraction` is dispatched by
+content type and carries no interaction type at all, so there is nothing there to check - a plugin's content-matching
+capabilities are already scoped by its `CONTENT_MATCHER`/`CONTENT_GENERATOR` catalogue entries. `StartMockServer`
+carries whole-Pact interaction contents, and the Pact handed to a transport plugin's mock server can legitimately
+contain interactions belonging to other transports (see the `http-plus-grpc` example), so an interaction type the
+plugin did not declare is not an error there.
 
-The decision: what should branch on it first? The CSV V2 plugin's request/response-scoped sections are the obvious
-candidate, which makes this the same decision as item 1 seen from the other side. Until something branches on a
-declared capability, a plugin declaring one and a plugin declaring none are treated identically, and the
-"optional capability" category in this document describes an intent rather than a behaviour.
+Reference plugins in this repository declare no interaction capabilities yet, and so are unaffected. A plugin opts in
+when it wants the driver to enforce the boundary on its behalf.

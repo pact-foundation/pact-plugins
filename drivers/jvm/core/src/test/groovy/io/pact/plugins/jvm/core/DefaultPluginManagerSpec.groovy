@@ -496,4 +496,89 @@ class DefaultPluginManagerSpec extends Specification {
     cleanup:
     DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove('test-verifyInteraction/1.2.3')
   }
+
+  private PactPlugin registerV2Plugin(String name, List<String> capabilities) {
+    def manifest = Mock(PactPluginManifest) {
+      getName() >> name
+      getVersion() >> '1.2.3'
+      getPluginInterfaceVersion() >> 2
+    }
+    PactPlugin mockPlugin = Mock() {
+      getManifest() >> manifest
+      getPluginCapabilities() >> capabilities
+    }
+    DefaultPluginManager.INSTANCE.PLUGIN_REGISTER["$name/1.2.3".toString()] = mockPlugin
+    mockPlugin
+  }
+
+  def 'V2 verification is dispatched when the plugin declared the interaction type'() {
+    given:
+    def name = 'test-declared-interaction-type'
+    def mockPlugin = registerV2Plugin(name, ['interaction/request-response'])
+    def transportEntry = new CatalogueEntry(CatalogueEntryType.TRANSPORT, CatalogueEntryProviderType.PLUGIN,
+      name, 'stuff')
+    def interaction = new V4Interaction.SynchronousHttp('test interaction')
+    def pact = new V4Pact(new Consumer(), new Provider(), [ interaction ])
+
+    def mockClient = Mockito.mock(PactPluginRpcClient)
+    doReturn(Plugin.VerificationPreparationResponse.newBuilder().build())
+      .when(mockClient).prepareInteractionForVerificationV2(Mockito.any())
+
+    when:
+    def result = DefaultPluginManager.INSTANCE.prepareValidationForInteraction(transportEntry, pact, interaction, [:])
+
+    then:
+    1 * mockPlugin.withRpcClient(_) >> { args -> args[0].apply(mockClient) }
+    result instanceof Result.Ok
+
+    cleanup:
+    DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove("$name/1.2.3".toString())
+  }
+
+  def 'V2 verification fails when the plugin did not declare the interaction type'() {
+    given:
+    def name = 'test-undeclared-interaction-type'
+    def mockPlugin = registerV2Plugin(name, ['interaction/synchronous-message'])
+    def transportEntry = new CatalogueEntry(CatalogueEntryType.TRANSPORT, CatalogueEntryProviderType.PLUGIN,
+      name, 'stuff')
+    def interaction = new V4Interaction.SynchronousHttp('test interaction')
+    def pact = new V4Pact(new Consumer(), new Provider(), [ interaction ])
+
+    when:
+    DefaultPluginManager.INSTANCE.prepareValidationForInteraction(transportEntry, pact, interaction, [:])
+
+    then:
+    0 * mockPlugin.withRpcClient(_)
+    def ex = thrown(PactPluginInteractionTypeNotSupportedException)
+    ex.message == "Plugin $name/1.2.3 does not support Synchronous/HTTP interactions - it did not " +
+      "declare the 'interaction/request-response' capability"
+
+    cleanup:
+    DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove("$name/1.2.3".toString())
+  }
+
+  def 'V2 verification is dispatched when the plugin declared no interaction types'() {
+    given:
+    def name = 'test-no-interaction-types'
+    def mockPlugin = registerV2Plugin(name, ['plugin/verification'])
+    def transportEntry = new CatalogueEntry(CatalogueEntryType.TRANSPORT, CatalogueEntryProviderType.PLUGIN,
+      name, 'stuff')
+    def interaction = new V4Interaction.SynchronousHttp('test interaction')
+    def pact = new V4Pact(new Consumer(), new Provider(), [ interaction ])
+
+    def mockClient = Mockito.mock(PactPluginRpcClient)
+    doReturn(Plugin.VerifyInteractionResponse.newBuilder().build())
+      .when(mockClient).verifyInteractionV2(Mockito.any())
+
+    when:
+    def result = DefaultPluginManager.INSTANCE.verifyInteraction(transportEntry,
+      new InteractionVerificationData(OptionalBody.empty(), [:]), [:], pact, interaction)
+
+    then:
+    1 * mockPlugin.withRpcClient(_) >> { args -> args[0].apply(mockClient) }
+    result instanceof Result.Ok
+
+    cleanup:
+    DefaultPluginManager.INSTANCE.PLUGIN_REGISTER.remove("$name/1.2.3".toString())
+  }
 }
