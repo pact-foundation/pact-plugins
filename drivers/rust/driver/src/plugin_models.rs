@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use anyhow::anyhow;
 use async_trait::async_trait;
+use pact_models::v4::V4InteractionType;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing::trace;
@@ -155,6 +156,63 @@ impl TryFrom<u8> for PluginInterfaceVersion {
       2 => Ok(PluginInterfaceVersion::V2),
       _ => Err(anyhow!("Unsupported plugin interface version {}", value)),
     }
+  }
+}
+
+/// Capability name a V2 plugin declares to say it can handle interactions of this type.
+///
+/// There is one per interaction type a Pact file can record, and they are the same names the host
+/// registers as `INTERACTION` catalogue entries and advertises in `hostCapabilities`. The transport
+/// an interaction is carried over is a separate concern - it is only history that the
+/// request/response interaction is the original Pact one carried over HTTP or HTTPS.
+pub fn interaction_type_capability(interaction_type: &V4InteractionType) -> &'static str {
+  match interaction_type {
+    V4InteractionType::Synchronous_HTTP => "interaction/request-response",
+    V4InteractionType::Asynchronous_Messages => "interaction/message",
+    V4InteractionType::Synchronous_Messages => "interaction/synchronous-message",
+  }
+}
+
+/// Every interaction type a Pact file can record.
+pub const ALL_INTERACTION_TYPES: [V4InteractionType; 3] = [
+  V4InteractionType::Synchronous_HTTP,
+  V4InteractionType::Asynchronous_Messages,
+  V4InteractionType::Synchronous_Messages,
+];
+
+/// Check that a plugin declared it can handle interactions of the given type.
+///
+/// This is the plugin→driver half of the capability negotiation from proposal 005: a V2 plugin
+/// declares an `interaction/*` capability for each interaction type it understands, and the driver
+/// refuses to hand it an interaction of a type it did not declare rather than letting the plugin
+/// fail further in with a less obvious error.
+///
+/// A plugin that declares no interaction capability at all is treated as supporting every type, so
+/// V2 plugins written before these capabilities existed keep working unchanged. Declaring one is
+/// therefore opting in to the check for all three.
+pub fn check_interaction_type_capability(
+  plugin: &dyn PluginInstance,
+  interaction_type: V4InteractionType,
+) -> anyhow::Result<()> {
+  let declares_any = ALL_INTERACTION_TYPES
+    .iter()
+    .any(|interaction_type| plugin.has_capability(interaction_type_capability(interaction_type)));
+  if !declares_any {
+    return Ok(());
+  }
+
+  let required = interaction_type_capability(&interaction_type);
+  if plugin.has_capability(required) {
+    Ok(())
+  } else {
+    let manifest = plugin.manifest();
+    Err(anyhow!(
+      "Plugin {}/{} does not support {} interactions - it did not declare the '{}' capability",
+      manifest.name,
+      manifest.version,
+      interaction_type,
+      required
+    ))
   }
 }
 
@@ -459,15 +517,24 @@ pub(crate) mod tests {
   use std::sync::RwLock;
 
   use async_trait::async_trait;
+  use expectest::prelude::*;
+  use pact_models::v4::V4InteractionType;
 
-  use crate::plugin_models::{PactPluginManifest, PluginInitRequest, PluginInitResponse, PluginInstance};
+  use crate::plugin_models::{
+    ALL_INTERACTION_TYPES, PactPluginManifest, PluginInitRequest, PluginInitResponse,
+    PluginInstance, check_interaction_type_capability, interaction_type_capability,
+  };
   use crate::proto::verification_preparation_response::Response;
   use crate::proto::*;
+  use crate::proto_v2;
 
   pub(crate) struct MockPlugin {
     pub manifest: PactPluginManifest,
+    pub capabilities: Vec<String>,
     pub prepare_request: RwLock<VerificationPreparationRequest>,
     pub verify_request: RwLock<VerifyInteractionRequest>,
+    pub prepare_request_v2: RwLock<Option<proto_v2::VerificationPreparationRequest>>,
+    pub verify_request_v2: RwLock<Option<proto_v2::VerifyInteractionRequest>>,
   }
 
   impl std::fmt::Debug for MockPlugin {
@@ -482,8 +549,11 @@ pub(crate) mod tests {
     fn default() -> Self {
       MockPlugin {
         manifest: PactPluginManifest::default(),
+        capabilities: vec![],
         prepare_request: RwLock::new(VerificationPreparationRequest::default()),
         verify_request: RwLock::new(VerifyInteractionRequest::default()),
+        prepare_request_v2: RwLock::new(None),
+        verify_request_v2: RwLock::new(None),
       }
     }
   }
@@ -498,8 +568,8 @@ pub(crate) mod tests {
       "test-instance"
     }
 
-    fn has_capability(&self, _capability: &str) -> bool {
-      false
+    fn has_capability(&self, capability: &str) -> bool {
+      self.capabilities.iter().any(|c| c == capability)
     }
 
     async fn compare_contents(
@@ -559,12 +629,44 @@ pub(crate) mod tests {
       })
     }
 
+    async fn prepare_interaction_for_verification_v2(
+      &self,
+      request: proto_v2::VerificationPreparationRequest,
+    ) -> anyhow::Result<VerificationPreparationResponse> {
+      let mut w = self.prepare_request_v2.write().unwrap();
+      *w = Some(request);
+      let data = InteractionData {
+        body: None,
+        metadata: Default::default(),
+      };
+      Ok(VerificationPreparationResponse {
+        response: Some(Response::InteractionData(data)),
+      })
+    }
+
     async fn verify_interaction(
       &self,
       request: VerifyInteractionRequest,
     ) -> anyhow::Result<VerifyInteractionResponse> {
       let mut w = self.verify_request.write().unwrap();
       *w = request;
+      let result = VerificationResult {
+        success: false,
+        response_data: None,
+        mismatches: vec![],
+        output: vec![],
+      };
+      Ok(VerifyInteractionResponse {
+        response: Some(verify_interaction_response::Response::Result(result)),
+      })
+    }
+
+    async fn verify_interaction_v2(
+      &self,
+      request: proto_v2::VerifyInteractionRequest,
+    ) -> anyhow::Result<VerifyInteractionResponse> {
+      let mut w = self.verify_request_v2.write().unwrap();
+      *w = Some(request);
       let result = VerificationResult {
         success: false,
         response_data: None,
@@ -619,5 +721,58 @@ pub(crate) mod tests {
         plugin_capabilities: vec!["interaction/request-response".to_string()],
       })
     }
+  }
+
+  /// One capability per interaction type a Pact file can record, named after the interaction and
+  /// not the transport it happens to be carried over. These are the same names the host registers
+  /// as INTERACTION catalogue entries, so the two halves of the negotiation agree.
+  #[test]
+  fn interaction_type_capability_covers_every_interaction_type() {
+    let capabilities = ALL_INTERACTION_TYPES
+      .iter()
+      .map(|interaction_type| {
+        (
+          interaction_type.to_string(),
+          interaction_type_capability(interaction_type),
+        )
+      })
+      .collect::<Vec<_>>();
+
+    expect!(capabilities).to(be_equal_to(vec![
+      ("Synchronous/HTTP".to_string(), "interaction/request-response"),
+      ("Asynchronous/Messages".to_string(), "interaction/message"),
+      (
+        "Synchronous/Messages".to_string(),
+        "interaction/synchronous-message",
+      ),
+    ]));
+  }
+
+  #[test]
+  fn check_interaction_type_capability_allows_a_plugin_that_declared_none() {
+    let plugin = MockPlugin::default();
+    expect!(check_interaction_type_capability(
+      &plugin,
+      V4InteractionType::Synchronous_HTTP
+    ))
+    .to(be_ok());
+  }
+
+  #[test]
+  fn check_interaction_type_capability_rejects_an_undeclared_type() {
+    let plugin = MockPlugin {
+      capabilities: vec!["interaction/message".to_string()],
+      ..MockPlugin::default()
+    };
+
+    expect!(check_interaction_type_capability(
+      &plugin,
+      V4InteractionType::Asynchronous_Messages
+    ))
+    .to(be_ok());
+    expect!(
+      check_interaction_type_capability(&plugin, V4InteractionType::Synchronous_HTTP).is_err()
+    )
+    .to(be_true());
   }
 }

@@ -15,6 +15,15 @@ class PactPluginValidationForInteractionException(val name: String, val error: S
 class PactPluginInteractionVerificationException(val name: String, val error: String) :
   RuntimeException("Plugin $name failed to run the verification for the interaction: $error")
 
+class PactPluginInteractionTypeNotSupportedException(
+  val name: String,
+  val version: String,
+  val interactionType: String,
+  val capability: String
+) : RuntimeException(
+  "Plugin $name/$version does not support $interactionType interactions - it did not declare the '$capability' capability"
+)
+
 class PactFieldGenerationException(val key: String, val error: String) :
   RuntimeException("Field generator '$key' failed: $error")
 

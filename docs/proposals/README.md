@@ -20,7 +20,7 @@ Here is the current list of proposed changes to the Pact Plugin architecture. Pr
 **Phase 1 — Foundational (004, 005)**
 These two proposals are independent of each other and establish the groundwork for all later work. 004 cleans up the verification contract so plugins no longer need to parse full Pact JSON. 005 introduces explicit capability negotiation so new interface features can be adopted incrementally without an all-or-nothing version bump. Both must ship before any Phase 2 or later work begins.
 
-005's negotiation mechanism is implemented and everything downstream builds on it, but its Phase 1 capability set was never wired up in either direction - see [Outstanding items](./005_Plugin_capability_negotiation_and_versioning.md#outstanding-items), which needs a naming decision before it is only code.
+005's negotiation mechanism is implemented and everything downstream builds on it, and its Phase 1 capability set - one capability per interaction type a Pact file can record - is now wired up in both directions: both hosts register the three interaction types as core catalogue entries and advertise them, and both drivers check a plugin's declared interaction capabilities before handing it an interaction to verify.
 
 **Phase 2 — Observability (008)**
 008 addresses a real and immediate user pain point — plugin logging is currently difficult to work with. It is largely independent of the new functionality proposals and should be delivered after Phase 1 but before the more complex Phase 3 work, so that diagnostic improvements are in place before the interface grows more complex.

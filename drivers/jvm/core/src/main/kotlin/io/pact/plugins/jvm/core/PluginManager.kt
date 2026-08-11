@@ -266,6 +266,48 @@ data class DefaultPactPluginManifest(
 }
 
 /**
+ * The capability a V2 plugin declares to say it can handle interactions of each type, keyed by the
+ * interaction type.
+ *
+ * There is one per interaction type a Pact file can record, and they are the same names the host
+ * registers as INTERACTION catalogue entries and advertises in `hostCapabilities`. The transport an
+ * interaction is carried over is a separate concern - it is only history that the request/response
+ * interaction is the original Pact one carried over HTTP or HTTPS.
+ */
+val INTERACTION_TYPE_CAPABILITIES = mapOf(
+  V4InteractionType.SynchronousHTTP to "interaction/request-response",
+  V4InteractionType.AsynchronousMessages to "interaction/message",
+  V4InteractionType.SynchronousMessages to "interaction/synchronous-message"
+)
+
+/**
+ * Check that a plugin declared it can handle interactions of the given type.
+ *
+ * This is the plugin -> driver half of the capability negotiation from proposal 005: a V2 plugin
+ * declares one of the [INTERACTION_TYPE_CAPABILITIES] for each interaction type it understands, and
+ * the driver refuses to hand it an interaction of a type it did not declare rather than letting the
+ * plugin fail further in with a less obvious error.
+ *
+ * A plugin that declares no interaction capability at all is treated as supporting every type, so
+ * V2 plugins written before these capabilities existed keep working unchanged. Declaring one is
+ * therefore opting in to the check for all three.
+ */
+fun checkInteractionTypeCapability(plugin: PactPlugin, interaction: V4Interaction) {
+  if (INTERACTION_TYPE_CAPABILITIES.values.none { plugin.pluginCapabilities.contains(it) }) {
+    return
+  }
+
+  val interactionType = INTERACTION_TYPE_CAPABILITIES.keys.find { interaction.isInteractionType(it) }
+    ?: return
+  val required = INTERACTION_TYPE_CAPABILITIES.getValue(interactionType)
+  if (!plugin.pluginCapabilities.contains(required)) {
+    throw PactPluginInteractionTypeNotSupportedException(
+      plugin.manifest.name, plugin.manifest.version, interactionType.toString(), required
+    )
+  }
+}
+
+/**
  * Interface to a running Pact Plugin
  */
 interface PactPlugin {
@@ -769,12 +811,8 @@ object DefaultPluginManager: PluginManager {
     pact: V4Pact,
     interaction: V4Interaction
   ): PluginV2.InteractionContents {
-    val interactionType = when {
-      interaction.isInteractionType(V4InteractionType.SynchronousHTTP) -> V4InteractionType.SynchronousHTTP.toString()
-      interaction.isInteractionType(V4InteractionType.AsynchronousMessages) -> V4InteractionType.AsynchronousMessages.toString()
-      interaction.isInteractionType(V4InteractionType.SynchronousMessages) -> V4InteractionType.SynchronousMessages.toString()
-      else -> ""
-    }
+    val interactionType = INTERACTION_TYPE_CAPABILITIES.keys
+      .find { interaction.isInteractionType(it) }?.toString().orEmpty()
 
     val pluginConfigBuilder = PluginV2.PluginConfiguration.newBuilder()
     val interactionConfig = interaction.pluginConfiguration[pluginName]
@@ -895,6 +933,7 @@ object DefaultPluginManager: PluginManager {
 
     logger.debug { "Sending prepareValidationForInteraction request to plugin ${plugin.manifest}" }
     val response = if (plugin.manifest.pluginInterfaceVersion >= 2) {
+      checkInteractionTypeCapability(plugin, interaction)
       val v2Request = PluginV2.VerificationPreparationRequest.newBuilder()
         .setInteractionContents(buildInteractionContents(plugin.manifest.name, pact, interaction))
         .setConfig(mapToProtoStruct(config))
@@ -955,6 +994,7 @@ object DefaultPluginManager: PluginManager {
 
     logger.debug { "Sending verifyInteraction request to plugin ${plugin.manifest}" }
     val response = if (plugin.manifest.pluginInterfaceVersion >= 2) {
+      checkInteractionTypeCapability(plugin, interaction)
       val v2InteractionData = PluginV2.InteractionData.parser().parseFrom(interactionDataV1.toByteArray())
       val v2Request = PluginV2.VerifyInteractionRequest.newBuilder()
         .setInteractionData(v2InteractionData)

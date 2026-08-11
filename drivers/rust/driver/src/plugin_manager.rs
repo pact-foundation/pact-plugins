@@ -38,7 +38,7 @@ use crate::metrics::send_metrics;
 use crate::mock_server::{MockServerConfig, MockServerDetails, MockServerResults};
 use crate::plugin_models::{
   PactPlugin, PactPluginManifest, PactPluginRpc, PluginDependency, PluginInitRequest,
-  PluginInstance, PluginInterfaceVersion,
+  PluginInstance, PluginInterfaceVersion, check_interaction_type_capability,
 };
 use crate::proto::*;
 use crate::proto_v2;
@@ -850,6 +850,7 @@ pub(crate) async fn prepare_validation_for_interaction_inner(
   );
 
   let response = if manifest.plugin_interface_version >= 2 {
+    check_interaction_type_capability(plugin, interaction.v4_type())?;
     let interaction_contents = build_v2_single_interaction_contents(manifest, pact, interaction);
     let request = proto_v2::VerificationPreparationRequest {
       interaction_contents: Some(interaction_contents),
@@ -975,6 +976,7 @@ pub(crate) async fn verify_interaction_inner(
   };
 
   let response = if manifest.plugin_interface_version >= 2 {
+    check_interaction_type_capability(plugin, interaction.v4_type())?;
     let interaction_contents = build_v2_single_interaction_contents(manifest, pact, interaction);
     let request = proto_v2::VerifyInteractionRequest {
       interaction_data: Some(to_proto_v2_interaction_data(interaction_data)),
@@ -1396,5 +1398,107 @@ mod tests {
       V4Pact::pact_from_json(&serde_json::from_str(request.pact.as_str()).unwrap(), "").unwrap();
     expect!(request.interaction_key.as_str()).to(be_equal_to("1234567890"));
     expect!(pact_in.interactions[0].key().unwrap()).to(be_equal_to(request.interaction_key));
+  }
+
+  /// A V2 plugin that declares the interaction types it handles.
+  fn v2_mock_plugin(capabilities: &[&str]) -> MockPlugin {
+    MockPlugin {
+      manifest: PactPluginManifest {
+        name: "test-plugin".to_string(),
+        version: "0.0.0".to_string(),
+        plugin_interface_version: 2,
+        ..PactPluginManifest::default()
+      },
+      capabilities: capabilities.iter().map(|c| c.to_string()).collect(),
+      ..MockPlugin::default()
+    }
+  }
+
+  fn sync_message_pact() -> (SynchronousMessage, V4Pact) {
+    let interaction = SynchronousMessage::default();
+    let pact = V4Pact {
+      interactions: vec![interaction.boxed_v4()],
+      ..V4Pact::default()
+    };
+    (interaction, pact)
+  }
+
+  #[test_log::test(tokio::test)]
+  async fn v2_verification_is_dispatched_when_the_plugin_declared_the_interaction_type() {
+    let mock_plugin = v2_mock_plugin(&["interaction/synchronous-message"]);
+    let (interaction, pact) = sync_message_pact();
+    let context = hashmap! {};
+
+    let result =
+      prepare_validation_for_interaction_inner(&mock_plugin, &pact, &interaction, &context).await;
+    expect!(result).to(be_ok());
+
+    let result = verify_interaction_inner(
+      &mock_plugin,
+      &InteractionVerificationData::default(),
+      &context,
+      &pact,
+      &interaction,
+    )
+    .await;
+    expect!(result).to(be_ok());
+
+    expect!(mock_plugin.prepare_request_v2.read().unwrap().is_some()).to(be_true());
+    expect!(mock_plugin.verify_request_v2.read().unwrap().is_some()).to(be_true());
+  }
+
+  #[test_log::test(tokio::test)]
+  async fn v2_verification_fails_when_the_plugin_did_not_declare_the_interaction_type() {
+    let mock_plugin = v2_mock_plugin(&["interaction/request-response"]);
+    let (interaction, pact) = sync_message_pact();
+    let context = hashmap! {};
+
+    let err = prepare_validation_for_interaction_inner(&mock_plugin, &pact, &interaction, &context)
+      .await
+      .unwrap_err();
+    expect!(err.to_string()).to(be_equal_to(
+      "Plugin test-plugin/0.0.0 does not support Synchronous/Messages interactions - it did not \
+       declare the 'interaction/synchronous-message' capability",
+    ));
+
+    let err = verify_interaction_inner(
+      &mock_plugin,
+      &InteractionVerificationData::default(),
+      &context,
+      &pact,
+      &interaction,
+    )
+    .await
+    .unwrap_err();
+    expect!(err.to_string()).to(be_equal_to(
+      "Plugin test-plugin/0.0.0 does not support Synchronous/Messages interactions - it did not \
+       declare the 'interaction/synchronous-message' capability",
+    ));
+
+    expect!(mock_plugin.prepare_request_v2.read().unwrap().is_none()).to(be_true());
+    expect!(mock_plugin.verify_request_v2.read().unwrap().is_none()).to(be_true());
+  }
+
+  /// V2 plugins written before the interaction capabilities existed declare none, and must keep
+  /// receiving every interaction type.
+  #[test_log::test(tokio::test)]
+  async fn v2_verification_is_dispatched_when_the_plugin_declared_no_interaction_types() {
+    let mock_plugin = v2_mock_plugin(&["plugin/verification"]);
+    let (interaction, pact) = sync_message_pact();
+    let context = hashmap! {};
+
+    let result =
+      prepare_validation_for_interaction_inner(&mock_plugin, &pact, &interaction, &context).await;
+    expect!(result).to(be_ok());
+
+    let result = verify_interaction_inner(
+      &mock_plugin,
+      &InteractionVerificationData::default(),
+      &context,
+      &pact,
+      &interaction,
+    )
+    .await;
+    expect!(result).to(be_ok());
   }
 }
