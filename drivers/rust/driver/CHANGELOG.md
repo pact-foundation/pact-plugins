@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.3 - Maintenance Release
+
+* 789d715 - feat: Wire up the proposal 005 Phase 1 capability set (Ronald Holshausen, Tue Aug 11 16:50:37 2026 +1000)
+* 1a1e768 - chore: bump version to 1.2.3 [skip ci] (Ronald Holshausen, Mon Aug 10 09:46:38 2026 +1000)
+
 # 1.2.2 - Bugfix Release
 
 * 0f417ee - feat(drivers): Carry the test run ID on field-level requests (Ronald Holshausen, Fri Aug 7 17:05:09 2026 +1000)
