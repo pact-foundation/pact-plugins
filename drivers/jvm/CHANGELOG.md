@@ -1,5 +1,19 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.3 - Maintenance Release
+
+* 789d715 - feat: Wire up the proposal 005 Phase 1 capability set (Ronald Holshausen, Tue Aug 11 16:50:37 2026 +1000)
+* 35e65d2 - ci: remove unused triage board workflow (JP-Ellis, Tue Aug 11 09:16:00 2026 +1000)
+* 34fb97f - chore(grpc-examples): Fix go example on Windows (Ronald Holshausen, Mon Aug 10 12:23:01 2026 +1000)
+* 65235e2 - chore(grpc-examples): Update go dependencies (Ronald Holshausen, Mon Aug 10 11:51:03 2026 +1000)
+* 45e6d5a - bump version to 0.3.1 (Ronald Holshausen, Mon Aug 10 11:36:17 2026 +1000)
+* 0099be5 - update changelog for release 0.3.0 (Ronald Holshausen, Mon Aug 10 11:35:49 2026 +1000)
+* baa5af0 - chore: update repository.index (Ronald Holshausen, Mon Aug 10 11:35:25 2026 +1000)
+* 3ca946b - chore(plugin-cli): Update dependencies + support v2 plugins (Ronald Holshausen, Mon Aug 10 11:12:58 2026 +1000)
+* 1a1e768 - chore: bump version to 1.2.3 [skip ci] (Ronald Holshausen, Mon Aug 10 09:46:38 2026 +1000)
+* ccd78fb - chore: update changelog for release 1.2.2 [skip ci] (Ronald Holshausen, Mon Aug 10 09:46:07 2026 +1000)
+* 178ae44 - chore: bump version to 1.2.3 [skip ci] (Ronald Holshausen, Mon Aug 10 09:42:40 2026 +1000)
+
 # 1.2.2 - Bugfix Release
 
 * 067c923 - docs: Record the two capability-negotiation gaps left open by the review (Ronald Holshausen, Fri Aug 7 17:12:25 2026 +1000)
