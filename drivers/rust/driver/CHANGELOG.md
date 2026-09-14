@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.4 - Bugfix Release
+
+* e4882d7 - fix: panic when there is no configured TLS provider (Yousaf Nabi, Sat Sep 12 05:08:05 2026 +0100)
+* d8f338c - chore: bump pact-plugin-cli to 0.3.0 (Yousaf Nabi, Mon Sep 14 11:12:33 2026 +0100)
+* 95d9e35 - chore: bump version to 1.2.4 [skip ci] (Ronald Holshausen, Wed Aug 12 09:39:19 2026 +1000)
+
 # 1.2.3 - Maintenance Release
 
 * 789d715 - feat: Wire up the proposal 005 Phase 1 capability set (Ronald Holshausen, Tue Aug 11 16:50:37 2026 +1000)
