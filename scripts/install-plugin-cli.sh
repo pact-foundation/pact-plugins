@@ -11,9 +11,9 @@ case "$(uname -s)" in
    Darwin)
      echo '== Installing plugin CLI for Mac OSX =='
      if [ "$(uname -m)" = "arm64" ]; then
-        curl -L -o ~/.pact/bin/pact-plugin.gz https://github.com/pact-foundation/pact-plugins/releases/download/pact-plugin-cli-v${VERSION}/pact-plugin-osx-aarch64.gz
+        curl -L -o ~/.pact/bin/pact-plugin.gz https://github.com/pact-foundation/pact-plugins/releases/download/pact-plugin-cli-v${VERSION}/pact-plugin-macos-aarch64.gz
      else
-        curl -L -o ~/.pact/bin/pact-plugin.gz https://github.com/pact-foundation/pact-plugins/releases/download/pact-plugin-cli-v${VERSION}/pact-plugin-osx-x86_64.gz
+        curl -L -o ~/.pact/bin/pact-plugin.gz https://github.com/pact-foundation/pact-plugins/releases/download/pact-plugin-cli-v${VERSION}/pact-plugin-macos-x86_64.gz
      fi
      gunzip -N -f ~/.pact/bin/pact-plugin.gz
      chmod +x ~/.pact/bin/pact-plugin
