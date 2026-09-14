@@ -153,6 +153,11 @@ pub async fn load_plugin(plugin: &PluginDependency) -> anyhow::Result<PactPlugin
             "Could not load plugin manifest from disk, will try auto install it: {}",
             err
           );
+          if rustls::crypto::CryptoProvider::get_default().is_none() {
+            if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+              warn!("failed to installed the default crypto provider");
+            }
+          }
           let http_client = reqwest::ClientBuilder::new()
             .user_agent(USER_AGENT)
             .build()?;

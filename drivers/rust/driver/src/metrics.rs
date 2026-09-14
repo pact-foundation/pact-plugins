@@ -55,7 +55,11 @@ pub(crate) fn send_metrics(manifest: &PactPluginManifest) {
             We are tracking this plugin load anonymously to gather important usage statistics.\n\
             To disable tracking, set the 'PACT_DO_NOT_TRACK' environment variable to 'true'.\n\n"
           );
-
+          if rustls::crypto::CryptoProvider::get_default().is_none() {
+            if let Err(_) = rustls::crypto::ring::default_provider().install_default() {
+              warn!("failed to installed the default crypto provider");
+            }
+          }
           let ci_context = if CIS.iter()
             .any(|n| var(n).map(|val| !val.is_empty()).unwrap_or(false)) {
             "CI"
