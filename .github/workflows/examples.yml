@@ -37,7 +37,7 @@ jobs:
         run: scripts/install-plugin-cli.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/.pact/bin/pact-plugin-cli -y install protobuf
+        run: ~/.pact/bin/pact-plugin -y install protobuf
         shell: bash
       - name: Build and install local CSV plugin
         run: |
@@ -125,10 +125,10 @@ jobs:
         with:
           go-version: 1.23.x
       - name: Install plugin cli
-        run: scripts/install-plugin-cli.sh
+        run: scripts/install-plugin.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/.pact/bin/pact-plugin-cli -y install protobuf
+        run: ~/.pact/bin/pact-plugin -y install protobuf
         shell: bash
       - name: Install Pact verifier
         run: scripts/install-verifier-cli.sh
@@ -221,7 +221,7 @@ jobs:
         run: scripts/install-plugin-cli.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/.pact/bin/pact-plugin-cli -y install protobuf
+        run: ~/.pact/bin/pact-plugin -y install protobuf
         shell: bash
       - name: Install Pact verifier
         run: scripts/install-verifier-cli.sh

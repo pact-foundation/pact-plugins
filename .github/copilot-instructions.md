@@ -7,7 +7,7 @@ This repository is **not** a single top-level workspace. Run commands in the com
 ### Common prerequisites
 
 - `protoc` must be installed for the Rust driver, CLI workflow, JVM builds, and the example/plugin builds.
-- Driver and example flows often require installed plugins in `~/.pact/plugins` (or `PACT_PLUGIN_DIR`). CI installs the CLI with `scripts/install-plugin-cli.sh` and then installs plugins with `~/.pact/bin/pact-plugin-cli -y install protobuf` and, where needed, `~/.pact/bin/pact-plugin-cli -y install csv`.
+- Driver and example flows often require installed plugins in `~/.pact/plugins` (or `PACT_PLUGIN_DIR`). CI installs the CLI with `scripts/install-plugin-cli.sh` and then installs plugins with `~/.pact/bin/pact-plugin -y install protobuf` and, where needed, `~/.pact/bin/pact-plugin -y install csv`.
 - To suppress plugin telemetry in local runs, use `pact_do_not_track=true`.
 
 ### Main components

@@ -23,8 +23,8 @@ This is **not** a single top-level workspace. Run all build/test commands from w
 - Integration tests require plugins installed in `~/.pact/plugins` (or `PACT_PLUGIN_DIR`). Install with:
   ```sh
   scripts/install-plugin-cli.sh
-  ~/.pact/bin/pact-plugin-cli -y install protobuf
-  ~/.pact/bin/pact-plugin-cli -y install csv
+  ~/.pact/bin/pact-plugin -y install protobuf
+  ~/.pact/bin/pact-plugin -y install csv
   ```
 - Set `pact_do_not_track=true` to suppress plugin telemetry in local runs.
 

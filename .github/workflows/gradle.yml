@@ -34,7 +34,7 @@ jobs:
       run: scripts/install-plugin-cli.sh
       shell: bash
     - name: Install Protobuf plugin
-      run: ~/.pact/bin/pact-plugin-cli -y install protobuf
+      run: ~/.pact/bin/pact-plugin -y install protobuf
       shell: bash
     - name: Run plugin driver tests
       run: ./gradlew -s --no-daemon -i check
@@ -67,7 +67,7 @@ jobs:
         run: scripts/install-plugin-cli.sh
         shell: bash
       - name: Install Protobuf plugin
-        run: ~/.pact/bin/pact-plugin-cli -y install protobuf
+        run: ~/.pact/bin/pact-plugin -y install protobuf
         shell: bash
       - name: Run plugin driver tests
         run: ./gradlew -s --no-daemon -i check
