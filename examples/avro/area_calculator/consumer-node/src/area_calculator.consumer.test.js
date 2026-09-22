@@ -1,76 +1,55 @@
 'use strict';
 
 const path = require('path');
-const { makeConsumerAsyncMessagePact } = require('@pact-foundation/pact-core');
+const { PactV4 } = require('@pact-foundation/pact');
 const { AreaCalculatorClient } = require('./area_calculator_client');
 
 const schemaPath = path.resolve(__dirname, '..', '..', 'schema', 'area_response.avsc');
 const pactDir   = path.resolve(__dirname, '..', '..', 'pacts');
 
-// FfiSpecificationVersion.SPECIFICATION_VERSION_V4 = 5
-const SPEC_V4 = 5;
-
 const client = new AreaCalculatorClient(schemaPath);
 
-async function runPactTest(description, pluginConfig, verify) {
-  const pact = makeConsumerAsyncMessagePact(
-    'area-calculator-node-consumer',
-    'area-calculator-producer',
-    SPEC_V4,
-    'info'
-  );
-  pact.addPlugin('avro', '0.1.0-dev');
+const consumer = new PactV4({
+  consumer: 'area-calculator-node-consumer',
+  provider: 'area-calculator-producer',
+  dir: pactDir,
+  logLevel: 'info',
+});
 
-  const message = pact.newAsynchronousMessage(description);
-  message.withPluginRequestInteractionContents(
-    'avro/binary',
-    JSON.stringify(pluginConfig)
-  );
-
-  const raw     = JSON.parse(message.reifyMessage());
-  // For plugin-generated binary bodies, contents is { content, contentType, encoded }
-  const bytes   = Buffer.from(raw.contents.content, 'base64');
-
-  await verify(bytes);
-
-  pact.writePactFile(pactDir, true);
-  pact.cleanupPlugins();
-}
+const pluginConfig = (shape, value) => JSON.stringify({
+  'pact:avro'        : schemaPath,
+  'pact:record-name' : 'AreaResponse',
+  'pact:content-type': 'avro/binary',
+  'shape'            : `notEmpty('${shape}')`,
+  'value'            : `matching(decimal, ${value})`,
+});
 
 describe('Area Calculator Consumer', () => {
-  it('receives an area response for a rectangle', async () => {
-    await runPactTest(
-      'an area response for a rectangle',
-      {
-        'pact:avro'        : schemaPath,
-        'pact:record-name' : 'AreaResponse',
-        'pact:content-type': 'avro/binary',
-        'shape'            : "notEmpty('rectangle')",
-        'value'            : "matching(decimal, 12.0)",
-      },
-      (bytes) => {
+  it('receives an area response for a rectangle', () => {
+    return consumer
+      .addAsynchronousInteraction()
+      .usingPlugin({ plugin: 'avro', version: '0.1.0-dev' })
+      .expectsToReceive('an area response for a rectangle')
+      .withPluginContents(pluginConfig('rectangle', 12.0), 'avro/binary')
+      .executeTest(async (m) => {
+        const bytes = Buffer.from(m.contents.content, 'base64');
         const decoded = client.processAreaResponse(bytes);
         expect(decoded.shape).toBe('rectangle');
         expect(decoded.value).toBeGreaterThan(0);
-      }
-    );
+      });
   });
 
-  it('receives an area response for a circle', async () => {
-    await runPactTest(
-      'an area response for a circle',
-      {
-        'pact:avro'        : schemaPath,
-        'pact:record-name' : 'AreaResponse',
-        'pact:content-type': 'avro/binary',
-        'shape'            : "notEmpty('circle')",
-        'value'            : "matching(decimal, 78.5)",
-      },
-      (bytes) => {
+  it('receives an area response for a circle', () => {
+    return consumer
+      .addAsynchronousInteraction()
+      .usingPlugin({ plugin: 'avro', version: '0.1.0-dev' })
+      .expectsToReceive('an area response for a circle')
+      .withPluginContents(pluginConfig('circle', 78.5), 'avro/binary')
+      .executeTest(async (m) => {
+        const bytes = Buffer.from(m.contents.content, 'base64');
         const decoded = client.processAreaResponse(bytes);
         expect(decoded.shape).toBe('circle');
         expect(decoded.value).toBeGreaterThan(0);
-      }
-    );
+      });
   });
 });
