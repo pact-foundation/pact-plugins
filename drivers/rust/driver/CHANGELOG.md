@@ -1,5 +1,10 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.5 - Bugfix Release
+
+* 9cd2c14 - fix: proto number values that are whole numbers should be serialised as integers not floats (Ronald Holshausen, Tue Sep 22 10:01:27 2026 +1000)
+* a8fa2be - chore: bump version to 1.2.5 [skip ci] (Yousaf Nabi, Mon Sep 14 14:40:17 2026 +0100)
+
 # 1.2.4 - Bugfix Release
 
 * e4882d7 - fix: panic when there is no configured TLS provider (Yousaf Nabi, Sat Sep 12 05:08:05 2026 +0100)
