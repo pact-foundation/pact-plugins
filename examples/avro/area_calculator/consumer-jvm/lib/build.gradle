@@ -1,0 +1,26 @@
+plugins {
+    id 'groovy'
+    id 'java-library'
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'org.apache.avro:avro:1.11.3'
+    implementation 'org.apache.groovy:groovy:4.0.6'
+
+    testImplementation platform('org.junit:junit-bom:5.11.3')
+    testImplementation 'au.com.dius.pact.consumer:junit5:4.7.3'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+    testRuntimeOnly 'ch.qos.logback:logback-classic:1.4.14'
+}
+
+test {
+    useJUnitPlatform()
+    systemProperty 'pact.rootDir', '../../pacts'
+    systemProperty 'pact_do_not_track', 'true'
+}

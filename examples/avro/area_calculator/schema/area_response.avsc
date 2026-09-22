@@ -1,0 +1,9 @@
+{
+  "type": "record",
+  "name": "AreaResponse",
+  "namespace": "area_calculator",
+  "fields": [
+    {"name": "shape", "type": "string"},
+    {"name": "value", "type": "float"}
+  ]
+}

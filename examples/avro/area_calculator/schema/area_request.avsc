@@ -1,0 +1,11 @@
+{
+  "type": "record",
+  "name": "AreaRequest",
+  "namespace": "area_calculator",
+  "fields": [
+    {"name": "shape", "type": "string"},
+    {"name": "length", "type": ["null", "float"], "default": null},
+    {"name": "width",  "type": ["null", "float"], "default": null},
+    {"name": "radius", "type": ["null", "float"], "default": null}
+  ]
+}
