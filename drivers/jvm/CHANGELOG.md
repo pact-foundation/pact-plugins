@@ -1,5 +1,24 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)'  TAGNAME..HEAD` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.4 - Bugfix Release
+
+* 3848aa3 - chore: bump version to 1.2.6 [skip ci] (Ronald Holshausen, Tue Sep 22 12:53:08 2026 +1000)
+* ca98eaa - chore: update changelog for release 1.2.5 [skip ci] (Ronald Holshausen, Tue Sep 22 12:51:58 2026 +1000)
+* fd6bca4 - refactor: update avro node consumer to use @pact-foundation/pact instead of pact-core (Ronald Holshausen, Tue Sep 22 12:09:34 2026 +1000)
+* 495e72a - feat: add Avro area calculator example with JVM and Node consumers (Ronald Holshausen, Tue Sep 22 11:54:09 2026 +1000)
+* 9cd2c14 - fix: proto number values that are whole numbers should be serialised as integers not floats (Ronald Holshausen, Tue Sep 22 10:01:27 2026 +1000)
+* a8fa2be - chore: bump version to 1.2.5 [skip ci] (Yousaf Nabi, Mon Sep 14 14:40:17 2026 +0100)
+* 1ef8a0e - chore: update changelog for release 1.2.4 [skip ci] (Yousaf Nabi, Mon Sep 14 14:28:56 2026 +0100)
+* 2785452 - Merge pull request #113 from pact-foundation/fix/crypto-provider-panic (Yousaf Nabi, Mon Sep 14 12:52:54 2026 +0100)
+* e4882d7 - fix: panic when there is no configured TLS provider (Yousaf Nabi, Sat Sep 12 05:08:05 2026 +0100)
+* 88ef4cb - chore: correct pact-plugin script location (Yousaf Nabi, Mon Sep 14 11:15:30 2026 +0100)
+* d8f338c - chore: bump pact-plugin-cli to 0.3.0 (Yousaf Nabi, Mon Sep 14 11:12:33 2026 +0100)
+* 3529a76 - chore(deps): update Dockerfile.rust to trixie (Yousaf Nabi, Mon Sep 14 11:11:38 2026 +0100)
+* 8453f59 - feat: add MCP plugin (Matt Fellows, Mon Aug 17 18:34:40 2026 +1000)
+* 95d9e35 - chore: bump version to 1.2.4 [skip ci] (Ronald Holshausen, Wed Aug 12 09:39:19 2026 +1000)
+* e2fff2d - chore: update changelog for release 1.2.3 [skip ci] (Ronald Holshausen, Wed Aug 12 09:38:39 2026 +1000)
+* 686bb8b - chore: bump version to 1.2.4 [skip ci] (Ronald Holshausen, Wed Aug 12 09:36:01 2026 +1000)
+
 # 1.2.3 - Maintenance Release
 
 * 789d715 - feat: Wire up the proposal 005 Phase 1 capability set (Ronald Holshausen, Tue Aug 11 16:50:37 2026 +1000)
