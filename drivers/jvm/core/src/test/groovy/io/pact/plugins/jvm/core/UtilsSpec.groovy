@@ -21,6 +21,23 @@ class UtilsSpec extends Specification {
     structValue() | [null: null, num: 786.0, str: 'adx0diuisd', bool: false, list: [786.0, null, 'adx0diuisd'], struct: [one: 786.0]]
   }
 
+  @Unroll
+  def 'valueToJson converts whole-number floats to JsonValue.Integer'() {
+    given:
+    def protoVal = Value.newBuilder().setNumberValue(input).build()
+
+    expect:
+    Utils.INSTANCE.valueToJson(protoVal).class == expectedClass
+
+    where:
+    input | expectedClass
+    2.0   | au.com.dius.pact.core.support.json.JsonValue.Integer
+    0.0   | au.com.dius.pact.core.support.json.JsonValue.Integer
+    -42.0 | au.com.dius.pact.core.support.json.JsonValue.Integer
+    2.5   | au.com.dius.pact.core.support.json.JsonValue.Decimal
+    -0.1  | au.com.dius.pact.core.support.json.JsonValue.Decimal
+  }
+
   def 'converting map to Protobuf Struct'() {
     expect:
     Utils.INSTANCE.mapToProtoStruct([

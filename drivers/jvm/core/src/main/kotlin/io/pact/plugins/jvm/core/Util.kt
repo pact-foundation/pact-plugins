@@ -73,7 +73,14 @@ object Utils {
       JsonValue.Null
     } else {
       when (value.kindCase) {
-        Value.KindCase.NUMBER_VALUE -> JsonValue.Decimal(value.numberValue)
+        Value.KindCase.NUMBER_VALUE -> {
+          val n = value.numberValue
+          if (n % 1.0 == 0.0 && n >= Int.MIN_VALUE.toDouble() && n <= Int.MAX_VALUE.toDouble()) {
+            JsonValue.Integer(n.toInt())
+          } else {
+            JsonValue.Decimal(n)
+          }
+        }
         Value.KindCase.STRING_VALUE -> JsonValue.StringValue(value.stringValue)
         Value.KindCase.BOOL_VALUE -> if (value.boolValue) {
           JsonValue.True

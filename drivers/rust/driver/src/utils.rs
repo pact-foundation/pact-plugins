@@ -51,7 +51,13 @@ pub fn proto_value_to_json(val: &prost_types::Value) -> Value {
   match &val.kind {
     Some(kind) => match kind {
       Kind::NullValue(_) => Value::Null,
-      Kind::NumberValue(n) => json!(n),
+      Kind::NumberValue(n) => {
+        if n.fract() == 0.0 && *n >= i64::MIN as f64 && *n <= i64::MAX as f64 {
+          json!(*n as i64)
+        } else {
+          json!(n)
+        }
+      }
       Kind::StringValue(s) => Value::String(s.clone()),
       Kind::BoolValue(b) => Value::Bool(*b),
       Kind::StructValue(s) => proto_struct_to_json(s),
@@ -152,8 +158,25 @@ pub fn os_and_arch() -> anyhow::Result<(&'static str, &'static str)> {
 #[cfg(test)]
 mod tests {
   use expectest::prelude::*;
+  use serde_json::json;
 
-  use super::versions_compatible;
+  use super::{proto_value_to_json, versions_compatible};
+
+  #[test]
+  fn proto_value_to_json_preserves_integers() {
+    let make_num = |n: f64| prost_types::Value {
+      kind: Some(prost_types::value::Kind::NumberValue(n)),
+    };
+
+    // Whole-number floats must round-trip as JSON integers, not floats.
+    assert_eq!(proto_value_to_json(&make_num(2.0)), json!(2));
+    assert_eq!(proto_value_to_json(&make_num(0.0)), json!(0));
+    assert_eq!(proto_value_to_json(&make_num(-42.0)), json!(-42));
+
+    // Actual fractional values must stay as floats.
+    assert_eq!(proto_value_to_json(&make_num(2.5)), json!(2.5));
+    assert_eq!(proto_value_to_json(&make_num(-0.1)), json!(-0.1));
+  }
 
   #[test]
   fn versions_compatible_test() {
