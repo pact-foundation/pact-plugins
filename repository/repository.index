@@ -1,4 +1,4 @@
-index_version = 42
+index_version = 43
 format_version = 0
 timestamp = "2023-03-10T05:36:45.725083896Z"
 
@@ -1235,7 +1235,7 @@ windows = "pact-mcp-plugin.exe"
 
 [entries.avro]
 name = "avro"
-latest_version = "0.0.6"
+latest_version = "0.1.0"
 
 [[entries.avro.versions]]
 version = "0.0.3"
@@ -1330,6 +1330,26 @@ windows = "bin/pact-avro-plugin.bat"
 name = "jvm"
 version = "17+"
 dependencyType = "Plugin"
+
+[entries.avro.versions.manifest.pluginConfig]
+
+[[entries.avro.versions]]
+version = "0.1.0"
+
+[entries.avro.versions.source]
+type = "GitHubRelease"
+value = "https://github.com/ZirekHQ/pact-avro-plugin/releases/tag/v0.1.0"
+
+[entries.avro.versions.manifest]
+pluginInterfaceVersion = 1
+name = "avro"
+version = "0.1.0"
+executableType = "exec"
+entryPoint = "pact-avro-plugin"
+dependencies = []
+
+[entries.avro.versions.manifest.entryPoints]
+windows = "pact-avro-plugin.exe"
 
 [entries.avro.versions.manifest.pluginConfig]
 
