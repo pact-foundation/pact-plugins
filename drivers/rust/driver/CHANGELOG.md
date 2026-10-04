@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.6 - Maintenance Release
+
+* 345a646 - chore: update repository.index [skip ci] (Ronald Holshausen, Mon Oct 5 10:20:26 2026 +1100)
+* adbc681 - chore(rust-driver): Use a BTreeMap for the repository to keep the entries in a deterministic order (Ronald Holshausen, Mon Oct 5 10:08:02 2026 +1100)
+* 3848aa3 - chore: bump version to 1.2.6 [skip ci] (Ronald Holshausen, Tue Sep 22 12:53:08 2026 +1000)
+
 # 1.2.5 - Bugfix Release
 
 * 9cd2c14 - fix: proto number values that are whole numbers should be serialised as integers not floats (Ronald Holshausen, Tue Sep 22 10:01:27 2026 +1000)
