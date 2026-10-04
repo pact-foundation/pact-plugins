@@ -1,6 +1,6 @@
 //! Module for dealing with the plugin repository
 
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::fs;
 use std::fs::File;
 use std::io::{BufReader, Read, Write};
@@ -33,7 +33,7 @@ pub struct PluginRepositoryIndex {
   pub timestamp: DateTime<Utc>,
 
   /// Plugin entries
-  pub entries: HashMap<String, PluginEntry>
+  pub entries: BTreeMap<String, PluginEntry>
 }
 
 impl PluginRepositoryIndex {
