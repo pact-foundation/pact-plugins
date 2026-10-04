@@ -1,5 +1,11 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 0.3.1 - Maintenance Release
+
+* a0594be - chore: update repository.index (Ronald Holshausen, Mon Oct 5 10:31:13 2026 +1100)
+* 6533d33 - chore(plugin-cli): Update plugin driver to 1.2.6 (Ronald Holshausen, Mon Oct 5 10:29:41 2026 +1100)
+* 45e6d5a - bump version to 0.3.1 (Ronald Holshausen, Mon Aug 10 11:36:17 2026 +1000)
+
 # 0.3.0 - Update dependencies + support v2 plugins
 
 * baa5af0 - chore: update repository.index (Ronald Holshausen, Mon Aug 10 11:35:25 2026 +1000)
