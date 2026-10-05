@@ -2468,6 +2468,7 @@ dependencies = [
  "rustls",
  "semver",
  "serde",
+ "serde-ordered-collections",
  "serde_json",
  "sha2 0.10.9",
  "sysinfo",
@@ -3291,6 +3292,15 @@ checksum = "4148590afebada386688f18773da617792bf2ef03ffc1e4cbd2b1d45b023e0ba"
 dependencies = [
  "serde_core",
  "serde_derive",
+]
+
+[[package]]
+name = "serde-ordered-collections"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dd301d753ea81034aee5156d8d60fb4b47d8360289e6d10e40c4abc8281b4936"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

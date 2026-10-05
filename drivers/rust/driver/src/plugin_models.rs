@@ -85,7 +85,7 @@ pub struct PactPluginManifest {
   pub entry_point: String,
 
   /// Additional entry points for other operating systems (i.e. requiring a .bat file for Windows)
-  #[serde(default)]
+  #[serde(default, serialize_with = "serde_ordered_collections::map::sorted_serialize")]
   pub entry_points: HashMap<String, String>,
 
   /// Parameters to pass into the command line
@@ -95,7 +95,7 @@ pub struct PactPluginManifest {
   pub dependencies: Option<Vec<PluginDependency>>,
 
   /// Plugin specific config
-  #[serde(default)]
+  #[serde(default, serialize_with = "serde_ordered_collections::map::sorted_serialize")]
   pub plugin_config: HashMap<String, Value>,
 }
 

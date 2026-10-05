@@ -11,7 +11,7 @@ class](server/src/main/kotlin/io/pact/example/grpc/provider/Server.kt) implement
 
 ## gRPC plugin
 
-To run the test in this project, it requires the gRPC plugin to be installed. See the [documentation on that plugin](https://github.com/pactflow/pact-protobuf-plugin#installation).
+To run the test in this project, it requires the gRPC plugin to be installed. See the [documentation on that plugin](https://github.com/pact-foundation/pact-protobuf-plugin#installation).
 
 ## Pact verification test
 

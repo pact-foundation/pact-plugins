@@ -13,7 +13,7 @@ For more information about gRPC in Go - Check out the [Go gRPC quick start](http
 
 ## gRPC plugin
 
-To run the test in this project, it requires the gRPC plugin to be installed. See the [documentation on that plugin](https://github.com/pactflow/pact-protobuf-plugin#installation).
+To run the test in this project, it requires the gRPC plugin to be installed. See the [documentation on that plugin](https://github.com/pact-foundation/pact-protobuf-plugin#installation).
 
 ## Generated gRPC stub
 

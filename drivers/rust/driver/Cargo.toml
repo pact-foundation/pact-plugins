@@ -49,6 +49,7 @@ rsa = { version = "0.9.10", features = ["sha2", "pem"], optional = true }
 semver = "1.0.28"
 serde_json = "1.0.151"
 serde = { version = "1.0.229",  features = ["derive"] }
+serde-ordered-collections = "2.0.0"
 sha2 = "0.10.9"
 sysinfo = "0.30.13"
 tar = "0.4.46"

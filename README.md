@@ -49,7 +49,7 @@ able to create the protocol transport payloads and create a mock server that can
 
 See [Protocol design docs](docs/protocol-plugin-design.md).
 
-For an example, see the [gRPC plugin](https://github.com/pactflow/pact-protobuf-plugin), it supports gRPC over HTTP/2.
+For an example, see the [gRPC plugin](https://github.com/pact-foundation/pact-protobuf-plugin), it supports gRPC over HTTP/2.
 
 #### Plugins that provide support for different types of content
 
@@ -61,7 +61,7 @@ See [Content matcher design docs](docs/content-matcher-design.md).
 There are two example prototype plugins that support matching different types of content: [Protobuf](plugins/protobuf) and
 [CSV](plugins/csv). There is also a transport example plugin for [JSON-RPC](plugins/jsonrpc).
 
-See [PactFlow Protobuf/gRPC plugin](https://github.com/pactflow/pact-protobuf-plugin) for a PactFlow supported plugin.
+See [PactFlow Protobuf/gRPC plugin](https://github.com/pact-foundation/pact-protobuf-plugin) for a PactFlow supported plugin.
 
 #### Plugins that provide matchers/generators (WIP)
 
