@@ -1,6 +1,6 @@
 [package]
 name = "pact-csv-plugin"
-version = "0.1.0-beta.1"
+version = "0.1.0"
 edition = "2021"
 
 [dependencies]
@@ -9,27 +9,26 @@ tonic-prost = "0.14.6"
 prost = "0.14.3"
 prost-types = "0.14.3"
 tokio = { version = "1", features = ["full"] }
-uuid = { version = "1.6.1", features = ["v4"] }
+uuid = { version = "1.27.0", features = ["v4"] }
 futures = "0.3"
-async-std = "1.12.0"
+async-std = "1.13.2"
 log = "0.4"
-env_logger = "0.10.1"
+env_logger = "0.11.11"
 maplit = "1.0.2"
 pact_matching = "2.0.4"
 pact_models = "~1.3.10"
 pact-plugin-driver = { version = "~1.2.0", path = "../../drivers/rust/driver" }
 csv = "1.3.0"
-logos = "~0.12.1"
+logos = "0.16.1"
 anyhow = "1.0.75"
 bigdecimal = "0.4.2"
 serde_json = "1.0.108"
 bytes = { version = "1", features = ["serde"] }
 either = "1.9.0"
-itertools = "0.12.0"
+itertools = "0.15.0"
 
 [build-dependencies]
 tonic-prost-build = "0.14.6"
-
 
 [profile.release]
 strip = true

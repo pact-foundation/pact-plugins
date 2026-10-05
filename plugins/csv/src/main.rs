@@ -38,8 +38,8 @@ mod utils;
 /// Plugin instance UUID set by the driver in InitPluginRequest; included in every Log RPC call
 static PLUGIN_INSTANCE_ID: OnceLock<String> = OnceLock::new();
 
-/// Test run ID from testContext["testRunId"]; scoped per gRPC request task
 tokio::task_local! {
+  /// Test run ID from testContext["testRunId"]; scoped per gRPC request task
   static TEST_RUN_ID: String;
 }
 

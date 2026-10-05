@@ -6,6 +6,7 @@ use either::Either;
 use either::Either::{Left, Right};
 
 #[derive(Logos, Debug, PartialEq)]
+#[logos(skip r"[ \t\n\f]+")]
 enum FieldToken {
   #[token("column")]
   Column,
@@ -16,29 +17,25 @@ enum FieldToken {
   #[regex("[a-zA-Z]+")]
   Text,
 
-  #[regex("[0-9]+", |lex| lex.slice().parse())]
-  Int(i64),
-
-  #[error]
-  #[regex(r"[ \t\n\f]+", logos::skip)]
-  Error,
+  #[regex("[0-9]+", |lex| lex.slice().parse().ok())]
+  Int(i64)
 }
 
 // field -> "column" : int | text
 pub(crate) fn parse_field(s: &str) -> anyhow::Result<Either<usize, String>> {
   let mut lex = FieldToken::lexer(s);
   let first = lex.next();
-  if first == Some(FieldToken::Column) {
+  if first == Some(Ok(FieldToken::Column)) {
     let second = lex.next();
-    if second == Some(FieldToken::Colon) {
+    if second == Some(Ok(FieldToken::Colon)) {
       let third = lex.next();
-      if let Some(FieldToken::Int(i)) = third {
+      if let Some(Ok(FieldToken::Int(i))) = third {
         if i < 1 {
           Err(anyhow!("'{}' is not a valid field definition, expected an integer >= 1, got {}", s, i))
         } else {
           Ok(Left(i as usize))
         }
-      } else if let Some(FieldToken::Text) = third {
+      } else if let Some(Ok(FieldToken::Text)) = third {
         Ok(Right(lex.slice().to_string()))
       } else {
         Err(anyhow!("'{}' is not a valid field definition, expected an integer, got '{}'", s, lex.remainder()))

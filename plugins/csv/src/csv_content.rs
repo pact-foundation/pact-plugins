@@ -93,13 +93,13 @@ pub fn setup_csv_contents(
         if let Some((md, name)) = vals {
           for rule in md.rules {
             if let Either::Left(rule) = rule {
-              debug!("rule.values()={:?}", rule.values());
+              debug!("rule.values()={:?}", rule.value_map());
               rules.insert(format!("column:{}", name), proto::MatchingRules {
                 rule: vec![
                   proto::MatchingRule {
                     r#type: rule.name(),
                     values: Some(prost_types::Struct {
-                      fields: rule.values().iter().map(|(key, val)| (key.to_string(), to_value(val))).collect()
+                      fields: rule.value_map().iter().map(|(key, val)| (key.to_string(), to_value(val))).collect()
                     })
                   }
                 ]
@@ -116,7 +116,7 @@ pub fn setup_csv_contents(
             generators.insert(format!("column:{}", name), proto::Generator {
               r#type: gen.name(),
               values: Some(prost_types::Struct {
-                fields: gen.values().iter().map(|(key, val)| (key.to_string(), to_value(val))).collect()
+                fields: gen.value_map().iter().map(|(key, val)| (key.to_string(), to_value(val))).collect()
               })
             });
           }
