@@ -194,7 +194,7 @@ fn unzip_file(zip_file: &PathBuf, plugin_dir: &PathBuf) -> anyhow::Result<PathBu
       None => continue
     };
 
-    if (*file.name()).ends_with('/') {
+    if file.is_dir() {
       debug!("Dir {} extracted to \"{}\"", i, outpath.display());
       fs::create_dir_all(&outpath)?;
     } else {
@@ -331,5 +331,39 @@ pub fn check_sha(file: &PathBuf, sha_file: &PathBuf) -> anyhow::Result<()> {
   } else {
     Err(anyhow!("Downloaded file {} has a checksum mismatch: {} != {}",
       file.display(), sha, calculated))
+  }
+}
+
+#[cfg(test)]
+mod tests {
+  use std::fs::{self, File};
+  use std::io::Write;
+
+  use expectest::prelude::*;
+  use tempdir::TempDir;
+  use zip::write::SimpleFileOptions;
+
+  use super::unzip_file;
+
+  #[test]
+  fn unzip_file_extracts_files_and_directories() {
+    let dir = TempDir::new("unzip").unwrap();
+    let zip_path = dir.path().join("plugin.zip");
+    let mut writer = zip::ZipWriter::new(File::create(&zip_path).unwrap());
+    writer.add_directory("bin/", SimpleFileOptions::default()).unwrap();
+    writer.start_file("bin/plugin", SimpleFileOptions::default().unix_permissions(0o755)).unwrap();
+    writer.write_all(b"plugin binary").unwrap();
+    writer.finish().unwrap();
+
+    let plugin_dir = dir.path().join("out");
+    unzip_file(&zip_path, &plugin_dir).unwrap();
+
+    expect!(fs::read_to_string(plugin_dir.join("bin/plugin")).unwrap()).to(be_equal_to("plugin binary"));
+    #[cfg(unix)]
+    {
+      use std::os::unix::fs::PermissionsExt;
+      let mode = fs::metadata(plugin_dir.join("bin/plugin")).unwrap().permissions().mode();
+      expect!(mode & 0o777).to(be_equal_to(0o755));
+    }
   }
 }
