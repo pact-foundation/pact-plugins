@@ -60,7 +60,7 @@ tonic-prost = "0.14.6"
 tracing = { version = "0.1.44", features = [ "log" ] }
 tracing-core = "0.1.36"
 uuid = { version = "1.24.0", features = ["v4"] }
-zip = "8.6.0"
+zip = "9.0.3"
 
 [dev-dependencies]
 env_logger = "0.11.11"
