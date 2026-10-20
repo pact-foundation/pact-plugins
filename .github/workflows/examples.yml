@@ -249,8 +249,15 @@ jobs:
         run: |
           go install github.com/pact-foundation/pact-go/v2@latest
           #$HOME/go/bin/pact-go -l DEBUG install
-          curl -L -o ~/.pact/pact_ffi.dll.gz https://github.com/pact-foundation/pact-reference/releases/download/libpact_ffi-v0.5.6/pact_ffi-windows-x86_64.dll.gz
-          gunzip -N -f ~/.pact/pact_ffi.dll.gz
+          FFI_VERSION=0.5.12
+          FFI_ARCHIVE=pact_ffi-x86_64-pc-windows-msvc.zip
+          mkdir -p ~/.pact
+          cd ~/.pact
+          curl -fsSL -O "https://github.com/pact-foundation/pact-reference/releases/download/pact_ffi-v${FFI_VERSION}/${FFI_ARCHIVE}"
+          curl -fsSL -O "https://github.com/pact-foundation/pact-reference/releases/download/pact_ffi-v${FFI_VERSION}/${FFI_ARCHIVE}.sha256"
+          sha256sum -c "${FFI_ARCHIVE}.sha256"
+          7z x -y "${FFI_ARCHIVE}" pact_ffi.dll
+          cd "$GITHUB_WORKSPACE"
           cp ~/.pact/pact_ffi.dll examples/gRPC/area_calculator/consumer-go
         shell: bash
         env:
