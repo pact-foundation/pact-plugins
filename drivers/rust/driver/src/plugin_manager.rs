@@ -1070,7 +1070,33 @@ pub async fn install_plugin_from_url(
   }
 }
 
+/// Validate a path value taken from a (potentially untrusted) plugin manifest before it
+/// is joined onto the plugin directory. Rejects any value that could escape the plugin
+/// directory: `..` components, absolute paths, and Windows drive/UNC prefixes. The value
+/// must be a plain relative path made only of normal components. See GH issue #120.
+pub(crate) fn validate_manifest_path(label: &str, value: &str) -> anyhow::Result<()> {
+  use std::path::Component;
+  if value.trim().is_empty() {
+    bail!("Plugin manifest '{}' must not be empty", label);
+  }
+  for component in std::path::Path::new(value).components() {
+    if !matches!(component, Component::Normal(_) | Component::CurDir) {
+      bail!(
+        "Plugin manifest '{}' value '{}' contains an illegal path component; it must be a \
+         plain relative path (no '..', absolute paths, or drive/UNC prefixes)",
+        label, value
+      );
+    }
+  }
+  Ok(())
+}
+
 fn create_plugin_dir(manifest: &PactPluginManifest) -> anyhow::Result<PathBuf> {
+  // The name and version come from the downloaded manifest and are joined onto the
+  // plugins directory below, so reject anything that would escape it (e.g. `../..`).
+  validate_manifest_path("name", &manifest.name)?;
+  validate_manifest_path("version", &manifest.version)?;
+
   let plugins_dir = pact_plugin_dir()?;
   if !plugins_dir.exists() {
     info!(plugins_dir = %plugins_dir.display(), "Creating plugins directory");
@@ -1113,7 +1139,35 @@ mod tests {
     CatalogueEntry, CatalogueEntryProviderType, CatalogueEntryType, register_core_entries,
   };
 
-  use super::{PactPluginManifest, init_handshake, initialise_plugin, load_manifest_from_dir};
+  use super::{PactPluginManifest, init_handshake, initialise_plugin, load_manifest_from_dir, validate_manifest_path};
+
+  // Regression test for the path-traversal fix (GH issue #120). Both install sinks
+  // (create_plugin_dir's "{name}-{version}" join and download::gunzip_file's
+  // entry_point join) route manifest-supplied values through validate_manifest_path,
+  // so this proves a hostile manifest can no longer escape the plugin directory.
+  #[test]
+  fn validate_manifest_path_rejects_traversal() {
+    // Plain relative paths — what a legitimate manifest uses — are accepted.
+    expect!(validate_manifest_path("name", "csv")).to(be_ok());
+    expect!(validate_manifest_path("version", "0.1.20")).to(be_ok());
+    expect!(validate_manifest_path("entry_point", "bin/plugin")).to(be_ok());
+    expect!(validate_manifest_path("entry_point", "./pact-plugin")).to(be_ok());
+
+    // `..` components, absolute paths, and empty values are rejected.
+    expect!(validate_manifest_path("name", "../evil")).to(be_err());
+    expect!(validate_manifest_path("version", "1.0.0/../..")).to(be_err());
+    expect!(validate_manifest_path("entry_point", "../../../../tmp/pwned")).to(be_err());
+    expect!(validate_manifest_path("entry_point", "/etc/cron.d/pwned")).to(be_err());
+    expect!(validate_manifest_path("name", "")).to(be_err());
+    expect!(validate_manifest_path("name", "   ")).to(be_err());
+
+    // Windows drive-letter / UNC prefixes (only parsed as path prefixes on Windows).
+    #[cfg(windows)]
+    {
+      expect!(validate_manifest_path("entry_point", "C:\\Windows\\System32\\pwn.exe")).to(be_err());
+      expect!(validate_manifest_path("entry_point", "\\\\attacker\\share\\pwn.exe")).to(be_err());
+    }
+  }
 
   #[test]
   fn load_manifest_from_dir_test() {
