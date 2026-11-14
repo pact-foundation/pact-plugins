@@ -21,7 +21,7 @@ dependencies {
   testRuntimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
   testRuntimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
   // Parses the test's PKCS#1 "RSA PRIVATE KEY" PEM (java.security.KeyFactory only handles PKCS#8)
-  testImplementation 'org.bouncycastle:bcpkix-jdk18on:1.81'
+  testImplementation 'org.bouncycastle:bcpkix-jdk18on:1.87'
 
   testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.2'
   testRuntimeOnly 'org.junit.platform:junit-platform-launcher:1.12.2'
