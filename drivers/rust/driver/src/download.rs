@@ -18,6 +18,7 @@ use tracing::{debug, info};
 
 use futures_util::StreamExt;
 
+use crate::plugin_manager::validate_manifest_path;
 use crate::plugin_models::PactPluginManifest;
 use crate::utils::os_and_arch;
 use tar::Archive;
@@ -225,6 +226,9 @@ fn gunzip_file(
   manifest: &PactPluginManifest,
   ext: &str
 ) -> anyhow::Result<PathBuf> {
+  // entry_point comes from the (untrusted) manifest and is joined onto plugin_dir, so an
+  // absolute or `..`-containing value would write outside it. Reject those first.
+  validate_manifest_path("entry_point", &manifest.entry_point)?;
   let file = if ext.is_empty() {
     plugin_dir.join(&manifest.entry_point)
   } else {
