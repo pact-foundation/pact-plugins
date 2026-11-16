@@ -47,7 +47,7 @@ dependencies {
     implementation 'party.iroiro.luajava:lua54-platform:4.1.0:natives-desktop'
     // PKCS#1 PEM key parsing for the Lua plugin RSA host functions (the JDK's KeyFactory only
     // understands PKCS#8/X.509 encoded keys, not the "RSA PRIVATE/PUBLIC KEY" PKCS#1 PEM format).
-    implementation 'org.bouncycastle:bcpkix-jdk18on:1.81'
+    implementation 'org.bouncycastle:bcpkix-jdk18on:1.87'
 
     protobuf files('../../../proto/')
 
