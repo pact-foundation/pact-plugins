@@ -1,5 +1,13 @@
 To generate the log, run `git log --pretty='* %h - %s (%an, %ad)' TAGNAME..HEAD .` replacing TAGNAME and HEAD as appropriate.
 
+# 1.2.7 - Bugfix Release
+
+* 09c58c4 - fix: validate plugin manifest paths to prevent directory traversal (MuhammadHassnain, Fri Oct 30 08:46:29 2026 -0700)
+* 7a290b6 - fix(driver): move to zip 9, since every zip 8 release is yanked (JP-Ellis, Fri Oct 16 15:33:56 2026 +1100)
+* 801c143 - fix(driver): enable chrono's clock feature (JP-Ellis, Fri Oct 16 14:07:39 2026 +1100)
+* ba8cb00 - fix: Protobuf plugin repo was moved to the pact foundation org (Ronald Holshausen, Mon Oct 5 14:47:45 2026 +1100)
+* af0b85d - chore: bump version to 1.2.7 [skip ci] (Ronald Holshausen, Mon Oct 5 10:22:11 2026 +1100)
+
 # 1.2.6 - Maintenance Release
 
 * 345a646 - chore: update repository.index [skip ci] (Ronald Holshausen, Mon Oct 5 10:20:26 2026 +1100)
